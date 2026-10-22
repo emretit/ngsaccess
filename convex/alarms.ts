@@ -3,7 +3,8 @@ import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
 import { v } from "convex/values";
 import { adminMutation, adminQuery, authedQuery } from "./lib/customFunctions";
-import { internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { writeAudit } from "./lib/audit";
 
@@ -40,7 +41,10 @@ export const list = authedQuery({
     const deviceIds = [...new Set(result.page.flatMap(event => event.deviceId ? [event.deviceId] : []))];
     const devices = (await Promise.all(deviceIds.map(id => ctx.db.get(id)))).filter((device): device is NonNullable<typeof device> => device !== null);
     const deviceMap = new Map(devices.map(device => [device._id, device]));
-    return { ...result, page: result.page.map(event => ({ ...event, deviceName: event.deviceId ? deviceMap.get(event.deviceId)?.name ?? "Cihaz bulunamadı" : "—" })), scannedCount, scanLimitReached: result.pageStatus === "SplitRequired" };
+    return { ...result, page: result.page.map(event => {
+      const { alarmEmailRecipients: _recipients, ...safeEvent } = event;
+      return { ...safeEvent, deviceName: event.deviceId ? deviceMap.get(event.deviceId)?.name ?? "Cihaz bulunamadı" : "—" };
+    }), scannedCount, scanLimitReached: result.pageStatus === "SplitRequired" };
   },
 });
 
@@ -83,7 +87,13 @@ export const getSettings = adminQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
     if (!isProjectAllowed(await getProjectIdsForUser(ctx), args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
-    return await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", args.projectId)).unique() ?? { projectId: args.projectId, emailEnabled: false, recipients: [], minSeverity: "warning" as const };
+    const settings = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", args.projectId)).unique();
+    const last = settings?.lastEmailEventId ? await ctx.db.get(settings.lastEmailEventId) : null;
+    return {
+      projectId: args.projectId, emailEnabled: settings?.emailEnabled ?? false,
+      recipients: settings?.recipients ?? [], minSeverity: settings?.minSeverity ?? "warning",
+      lastEmail: last ? { status: last.alarmEmailStatus, attempts: last.alarmEmailAttempts ?? 0, at: last.alarmEmailAttemptAt ?? last.alarmQueuedAt, error: last.alarmEmailError, retryAt: last.alarmEmailRetryAt, test: last.alarmEmailTest ?? false } : null,
+    };
   },
 });
 
@@ -91,7 +101,7 @@ export const saveSettings = adminMutation({
   args: { projectId: v.id("projects"), emailEnabled: v.boolean(), recipients: v.array(v.string()), minSeverity: v.union(v.literal("warning"), v.literal("critical")) },
   handler: async (ctx, args) => {
     if (!isProjectAllowed(await getProjectIdsForUser(ctx), args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
-    const recipients = [...new Set(args.recipients.map(email => email.trim().toLowerCase()).filter(Boolean))];
+    const recipients = [...new Set(args.recipients.map(email => email.trim().toLowerCase()).filter(email => email.length > 0))];
     if (args.recipients.length > 8 || args.recipients.some(email => email.length > 254) || recipients.some(email => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error("En fazla 8 geçerli e-posta adresi girin");
     const existing = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", args.projectId)).unique();
     const values = { emailEnabled: args.emailEnabled, recipients, minSeverity: args.minSeverity, updatedBy: ctx.user._id, updatedAt: new Date().toISOString() };
@@ -113,5 +123,74 @@ export const emailPayload = internalQuery({
     const recent = await ctx.db.query("deviceEvents").withIndex("by_device_and_event_time", q => q.eq("deviceId", deviceId).gte("eventTime", new Date(Date.now() - 10 * 60_000).toISOString())).order("desc").take(200);
     const sentRecently = recent.some(item => item._id !== event._id && item.alarmNotifiedAt !== undefined && item.label === event.label && item.category === event.category);
     return { event, device: await ctx.db.get(deviceId), recipients: settings.recipients, minSeverity: settings.minSeverity, sentRecently };
+  },
+});
+
+/** Test requests share the normal delivery pipeline, but never appear as an alarm. */
+export const testEmail = adminMutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<{ queued: boolean }> => {
+    if (!isProjectAllowed(await getProjectIdsForUser(ctx), args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
+    const settings = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", args.projectId)).unique();
+    if (!settings?.emailEnabled || settings.recipients.length === 0) throw new Error("Önce alarm e-postasını açıp en az bir alıcı kaydedin");
+    const nowMs = Date.now();
+    if (settings.lastTestRequestedAt && nowMs - Date.parse(settings.lastTestRequestedAt) < 5 * 60_000) throw new Error("Test e-postası için 5 dakika bekleyin");
+    const now = new Date(nowMs).toISOString();
+    const eventId = await ctx.db.insert("deviceEvents", {
+      projectId: args.projectId, source: "system", category: "operation", severity: "info", label: "Alarm test e-postası",
+      eventTime: now, createdAt: now, updatedAt: now, alarmEmailTest: true,
+      alarmQueuedAt: now, alarmEmailStatus: "queued", alarmEmailAttempts: 0, alarmEmailRecipients: settings.recipients,
+    });
+    await ctx.scheduler.runAfter(0, internal.actions.sendAlarmEmail.send, { eventId });
+    await ctx.db.patch(settings._id, { lastEmailEventId: eventId, lastTestRequestedAt: now });
+    await writeAudit(ctx, { user: ctx.user, projectId: args.projectId, action: "create", targetTable: "deviceEvents", targetId: eventId, newValue: { alarmEmailTest: true, recipientCount: settings.recipients.length } });
+    return { queued: true };
+  },
+});
+
+/** Atomic claim prevents duplicate scheduled actions from sending the same attempt. */
+export const claimEmail = internalMutation({
+  args: { eventId: v.id("deviceEvents"), attempt: v.number() },
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId);
+    if (!event?.projectId || ![1, 2].includes(args.attempt) || args.attempt !== (event.alarmEmailAttempts ?? 0) + 1) return null;
+    // A crashed first action may be reclaimed only as the second and final attempt.
+    const interrupted = args.attempt === 2 && event.alarmEmailStatus === "sending"
+      && Date.now() - Date.parse(event.alarmEmailAttemptAt ?? "") > 10 * 60_000;
+    if (!interrupted && event.alarmEmailStatus !== (args.attempt === 1 ? "queued" : "retryScheduled")) return null;
+    if (args.attempt === 2 && Date.parse(event.alarmEmailRetryAt ?? "") > Date.now()) return null;
+    const projectId = event.projectId;
+    const settings = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", projectId)).unique();
+    const recipients = (event.alarmEmailRecipients ?? []).filter(email => settings?.recipients.includes(email));
+    const now = new Date().toISOString();
+    if (!settings?.emailEnabled || !recipients.length || (!event.alarmEmailTest && settings.minSeverity === "critical" && event.severity !== "critical")) {
+      await ctx.db.patch(event._id, { alarmEmailStatus: "skipped", alarmEmailError: "Gönderim güncel alarm ayarları nedeniyle durduruldu", alarmEmailRetryAt: undefined, updatedAt: now });
+      return null;
+    }
+    await ctx.db.patch(event._id, { alarmEmailStatus: "sending", alarmEmailAttempts: args.attempt, alarmEmailAttemptAt: now, alarmEmailRetryAt: undefined, updatedAt: now });
+    return { event, device: event.deviceId ? await ctx.db.get(event.deviceId) : null, recipients };
+  },
+});
+
+export const recordEmailResult = internalMutation({
+  args: { eventId: v.id("deviceEvents"), attempt: v.number(), failedRecipients: v.array(v.string()), error: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<null> => {
+    const event = await ctx.db.get(args.eventId);
+    if (!event || event.alarmEmailStatus !== "sending" || event.alarmEmailAttempts !== args.attempt) return null;
+    const now = new Date().toISOString();
+    const failed = args.failedRecipients.filter(email => event.alarmEmailRecipients?.includes(email));
+    let retryAt = failed.length > 0 && args.attempt === 1 ? new Date(Date.now() + 5 * 60_000).toISOString() : undefined;
+    let error = failed.length ? args.error ?? "E-posta gönderilemedi" : undefined;
+    if (retryAt) {
+      try { await ctx.scheduler.runAfter(5 * 60_000, internal.actions.sendAlarmEmail.send, { eventId: event._id, attempt: 2 }); }
+      catch { retryAt = undefined; error = "E-posta gönderilemedi; yeniden deneme zamanlanamadı"; }
+    }
+    await ctx.db.patch(event._id, {
+      alarmEmailStatus: failed.length === 0 ? "sent" : retryAt ? "retryScheduled" : "failed",
+      alarmEmailAttemptAt: now, alarmEmailError: error,
+      alarmEmailRetryAt: retryAt, alarmEmailRecipients: failed,
+      ...(failed.length === 0 ? { alarmNotifiedAt: now } : {}), updatedAt: now,
+    });
+    return null;
   },
 });

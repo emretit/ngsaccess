@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Switch } from "@/components/ui/switch";
@@ -19,10 +20,10 @@ export function NotificationSettings({ onComplete }: { onComplete?: () => void }
     if (success) { draft.reset(); onComplete?.(); }
   }}>
     <p className="text-sm text-muted-foreground">Bu tercihler seçili projeye aittir. Tercih kaydı gönderim testi veya teslimat garantisi değildir.</p>
+    <p className="rounded border p-3 text-sm">Alarm ve cihaz arızası e-postalarının açılması, alıcıları ve önem eşiği yalnızca <Link className="underline" to="/alarms?settings=notifications">Alarm merkezi → Bildirim ayarları</Link> bölümünden yönetilir. Son gönderim sonucu ve test e-postası da oradadır; yönetici yetkisi gerekir.</p>
     <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
     <fieldset disabled={isSaving} className="space-y-4">
       {([
-        ["emailNotifications", "E-posta bildirimleri", "Projenin e-posta bildirim tercihi."],
         ["lateNotifications", "Geç kalma bildirimleri", "Geç kalma olayları için tercih."],
         ["reportNotifications", "Rapor bildirimleri", "Proje rapor bildirim tercihi; kişisel hatırlatmadan ayrıdır."],
         ["systemNotifications", "Sistem olayları için bildirim tercihi", "Sistem olaylarına ait proje tercihidir. Genel bölümündeki eski kayıt bu tercihi değiştirmez; bu kayıt henüz gönderimi durdurmaz."],

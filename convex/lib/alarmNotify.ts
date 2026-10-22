@@ -28,6 +28,7 @@ export function shouldNotifyAlarm(input: { severity: AlarmSeverity; minSeverity:
 export async function notifyAlarmIfNeeded(ctx: MutationCtx, eventId: Id<"deviceEvents">): Promise<void> {
   const event = await ctx.db.get(eventId);
   if (!event?.deviceId || !event.projectId || (event.category !== "alarm" && event.category !== "exception") || event.severity === "info") return;
+  if (event.alarmQueuedAt || !isFreshAlarmEvent(event.eventTime)) return;
   const projectId = event.projectId;
   const settings = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", projectId)).unique();
   if (!settings?.emailEnabled || settings.recipients.length === 0 || (settings.minSeverity === "critical" && event.severity !== "critical")) return;
@@ -37,15 +38,18 @@ export async function notifyAlarmIfNeeded(ctx: MutationCtx, eventId: Id<"deviceE
     .withIndex("by_device_and_event_time", q => q.eq("deviceId", event.deviceId).gte("eventTime", cutoff))
     .order("desc")
     .take(200);
+  // Cihaz kimliği debounce anahtarının parçasıdır; başka cihazın arızası bastırılmaz.
   // Bastırma bildirimin kendi zamanına bakar; olay saati (cihaz saati) tek başına bildirim yaşını göstermez.
-  const sentRecently = recent.some(item => item._id !== event._id && item.alarmNotifiedAt !== undefined && item.alarmNotifiedAt >= cutoff && item.label === event.label && item.category === event.category);
+  const sentRecently = recent.some(item => item._id !== event._id && item.deviceId === event.deviceId && (item.alarmQueuedAt ?? item.alarmNotifiedAt ?? "") >= cutoff && item.label === event.label && item.category === event.category);
   if (!shouldNotifyAlarm({ severity: event.severity, minSeverity: settings.minSeverity, emailEnabled: true, sentRecently })) return;
 
   const notifiedAt = new Date().toISOString();
-  await ctx.db.patch(eventId, { alarmNotifiedAt: notifiedAt, updatedAt: notifiedAt });
   try {
     await ctx.scheduler.runAfter(0, internal.actions.sendAlarmEmail.send, { eventId });
+    await ctx.db.patch(eventId, { alarmQueuedAt: notifiedAt, alarmEmailStatus: "queued", alarmEmailAttempts: 0, alarmEmailRecipients: settings.recipients, updatedAt: notifiedAt });
+    await ctx.db.patch(settings._id, { lastEmailEventId: eventId });
   } catch {
-    console.error("Alarm e-postası zamanlanamadı");
+    await ctx.db.patch(eventId, { alarmEmailStatus: "failed", alarmEmailError: "Alarm e-postası zamanlanamadı", alarmEmailAttemptAt: notifiedAt, updatedAt: notifiedAt });
+    await ctx.db.patch(settings._id, { lastEmailEventId: eventId });
   }
 }

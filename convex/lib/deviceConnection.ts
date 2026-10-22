@@ -1,5 +1,6 @@
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { notifyAlarmIfNeeded } from "./alarmNotify";
 
 export const DEVICE_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -45,5 +46,13 @@ export async function recordConnectivityTransition(
     eventTime: now, createdAt: now, updatedAt: now,
     rawData: JSON.stringify({ offlineFrom, offlineTo: nowMs, durationMs: nowMs - offlineFrom }),
   });
+  const eventId = await ctx.db.insert("deviceEvents", {
+    deviceId: device._id, projectId: device.projectId,
+    source: device.brand === "hikvision" ? "hikvision" : device.brand === "ide_smart" ? "ide_smart" : "system",
+    category: "exception", severity: "warning", label: "Arıza: cihaz çevrimdışı",
+    eventTime: now, createdAt: now, updatedAt: now, resolvedAt: now,
+    rawData: JSON.stringify({ offlineFrom, offlineTo: nowMs, durationMs: nowMs - offlineFrom }),
+  });
+  await notifyAlarmIfNeeded(ctx, eventId);
   return true;
 }

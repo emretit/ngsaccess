@@ -39,14 +39,43 @@ function row(id: string, overrides: Record<string, unknown> = {}) {
 beforeEach(() => { state.events = []; state.scheduled = 0; });
 
 describe("notifyAlarmIfNeeded", () => {
+  it("does not send stale alarms or schedule the same event twice", async () => {
+    state.events = [row("stale", { eventTime: new Date(Date.now() - 11 * 60_000).toISOString() }), row("live")];
+    const ctx = createCtx();
+    await notifyAlarmIfNeeded(ctx, "stale" as Id<"deviceEvents">);
+    await notifyAlarmIfNeeded(ctx, "live" as Id<"deviceEvents">);
+    await notifyAlarmIfNeeded(ctx, "live" as Id<"deviceEvents">);
+    expect(state.scheduled).toBe(1);
+    expect(state.events[1]?.alarmNotifiedAt).toBeUndefined();
+    expect(state.events[1]?.alarmEmailStatus).toBe("queued");
+  });
+
+  it("records scheduler failure without a misleading sent stamp", async () => {
+    state.events = [row("live")];
+    const ctx = createCtx();
+    vi.mocked(ctx.scheduler.runAfter).mockRejectedValueOnce(new Error("schedule failed"));
+    await notifyAlarmIfNeeded(ctx, "live" as Id<"deviceEvents">);
+    expect(state.events[0]).toMatchObject({ alarmEmailStatus: "failed", alarmEmailError: "Alarm e-postası zamanlanamadı" });
+    expect(state.events[0]?.alarmNotifiedAt).toBeUndefined();
+    expect(state.events[0]?.alarmQueuedAt).toBeUndefined();
+  });
   it("stamps only the first matching event within ten minutes", async () => {
     state.events = [row("e1"), row("e2")];
     const ctx = createCtx();
     await notifyAlarmIfNeeded(ctx, "e1" as Id<"deviceEvents">);
     await notifyAlarmIfNeeded(ctx, "e2" as Id<"deviceEvents">);
-    expect(state.events[0]?.alarmNotifiedAt).toEqual(expect.any(String));
-    expect(state.events[1]?.alarmNotifiedAt).toBeUndefined();
+    expect(state.events[0]?.alarmQueuedAt).toEqual(expect.any(String));
+    expect(state.events[1]?.alarmQueuedAt).toBeUndefined();
     expect(state.scheduled).toBe(1);
+  });
+
+  it.each(["Arıza: cihaz çevrimdışı", "Kapı zorlandı"])("debounces %s per device and preserves label/category separation", async label => {
+    state.events = [row("e1", { label }), row("e2", { label, deviceId: "d2" }), row("duplicate", { label }), row("otherLabel", { label: "Başka alarm" }), row("otherCategory", { label, category: "exception" })];
+    const ctx = createCtx();
+    for (const id of ["e1", "e2", "duplicate", "otherLabel", "otherCategory"]) await notifyAlarmIfNeeded(ctx, id as Id<"deviceEvents">);
+    expect(state.scheduled).toBe(4);
+    expect(state.events[2]?.alarmQueuedAt).toBeUndefined();
+    expect(state.events[1]?.alarmEmailStatus).toBe("queued");
   });
 
   it("serializes competing event mutations so exactly one is scheduled", async () => {
@@ -60,7 +89,7 @@ describe("notifyAlarmIfNeeded", () => {
     };
     await Promise.all([runMutation("e1"), runMutation("e2")]);
     expect(state.scheduled).toBe(1);
-    expect(state.events.filter(event => event.alarmNotifiedAt !== undefined)).toHaveLength(1);
+    expect(state.events.filter(event => event.alarmQueuedAt !== undefined)).toHaveLength(1);
   });
 
   it("allows another notification after the prior stamp is older than ten minutes", async () => {

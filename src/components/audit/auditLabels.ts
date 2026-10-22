@@ -19,6 +19,7 @@ const commonLabels: Record<string, string> = {
   emailEnabled: "E-posta bildirimi",
   minSeverity: "En düşük bildirim önemi",
   recipientCount: "Alıcı sayısı",
+  alarmEmailTest: "Alarm test e-postası",
   exported: "Dışa aktarılan kayıt sayısı",
   cardNumber: "Kart numarası",
   readingId: "Kart okuma kimliği",

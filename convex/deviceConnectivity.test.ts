@@ -36,7 +36,9 @@ async function fixture(fields: Partial<Doc<"devices">> = {}) {
   };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
-const events = (f: Fixture) => f.t.run(ctx => ctx.db.query("deviceEvents").take(600));
+const allEvents = (f: Fixture) => f.t.run(ctx => ctx.db.query("deviceEvents").take(600));
+const events = async (f: Fixture) => (await allEvents(f)).filter(row => row.category === "status");
+const alarms = async (f: Fixture) => (await allEvents(f)).filter(row => row.category === "exception");
 const history = (f: Fixture) => f.caller.query(api.deviceEvents.getConnectivityHistory, { deviceId: f.deviceId });
 
 const paths = ["gateway", "localBridge", "ideMqtt", "ideCommand", "esp32", "httpOther", "settings"] as const;
@@ -64,7 +66,7 @@ describe("connectivity writers", () => {
   it("gateway quiet gap without an offline hint is not an outage (card-event-only signal)", async () => {
     const f = await pathFixture("gateway", now - 6 * 60000);
     await heartbeat(f, "gateway");
-    expect(await events(f)).toEqual([]);
+    expect(await allEvents(f)).toEqual([]);
   });
   it.each(paths.filter(path => path !== "gateway"))("%s records one long gap, then no repeated event", async path => {
     const f = await pathFixture(path, now - 600000);
@@ -72,6 +74,8 @@ describe("connectivity writers", () => {
     await heartbeat(f, path);
     const rows = await events(f);
     expect(rows).toHaveLength(1);
+    expect(await alarms(f)).toHaveLength(1);
+    expect((await alarms(f))[0]).toMatchObject({ label: "Arıza: cihaz çevrimdışı", severity: "warning", resolvedAt: new Date(now).toISOString() });
     expect(rows[0]).toMatchObject({ category: "status", severity: "warning", label: "Çevrimdışı dönemi", eventTime: new Date(now).toISOString(), source: path === "localBridge" ? "hikvision" : path === "ideMqtt" || path === "ideCommand" ? "ide_smart" : "system" });
     expect(JSON.parse(rows[0].rawData ?? "null")).toEqual({ offlineFrom: now - 600000, offlineTo: now, durationMs: 600000 });
   });
@@ -79,20 +83,21 @@ describe("connectivity writers", () => {
     for (const signal of [now - 60000, undefined, now + 60000]) {
       const f = await pathFixture(path, signal);
       await heartbeat(f, path);
-      expect(await events(f)).toHaveLength(0);
+      expect(await allEvents(f)).toHaveLength(0);
     }
   });
   it("gateway hint transition records once before throttle and offline probes retain successful signal", async () => {
     const f = await pathFixture("gateway", now - 1000);
     await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: false });
     expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.hikLastSeenAt).toBe(now - 1000);
-    expect(await events(f)).toHaveLength(0);
+    expect(await allEvents(f)).toHaveLength(0);
     await heartbeat(f, "gateway");
     const after = await f.t.run(ctx => ctx.db.get(f.deviceId));
     vi.setSystemTime(now + 1);
     await heartbeat(f, "gateway");
     expect(await f.t.run(ctx => ctx.db.get(f.deviceId))).toEqual(after);
     expect(await events(f)).toHaveLength(1);
+    expect(await alarms(f)).toHaveLength(1);
     expect(JSON.parse((await events(f))[0].rawData ?? "null").durationMs).toBe(1000);
   });
   it("keeps offline gateway probes throttled without overwriting the last successful signal", async () => {
@@ -103,23 +108,25 @@ describe("connectivity writers", () => {
     await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: false });
     expect(await f.t.run(ctx => ctx.db.get(f.deviceId))).toEqual(after);
     expect(after?.hikLastSeenAt).toBe(now - 600000);
-    expect(await events(f)).toHaveLength(0);
+    expect(await allEvents(f)).toHaveLength(0);
   });
   it("writes a reconnect signal even if another transport timestamp would throttle the heartbeat", async () => {
     const f = await fixture({ brand: "hikvision", hikTransport: "localBridge", hikDevIndex: "gateway", hikLastSeenAt: now - 1 });
     await heartbeat(f, "gateway"); await heartbeat(f, "gateway");
     expect(await events(f)).toHaveLength(1);
+    expect(await alarms(f)).toHaveLength(1);
     expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.lastSeen).toBe(new Date(now).toISOString());
   });
   it("rejected gateway scope cannot create a period", async () => {
     const f = await pathFixture("gateway", now - 600000);
     expect(await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: true, allowedProjectIds: [] })).toBe(false);
-    expect(await events(f)).toHaveLength(0);
+    expect(await allEvents(f)).toHaveLength(0);
   });
   it("HTTP clears an offline hint along with the signal to prevent duplicate periods", async () => {
     const f = await fixture({ brand: "hikvision", hikOfflineHint: "Çevrimdışı", hikLastSeenAt: now - 1000 });
     await heartbeat(f, "httpOther"); await heartbeat(f, "httpOther");
     expect(await events(f)).toHaveLength(1);
+    expect(await alarms(f)).toHaveLength(1);
     expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.hikOfflineHint).toBeUndefined();
   });
 });

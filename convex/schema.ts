@@ -641,8 +641,18 @@ export default defineSchema({
     ackedAt: v.optional(v.string()),
     ackedBy: v.optional(v.id("users")),
     ackNote: v.optional(v.string()),
-    // E-posta bildirimi gerçekten planlandıysa damga (debounce "gönderim"e bakar, olay varlığına değil; P1 düzeltme).
+    // Eski kayıtlarda planlama damgası; yeni akışta yalnız servis kabulünden sonra yazılır.
     alarmNotifiedAt: v.optional(v.string()),
+    // Yeni akışın debounce rezervasyonu gönderim sonucundan ayrıdır.
+    alarmQueuedAt: v.optional(v.string()),
+    resolvedAt: v.optional(v.string()),
+    alarmEmailTest: v.optional(v.boolean()),
+    alarmEmailStatus: v.optional(v.union(v.literal("queued"), v.literal("sending"), v.literal("retryScheduled"), v.literal("sent"), v.literal("failed"), v.literal("skipped"))),
+    alarmEmailAttempts: v.optional(v.number()),
+    alarmEmailAttemptAt: v.optional(v.string()),
+    alarmEmailError: v.optional(v.string()),
+    alarmEmailRetryAt: v.optional(v.string()),
+    alarmEmailRecipients: v.optional(v.array(v.string())),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
@@ -660,6 +670,8 @@ export default defineSchema({
     emailEnabled: v.boolean(),
     recipients: v.array(v.string()),
     minSeverity: v.union(v.literal("warning"), v.literal("critical")),
+    lastEmailEventId: v.optional(v.id("deviceEvents")),
+    lastTestRequestedAt: v.optional(v.string()),
     updatedBy: v.optional(v.id("users")),
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),

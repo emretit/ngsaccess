@@ -8,6 +8,11 @@ import {
 } from "./auditLabels";
 
 describe("denetim değişiklik ayrıntısı", () => {
+  it("alarm test e-postasını Türkçe etiketler ve yalnız alıcı sayısını gösterir", () => {
+    expect(auditFieldLabel("deviceEvents", "alarmEmailTest")).toBe("Alarm test e-postası");
+    expect(auditFieldLabel("deviceEvents", "recipientCount")).toBe("Alıcı sayısı");
+    expect(auditDisplayValue(true)).toBe("Evet");
+  });
   it("yalnız değişen alanları, eklenen ve kaldırılan değerleri gösterir", () => {
     expect(
       auditChanges(
