@@ -1,0 +1,278 @@
+{
+  "date": "2026-10-21",
+  "scope": "Flutter mobile projesinin mevcut çalışma ağacı; uygulama kodu değiştirilmeden tekrar audit",
+  "baseline": {
+    "head": "4e2ef074b32126e6f24b0ea6e88476a57e79a7b1",
+    "mobileLibDigest": "8292e4ff9a59030543a6c7a17ad5ed89be4d4a376253598409cb208cd4aea84c",
+    "dartFiles": 68,
+    "scope": "Current working tree including existing uncommitted mobile UI changes"
+  },
+  "sourceDigestUnchangedDuringAudit": true,
+  "summary": {
+    "P0": 0,
+    "P1": 1,
+    "P2": 3,
+    "newReproducedFunctionalFindings": 3,
+    "existingUXGaps": 1
+  },
+  "checks": {
+    "flutterAnalyze": "0 issue",
+    "flutterTests": {
+      "passed": 464,
+      "failed": 0
+    },
+    "auditCharacterizationScenarios": {
+      "passed": 3,
+      "meaning": "Bu senaryolar hatalı mevcut davranışı doğrular; düzelme testleri değildir."
+    },
+    "releasePythonTests": {
+      "passed": 25,
+      "failed": 0
+    },
+    "TR_ENParity": "passed",
+    "sourcePrivacyAndPermissions": "passed",
+    "gitDiffCheckMobile": "passed"
+  },
+  "findings": [
+    {
+      "id": "AUD-01",
+      "priority": "P1",
+      "type": "functional regression",
+      "title": "Yanıtı kaybolan kapı isteğinde kurtarma eylemi erişilemez; Kapıyı Aç kilitli kalır",
+      "trigger": "İlk kapı isteği timeout verir ve sunucudaki request sorgusu null döner. Ana sayfa yenilenir veya uygulama yeniden başlatılır.",
+      "actual": "Kalıcı intent korunur, hasUnresolvedOperation true ve düğmenin onTap değeri null kalır. Yenileme sadece checkStatus çağırır; null sonuç intenti temizlemez. retrySameRequest providerda mevcut fakat artık kullanıcı arayüzünde çağıran yok.",
+      "impact": "Bu hesapla kapı açma akışı kullanıcı tarafından kurtarılamaz. Normal pending durumunda da durum yenilenene kadar düğme kilitlidir.",
+      "sources": [
+        {
+          "file": "mobile/lib/screens/home/home_screen.dart",
+          "line": 224
+        },
+        {
+          "file": "mobile/lib/screens/home/home_screen.dart",
+          "line": 81
+        },
+        {
+          "file": "mobile/lib/providers/door_operation_provider.dart",
+          "line": 334
+        },
+        {
+          "file": "mobile/lib/providers/door_operation_provider.dart",
+          "line": 344
+        }
+      ],
+      "evidence": "audit_repro_test.dart: AUD-01; gerçek provider + kalıcı store fixture ile refresh ve provider yeniden oluşturma sonrası aynı kilit doğrulandı",
+      "recommendation": "Ana sayfaya işlem bildirimi geri eklemeden erişilebilir ayrı bir kurtarma yolu sağlayın. Önce sorgulayın, yalnız açık kullanıcı eylemiyle aynı requestId/aynı hedef üzerinden uzlaşma veya mevcut retrySameRequest yolunu sunun. Otomatik yeni komut üretmeyin; intent kilidini körlemesine kaldırmayın.",
+      "acceptance": [
+        "Kayıp yanıt + null receipt + relaunch senaryosunda kullanıcı arayüzünden kurtarma mümkün",
+        "Aynı niyet farklı requestId ile yeniden gönderilmez",
+        "Ana sayfada işlem durum kartı görünmez"
+      ]
+    },
+    {
+      "id": "AUD-02",
+      "priority": "P2",
+      "type": "functional regression",
+      "title": "Ziyaretçi detayı görünürken otomatik durum yenilemesi duruyor",
+      "trigger": "Root navigator üzerinden ziyaretçi detayını açın; web operatörü ziyaretçiyi aktive etsin ve 30 saniyeden uzun bekleyin.",
+      "actual": "Root modal ana shell routeunu current olmaktan çıkarır. MainNavigationShell setVisible(false) çağırdığı için hem liste hem detay polling timerı iptal edilir. Detay ilk yüklenen durumla kalır; kapatınca liste yeni durumu alır.",
+      "impact": "Aktivasyon, fiziksel varlık ve senkronizasyon bilgileri detay açık kaldığı sürece güncel görünmez.",
+      "sources": [
+        {
+          "file": "mobile/lib/screens/main_navigation_shell.dart",
+          "line": 37
+        },
+        {
+          "file": "mobile/lib/screens/main_navigation_shell.dart",
+          "line": 63
+        },
+        {
+          "file": "mobile/lib/screens/visitor/visitor_screen.dart",
+          "line": 125
+        },
+        {
+          "file": "mobile/lib/providers/visitor_provider.dart",
+          "line": 95
+        }
+      ],
+      "evidence": "audit_repro_test.dart: AUD-02; gerçek router/root modal üzerinde 31 saniye sonra detailCalls=1 ve eski durum; kapatma sonrası liste aktif duruma geçiyor",
+      "recommendation": "Liste ve açık detayın görünürlük/polling sahipliğini ayırın. Root detay açıkken detay yenilensin; uygulama arka plana geçince ve detay kapanınca durdurulsun.",
+      "acceptance": [
+        "Root detay açıkken operatör aktivasyonu ekranda yenilenir",
+        "Kapatma/logout/arka plan timerı temizler",
+        "Alt navigasyon modalın altında erişilebilir hale gelmez"
+      ]
+    },
+    {
+      "id": "AUD-03",
+      "priority": "P2",
+      "type": "lifecycle defect",
+      "title": "Geçmiş takvimi ve dönem özetleri ay/hafta değişiminde eski dönemde kalıyor",
+      "trigger": "Geçmiş ekranı retained branch olarak açık kalsın; İstanbul saatinde yeni ay/haftaya geçip uygulamaya dönün.",
+      "actual": "_periodInstant sadece initState ve elle _refresh sırasında güncellenir. Lifecycle dönüşü veya provider rebuild bu değeri değiştirmez. Sentetik 31 Ekim → 1 Kasım dönüşünde Ekim başlığı ve sorgu aralığı kaldı; Yenile düğmesiyle Kasım geldi.",
+      "impact": "Kullanıcı elle yenileyene kadar güncel ay/hafta takvim ve toplamlarına erişemeyebilir.",
+      "sources": [
+        {
+          "file": "mobile/lib/screens/history/history_screen.dart",
+          "line": 41
+        },
+        {
+          "file": "mobile/lib/screens/history/history_screen.dart",
+          "line": 81
+        },
+        {
+          "file": "mobile/lib/screens/history/history_screen.dart",
+          "line": 90
+        }
+      ],
+      "evidence": "audit_repro_test.dart: AUD-03; injected clock + pause/resume + provider rebuild + manuel refresh pozitif kontrolü",
+      "recommendation": "İstanbul iş günü/hafta/ay sınırlarını lifecycle dönüşünde ve ekran görünür olduğunda karşılaştırın; dönem değişmişse ilgili özetleri yenileyin. Kullanıcının kayıt tarih/cihaz filtrelerini koruyun.",
+      "acceptance": [
+        "Ay/hafta sınırı sonrası dönüşte yeni dönem sorgulanır",
+        "Aynı dönem için gereksiz tekrar sorgu üretilmez",
+        "Kayıt filtreleri kullanıcı seçimi dışında temizlenmez"
+      ]
+    },
+    {
+      "id": "AUD-04",
+      "priority": "P2",
+      "type": "existing UX gap",
+      "title": "Mobil hesabın firma/proje bağlamı profilde görünmüyor",
+      "trigger": "Web yönetici ve mobil çalışan kayıtları farklı projelere bağlı olsun; kullanıcı mobil profilden kendi firmasını doğrulamak istesin.",
+      "actual": "Profil ve kişi bilgileri yalnız ad/e-posta gösterir. AuthUser projectId taşıyor fakat projectName alanı ve kullanıcıya gösterilen proje etiketi yok.",
+      "impact": "Ayrı web/mobil hesap modelinde kullanıcı hangi firmanın kapı ve kayıtlarına baktığını anlayamıyor; bugünkü gerçek kullanım karışıklığı bu boşluğu gösterdi.",
+      "sources": [
+        {
+          "file": "mobile/lib/screens/profile/profile_screen.dart",
+          "line": 96
+        },
+        {
+          "file": "mobile/lib/screens/profile/profile_screen.dart",
+          "line": 429
+        },
+        {
+          "file": "mobile/lib/repositories/auth_repository.dart",
+          "line": 28
+        }
+      ],
+      "evidence": "Kaynak incelemesi + mevcut oturumda native profil AX kontrolü; hesap/kişi bilgileri raporda kaydedilmedi",
+      "recommendation": "Mobil oturumun doğrulanmış projesinin adını backend DTO üzerinden döndürüp profilde açıkça gösterin. Departman/bölge adını proje adı yerine kullanmayın. E-postayla otomatik web hesabı birleştirmesi veya yetki kopyalama yapmayın; kullanıcı web ve mobilin ayrı kalmasını istedi.",
+      "acceptance": [
+        "Profil doğru mobil firma/proje adını gösterir",
+        "Hesap değişince eski proje etiketi temizlenir",
+        "Web ve mobil kimlikleri ve yetkileri ayrı kalır"
+      ]
+    }
+  ],
+  "coverage": [
+    {
+      "module": "Giriş ve oturum",
+      "review": "AuthProvider, SessionStore, client generation/epoch guards; mevcut auth/router testleri",
+      "result": "Yeni doğrulanmış kusur bulunmadı; tam güvenlik sertifikasyonu değildir"
+    },
+    {
+      "module": "Ana sayfa ve kapı işlemleri",
+      "review": "HomeScreen, DoorOperationProvider/Store; sentetik kayıp yanıt ve yeniden başlatma senaryosu; native menü turu",
+      "result": "AUD-01"
+    },
+    {
+      "module": "Kapı seçimi",
+      "review": "Model/repository/selection ve hesap kapsamı; mevcut widget testleri",
+      "result": "Cihaz/bölge etiketi düzeltmesi mevcut; yeni kusur doğrulanmadı"
+    },
+    {
+      "module": "Geçmiş",
+      "review": "AttendanceProvider, takvim/filtre/özet; mevcut testler, sentetik ay geçişi ve native kayıt/filtre turu",
+      "result": "AUD-03"
+    },
+    {
+      "module": "QR ve kamera",
+      "review": "Token/camera lifecycle, session ownership, parse/gate; mevcut testler",
+      "result": "Bu tur fiziksel kamera/okuyucu testi yapılmadı"
+    },
+    {
+      "module": "Ziyaretçiler",
+      "review": "Provider, form, root detay/filter navigasyonu; mevcut testler, 31 saniyelik sentetik aktivasyon ve native boş liste/filtre",
+      "result": "AUD-02; native hesapta dolu ziyaretçi verisi yoktu"
+    },
+    {
+      "module": "Profil",
+      "review": "Profil ve kişi bilgi alanları; native profil incelemesi ve DTO",
+      "result": "AUD-04"
+    },
+    {
+      "module": "Ağ ve API istemcisi",
+      "review": "HTTP 560/structured errors, timeout/retry, mutation retry false ve session generation",
+      "result": "Mevcut testler geçti; canlı API mutasyonu yapılmadı"
+    },
+    {
+      "module": "Mimari ve navigasyon",
+      "review": "Composition root, go_router, retained branches ve root modal görünürlüğü",
+      "result": "AUD-02 görünürlük sahipliği sorunu"
+    },
+    {
+      "module": "Yerelleştirme",
+      "review": "TR/EN key/placeholder parity ve mevcut katalog testleri",
+      "result": "Geçti"
+    },
+    {
+      "module": "Erişilebilirlik ve responsive UI",
+      "review": "Mevcut widget testleri (dar ekran/büyük yazı/semantics) ve native AX turu",
+      "result": "Tam VoiceOver/TalkBack saha doğrulaması yapılmadı"
+    },
+    {
+      "module": "Platform ve dağıtım",
+      "review": "Android manifest, iOS plist, source preflight, Python release testleri ve pub outdated",
+      "result": "Kaynak kontrolleri geçti; bu tur yeni store release/cihaz testi yok"
+    }
+  ],
+  "dependencyMaintenance": {
+    "checkedWith": "flutter pub outdated --json, bu tur gerçek registry sorgusu",
+    "directPackagesWithNewMajorVersions": [
+      {
+        "package": "cupertino_icons",
+        "current": "1.0.8",
+        "latest": "2.0.0",
+        "upgradableWithinCurrentConstraints": "1.0.8"
+      },
+      {
+        "package": "flutter_secure_storage",
+        "current": "10.3.1",
+        "latest": "11.2.0",
+        "upgradableWithinCurrentConstraints": "10.3.1"
+      },
+      {
+        "package": "go_router",
+        "current": "17.5.0",
+        "latest": "18.1.1",
+        "upgradableWithinCurrentConstraints": "17.5.0"
+      },
+      {
+        "package": "package_info_plus",
+        "current": "8.3.1",
+        "latest": "10.2.2",
+        "upgradableWithinCurrentConstraints": "8.3.1"
+      },
+      {
+        "package": "permission_handler",
+        "current": "12.0.3",
+        "latest": "13.0.2",
+        "upgradableWithinCurrentConstraints": "12.0.3"
+      }
+    ],
+    "note": "Bu beş pakette mevcut sürüm kısıtları içindeki upgradable sürüm yüklü sürümle aynı. Yeni major sürüm bulunması tek başına güvenlik açığı değildir; otomatik yükseltme yapılmadı. Android son buildleri AGP/Kotlin için gelecek Flutter desteği uyarısı verdi; build engeli yoktu."
+  },
+  "knownLimitationsNotCountedAsNewFindings": [
+    "Belirsiz ziyaretçi oluşturma niyeti yalnız bellekte korunuyor; süreç ölümünde kalıcılık önceki 12-visitors raporunda açık kabul kapısıdır.",
+    "Dağıtılan Android APKları test imzalı debug/profile yapılarıdır; store release signing ve mağaza kabulü bu audit ile tamamlanmış sayılmaz.",
+    "Bu tur fiziksel kapı, QR okuyucu, Android cihaz, VoiceOver veya TalkBack kabul testi yapılmadı.",
+    "Native ziyaretçi hesabında dolu liste yoktu; dolu detay davranışı sentetik gerçek-router fixture ile sınandı."
+  ],
+  "constraintsRespected": [
+    "Uygulama/lib/test kaynaklarında değişiklik yok",
+    "Backend canlı veri yazması, deploy, codegen veya fiziksel kapı komutu yok",
+    "Web/mobil hesaplar ayrı bırakıldı",
+    "Ana sayfa kapı durum kartı geri eklenmedi"
+  ],
+  "evidenceDirectory": "docs/mobile-audit/evidence/20261021",
+  "reproduceCommand": "cd mobile && flutter test ../docs/mobile-audit/evidence/20261021/audit_repro_test.dart --reporter expanded"
+}

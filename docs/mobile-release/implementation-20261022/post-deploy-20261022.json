@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-22T11:49:00+03:00",
+  "deployedRevision": "eb677f9",
+  "deployedBy": "CEO (Convex 11:42 TR, web 11:43 TR, Netlify 6ad9cc8d); origin/main pushed to eb677f9",
+  "mobileSourceCommit": "a6c5918",
+  "targetHost": "notable-tern-4.convex.cloud",
+  "checks": [
+    {
+      "id": "receipt-query-present",
+      "operation": "unauthenticated read-only query with synthetic UUID and invalid session token",
+      "result": "ConvexError SESSION_INVALID (function exists; before deploy: function not found)",
+      "authBeforeInputValidation": true,
+      "piiReturned": false,
+      "status": "passed"
+    },
+    {
+      "id": "me-invalid-session",
+      "operation": "employeeAuth:me with invalid session token",
+      "result": "ConvexError SESSION_INVALID",
+      "status": "passed"
+    },
+    {
+      "id": "profile-project-name",
+      "operation": "iPhone 17 Pro simulator (iOS 27.0), existing authenticated employee session, app relaunched, Profile tab opened",
+      "result": "Profile card shows 'Firma / proje' with the canonical mobile project name from employees.projectId -> projects.name (fallback text not shown)",
+      "screenshot": "local only, not committed (contains personal email)",
+      "status": "passed"
+    },
+    {
+      "id": "home-after-deploy",
+      "operation": "same simulator session, cold relaunch",
+      "result": "Authenticated Home loads; quick actions only Kapıyı Aç and Ziyaretçi; no door notification card",
+      "status": "passed"
+    }
+  ],
+  "notPerformed": [
+    "No visitor create/update/cancel",
+    "No door command",
+    "No OS-kill create response-loss acceptance (needs approved isolated test account + operator)"
+  ],
+  "remainingGates": "release-gates.json remainingDeviceAcceptance, storePreparation, signing"
+}

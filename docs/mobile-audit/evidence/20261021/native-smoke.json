@@ -1,0 +1,13 @@
+{
+  "device": "iPhone 17 Pro / iOS 27.0",
+  "installedVersion": "1.0.4+1",
+  "screensObserved": [
+    "Ziyaretçi boş liste ve durum filtresi",
+    "Geçmiş kayıtları ve tek filtre paneli",
+    "Profil",
+    "Ana sayfa"
+  ],
+  "result": "Açılış/menü gezinmesi ve filtre kapatma sorunsuz; kapı durum kartı yok; profil proje etiketi yok",
+  "runtimeMutations": "No visitor submit/cancel, no door command, no live auth change",
+  "leftOn": "Başlangıçtaki Ziyaretçiler sayfası"
+}
