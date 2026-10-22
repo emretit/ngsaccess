@@ -214,7 +214,6 @@ import type * as seedTestCardAccess from "../seedTestCardAccess.js";
 import type * as settings from "../settings.js";
 import type * as sgkExport from "../sgkExport.js";
 import type * as shifts from "../shifts.js";
-import type * as syncStatus from "../syncStatus.js";
 import type * as userPreferences from "../userPreferences.js";
 import type * as userProjects from "../userProjects.js";
 import type * as users from "../users.js";
@@ -434,7 +433,6 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   sgkExport: typeof sgkExport;
   shifts: typeof shifts;
-  syncStatus: typeof syncStatus;
   userPreferences: typeof userPreferences;
   userProjects: typeof userProjects;
   users: typeof users;

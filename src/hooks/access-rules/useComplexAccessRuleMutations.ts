@@ -4,7 +4,6 @@ import { useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { notify } from "@/lib/notify";
 import { Id } from "../../../convex/_generated/dataModel";
-import { deviceSyncStore } from "./deviceSyncStore";
 
 interface CreateRuleWithMembersParams {
   rule: {
@@ -70,7 +69,6 @@ export const useComplexAccessRuleMutations = (onDiffSaved?: (result: RuleSaveRes
   const updateWithGroupsTracked = useMutation(api.accessRules.updateWithGroupsTracked);
   const startRuleSync = useAction(api.deviceSyncRuns.startRuleSync);
   const startBackgroundSync = (ruleId: Id<"accessRules">) => {
-    const finish = deviceSyncStore.start();
     void startRuleSync({ ruleId })
       .then(() => {
         notify.info(
@@ -80,8 +78,7 @@ export const useComplexAccessRuleMutations = (onDiffSaved?: (result: RuleSaveRes
       })
       .catch((error: unknown) => {
         notify.error("Kural kaydedildi; cihaz gönderimi başlatılamadı", error);
-      })
-      .finally(finish);
+      });
   };
 
   const createAccessRuleWithMembers = {
