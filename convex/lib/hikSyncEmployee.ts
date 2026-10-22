@@ -1,3 +1,5 @@
+"use node";
+
 // Node-only sync implementation: import only from actions/hikvisionSync.ts.
 // Employee and week-plan sync share plan caches and deletion helpers here.
 import type { GrantResult } from "./grantStatus";
