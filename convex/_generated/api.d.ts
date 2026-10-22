@@ -10,6 +10,7 @@
 
 import type * as accountAccess from "../accountAccess.js";
 import type * as accessRules from "../accessRules.js";
+import type * as accessScheduleTemplates from "../accessScheduleTemplates.js";
 import type * as actions_biometricDestruction from "../actions/biometricDestruction.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
 import type * as actions_hikBridgeWake from "../actions/hikBridgeWake.js";
@@ -217,6 +218,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accountAccess: typeof accountAccess;
   accessRules: typeof accessRules;
+  accessScheduleTemplates: typeof accessScheduleTemplates;
   "actions/biometricDestruction": typeof actions_biometricDestruction;
   "actions/getChatData": typeof actions_getChatData;
   "actions/hikBridgeWake": typeof actions_hikBridgeWake;

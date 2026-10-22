@@ -88,8 +88,12 @@ export async function resolveActiveMatchingRuleIds(
   const matching = deviceGroupIds.filter((gid) => employeeSet.has(gid));
   const rules = await Promise.all(matching.map((gid) => ctx.db.get(gid)));
   const activeRules = rules.filter((r): r is NonNullable<typeof r> => r?.isActive === true);
-  return {
-    activeRuleIds: new Set(activeRules.map(r => r._id)),
-    openRuleIds: new Set(activeRules.filter(r => isRuleOpenAt(r, nowMs)).map(r => r._id)),
-  };
+  const openRuleIds = new Set<Id<"accessRules">>();
+  for (const rule of activeRules) {
+    const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
+    try {
+      if (isRuleOpenAt(rule, nowMs, template)) openRuleIds.add(rule._id);
+    } catch (error) { console.warn("Geçersiz erişim şablonu; kart erişimi kapatıldı", rule._id, error); }
+  }
+  return { activeRuleIds: new Set(activeRules.map(r => r._id)), openRuleIds };
 }

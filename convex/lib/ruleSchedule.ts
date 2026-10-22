@@ -1,5 +1,8 @@
+import { effectiveSchedule, isAllowedAt, type ScheduleTemplate } from "./accessSchedule";
 /** Cloud equivalent of hikSync.defaultRuleSchedule; both boundaries include the minute. */
 export interface RuleSchedule {
+  scheduleTemplateId?: string;
+  projectId?: string;
   days?: readonly string[];
   startTime?: string;
   endTime?: string;
@@ -9,7 +12,8 @@ const istanbulClock = new Intl.DateTimeFormat("en-US", {
   timeZone: "Europe/Istanbul", weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
 });
 
-export function isRuleOpenAt(rule: RuleSchedule, nowMs: number): boolean {
+export function isRuleOpenAt(rule: RuleSchedule, nowMs: number, template: ScheduleTemplate | null = null): boolean {
+  if (rule.scheduleTemplateId) return isAllowedAt(effectiveSchedule(rule, template), nowMs);
   if (!Number.isFinite(nowMs)) return false;
   const parts = istanbulClock.formatToParts(new Date(nowMs));
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value ?? "";

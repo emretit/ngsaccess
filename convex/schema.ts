@@ -438,7 +438,23 @@ export default defineSchema({
     .index("by_project", ["projectId"]),
 
   // ═══════ 4 · ERİŞİM KURALLARI · GRUP BAĞLARI ══════════════════════════
+  accessScheduleTemplates: defineTable({
+    projectId: v.id("projects"), name: v.string(), description: v.optional(v.string()),
+    week: v.object({
+      Monday: v.array(v.object({ start: v.string(), end: v.string() })),
+      Tuesday: v.array(v.object({ start: v.string(), end: v.string() })),
+      Wednesday: v.array(v.object({ start: v.string(), end: v.string() })),
+      Thursday: v.array(v.object({ start: v.string(), end: v.string() })),
+      Friday: v.array(v.object({ start: v.string(), end: v.string() })),
+      Saturday: v.array(v.object({ start: v.string(), end: v.string() })),
+      Sunday: v.array(v.object({ start: v.string(), end: v.string() })),
+    }),
+    version: v.number(), pendingSyncJobId: v.optional(v.id("_scheduled_functions")),
+    isArchived: v.optional(v.boolean()), createdAt: v.string(), updatedAt: v.string(),
+  }).index("by_project", ["projectId"]).index("by_project_name", ["projectId", "name"]),
   accessRules: defineTable({
+    scheduleTemplateId: v.optional(v.id("accessScheduleTemplates")),
+    ideExtraPermissionNos: v.optional(v.array(v.number())),
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     targetType: v.optional(v.string()),
@@ -463,6 +479,7 @@ export default defineSchema({
     .index("by_project_targetType", ["projectId", "targetType"])
     .index("by_project_targetType_isActive", ["projectId", "targetType", "isActive"])
     .index("by_active", ["isActive"])
+    .index("by_template", ["scheduleTemplateId"])
     .index("by_hikWeekPlanNo", ["hikWeekPlanNo"])
     .searchIndex("search_name", { searchField: "name", filterFields: ["projectId", "isActive", "targetType"] }),
 
@@ -689,6 +706,12 @@ export default defineSchema({
     .index("by_project_status_dismissed_created", ["projectId", "status", "dismissedAt", "createdAt"])
     .index("by_run_device", ["runId", "deviceId"]),
 
+  // Global monotonically increasing permission numbers, including retired slots.
+  ideSequences: defineTable({
+    name: v.literal("permissionNo"),
+    last: v.number(),
+  }).index("by_name", ["name"]),
+
   /**
    * IDE Smart bulut→panel komut kuyruğu. Convex serverless MQTT tutamaz; Hetzner'daki
    * ide-mqtt-bridge daemon bu kuyruğu /ide-bridge/poll ile çeker, broker'a publish eder,
@@ -756,7 +779,8 @@ export default defineSchema({
   /** Cihazlara gönderim çalıştırması (proje geneli veya tek kural); hedef satırları deviceSyncRunTargets'ta. */
   deviceSyncRuns: defineTable({
     projectId: v.id("projects"),
-    kind: v.union(v.literal("project_resync"), v.literal("rule_sync")),
+    kind: v.union(v.literal("project_resync"), v.literal("rule_sync"), v.literal("template_sync")),
+    templateId: v.optional(v.id("accessScheduleTemplates")),
     ruleId: v.optional(v.id("accessRules")),
     startedBy: v.id("users"),
     startedAt: v.number(),

@@ -1,9 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { RuleSaveNotice } from "./SyncRuns";
+import { RuleSaveNotice, RecentRuns } from "./SyncRuns";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
-vi.mock("convex/react", () => ({ useAction: () => vi.fn(), useQuery: () => undefined }));
+const state = vi.hoisted(() => ({ runs: undefined as unknown[] | undefined }));
+vi.mock("convex/react", () => ({ useAction: () => vi.fn(), useQuery: () => state.runs }));
 
 describe("rule diff save feedback", () => {
   it("offers the existing full-send path when there was no device diff", () => {
@@ -18,4 +19,12 @@ describe("rule diff save feedback", () => {
     expect(html).toContain("Cihaz gönderiminin sonucu ayrıca izlenir");
     expect(html).not.toContain("uygulandı");
   });
+});
+
+it("şablon gönderimini kural gönderiminden ayırır", () => {
+  state.runs = [{ _id: "run", kind: "template_sync", status: "done", startedAt: Date.parse("2026-10-22T07:00:00Z"), counts: { queued: 0, sent: 1, verified: 0, failed: 0, skipped: 0, unknown: 0 } }];
+  const html = renderToStaticMarkup(<RecentRuns projectId={"p" as Id<"projects">} />);
+  expect(html).toContain("Şablon gönderimi");
+  expect(html).not.toContain("Kural gönderimi");
+  state.runs = undefined;
 });

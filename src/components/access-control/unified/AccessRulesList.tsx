@@ -1,3 +1,4 @@
+import { RuleScheduleSummary } from "./templates/RuleScheduleSummary";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useConvex, useQuery } from "convex/react";
@@ -108,6 +109,14 @@ function RuleRow({
           <p className="md:hidden text-xs text-muted-foreground break-words">
             {scopeText(rule)}
           </p>
+          {rule.scheduleTemplateId && (
+            <p className="xl:hidden text-xs text-muted-foreground break-words">
+              <RuleScheduleSummary
+                templateId={rule.scheduleTemplateId}
+                projectId={projectId}
+              />
+            </p>
+          )}
         </TableCell>
         <TableCell className="hidden lg:table-cell">
           {rule.targetType === "visitor"
@@ -124,14 +133,23 @@ function RuleRow({
           </p>
         </TableCell>
         <TableCell className="hidden xl:table-cell">
-          <p>{formatWeekdaysAbbr(rule.days ?? [])}</p>
-          <p className="text-xs text-muted-foreground">
-            {rule.startTime && rule.endTime
-              ? `${rule.startTime}–${rule.endTime}`
-              : rule.startTime || rule.endTime
-                ? "Eksik saat aralığı"
-                : "Tüm gün"}
-          </p>
+          {rule.scheduleTemplateId ? (
+            <RuleScheduleSummary
+              templateId={rule.scheduleTemplateId}
+              projectId={projectId}
+            />
+          ) : (
+            <>
+              <p>{formatWeekdaysAbbr(rule.days ?? [])}</p>
+              <p className="text-xs text-muted-foreground">
+                {rule.startTime && rule.endTime
+                  ? `${rule.startTime}–${rule.endTime}`
+                  : rule.startTime || rule.endTime
+                    ? "Eksik saat aralığı"
+                    : "Tüm gün"}
+              </p>
+            </>
+          )}
         </TableCell>
         <TableCell className="px-2">
           <StatusBadge tone={(rule.isActive ?? true) ? "success" : "neutral"}>
@@ -177,13 +195,22 @@ function RuleRow({
                 ? "Ziyaretçi şablonu"
                 : "Personel yetkisi"}{" "}
               · {(rule.isActive ?? true) ? "Aktif" : "Pasif"} ·{" "}
-              {formatWeekdaysAbbr(rule.days ?? [])} ·{" "}
-              {rule.startTime && rule.endTime
-                ? `${rule.startTime}–${rule.endTime}`
-                : rule.startTime || rule.endTime
-                  ? "Eksik saat aralığı · düzenleyin"
-                  : "Tüm gün"}{" "}
-              (Türkiye saati)
+              {rule.scheduleTemplateId ? (
+                <RuleScheduleSummary
+                  templateId={rule.scheduleTemplateId}
+                  projectId={projectId}
+                />
+              ) : (
+                <>
+                  {formatWeekdaysAbbr(rule.days ?? [])} ·{" "}
+                  {rule.startTime && rule.endTime
+                    ? `${rule.startTime}–${rule.endTime}`
+                    : rule.startTime || rule.endTime
+                      ? "Eksik saat aralığı · düzenleyin"
+                      : "Tüm gün"}{" "}
+                  (Türkiye saati)
+                </>
+              )}
             </SheetDescription>
           </SheetHeader>
           {rule.description?.trim() && <p className="mt-4 break-words">{rule.description}</p>}

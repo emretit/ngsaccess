@@ -66,7 +66,7 @@ const graph = vi.hoisted(() => ({ removed: vi.fn(), roster: vi.fn(), tracked: vi
 vi.mock("../deviceSyncRuns", () => ({ createRuleDiffRun: graph.tracked }));
 vi.mock("./customFunctions", () => {
   const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
-  return { authedMutation: register, authedQuery: register };
+  return { adminQuery: register, adminMutation: register, authedAction: register, authedMutation: register, authedQuery: register };
 });
 vi.mock("./auth", () => ({ getProjectIdsForUser: async () => ["project"] }));
 vi.mock("./projectScope", () => ({ resolveProjectScope: async () => ["project"] }));

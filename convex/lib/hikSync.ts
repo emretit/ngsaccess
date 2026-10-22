@@ -3,7 +3,8 @@
 "use node";
 
 import type { Doc, Id } from "../_generated/dataModel";
-import { ALL_DAYS, type Weekday, type WeekScheduleEntry } from "./hikGateway";
+import type { WeekScheduleEntry } from "./hikGateway";
+import { effectiveSchedule, toHikWeekSchedule, type ScheduleRule, type ScheduleTemplate } from "./accessSchedule";
 
 /**
  * Hik gateway sync için ortak helper'lar — `actions/hikvisionSync.ts` ve
@@ -51,23 +52,6 @@ export type DeviceDoc = Doc<"devices">;
  * açılmasını önler. Cihaza endTime saniye `:59` gider — DS-K1T8 `23:59:59`
  * (dakikanın son saniyesi) bekler.
  */
-export function defaultRuleSchedule(rule: {
-  startTime?: string;
-  endTime?: string;
-  days?: string[];
-}): WeekScheduleEntry[] {
-  const start = (rule.startTime ?? "").trim() || "00:00";
-  const end = (rule.endTime ?? "").trim() || "23:59";
-  const rawDays = rule.days?.filter((d): d is string => !!d) ?? [];
-  const days: readonly Weekday[] =
-    rawDays.length === 0
-      ? ALL_DAYS
-      : rawDays.filter((d): d is Weekday =>
-          (ALL_DAYS as readonly string[]).includes(d),
-        );
-  return days.map((week) => ({
-    week,
-    beginTime: `${start}:00`,
-    endTime: `${end}:59`,
-  }));
+export function defaultRuleSchedule(rule: ScheduleRule, template: ScheduleTemplate | null = null): WeekScheduleEntry[] {
+  return toHikWeekSchedule(effectiveSchedule(rule, template));
 }

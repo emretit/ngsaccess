@@ -16,7 +16,7 @@ vi.mock("./lib/customFunctions", () => {
       return (definition.handler as Handler)(ctx, args);
     },
   });
-  return { authedQuery: register, authedMutation: register, authedAction: register,
+  return { adminQuery: register, authedQuery: register, authedMutation: register, authedAction: register,
     adminMutation: (definition: { handler: unknown }) => register(definition, true) };
 });
 vi.mock("./lib/auth", async importOriginal => {

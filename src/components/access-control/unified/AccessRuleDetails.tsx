@@ -1,3 +1,4 @@
+import { RuleScheduleSummary } from "./templates/RuleScheduleSummary";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -72,6 +73,12 @@ export function AccessRuleDetails({
   if (!rule) return <SectionSkeleton rows={3} label="Kural ayrıntısı yükleniyor" />;
   return (
     <div className="mt-4 space-y-6 min-w-0">
+      {rule.scheduleTemplateId && (
+        <RuleScheduleSummary
+          templateId={rule.scheduleTemplateId}
+          projectId={projectId}
+        />
+      )}
       {rule.targetType === "visitor" && (
         <p className="text-xs text-muted-foreground">
           Ziyaretçiler şablona Ziyaretçiler ekranından eklenir.

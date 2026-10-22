@@ -49,7 +49,7 @@ import type { MutationCtx, ActionCtx } from "../_generated/server";
 import * as runs from "../deviceSyncRuns";
 vi.mock("./customFunctions", () => {
   const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
-  return { authedAction: register, authedQuery: register, authedMutation: register, adminMutation: register };
+  return { adminQuery: register, authedAction: register, authedQuery: register, authedMutation: register, adminMutation: register };
 });
 vi.mock("./auth", () => ({ requireAdmin: async () => ({ _id: "admin" }), getProjectIdsForUser: async () => ["project"] }));
 
@@ -332,4 +332,14 @@ describe("diff operation correlation at the action boundary", () => {
     await invoke(deleteIdeUserFromPanels, { runQuery, runMutation }, { cardNumber: "123", deviceIds: ["ide"], runId: "run" });
     expect(runMutation.mock.calls[0][1]).toMatchObject({ deviceId: "ide", runId: "run", opType: "deleteUser", payload: { ideUserId: 123 } });
   });
+});
+
+
+it("finishTarget keeps bridge and IDE operations queued until evidence arrives", async () => {
+  const f = memory();
+  for (const targetId of ["hik-target", "ide-target"]) await invoke(runs.finishTarget, f.ctx, { targetId });
+  expect(f.targets.map(target => target.status)).toEqual(["queued", "queued"]);
+  await invoke(runs.refreshSummary, f.ctx, { runId: "run" });
+  expect(f.targets.map(target => target.status)).toEqual(["queued", "queued"]);
+  expect(f.run.status).toBe("running");
 });

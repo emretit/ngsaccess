@@ -1,3 +1,5 @@
+import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule, type ScheduleTemplate } from "./lib/accessSchedule";
+import { boundedScheduleRows, scheduleRuleDevices } from "./accessScheduleTemplates";
 import { mobileOperationId, mobileQueueAllowed, accessError } from "./lib/mobileAccess";
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
@@ -224,7 +226,12 @@ export const enqueueIdeOp = internalMutation({
     payload: v.any(),
     maxAttempts: v.optional(v.number()),
   },
-  handler: async (ctx, args): Promise<Id<"idePendingOperations">> => {
+  handler: enqueueIdeOpInTransaction,
+});
+export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
+  deviceId: Id<"devices">; runId?: Id<"deviceSyncRuns">; projectId?: Id<"projects">;
+  opType: IdeOpType; payload: unknown; maxAttempts?: number;
+}): Promise<Id<"idePendingOperations">> {
     const device = await ctx.db.get(args.deviceId);
     if (!device || device.brand !== "ide_smart") {
       throw new Error("IDE sync kuyruğuna sadece IDE Smart panel işleri yazılabilir");
@@ -239,7 +246,8 @@ export const enqueueIdeOp = internalMutation({
       const existing = await ctx.db
         .query("idePendingOperations")
         .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", idempotencyKey))
-        .collect();
+        .order("desc")
+        .take(20);
       const open = existing.find((o) => o.status === "pending" || o.status === "sent");
       if (open) {
         await ctx.db.patch(open._id, {
@@ -266,8 +274,7 @@ export const enqueueIdeOp = internalMutation({
       nextRetryAt: now,
       createdAt: now,
     });
-  },
-});
+}
 
 /** Bridge'in çekeceği pending op'lar (nextRetryAt geçmiş). materialize edilmiş alanlarla. */
 async function pendingForBridge(ctx: QueryCtx, max?: number) {
@@ -530,19 +537,68 @@ export const requeueTimedOut = internalMutation({
  * iki eşzamanlı sync'in aynı no'yu atamasına yol açan read-modify-write yarışını kapatır
  * (getMaxIdePermissionNo + ayrı assign çağrısı yerine).
  */
+export function ideRuleSegments(rule: ScheduleRule, template: ScheduleTemplate | null) {
+  return toIdePermissionSegments(effectiveSchedule(rule, template));
+}
+export async function allocateIdePermissionNos(ctx: MutationCtx, rule: Doc<"accessRules">, count: number, runId?: Id<"deviceSyncRuns">) {
+  const old = [rule.idePermissionNo, ...(rule.ideExtraPermissionNos ?? [])].filter((n): n is number => n !== undefined);
+  const nos = old.slice(0, count);
+  if (nos.length < count) {
+    let sequence = await ctx.db.query("ideSequences").withIndex("by_name", q => q.eq("name", "permissionNo")).unique();
+    if (!sequence) {
+      // Bootstrap once, including retired records retained in operation history.
+      const rules = await ctx.db.query("accessRules").take(10001);
+      const ops = await ctx.db.query("idePendingOperations").take(10001);
+      if (rules.length > 10000 || ops.length > 10000) throw new Error("IDE izin sayacı başlatılamadı: 10000 kayıt sınırı aşıldı");
+      let last = 0;
+      for (const row of rules) for (const no of [row.idePermissionNo, ...(row.ideExtraPermissionNos ?? [])]) {
+        if (no !== undefined && Number.isSafeInteger(no)) last = Math.max(last, no);
+      }
+      for (const op of ops) {
+        if (op.opType !== "upsertPermission" && op.opType !== "deletePermission") continue;
+        const payload: unknown = op.payload;
+        if (!payload || typeof payload !== "object") continue;
+        const record = payload as Record<string, unknown>;
+        const permission = record.permissionRecord;
+        const id = record.ideId ?? (permission && typeof permission === "object" ? (permission as Record<string, unknown>).id : undefined);
+        if (typeof id === "number" && Number.isSafeInteger(id)) last = Math.max(last, id);
+      }
+      const id = await ctx.db.insert("ideSequences", { name: "permissionNo", last });
+      sequence = await ctx.db.get(id);
+    }
+    if (!sequence) throw new Error("IDE izin sayacı bulunamadı");
+    const last = sequence.last + count - nos.length;
+    if (!Number.isSafeInteger(last) || last > 65535) throw new Error("IDE izin numarası kapasitesi aşıldı (65535)");
+    let next = sequence.last;
+    while (nos.length < count) nos.push(++next);
+    await ctx.db.patch(sequence._id, { last });
+  }
+  // K=0 removes every reference and retires every previously allocated record.
+  const primary = nos[0];
+  const patch = { idePermissionNo: primary, ideExtraPermissionNos: nos.slice(1) };
+  if (primary !== rule.idePermissionNo || JSON.stringify(patch.ideExtraPermissionNos) !== JSON.stringify(rule.ideExtraPermissionNos ?? [])) await ctx.db.patch(rule._id, patch);
+  const retired = old.filter(n => !nos.includes(n));
+  if (retired.length) for (const device of await scheduleRuleDevices(ctx, rule)) if (device.brand === "ide_smart") {
+    for (const ideId of retired) await enqueueIdeOpInTransaction(ctx, { deviceId: device._id, runId, projectId: rule.projectId, opType: "deletePermission", payload: { ideId } });
+  }
+  return { nos, changed: old.length !== count };
+}
+export const ensureIdePermissionPlan = internalMutation({
+  args: { accessRuleId: v.id("accessRules"), runId: v.optional(v.id("deviceSyncRuns")) },
+  handler: async (ctx, args) => {
+    const rule = await ctx.db.get(args.accessRuleId);
+    if (!rule) throw new Error("Kural bulunamadı");
+    const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
+    const segments = ideRuleSegments(rule, template);
+    return { ...await allocateIdePermissionNos(ctx, rule, segments.length, args.runId), segments };
+  },
+});
 export const ensureIdePermissionNo = internalMutation({
   args: { accessRuleId: v.id("accessRules") },
   handler: async (ctx, args): Promise<number> => {
     const rule = await ctx.db.get(args.accessRuleId);
-    if (rule && typeof rule.idePermissionNo === "number") return rule.idePermissionNo;
-    const rules = await ctx.db.query("accessRules").collect();
-    let max = 0;
-    for (const r of rules) {
-      if (typeof r.idePermissionNo === "number" && r.idePermissionNo > max) max = r.idePermissionNo;
-    }
-    const next = max + 1;
-    await ctx.db.patch(args.accessRuleId, { idePermissionNo: next });
-    return next;
+    if (!rule) throw new Error("Kural bulunamadı");
+    return (await allocateIdePermissionNos(ctx, rule, 1)).nos[0] ?? 0;
   },
 });
 
@@ -553,11 +609,14 @@ export const ensureIdePermissionNo = internalMutation({
  */
 export const getRuleIoIdsForPanel = internalQuery({
   args: { ruleId: v.id("accessRules"), deviceId: v.id("devices") },
-  handler: async (ctx, args): Promise<number[]> => {
+  handler: ruleIoIdsForPanel,
+});
+export async function ruleIoIdsForPanel(ctx: QueryCtx, args: { ruleId: Id<"accessRules">; deviceId: Id<"devices"> }): Promise<number[]> {
     const groupDoors = await ctx.db
       .query("groupDoors")
       .withIndex("by_group", (q) => q.eq("groupId", args.ruleId))
-      .collect();
+      .take(201);
+    boundedScheduleRows(groupDoors, 200);
     const ioIds = new Set<number>();
     for (const gd of groupDoors) {
       const door = await ctx.db.get(gd.doorId);
@@ -570,13 +629,13 @@ export const getRuleIoIdsForPanel = internalQuery({
     const doors = await ctx.db
       .query("doors")
       .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-      .collect();
+      .take(201);
+    boundedScheduleRows(doors, 200);
     for (const d of doors) {
       if (typeof d.ioId === "number") ioIds.add(d.ioId);
     }
     return Array.from(ioIds).sort((a, b) => a - b);
-  },
-});
+}
 
 /** UI: çözülmemiş IDE komut sorunları (failed op'lar). RBAC: kullanıcının projeleri. */
 export const listSyncIssues = query({

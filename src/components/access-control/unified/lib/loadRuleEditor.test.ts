@@ -10,7 +10,7 @@ const member = (id: string) => ({ _id: `member-${id}`, groupId: ruleId, employee
 function client(failSecondPage = false) {
   const query = vi.fn(async (reference: Parameters<ConvexReactClient["query"]>[0], args?: unknown) => {
     if (getFunctionName(reference) === "accessRules:getDetails") {
-      return { _id: ruleId, name: "Rule", groupMembers: [member("preview-only")], groupDevices: [], groupDoors: [], membersTruncated: true };
+      return { _id: ruleId, name: "Rule", scheduleTemplateId: "template", groupMembers: [member("preview-only")], groupDevices: [], groupDoors: [], membersTruncated: true };
     }
     const input = args as { kind: string; paginationOpts: { cursor: string | null } };
     if (input.kind === "people") {
@@ -31,6 +31,7 @@ describe("editor cursor snapshot", () => {
   it("loads all pages of every kind and never uses truncated getDetails membership", async () => {
     const convex = client();
     const result = await loadRuleEditor(convex, ruleId);
+    expect(result.scheduleTemplateId).toBe("template");
     expect(result.groupMembers?.map(row => row.employeeId)).toEqual(["a", "b"]);
     expect(result.groupDevices?.map(row => row.deviceId)).toEqual(["panel"]);
     expect(result.groupDoors).toEqual([{ doorId: "door", deviceId: "panel" }]);

@@ -1,3 +1,4 @@
+import { requestTemplateEdit } from "./templates/model";
 import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
@@ -252,6 +253,12 @@ export default function CreateRuleDialog({
                       )}
                     </div>
                     <TimeSchedule
+                      currentTemplateId={editingRule?.scheduleTemplateId}
+                      onEditTemplate={(navigate) => {
+                        if (!submittingRef.current && !isSubmitting) {
+                          requestTemplateEdit(guard.requestClose, onClose, navigate);
+                        }
+                      }}
                       formData={formData}
                       setFormData={setFormData}
                       errors={errors}
@@ -272,10 +279,9 @@ export default function CreateRuleDialog({
               : `${formData.selected_employees.length} kişi`}{" "}
             → {formData.selected_devices.length} panel /{" "}
             {formData.selected_doors.length} açık kapı seçimi →{" "}
-            {formData.days.length} gün ·{" "}
-            {formData.start_time || formData.end_time
-              ? `${formData.start_time}–${formData.end_time}`
-              : "Tüm gün"}
+            {formData.scheduleMode === "template"
+              ? "Şablon kullanılıyor"
+              : `${formData.days.length} gün · ${formData.start_time || formData.end_time ? `${formData.start_time}–${formData.end_time}` : "Tüm gün"}`}
           </div>
           <DialogFooter className="px-4 py-3 border-t flex-wrap">
             <Button

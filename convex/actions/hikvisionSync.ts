@@ -241,12 +241,12 @@ async function syncEmployeeDevices(
           if (isLocalBridgeDevice(t.device)) {
             await enqueueLocalBridgeOp(ctx, t.device, "syncWeekPlan", {
               accessRuleId: rule._id, weekPlanNo: planNo,
-              templateName: rule.name ?? `Rule ${planNo}`, schedule: defaultRuleSchedule(rule),
+              templateName: rule.name ?? `Rule ${planNo}`, schedule: defaultRuleSchedule(rule, rule.scheduleTemplate ?? null),
             }, args.runId);
             return { ok: true };
           }
           if (!t.device.hikDevIndex) return { ok: false, error: "gateway'e kayıtlı değil" };
-          const wp = await setWeekPlanOnDevice(t.device.hikDevIndex, planNo, defaultRuleSchedule(rule));
+          const wp = await setWeekPlanOnDevice(t.device.hikDevIndex, planNo, defaultRuleSchedule(rule, rule.scheduleTemplate ?? null));
           if (!wp.ok) return wp;
           return await setPlanTemplate(t.device.hikDevIndex, planNo, { weekPlanNo: planNo, templateName: rule.name ?? `Rule ${planNo}` });
         };
@@ -567,7 +567,7 @@ export const syncWeekPlanToDevicesInternal = internalAction({
       });
     }
 
-    const schedule = defaultRuleSchedule(rule);
+    const schedule = defaultRuleSchedule(rule, rule.scheduleTemplate ?? null);
 
     const errors: string[] = [];
     const skippedDevices: { device: typeof devices[number]; reason: string }[] = [];
@@ -972,5 +972,32 @@ export const deleteEmployeeFingerprintFromDevicesInternal = internalAction({
     }
     await Promise.all(failureWrites);
     return { removed, failed, errors };
+  },
+});
+
+/** Template updates keep person RightPlans stable: direct gateway sends plans only. */
+export const executeTemplateTarget = internalAction({
+  args: { targetId: v.id("deviceSyncRunTargets"), ruleIds: v.array(v.id("accessRules")), changedRuleIds: v.array(v.id("accessRules")) },
+  handler: async (ctx, args): Promise<void> => {
+    const data = await ctx.runQuery(internal.deviceSyncRuns.loadTemplateTarget, { targetId: args.targetId, ruleIds: args.ruleIds });
+    if (!data) return;
+    let failure: string | undefined;
+    const direct = data.device.brand === "hikvision" && data.device.hikTransport !== "localBridge";
+    try {
+      if (direct) {
+        const index = data.device.hikDevIndex;
+        if (!index) throw new Error("Gateway kaydı bulunamadı");
+        for (const plan of data.plans) {
+          const no = plan.rule.hikWeekPlanNo;
+          if (!no) throw new Error("Hafta planı numarası bulunamadı");
+          const week = await setWeekPlanOnDevice(index, no, plan.schedule);
+          if (!week.ok) throw new Error(week.error ?? "Hafta planı gönderilemedi");
+          const template = await setPlanTemplate(index, no, { weekPlanNo: no, templateName: plan.rule.name });
+          if (!template.ok) throw new Error(template.error ?? "Plan şablonu gönderilemedi");
+        }
+      } else await ctx.runMutation(internal.deviceSyncRuns.enqueueTemplateTarget, args);
+    } catch (error) { failure = error instanceof Error ? error.message : "Şablon gönderilemedi"; }
+    await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: args.targetId, failure, directSent: direct,
+      skipped: !data.plans.length && !failure ? "Cihaza bağlı şablon kuralı yok" : undefined });
   },
 });

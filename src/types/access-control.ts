@@ -93,6 +93,7 @@ export interface GroupDoor {
 }
 
 export interface AccessRule {
+  scheduleTemplateId?: Id<"accessScheduleTemplates">;
   _id: Id<"accessRules">;
   name: string;
   description?: string;

@@ -1,7 +1,8 @@
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-export function accessScheduleError(input: { days?: string[]; startTime?: string | null; endTime?: string | null }): string | null {
+export function accessScheduleError(input: { scheduleTemplateId?: string | null; days?: string[]; startTime?: string | null; endTime?: string | null }): string | null {
+  if (input.scheduleTemplateId) return null;
   if (!input.days?.length || input.days.some((day) => !DAYS.includes(day))) return "En az bir geçerli gün seçin.";
   const start = input.startTime || "";
   const end = input.endTime || "";
@@ -20,7 +21,7 @@ export function assertAccessScheduleUpdate(
   rule: Parameters<typeof accessScheduleError>[0],
   updates: Parameters<typeof accessScheduleError>[0],
 ): void {
-  if (updates.days !== undefined || updates.startTime !== undefined || updates.endTime !== undefined) {
+  if (updates.scheduleTemplateId !== undefined || updates.days !== undefined || updates.startTime !== undefined || updates.endTime !== undefined) {
     assertAccessSchedule({ ...rule, ...updates });
   }
 }

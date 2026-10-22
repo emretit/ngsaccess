@@ -1,10 +1,11 @@
+import type { ScheduleTemplate } from "./lib/accessSchedule";
 import { mobileOperationId, mobileQueueAllowed } from "./lib/mobileAccess";
 import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } from "./lib/biometricGate";
 import { isBiometricEnabled } from "./lib/privacySettings";
 import { v } from "convex/values";
 import { scheduleBridgeWakeForProject } from "./hikBridge";
 import { internalQuery, internalMutation, query } from "./_generated/server";
-import type { QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation, adminMutation } from "./lib/customFunctions";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
@@ -57,6 +58,10 @@ type EmployeeDeviceRule = {
     name?: string;
     hikWeekPlanNo?: number;
     idePermissionNo?: number;
+    scheduleTemplateId?: Id<"accessScheduleTemplates">;
+    scheduleTemplate?: ScheduleTemplate | null;
+    projectId?: Id<"projects">;
+    ideExtraPermissionNos?: number[];
     startTime?: string;
     endTime?: string;
     days?: string[];
@@ -133,6 +138,7 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
         for (const [deviceId, doorNos] of byDevice) {
           const device = await ctx.db.get(deviceId);
           if (!device || !device.isActive || device.projectId !== employee.projectId) continue;
+
           if (device.brand !== "hikvision" && !groupDevices.some(link => link.deviceId === deviceId)) continue;
 
           resolved.push({
@@ -154,6 +160,10 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
               name: rule.name,
               hikWeekPlanNo: rule.hikWeekPlanNo,
               idePermissionNo: rule.idePermissionNo,
+              ideExtraPermissionNos: rule.ideExtraPermissionNos,
+              scheduleTemplateId: rule.scheduleTemplateId,
+              scheduleTemplate: rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null,
+              projectId: rule.projectId,
               startTime: rule.startTime,
               endTime: rule.endTime,
               days: rule.days,
@@ -272,6 +282,9 @@ export const getAccessRuleWithDevices = internalQuery({
         days: rule.days,
         hikWeekPlanNo: rule.hikWeekPlanNo,
         idePermissionNo: rule.idePermissionNo,
+        ideExtraPermissionNos: rule.ideExtraPermissionNos,
+        scheduleTemplateId: rule.scheduleTemplateId,
+        scheduleTemplate: rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null,
         projectId: rule.projectId,
       },
       devices,
@@ -418,7 +431,12 @@ export const enqueueLocalBridgeOperation = internalMutation({
     operation: hikOperationValidator,
     payload: v.any(),
   },
-  handler: async (ctx, args) => {
+  handler: enqueueLocalBridgeOperationInTransaction,
+});
+export async function enqueueLocalBridgeOperationInTransaction(ctx: MutationCtx, args: {
+  deviceId: Id<"devices">; runId?: Id<"deviceSyncRuns">; projectId?: Id<"projects">;
+  operation: Doc<"hikPendingOperations">["operation"]; payload: unknown;
+}) {
     const device = await ctx.db.get(args.deviceId);
     if (!device || device.brand !== "hikvision") {
       throw new Error("Local bridge op sadece Hikvision cihazlar için yazılabilir");
@@ -476,8 +494,7 @@ export const enqueueLocalBridgeOperation = internalMutation({
     });
     await scheduleBridgeWakeForProject(ctx, device.projectId);
     return opId;
-  },
-});
+}
 
 function isLocalBridgeDevice(device: Doc<"devices"> | null): device is Doc<"devices"> {
   return device !== null && device.brand === "hikvision" && device.hikTransport === "localBridge";
@@ -769,17 +786,12 @@ export const listRetryCandidates = internalQuery({
           const employee = employeeId ? await ctx.db.get(employeeId) : null;
           if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, employee?.projectId))) return null;
 
-          let accessRule: { hikWeekPlanNo?: number; startTime?: string; endTime?: string; days?: string[] } | null = null;
+          let accessRule: (Doc<"accessRules"> & { scheduleTemplate: ScheduleTemplate | null }) | null = null;
           const accessRuleId = payload.accessRuleId as Id<"accessRules"> | undefined;
           if (accessRuleId) {
             const r = await ctx.db.get(accessRuleId);
             if (r) {
-              accessRule = {
-                hikWeekPlanNo: r.hikWeekPlanNo,
-                startTime: r.startTime,
-                endTime: r.endTime,
-                days: r.days,
-              };
+              accessRule = { ...r, scheduleTemplate: r.scheduleTemplateId ? await ctx.db.get(r.scheduleTemplateId) : null };
             }
           }
 

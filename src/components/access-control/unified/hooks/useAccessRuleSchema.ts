@@ -14,29 +14,32 @@ const dayEnum = z.enum([
 
 export const accessRuleSchema = z
   .object({
+    scheduleMode: z.enum(["custom", "template"]).default("custom"),
+    scheduleTemplateId: z.string().optional(),
     name: z.string().trim().min(1, "Lütfen kural adı girin."),
     description: z.string().optional(),
-    targetType: z.enum(["all", "department", "position", "individual", "visitor"]),
+    targetType: z.enum([
+      "all",
+      "department",
+      "position",
+      "individual",
+      "visitor",
+    ]),
     selectedEmployees: z.array(z.string()),
     selectedDevices: z.array(z.string()),
     selectedZones: z.array(z.string()),
     selectedDoors: z.array(z.string()),
-    startTime: z
-      .string()
-      .refine((v) => v === "" || HHMM.test(v), {
-        message: "Başlangıç saati HH:MM formatında olmalı",
-      }),
-    endTime: z
-      .string()
-      .refine((v) => v === "" || HHMM.test(v), {
-        message: "Bitiş saati HH:MM formatında olmalı",
-      }),
-    days: z.array(dayEnum).min(1, "En az bir gün seçin"),
+    startTime: z.string(),
+    endTime: z.string(),
+    days: z.array(dayEnum),
     accessDirection: z.enum(["entry", "exit", "both"]),
     priority: z.number().int().min(0),
   })
   .superRefine((data, ctx) => {
-    if (data.targetType === "individual" && data.selectedEmployees.length === 0) {
+    if (
+      data.targetType === "individual" &&
+      data.selectedEmployees.length === 0
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Lütfen en az bir çalışan seçin.",
@@ -54,13 +57,42 @@ export const accessRuleSchema = z
         path: ["selectedDevices"],
       });
     }
+    if (data.scheduleMode === "template") {
+      if (!data.scheduleTemplateId)
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Bir zaman şablonu seçin",
+          path: ["scheduleTemplateId"],
+        });
+      return;
+    }
+    for (const field of ["startTime", "endTime"] as const) {
+      if (data[field] && !HHMM.test(data[field]))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${field === "startTime" ? "Başlangıç" : "Bitiş"} saati HH:MM formatında olmalı`,
+          path: [field],
+        });
+    }
+    if (!data.days.length)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "En az bir gün seçin",
+        path: ["days"],
+      });
     if (Boolean(data.startTime) !== Boolean(data.endTime)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Başlangıç ve bitiş saatini birlikte girin veya tüm günü seçin.", path: [data.startTime ? "endTime" : "startTime"] });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Başlangıç ve bitiş saatini birlikte girin veya tüm günü seçin.",
+        path: [data.startTime ? "endTime" : "startTime"],
+      });
     }
     if (data.startTime && data.endTime && data.startTime >= data.endTime) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Bitiş saati başlangıçtan sonra olmalı; geceyi aşan plan için ayrı kurallar oluşturun.",
+        message:
+          "Bitiş saati başlangıçtan sonra olmalı; geceyi aşan plan için ayrı kurallar oluşturun.",
         path: ["endTime"],
       });
     }

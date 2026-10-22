@@ -152,6 +152,7 @@ export const syncEmployeeToIdePanels = internalAction({
     const skipped: string[] = [];
     const opIds: Id<"idePendingOperations">[] = [];
     let queued = 0;
+    let overflow = false;
 
     for (const [deviceId, rules] of byPanel) {
       const panel = await ctx.runQuery(internal.devices.getByIdInternal, { id: deviceId });
@@ -164,7 +165,7 @@ export const syncEmployeeToIdePanels = internalAction({
       // panelin tüm kapıları (getRuleIoIdsForPanel fallback'i geriye uyumlu davranır).
       const permNos: number[] = [];
       for (const dr of rules) {
-        const permNo = await ctx.runMutation(internal.ideSync.ensureIdePermissionNo, {
+        const plan = await ctx.runMutation(internal.ideSync.ensureIdePermissionPlan, {
           accessRuleId: dr.rule._id,
         });
         const ioIds = await ctx.runQuery(internal.ideSync.getRuleIoIdsForPanel, {
@@ -175,26 +176,23 @@ export const syncEmployeeToIdePanels = internalAction({
         if (droppedIo.length > 0) {
           skipped.push(`${panel.name}: spec-dışı io ${droppedIo.join(",")} atlandı (0–7 beklenir)`);
         }
-        const permissionRecord = buildIdePermissionRecord(permNo, ioIds, {
-          startTime: dr.rule.startTime,
-          endTime: dr.rule.endTime,
-          days: dr.rule.days,
-        });
-        const permOpId = await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
-          runId: args.runId,
-          deviceId,
-          projectId: panel.projectId,
-          opType: "upsertPermission",
-          payload: { mode: "create", permissionRecord },
-        });
-        opIds.push(permOpId);
-        queued++;
-        permNos.push(permNo);
+        for (const [index, schedule] of plan.segments.entries()) {
+          const permNo = plan.nos[index];
+          if (permNo === undefined) continue;
+          const permissionRecord = { ...buildIdePermissionRecord(permNo, ioIds, {}), schedule };
+          opIds.push(await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+            runId: args.runId, deviceId, projectId: panel.projectId,
+            opType: "upsertPermission", payload: { mode: "create", permissionRecord },
+          }));
+          queued++;
+          permNos.push(permNo);
+        }
       }
 
       const uniqueCount = new Set(permNos).size;
       const permissions = capPermissionNos(permNos);
       if (uniqueCount > permissions.length) {
+        overflow = true;
         skipped.push(
           `${panel.name}: ${uniqueCount} izin panel sınırına (${permissions.length}) kırpıldı`,
         );
@@ -211,7 +209,7 @@ export const syncEmployeeToIdePanels = internalAction({
       opIds.push(userOpId);
       queued++;
     }
-    return { ok: true, queued, skipped, opIds };
+    return { ok: !overflow, queued, skipped, opIds, ...(overflow ? { error: "IDE izin sınırı (16) aşıldı; güvenli kırpma uygulandı" } : {}) };
   },
 });
 
@@ -305,6 +303,7 @@ export const syncPermissionToIdePanels = internalAction({
     queued: number;
     skipped: string[];
     opIds: Id<"idePendingOperations">[];
+    expectedQueued?: number;
     error?: string;
   }> => {
     const data = await ctx.runQuery(internal.hikvisionSync.getAccessRuleWithDevices, {
@@ -313,20 +312,23 @@ export const syncPermissionToIdePanels = internalAction({
     if (!data) return { ok: false, queued: 0, skipped: [], opIds: [], error: "Erişim kuralı bulunamadı" };
 
     // idePermissionNo (yoksa atomik ata).
-    const permNo = await ctx.runMutation(internal.ideSync.ensureIdePermissionNo, {
-      accessRuleId: args.accessRuleId,
+    const plan = await ctx.runMutation(internal.ideSync.ensureIdePermissionPlan, {
+      accessRuleId: args.accessRuleId, runId: args.runId,
     });
 
     const seen = new Set<string>();
     const skipped: string[] = [];
     const opIds: Id<"idePendingOperations">[] = [];
     let queued = 0;
+    let expectedQueued = 0;
+    const errors: string[] = [];
     for (const device of data.devices) {
       if (device.brand !== "ide_smart" || seen.has(device._id) || (args.targetDeviceIds && !args.targetDeviceIds.includes(device._id))) continue;
       seen.add(device._id);
       const panel = await ctx.runQuery(internal.devices.getByIdInternal, { id: device._id });
       if (!panel?.ideUuid) continue;
 
+      expectedQueued += plan.segments.length;
       const ioIds = await ctx.runQuery(internal.ideSync.getRuleIoIdsForPanel, {
         ruleId: args.accessRuleId,
         deviceId: device._id,
@@ -335,22 +337,29 @@ export const syncPermissionToIdePanels = internalAction({
       if (droppedIo.length > 0) {
         skipped.push(`${panel.name}: spec-dışı io ${droppedIo.join(",")} atlandı (0–7 beklenir)`);
       }
-      const permissionRecord = buildIdePermissionRecord(permNo, ioIds, {
-        startTime: data.rule.startTime,
-        endTime: data.rule.endTime,
-        days: data.rule.days,
-      });
-      const permOpId = await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
-          runId: args.runId,
-        deviceId: device._id,
-        projectId: panel.projectId,
-        opType: "upsertPermission",
-        payload: { mode: "create", permissionRecord },
-      });
-      opIds.push(permOpId);
-      queued++;
+      for (const [index, schedule] of plan.segments.entries()) {
+        const permNo = plan.nos[index];
+        if (permNo === undefined) continue;
+        const permissionRecord = { ...buildIdePermissionRecord(permNo, ioIds, {}), schedule };
+        opIds.push(await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+          runId: args.runId, deviceId: device._id, projectId: panel.projectId,
+          opType: "upsertPermission", payload: { mode: "create", permissionRecord },
+        }));
+        queued++;
+      }
     }
-    return { ok: true, queued, skipped, opIds };
+    if (plan.changed) {
+      for (const employee of data.employees) {
+        const result = await ctx.runAction(internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+          employeeId: employee._id, runId: args.runId, targetDeviceIds: args.targetDeviceIds,
+        });
+        opIds.push(...result.opIds);
+        queued += result.queued;
+        skipped.push(...result.skipped);
+        if (!result.ok) errors.push(result.error ?? "Kişi gönderilemedi");
+      }
+    }
+    return { ok: errors.length === 0, queued, expectedQueued, skipped, opIds, error: errors.length ? errors.join("; ") : undefined };
   },
 });
 

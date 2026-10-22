@@ -59,6 +59,7 @@ export async function setWeekPlanOnDevice(
 
   for (const day of ALL_DAYS) {
     const segments = byDay.get(day) ?? [];
+    if (segments.length > MAX_SEGMENTS_PER_DAY) throw new Error("Hik: bir günde en fazla 8 zaman aralığı gönderilebilir");
     for (let idx = 0; idx < MAX_SEGMENTS_PER_DAY; idx++) {
       const s = segments[idx];
       WeekPlanCfg.push({

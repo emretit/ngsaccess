@@ -128,7 +128,9 @@ export function RecentRuns({
                   ·{" "}
                   {run.kind === "project_resync"
                     ? "Proje gönderimi"
-                    : "Kural gönderimi"}{" "}
+                    : run.kind === "template_sync"
+                      ? "Şablon gönderimi"
+                      : "Kural gönderimi"}{" "}
                   · {runLabels[run.status]}
                 </p>
                 <p className="text-xs text-muted-foreground break-words">
