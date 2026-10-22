@@ -7,7 +7,7 @@ const formData: EmployeeFormData = { firstName: "", lastName: "", email: "", tcN
 function render(autoFocusFirstName: boolean) { return renderToStaticMarkup(<EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} autoFocusFirstName={autoFocusFirstName} />); }
 it("02-O8: gives access its own fieldset and unambiguous empty option", () => {
   const html = render(false);
-  expect(html).toMatch(/<legend[^>]*>Erişim<\/legend><div><label[^>]*>Erişim kuralı ekle/);
+  expect(html).toMatch(/<legend[^>]*>Erişim<\/legend>[\s\S]*<label[^>]*>Erişim kuralı ekle/);
   expect(html).toContain("Kural eklenmesin");
   expect(html).not.toContain("Yeni kural ekleme");
 });
@@ -48,4 +48,14 @@ it("D-1: pay fields and amounts are hidden without pay.view", () => {
   const visible = renderToStaticMarkup(<EmployeeFormFields {...props} canViewPay />);
   expect(visible).toContain('name="monthlySalary"');
   expect(visible).toContain('45678');
+});
+
+it("offers an optional date and access hint, hidden for visitors", () => {
+  const html = render(false);
+  expect(html).toContain("Erişim başlangıcı");
+  expect(html).toMatch(/<input[^>]*type="date"[^>]*name="accessStartsAt"/);
+  expect(html).toContain("Bu tarihten önce kart, QR ve mobil erişim reddedilir.");
+  expect(html).not.toMatch(/<input(?=[^>]*name="accessStartsAt")(?=[^>]*required)[^>]*>/);
+  const visitor = renderToStaticMarkup(<EmployeeFormFields isVisitor formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} />);
+  expect(visitor).not.toContain('name="accessStartsAt"');
 });

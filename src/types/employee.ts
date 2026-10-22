@@ -17,6 +17,8 @@ export interface Employee {
   shiftId?: Id<"shifts"> | null;
   accessRuleId?: Id<"accessRules"> | null;
   isActive?: boolean;
+  accessStartsAt?: string;
+  isVisitor?: boolean;
   notes?: string;
   hourlyRate?: number | null;
   monthlySalary?: number | null;

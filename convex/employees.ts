@@ -1,3 +1,5 @@
+import { writeAudit } from "./lib/audit";
+import { toUtcISO, trDateKey, trDayRangeISO } from "./lib/trDate";
 import { getProjectIdsWithPermission, hasPermission, requirePermission } from "./lib/permissions";
 import { scheduleFingerprintPurge, scheduleEmployeeCardChange } from "./lib/employeeCardChange";
 import { canSeePayInProject, maskPay } from "./lib/payVisibility";
@@ -17,6 +19,15 @@ import { MutationCtx, QueryCtx } from "./_generated/server";
 import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeEmployeePassword } from "./lib/employeeAuth";
+
+/** Employee form dates are stored at the inclusive start of their Turkey calendar day. */
+export function normalizeEmployeeAccessStart(value: string | null | undefined): string | undefined {
+  if (value == null) return undefined;
+  const iso = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? toUtcISO(value) : undefined;
+  if (!iso) throw new Error("Erişim başlangıcı geçerli bir ISO tarih olmalıdır");
+  const day = trDateKey(iso);
+  return trDayRangeISO(day, day).startISO;
+}
 
 type DuplicateField = "cardNumber" | "email" | "tcNo";
 
@@ -175,6 +186,7 @@ export const create = authedMutation({
     accessRuleId: v.optional(v.id("accessRules")),
     photoUrl: v.optional(v.string()),
     photoStorageId: v.optional(v.id("_storage")),
+    accessStartsAt: v.optional(v.union(v.string(), v.null())),
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.string()),
     shift: v.optional(v.string()),
@@ -206,9 +218,14 @@ export const create = authedMutation({
     const id = await ctx.db.insert("employees", {
       ...args,
       ...photo,
+      accessStartsAt: normalizeEmployeeAccessStart(args.accessStartsAt),
       isActive: args.isActive ?? true,
       createdAt: now,
       updatedAt: now,
+    });
+    if (args.accessStartsAt != null) await writeAudit(ctx, {
+      user: ctx.user, projectId: args.projectId, action: "create", targetTable: "employees",
+      targetId: id, newValue: { accessStartsAt: normalizeEmployeeAccessStart(args.accessStartsAt) }, note: "Erişim başlangıcı",
     });
     await upsertGroupMembership(ctx, id, args.accessRuleId, args.projectId);
     // DB import gibi UI dışı insert akışlarında da push tetiklensin diye burada (idempotent).
@@ -242,6 +259,7 @@ export const update = authedMutation({
     accessRuleId: v.optional(v.id("accessRules")),
     photoUrl: v.optional(v.union(v.null(), v.string())),
     photoStorageId: v.optional(v.union(v.null(), v.id("_storage"))),
+    accessStartsAt: v.optional(v.union(v.string(), v.null())),
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.union(v.null(), v.string())),
     shift: v.optional(v.union(v.null(), v.string())),
@@ -260,6 +278,10 @@ export const update = authedMutation({
       throw new Error("Bu çalışana erişim yetkiniz yok");
     }
     await requirePermission(ctx, ctx.user, emp.projectId, "employees.manage");
+    if (updates.accessStartsAt !== undefined && emp.isVisitor) throw new Error("Ziyaretçi erişim başlangıcı ziyaretçi akışından yönetilir");
+    const accessStartsAt = updates.accessStartsAt === undefined ? emp.accessStartsAt : normalizeEmployeeAccessStart(updates.accessStartsAt);
+    const accessStartChanged = accessStartsAt !== emp.accessStartsAt;
+    if (updates.accessStartsAt !== undefined) updates.accessStartsAt = accessStartsAt ?? null;
     if (updates.hourlyRate !== undefined || updates.monthlySalary !== undefined) {
       await requirePermission(ctx, ctx.user, emp.projectId, "pay.view");
       if (updates.projectId !== undefined) await requirePermission(ctx, ctx.user, updates.projectId, "pay.view");
@@ -298,6 +320,11 @@ export const update = authedMutation({
       ? await snapshotEmployeeHikDevices(ctx, emp) : undefined;
     await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, updatedAt: new Date().toISOString() });
 
+    if (accessStartChanged) await writeAudit(ctx, {
+      user: ctx.user, projectId: emp.projectId, action: "update", targetTable: "employees",
+      targetId: employeeId, oldValue: { accessStartsAt: emp.accessStartsAt ?? null },
+      newValue: { accessStartsAt: accessStartsAt ?? null }, note: "Erişim başlangıcı",
+    });
     const groupMemberAdded = await upsertGroupMembership(
       ctx,
       employeeId,
@@ -320,11 +347,11 @@ export const update = authedMutation({
     // Eski kart temizliği yetki kaldırması değildir: employeeId taşımaz.
     if (cardChanged) await scheduleEmployeeCardChange(ctx, employeeId, emp.projectId, emp.cardNumber, previousHikSnapshot);
 
-    if (!cardChanged && (activeChanged || groupMemberAdded)) {
+    if (!cardChanged && (activeChanged || groupMemberAdded || accessStartChanged)) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId,
       });
-      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+      if (activeChanged || groupMemberAdded) await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
         employeeId,
       });
     }

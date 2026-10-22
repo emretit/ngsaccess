@@ -12,7 +12,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import type { FunctionArgs } from "convex/server";
 
 type UpdateArgs = FunctionArgs<typeof api.employees.update>;
-const DIFFABLE = ["projectId", "firstName", "lastName", "email", "tcNo", "cardNumber", "payrollCode", "companyId", "departmentId", "positionId", "shiftId", "shift", "notes", "isActive", "hourlyRate", "monthlySalary"] as const satisfies readonly (keyof EmployeeFormData & keyof UpdateArgs)[];
+const DIFFABLE = ["projectId", "firstName", "lastName", "email", "tcNo", "cardNumber", "payrollCode", "companyId", "departmentId", "positionId", "shiftId", "shift", "notes", "isActive", "hourlyRate", "monthlySalary", "accessStartsAt"] as const satisfies readonly (keyof EmployeeFormData & keyof UpdateArgs)[];
 
 /**
  * Düzenlemede yalnız kullanıcının taslakta değiştirdiği alanlar gönderilir: form açıkken başka yerde
@@ -38,7 +38,7 @@ export type EmployeeSaveResult = { employeeId: Id<"employees"> };
 export type { EmployeeFormData };
 
 export const useEmployeeFormSubmit = (
-  employee: Pick<Employee, "_id"> | null | undefined,
+  employee: Pick<Employee, "_id" | "isVisitor"> | null | undefined,
   _onClose: () => void,
   _onSave: (payload: EmployeeSaveResult) => void,
   onFieldError?: (key: string, message: string) => void,
@@ -74,6 +74,7 @@ export const useEmployeeFormSubmit = (
       const trimmedTcNo = parsed.data.tcNo?.trim() ?? "";
 
       const sharedPayload = {
+        ...(!employee?.isVisitor ? { accessStartsAt: parsed.data.accessStartsAt ? new Date(`${parsed.data.accessStartsAt}T00:00:00+03:00`).toISOString() : null } : {}),
         firstName: parsed.data.firstName.trim(),
         lastName: parsed.data.lastName.trim(),
         email: parsed.data.email.trim().toLowerCase(),

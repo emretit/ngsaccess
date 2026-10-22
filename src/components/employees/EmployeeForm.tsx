@@ -181,6 +181,7 @@ export default function EmployeeForm({
           ) : (
             <EmployeeFormFields
               canViewPay={can("pay.view")}
+              isVisitor={employee?.isVisitor}
               autoFocusFirstName={autoFocusFirstName}
               isEditing={!!employee}
               memberships={memberships}

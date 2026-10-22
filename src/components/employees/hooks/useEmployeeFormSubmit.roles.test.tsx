@@ -27,3 +27,18 @@ it.each([false, true])("D-1: salary fields are absent from submitted payload whe
   expect(state.calls[0].args).not.toHaveProperty("hourlyRate");
   expect(state.calls[0].args).not.toHaveProperty("monthlySalary");
 });
+
+it.each([false, true])("submits Turkey midnight and null when clearing, editing=%s", async editing => {
+  let current: ReturnType<typeof useEmployeeFormSubmit> | undefined;
+  function Harness() {
+    current = useEmployeeFormSubmit(editing ? { _id: "employee" as Id<"employees"> } : null, () => {}, () => {});
+    return null;
+  }
+  renderToStaticMarkup(<Harness />);
+  if (!current) throw new Error("Missing hook");
+  const form = { ...employeeFormValues(), firstName: "Ada", lastName: "Test", email: "ada@example.com", cardNumber: "1234", accessStartsAt: "2026-11-01" };
+  await current.handleSubmit(form);
+  expect(state.calls[0].args.accessStartsAt).toBe("2026-10-31T21:00:00.000Z");
+  await current.handleSubmit({ ...form, accessStartsAt: "" });
+  expect(state.calls[1].args.accessStartsAt).toBeNull();
+});

@@ -24,6 +24,7 @@ import {
   setVerifyWeekPlan,
   type Weekday,
 } from "../lib/hikGateway";
+import { hikValidBeginFromAccessStart } from "../lib/gateway/persons";
 import { defaultRuleSchedule } from "../lib/hikSync";
 
 /**
@@ -125,6 +126,7 @@ async function executeOperation(
         name: `${employee.firstName} ${employee.lastName}`,
         planTemplateNo,
         doorCount: c.device.hikDoorCount,
+        beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt),
       });
       if (result.ok) {
         try {

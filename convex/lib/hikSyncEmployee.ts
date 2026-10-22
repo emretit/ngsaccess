@@ -4,7 +4,7 @@
 // Employee and week-plan sync share plan caches and deletion helpers here.
 import type { GrantResult } from "./grantStatus";
 import type { FunctionReturnType } from "convex/server";
-import { buildDoorPlans } from "./gateway/persons";
+import { buildDoorPlans, hikValidBeginFromAccessStart } from "./gateway/persons";
 import { internal } from "../_generated/api";
 import { isProjectAllowed } from "./auth";
 import { filterHikvisionDevices, defaultRuleSchedule } from "./hikSync";
@@ -264,6 +264,7 @@ export async function syncEmployeeDevices(
         employeeNo: employee.cardNumber,
         name: `${employee.firstName} ${employee.lastName}`,
         doorPlans,
+        beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt),
       });
       if (!personResult.ok) {
         return {

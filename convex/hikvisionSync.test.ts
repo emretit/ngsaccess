@@ -296,3 +296,23 @@ describe("gateway card delivery survives supersession cleanup failure", () => {
     expect(wire.card).toHaveBeenCalledExactlyOnceWith("synthetic", expect.objectContaining({ cardNo: "123" }));
   });
 });
+
+describe("employee access start reaches every gateway person write", () => {
+  it("preserves local beginTime on the main sync and queued retry using the latest employee date", async () => {
+    const { t, employeeId, deviceId, projectId } = await fixture();
+    await t.run(ctx => ctx.db.patch(employeeId, { accessStartsAt: "2026-10-31T21:00:00.000Z" }));
+    await t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+    expect(wire.person).toHaveBeenCalledWith("synthetic", expect.objectContaining({ beginTime: "2026-11-01T00:00:00" }));
+    wire.person.mockClear();
+    await t.run(async ctx => {
+      await ctx.db.patch(employeeId, { accessStartsAt: "2026-11-01T21:00:00.000Z" });
+      await ctx.db.patch(deviceId, { hikLastSeenAt: Date.now() });
+      await ctx.db.insert("hikPendingOperations", {
+        projectId, deviceId, operation: "addPerson", status: "failed",
+        payload: { planTemplateNo: 4, employeeId }, attemptCount: 0, createdAt: Date.now(),
+      });
+    });
+    await t.action(internal.actions.hikQueueWorker.processHikQueue, {});
+    expect(wire.person).toHaveBeenCalledWith("synthetic", expect.objectContaining({ beginTime: "2026-11-02T00:00:00" }));
+  });
+});

@@ -50,3 +50,9 @@ describe("onlyChangedFields", () => {
     expect(onlyChangedFields(full(base), base, undefined)).toEqual(full(base));
   });
 });
+
+it("sends an epoch only when its date changed, including a deliberate clear", () => {
+  const baseline = { ...base, accessStartsAt: "2026-11-01" };
+  expect(onlyChangedFields({ employeeId, accessStartsAt: "2026-10-31T21:00:00.000Z" }, baseline, JSON.stringify(baseline))).toEqual({ employeeId });
+  expect(onlyChangedFields({ employeeId, accessStartsAt: null }, { ...baseline, accessStartsAt: "" }, JSON.stringify(baseline))).toEqual({ employeeId, accessStartsAt: null });
+});

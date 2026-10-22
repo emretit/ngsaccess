@@ -1,5 +1,7 @@
 "use node";
 
+import { toUtcISO } from "../trDate";
+
 import {
   gatewayApiCall,
   gatewayApiCallChecked,
@@ -58,6 +60,14 @@ export function buildDoorPlans(
     doorPlans: [...plans].sort(([a], [b]) => a - b).map(([doorNo, numbers]) => ({ doorNo, planTemplateNos: [...numbers].sort((a, b) => a - b) })),
     warnings,
   };
+}
+
+/** Hik local timeType expects Turkey wall-clock time, without an offset. */
+export function hikValidBeginFromAccessStart(accessStartsAt?: string): string | undefined {
+  if (!accessStartsAt) return undefined;
+  const iso = toUtcISO(accessStartsAt);
+  if (!iso) return undefined;
+  return new Date(Date.parse(iso) + 3 * 60 * 60 * 1000).toISOString().slice(0, 19);
 }
 
 /** Bugünden başlayan geniş validity window — accessRule'da explicit tarih alanı yok. */

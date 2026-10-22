@@ -22,6 +22,11 @@ export const employeeFormSchema = z
       .nullable()
       .optional(),
     payrollCode: z.string().optional(),
+    accessStartsAt: z.string().optional().refine(value => !value || (
+      /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+      Number.isFinite(Date.parse(value)) &&
+      new Date(value).toISOString().slice(0, 10) === value
+    ), "Geçerli bir erişim başlangıcı tarihi girin"),
   })
   .superRefine((data, ctx) => {
     if (data.tcNo && data.tcNo.trim()) {

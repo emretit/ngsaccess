@@ -15,6 +15,7 @@ export interface EmployeeFormData {
   tcNo: string;
   cardNumber: string;
   payrollCode: string;
+  accessStartsAt?: string;
   companyId: Id<"companies"> | null;
   departmentId: Id<"departments"> | null;
   positionId: Id<"positions"> | null;
@@ -38,6 +39,7 @@ export function employeeFormValues(employee?: Employee | null, projectId?: Id<"p
     tcNo: employee?.tcNo || "",
     cardNumber: employee?.cardNumber || "",
     payrollCode: employee?.payrollCode || "",
+    accessStartsAt: employee?.accessStartsAt ? new Date(Date.parse(employee.accessStartsAt) + 3 * 3600000).toISOString().slice(0, 10) : "",
     companyId: employee?.companyId ?? null,
     departmentId: employee?.departmentId ?? null,
     positionId: employee?.positionId ?? null,

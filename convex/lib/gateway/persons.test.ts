@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDoorPlans, buildPersonPayload } from "./persons";
+import { buildDoorPlans, buildPersonPayload, hikValidBeginFromAccessStart } from "./persons";
 import { parseHikJsonStatus } from "./core";
 
 const person = { employeeNo: "123", name: "Employee", beginTime: "2026-01-01T00:00:00" };
@@ -44,5 +44,18 @@ describe("Hik toplu yanıt durumu", () => {
   it("üst düzey statusCode hatası iç 'ok' ile örtülmez", () => {
     const data = { statusCode: 4, statusString: "Invalid Operation", Items: [{ subStatusCode: "ok" }] };
     expect(parseHikJsonStatus({ status: 200, data, raw: "" }).ok).toBe(false);
+  });
+});
+
+
+describe("Hik access start validity", () => {
+  it.each(["2026-11-01T00:00:00+03:00", "2026-10-31T21:00:00.000Z"])("writes Turkey local midnight from %s", accessStartsAt => {
+    expect(buildPersonPayload({ ...person, planTemplateNo: 4, doorCount: 1, beginTime: hikValidBeginFromAccessStart(accessStartsAt) }).Valid)
+      .toMatchObject({ beginTime: "2026-11-01T00:00:00", timeType: "local" });
+  });
+  it.each([undefined, "", "invalid", "2026-02-30T00:00:00+03:00"])("keeps the default for %s", accessStartsAt => {
+    expect(hikValidBeginFromAccessStart(accessStartsAt)).toBeUndefined();
+    expect(buildPersonPayload({ employeeNo: "123", name: "Test", doorCount: 1, planTemplateNo: 4, beginTime: hikValidBeginFromAccessStart(accessStartsAt) }).Valid.beginTime)
+      .toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00$/);
   });
 });

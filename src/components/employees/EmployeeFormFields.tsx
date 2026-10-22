@@ -14,6 +14,7 @@ interface Option {
 }
 interface Props {
   canViewPay?: boolean;
+  isVisitor?: boolean;
   formData: EmployeeFormData;
   setFormData: (data: EmployeeFormData) => void;
   companies: Option[];
@@ -30,6 +31,7 @@ interface Props {
 export default function EmployeeFormFields({
   formData,
   canViewPay = false,
+  isVisitor = false,
   setFormData,
   companies,
   departments,
@@ -62,7 +64,8 @@ export default function EmployeeFormFields({
       | "email"
       | "cardNumber"
       | "tcNo"
-      | "payrollCode",
+      | "payrollCode"
+      | "accessStartsAt",
     label: string,
     type = "text",
     hint?: string,
@@ -78,7 +81,7 @@ export default function EmployeeFormFields({
         required={["firstName", "lastName", "email", "cardNumber"].includes(
           key,
         )}
-        value={formData[key]}
+        value={formData[key] ?? ""}
         onChange={(e) => update(key, e.target.value)}
         aria-invalid={!!errors[key]}
         aria-describedby={
@@ -208,6 +211,7 @@ export default function EmployeeFormFields({
               ))}
             </ul>
           ))}
+          {!isVisitor && input("accessStartsAt", "Erişim başlangıcı", "date", "Bu tarihten önce kart, QR ve mobil erişim reddedilir.")}
           {select("accessRuleId", isEditing ? "Ek erişim kuralı" : "Erişim kuralı ekle", accessRules)}
           <p className="text-xs text-muted-foreground">
             {isEditing ? (

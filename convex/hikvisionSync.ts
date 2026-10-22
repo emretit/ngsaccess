@@ -161,6 +161,7 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
       cardNumber: employee.cardNumber,
       projectId: employee.projectId,
       isActive: employee.isActive,
+      accessStartsAt: employee.accessStartsAt,
     },
     deviceRules,
   };
@@ -852,6 +853,7 @@ export const listRetryCandidates = internalQuery({
                   cardNumber: employee.cardNumber,
                   firstName: employee.firstName,
                   lastName: employee.lastName,
+                  accessStartsAt: employee.accessStartsAt,
                 }
               : null,
             accessRule,
