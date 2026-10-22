@@ -5,7 +5,10 @@ import type { ServerDevice } from "@/types/device";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
-export function DeviceGatewayDanger({ device }: { device: ServerDevice }) {
+export function DeviceGatewayDanger({ device, onPendingChange }: {
+  device: ServerDevice;
+  onPendingChange?: (pending: boolean) => void;
+}) {
   const [open, setOpen] = useState(false);
   const remove = useAction(
     api.actions.hikGatewayDevice.removeDeviceFromGateway,
@@ -26,10 +29,15 @@ export function DeviceGatewayDanger({ device }: { device: ServerDevice }) {
         ]}
         confirmLabel="Bağlantıyı kaldır"
         onConfirm={async () => {
-          const result = await remove({ deviceId: device._id });
-          if (!result.ok)
-            throw new Error(result.error ?? "Gateway bağlantısı kaldırılamadı");
-          notify.success("Gateway bağlantısı kaldırıldı");
+          onPendingChange?.(true);
+          try {
+            const result = await remove({ deviceId: device._id });
+            if (!result.ok)
+              throw new Error(result.error ?? "Gateway bağlantısı kaldırılamadı");
+            notify.success("Gateway bağlantısı kaldırıldı");
+          } finally {
+            onPendingChange?.(false);
+          }
         }}
       />
     </section>

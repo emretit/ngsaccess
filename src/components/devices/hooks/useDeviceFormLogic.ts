@@ -52,7 +52,7 @@ export function useDeviceFormLogic({
     values: buildDeviceFormValues(device, defaultBrand),
   }));
   if (snapshot.deviceId !== deviceId || snapshot.defaultBrand !== defaultBrand || snapshot.open !== open) {
-    setSnapshot({ deviceId, defaultBrand, open, values: buildDeviceFormValues(device, defaultBrand) });
+    setSnapshot({ deviceId, defaultBrand, open, values: !open ? snapshot.values : buildDeviceFormValues(device, defaultBrand) });
   }
 
   const form = useForm<FormValues>({
@@ -77,6 +77,7 @@ export function useDeviceFormLogic({
       onSuccess();
     },
     adminMode,
+    getBaseline: () => form.formState.defaultValues ?? snapshot.values,
   });
 
   return {

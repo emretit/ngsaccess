@@ -3,7 +3,7 @@ import type { Navigator } from "react-router-dom";
 type Browser = Pick<Window, "history" | "addEventListener">;
 type Request = (proceed: () => void) => void;
 // One adapter per router, shared by every mounted form regardless of cleanup order.
-const registry = new WeakMap<Navigator, { guards: Map<Request, boolean>; dispose: () => void }>();
+const registry = new WeakMap<Navigator, { guards: Map<Request, boolean>; dispose: () => void; replace: Navigator["replace"] }>();
 const popHandlers = new WeakMap<Browser, (event: PopStateEvent) => void>();
 const intercepted = new WeakSet<Browser>();
 
@@ -62,7 +62,7 @@ export function installNavigationGuard(navigator: Navigator, request: Request, b
     };
     installPopstateInterceptor(browser);
     popHandlers.set(browser, onPop);
-    entry = { guards, dispose: () => {
+    entry = { guards, replace, dispose: () => {
       revision++;
       navigator.push = push;
       navigator.replace = replace;
@@ -79,6 +79,11 @@ export function installNavigationGuard(navigator: Navigator, request: Request, b
     installed.guards.delete(guard);
     if (installed.guards.size === 0 && registry.get(navigator) === installed) installed.dispose();
   };
+}
+/** Router's own replace, bypassing installed guards. Only for a page's internal URL sync (no navigation). */
+export function unguardedReplace(navigator: Navigator): Navigator["replace"] {
+  const original = registry.get(navigator)?.replace ?? navigator.replace;
+  return (...args) => original.apply(navigator, args);
 }
 function historyIndex(state: unknown): number | undefined {
   return state !== null && typeof state === "object" && "idx" in state && typeof state.idx === "number" ? state.idx : undefined;

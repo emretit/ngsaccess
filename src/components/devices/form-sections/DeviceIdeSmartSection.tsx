@@ -14,6 +14,7 @@ import type { FormValues } from "../hooks/useDeviceFormSchema";
 interface DeviceIdeSmartSectionProps {
   form: UseFormReturn<FormValues>;
   isEdit?: boolean;
+  section?: "identity" | "connection";
 }
 
 /**
@@ -27,12 +28,13 @@ interface DeviceIdeSmartSectionProps {
 export function DeviceIdeSmartSection({
   form,
   isEdit,
+  section,
 }: DeviceIdeSmartSectionProps) {
   return (
-    <div className="space-y-4 border-t border-line pt-4">
-      <h4 className="text-sm font-semibold">IDE Smart Panel</h4>
+    <div className="space-y-4">
 
-      <FormField
+
+      {section !== "connection" && <FormField
         control={form.control}
         name="ide_uuid"
         render={({ field }) => (
@@ -52,9 +54,9 @@ export function DeviceIdeSmartSection({
             <FormMessage />
           </FormItem>
         )}
-      />
+      />}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {section !== "identity" && <><div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField
           control={form.control}
           name="ide_user"
@@ -153,7 +155,7 @@ export function DeviceIdeSmartSection({
             )}
           />
         </div>
-      </details>
+      </details></>}
     </div>
   );
 }

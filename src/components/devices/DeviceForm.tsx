@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 
 import { Id } from "../../../convex/_generated/dataModel";
@@ -22,7 +22,7 @@ import {
 import { DeviceLocationSection } from "./form-sections/DeviceLocationSection";
 import { DeviceNetworkSection } from "./form-sections/DeviceNetworkSection";
 import { DeviceStatusSection } from "./form-sections/DeviceStatusSection";
-import { DeviceGatewayDanger } from "./DeviceGatewayDanger";
+import FormActions from "@/components/employees/FormActions";
 import { DeviceHikvisionSection } from "./form-sections/DeviceHikvisionSection";
 import { DeviceIdeSmartSection } from "./form-sections/DeviceIdeSmartSection";
 import { DeviceNameSection } from "./form-sections/DeviceNameSection";
@@ -39,6 +39,7 @@ interface DeviceFormProps {
   ) => void;
   open: boolean;
   disabled?: boolean;
+  embedded?: boolean;
   onClose: () => void;
   device?: (ServerDevice & { _id?: Id<"devices"> }) | null;
   projects: Project[];
@@ -51,9 +52,19 @@ interface DeviceFormProps {
   adminMode?: boolean;
 }
 
+function DeviceFormSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <fieldset className="min-w-0 space-y-3">
+      <legend className="mb-3 text-sm font-medium">{title}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
 export function DeviceForm({
   open,
   disabled = false,
+  embedded = false,
   onStateChange,
   onClose,
   device,
@@ -103,7 +114,17 @@ export function DeviceForm({
       else guard.requestClose(onClose);
     }
   };
-  if (!open) return null;
+  // Kayıt sırasında gateway bağlantısı kurulamamış cihaz: değişiklik olmadan da yeniden denenebilsin.
+  const needsGatewayRegistration =
+    !!device &&
+    !device.hikDevIndex &&
+    form.watch("brand") === "hikvision" &&
+    form.watch("hik_transport") !== "localBridge" &&
+    !!form.watch("ehome_id")?.trim();
+  const undo = () => {
+    form.reset(form.formState.defaultValues);
+    requestAnimationFrame(() => form.setFocus("name"));
+  };
 
   // Zone/door ID mapping for form components (expect .id; Convex uses _id)
   const zonesForForm = zones.map((z) => ({ ...z, id: z._id }));
@@ -133,15 +154,15 @@ export function DeviceForm({
             requestAnimationFrame(focusFirstError),
           )(event);
         }}
-        className="min-w-0 space-y-4 [&_input]:min-h-11 [&_button]:min-h-11 [&_select]:min-h-11"
+        className="min-w-0 space-y-4 [&_input]:h-9 [&_select]:h-9 [&_button[role=combobox]]:h-9 max-sm:[&_input]:min-h-11 max-sm:[&_button]:min-h-11 max-sm:[&_select]:min-h-11"
         noValidate
         aria-busy={isLoading}
       >
-        <p className="text-sm text-muted-foreground">
+        {!device && <p className="text-sm text-muted-foreground">
           Proje:{" "}
           {projects.find((project) => project._id === currentProjectId)?.name ??
             "Seçili proje"}
-        </p>
+        </p>}
         {Object.keys(form.formState.errors).length > 0 && (
           <div
             role="alert"
@@ -200,24 +221,29 @@ export function DeviceForm({
           ) : isIdeSmart ? (
             // IDE Smart paneli: panel adı + bölge (ayrı seçim) + bağlantı; kapılar
             // otomatik üretilir. Serial/type alanları gizli.
-            <div className="space-y-5">
-              <DeviceNameSection form={form} />
+            <div className="space-y-4">
+              <DeviceFormSection title="Kimlik">
+                <DeviceNameSection form={form} />
+                <DeviceIdeSmartSection form={form} isEdit={!!device} section="identity" />
+              </DeviceFormSection>
+              <DeviceFormSection title="Konum">
               <DeviceZoneSection
                 form={form}
                 zones={zonesForForm}
                 allowCreate={!device}
               />
-              <DeviceIdeSmartSection form={form} isEdit={!!device} />
               <DeviceStatusSection form={form} />
+              </DeviceFormSection>
+              <DeviceFormSection title="Bağlantı">
+                <DeviceIdeSmartSection form={form} isEdit={!!device} section="connection" />
+              </DeviceFormSection>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-4">
+              <DeviceFormSection title="Kimlik">
                 <DeviceBasicSection form={form} isEdit={!!device} />
-                {brand !== "hikvision" && <DeviceNetworkSection form={form} />}
-              </div>
-
-              <div className="space-y-4">
+              </DeviceFormSection>
+              <DeviceFormSection title="Konum">
                 <DeviceLocationSection
                   form={form}
                   zones={zonesForForm}
@@ -229,21 +255,29 @@ export function DeviceForm({
                 />
                 <DeviceStatusSection form={form} />
                 {brand !== "hikvision" && <DeviceTypeField form={form} />}
-              </div>
+              </DeviceFormSection>
+              {brand !== "hikvision" && (
+                <DeviceFormSection title="Bağlantı">
+                  <DeviceNetworkSection form={form} />
+                </DeviceFormSection>
+              )}
             </div>
           )}
 
           {brand === "hikvision" && (
-            <DeviceHikvisionSection form={form} device={device} />
+            <DeviceFormSection title="Bağlantı">
+              <DeviceHikvisionSection form={form} device={device} />
+            </DeviceFormSection>
           )}
 
           {!adminMode && (
-            <FormField
+            <DeviceFormSection title="Açıklama">
+              <FormField
               control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Açıklama</FormLabel>
+                  <FormLabel className="sr-only">Açıklama</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Cihaz hakkında açıklama giriniz"
@@ -254,7 +288,8 @@ export function DeviceForm({
                   <FormMessage />
                 </FormItem>
               )}
-            />
+              />
+            </DeviceFormSection>
           )}
         </fieldset>
         {connectionError && (
@@ -289,8 +324,24 @@ export function DeviceForm({
             Topoloji düzenleme bu ekranda desteklenmiyor.
           </p>
         )}
-        {!disabled && (
-          <div className="sticky bottom-0 -mx-5 px-5 flex flex-wrap justify-between gap-2 border-t border-line bg-surface py-4">
+        {!disabled && embedded && !dirty && !isLoading && needsGatewayRegistration && (
+          <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line p-3 text-sm">
+            <p>Cihaz gateway'e henüz kaydedilmedi.</p>
+            <Button type="submit" variant="outline" className="max-sm:min-h-11">
+              Gateway'e bağla
+            </Button>
+          </div>
+        )}
+        {!disabled && embedded && (dirty || isLoading) && (
+          <FormActions
+            isLoading={isLoading}
+            onClose={undo}
+            cancelLabel="Değişiklikleri geri al"
+            className="-mx-5"
+          />
+        )}
+        {!disabled && !embedded && (
+          <div className="sticky bottom-0 -mx-5 px-5 flex flex-wrap justify-between gap-3 border-t bg-background py-3">
             {onBack && !device ? (
               <Button
                 type="button"
@@ -310,22 +361,17 @@ export function DeviceForm({
                 onClick={close}
                 disabled={isLoading}
               >
-                İptal
+                Vazgeç
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading
                   ? "Kaydediliyor..."
                   : connectionError
                     ? "Bağlantıyı tekrar dene"
-                    : device
-                      ? "Güncelle"
-                      : "Kaydet"}
+                    : "Kaydet"}
               </Button>
             </div>
           </div>
-        )}
-        {!disabled && brand === "hikvision" && device?.hikDevIndex && (
-          <DeviceGatewayDanger device={device} />
         )}
         {guard.dialog}
       </form>

@@ -20,6 +20,6 @@ it("kaydetme çubuğunu görünür kaydırma alanının alt kenarında tutar", (
   const html = renderToStaticMarkup(<DeviceForm open projects={[]} device={{ _id: "d" as Id<"devices">, name: "Panel" }} onSuccess={vi.fn()} onClose={vi.fn()} />);
   expect(html).toContain("sticky bottom-0");
   expect(html).not.toContain("-bottom-5");
-  expect(html).toContain("Güncelle");
-  expect(html).toContain("İptal");
+  expect(html).toContain("Kaydet");
+  expect(html).toContain("Vazgeç");
 });

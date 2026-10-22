@@ -61,7 +61,7 @@ export function DeviceBasicSection({ form, isEdit }: DeviceBasicSectionProps) {
   const brand = form.watch("brand");
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormField
         control={form.control}
         name="name"
@@ -76,7 +76,7 @@ export function DeviceBasicSection({ form, isEdit }: DeviceBasicSectionProps) {
         )}
       />
 
-      {brand === "hikvision" && <DeviceHikModelField form={form} isEdit={isEdit} />}
+      {brand === "hikvision" && <div className="sm:col-span-2 sm:row-start-2"><DeviceHikModelField form={form} isEdit={isEdit} /></div>}
 
       <FormField
         control={form.control}

@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import { UNSAFE_NavigationContext, useLocation } from "react-router-dom";
+import { useCallback, useContext, useEffect, useRef } from "react";
+import { unguardedReplace } from "@/lib/navigationGuard";
 import type { ServerDevice } from "@/types/device";
 /** Consume each URL request once; a delayed router update cannot reopen a closed panel. */
 export function useDeviceDeepLink(
@@ -27,4 +29,14 @@ export function useDeviceDeepLink(
   return (id: string | null) => {
     handled.current = id;
   };
+}
+
+/** Drawer's own deviceId/filter URL sync; bypasses navigation guards so it never asks for confirmation. */
+export function useDeviceUrlSync() {
+  const { navigator } = useContext(UNSAFE_NavigationContext);
+  const location = useLocation();
+  return useCallback((update: (params: URLSearchParams) => URLSearchParams) => {
+    const search = update(new URLSearchParams(location.search)).toString();
+    unguardedReplace(navigator)({ ...location, search: search ? `?${search}` : "" }, location.state);
+  }, [navigator, location]);
 }

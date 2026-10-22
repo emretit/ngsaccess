@@ -1,3 +1,5 @@
+import { deviceUpdatePatch } from "./deviceUpdatePatch";
+import { buildDeviceFormValues, type DeviceData } from "./buildDeviceFormValues";
 import { useRef, useState } from "react";
 import { notify } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -19,7 +21,8 @@ const HIK_DEFAULT_PORT = 8000;
 const HIK_DEFAULT_DOOR_COUNT = 4;
 
 interface UseDeviceFormSubmissionProps {
-  device?: { _id?: Id<"devices">; hikDevIndex?: string } | null;
+  device?: DeviceData | null;
+  getBaseline?: () => Partial<FormValues>;
   currentProjectId: Id<"projects"> | null;
   onSuccess: () => void;
   /** Admin modu: yalnız bağlantı kimliği yazılır; isim seri/UUID'den türetilir, konum/yön/tip gönderilmez. */
@@ -31,6 +34,7 @@ export function useDeviceFormSubmission({
   currentProjectId,
   onSuccess,
   adminMode,
+  getBaseline,
 }: UseDeviceFormSubmissionProps) {
   const savedId = useRef<Id<"devices"> | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -193,8 +197,10 @@ export function useDeviceFormSubmission({
         ...ideFields,
       };
       let deviceId: Id<"devices"> | undefined;
+      // Yalnız düzenlemede false olabilir: değişen alan yoksa update atlanır, gateway kaydı yine denenir.
+      let changed = true;
       if (device?._id) {
-        await updateDevice(
+        const fullUpdate = (
           adminMode
             ? { deviceId: device._id, ...connectionFields }
             : {
@@ -210,6 +216,9 @@ export function useDeviceFormSubmission({
                 ...connectionFields,
               }
         );
+        const patch = deviceUpdatePatch(fullUpdate, values, getBaseline?.() ?? buildDeviceFormValues(device));
+        changed = Object.keys(patch).length > 1;
+        if (changed) await updateDevice(patch);
         deviceId = device._id;
       } else {
         deviceId = await createDevice(
@@ -265,8 +274,14 @@ export function useDeviceFormSubmission({
       ) {
         const reg = await registerOnGateway({ deviceId });
         if (!reg.ok) throw new Error(reg.error ?? "Gateway bağlantısı kurulamadı");
+        if (!changed) {
+          notify.success("Cihazın gateway bağlantısı hazırlandı");
+          onSuccess();
+          return;
+        }
       }
-      notify.success("Cihaz bilgileri kaydedildi");
+      if (changed) notify.success("Cihaz bilgileri kaydedildi");
+      else notify.info("Kaydedilecek değişiklik yok");
       onSuccess();
   };
   const { run, pending: isLoading } = useAsyncAction(async (values: FormValues) => {

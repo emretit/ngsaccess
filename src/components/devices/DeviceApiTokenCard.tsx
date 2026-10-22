@@ -11,6 +11,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 interface DeviceApiTokenCardProps {
+  onPendingChange?: (pending: boolean) => void;
   deviceId: Id<"devices">;
   deviceName?: string;
   currentToken?: string;
@@ -23,6 +24,7 @@ function maskToken(token?: string): string {
 }
 
 export function DeviceApiTokenCard({
+  onPendingChange,
   deviceId,
   deviceName,
   currentToken,
@@ -35,12 +37,14 @@ export function DeviceApiTokenCard({
 
   const handleRegenerate = async () => {
     setBusy(true);
+    onPendingChange?.(true);
     try {
       const result = await regenerate({ deviceId });
       setRevealedToken(result.token);
       notify.success("Yeni anahtar oluşturuldu", "Anahtarı kopyalayıp cihaz köprüsü yapılandırmasına uygulayın.");
     } finally {
       setBusy(false);
+      onPendingChange?.(false);
     }
   };
 

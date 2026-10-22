@@ -18,12 +18,12 @@ interface DeviceNetworkSectionProps {
 
 export function DeviceNetworkSection({ form }: DeviceNetworkSectionProps) {
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormField
         control={form.control}
         name="device_ip"
         render={({ field }) => (
-          <FormItem>
+          <FormItem className="sm:col-span-2">
             <FormLabel>{deviceLabels.optionalIp}</FormLabel>
             <FormControl>
               <Input placeholder={deviceLabels.ipPlaceholder} {...field} />

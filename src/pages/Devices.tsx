@@ -1,4 +1,4 @@
-import { useDeviceDeepLink } from "@/components/devices/useDeviceDeepLink";
+import { useDeviceDeepLink, useDeviceUrlSync } from "@/components/devices/useDeviceDeepLink";
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation } from 'convex/react';
@@ -26,6 +26,7 @@ import { AccessDenied } from '@/components/shared/AccessDenied';
 
 const Devices = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const syncDeviceUrl = useDeviceUrlSync();
   const requestedDeviceId = searchParams.get("deviceId");
   const { projectId, loading: scopeLoading } = useActiveProjectScope();
   const previousProject = useRef<string | null>(null);
@@ -33,10 +34,10 @@ const Devices = () => {
     if (scopeLoading) return;
     const nextProject = projectId ?? "none";
     if (previousProject.current !== null && previousProject.current !== nextProject) {
-      setSearchParams(resetDeviceFiltersForProject, { replace: true });
+      syncDeviceUrl(resetDeviceFiltersForProject);
     }
     previousProject.current = nextProject;
-  }, [projectId, scopeLoading, setSearchParams]);
+  }, [projectId, scopeLoading, syncDeviceUrl]);
   const { loading: projectLoading, isAdmin } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones, doors } = useZonesAndDoors();
@@ -61,12 +62,12 @@ const Devices = () => {
     devicePanel.device?._id ?? null, setDeviceUrl);
 
   function setDeviceUrl(deviceId: string | null) {
-    setSearchParams((previous) => {
+    syncDeviceUrl((previous) => {
       const next = new URLSearchParams(previous);
       if (deviceId) next.set("deviceId", deviceId);
       else next.delete("deviceId");
       return next;
-    }, { replace: true });
+    });
   };
 
   // QR Dialog
@@ -110,12 +111,12 @@ const Devices = () => {
   const handleDevicePanelClose = () => {
     consumeDeviceRequest(devicePanel.device?._id ?? requestedDeviceId);
     setDeviceUrl(null);
-    setDevicePanel({ open: false, device: null, projectId });
+    setDevicePanel(current => ({ ...current, open: false }));
   };
 
   const handleDevicePanelSuccess = () => {
     setDeviceUrl(null);
-    setDevicePanel({ open: false, device: null, projectId });
+    setDevicePanel(current => ({ ...current, open: false }));
   };
 
   const liveSelectedDevice = devices.find(device => device._id === devicePanel.device?._id);

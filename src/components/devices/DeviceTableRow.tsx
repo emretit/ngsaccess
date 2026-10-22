@@ -1,3 +1,4 @@
+import { deviceConnectionBadge } from "./hooks/deviceConnectionBadge";
 import { deviceDisplayName } from "@/lib/deviceDisplay";
 import { deviceBrandLabel } from "@/lib/deviceBrand";
 import { formatTrDateTime } from "@/lib/date";
@@ -61,19 +62,9 @@ export function DeviceTableRow({
   const getStatusBadge = () => (
     <StatusBadge
       className="max-w-full gap-1 px-1.5 whitespace-normal text-left md:whitespace-nowrap"
-      tone={
-        device.connectionStatus === "online"
-          ? "success"
-          : device.connectionStatus === "offline"
-            ? "warning"
-            : "neutral"
-      }
+      tone={deviceConnectionBadge(device.connectionStatus).tone}
     >
-      {device.connectionStatus === "online"
-        ? "Çevrimiçi"
-        : device.connectionStatus === "never"
-          ? "Henüz bağlanmadı"
-          : "Çevrimdışı"}
+      {deviceConnectionBadge(device.connectionStatus).label}
     </StatusBadge>
   );
 
