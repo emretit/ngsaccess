@@ -6,7 +6,6 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatInline } from "@/components/shared/StatInline";
-import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { ProjectSyncButton, RecentRuns } from "./SyncRuns";
 import { readRuleFilters } from "./rules-list/accessRulesListModel";
@@ -83,9 +82,6 @@ export default function AccessRulesList(props: Props) {
               },
             ]}
           />
-          <QuerySectionBoundary resetKey={projectId}>
-            <DeviceSyncStatusBanner />
-          </QuerySectionBoundary>
           <RulesFilters
             search={search}
             searchBy={searchBy}

@@ -9,7 +9,6 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 import { VisitorFilters, type VisitorStatusFilter } from "./VisitorFilters";
 import { displayVisitorStatus, isVisitorStatus } from "./lib/status";
 import { VisitorStats } from "./VisitorStats";
@@ -48,7 +47,6 @@ export default function VisitorManagement() {
       primaryAction={canManage && projectId ? { label: "Ziyaretçi kaydet", onClick: () => setPanel({ visitor: null, projectId }) } : undefined} />
     {loading ? <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" /> : !projectId ? !isSuperAdmin ? <AccessDenied compact /> : <EmptyState title="Proje seçin" description="Ziyaretçileri görmek için erişiminiz olan aktif bir proje seçin." /> : <>
       <QuerySectionBoundary title="Ziyaretçi özeti yüklenemedi" resetKey={projectId}><VisitorStats now={now} onNextExpiry={onNextExpiry} /></QuerySectionBoundary>
-      <QuerySectionBoundary title="Cihaz durumu yüklenemedi" resetKey={projectId}><div id="visitor-sync-status" tabIndex={-1} aria-label="Proje cihaz senkronizasyon durumu"><DeviceSyncStatusBanner hideVerified /></div></QuerySectionBoundary>
       <VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} onNewZone={can("devices.manage") ? () => setZoneOpen(true) : undefined} />
       <QuerySectionBoundary title="Ziyaretçiler yüklenemedi" description="Bağlantınızı kontrol edip tekrar deneyin." resetKey={resetKey}>
         <VisitorList key={resetKey} search={search} status={status} pageSize={pageSize} onPageSizeChange={setPageSize} now={now} onOpen={visitor => setPanel({ visitor, projectId })} onClear={clear} />

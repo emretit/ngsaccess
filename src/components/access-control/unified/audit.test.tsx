@@ -21,7 +21,6 @@ vi.mock("convex/react", () => ({
 vi.mock("react-router-dom", () => ({ useSearchParams: () => [new URLSearchParams({ tur: state.type }), vi.fn()] }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "project", activeProject: { name: "Proje" }, canManage: true }) }));
 vi.mock("@/hooks/access-rules/useAccessRuleMutations", () => ({ useAccessRuleMutations: () => ({ updateAccessRule: {}, deleteAccessRule: {} }) }));
-vi.mock("@/components/sync/DeviceSyncStatusBanner", () => ({ DeviceSyncStatusBanner: () => null }));
 vi.mock("@/hooks/useDevices", () => ({ useDevices: () => ({ devices: [{ _id: "p", name: "Panel", brand: "hikvision" }] }) }));
 vi.mock("@/hooks/useZonesAndDoors", () => ({ useZonesAndDoors: () => ({ zones: [{ _id: "z", name: "Bölge" }], doors: state.doorless ? [] : [{ _id: "d", name: "Kapı", deviceId: "p", zoneId: "z" }] }) }));
 vi.mock("@/hooks/useEmployees", () => ({ useEmployees: () => ({ employees: [{ _id: "e", firstName: "Ali", lastName: "Yılmaz" }] }) }));

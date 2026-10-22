@@ -1,6 +1,4 @@
 import type { ReactNode } from "react";
-import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
-import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DeviceAddMenu } from "./DeviceAddMenu";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
@@ -82,9 +80,6 @@ export function DevicesContent({
       <div className="flex min-w-0 flex-col gap-4 min-[1100px]:flex-row min-[1100px]:gap-5">
         {sidebar}
         <div className="min-w-0 flex-1 space-y-4">
-          <QuerySectionBoundary resetKey={activeProject?._id ?? "none"}>
-            <DeviceSyncStatusBanner />
-          </QuerySectionBoundary>
           <DeviceFilters
             onClearFilters={clearFilters}
             locationActive={Boolean(selectedZoneId || selectedDoorId)}

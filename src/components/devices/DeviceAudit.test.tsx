@@ -58,9 +58,6 @@ vi.mock("@/hooks/useDeviceFilters", () => ({
     setTypeFilter: vi.fn(),
   }),
 }));
-vi.mock("@/components/sync/DeviceSyncStatusBanner", () => ({
-  DeviceSyncStatusBanner: () => null,
-}));
 vi.mock("./DeviceList", () => ({ DeviceList: () => null }));
 vi.mock("@/components/ui/dialog", () => {
   const Part = ({ children }: { children?: ReactNode }) => (
