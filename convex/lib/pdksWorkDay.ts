@@ -1,8 +1,9 @@
+import { flexibleSchedule, relativeMinute, validFlexibleEntry, validFlexibleExit, type ShiftSchedule } from "./pdksFlexible";
 import type { Doc, Id } from "../_generated/dataModel";
 import { isoTimeToTRMinutes, parseHHMM } from "./pdksHelpers";
 import { trDateKey, trDayRangeISO } from "./trDate";
 
-export type PdksShift = Pick<Doc<"shifts">, "startTime" | "endTime">;
+export type PdksShift = ShiftSchedule;
 export type PdksShiftResolver = (
   employeeId: Id<"employees">,
   date: string,
@@ -15,7 +16,8 @@ export function addWorkDate(date: string, days: number): string {
 }
 
 export function isOvernightShift(shift: PdksShift | null | undefined): boolean {
-  return !!shift && parseHHMM(shift.endTime) <= parseHHMM(shift.startTime);
+  const flex = flexibleSchedule(shift);
+  return flex ? flex.checkOutEndDayOffset === 1 : !!shift && parseHHMM(shift.endTime) <= parseHHMM(shift.startTime);
 }
 
 /** Resolve against the assigned previous and current shifts, never global work hours.
@@ -30,6 +32,8 @@ export function pdksWorkDay(
   const date = trDateKey(accessTime);
   const previousDate = addWorkDate(date, -1);
   const previous = resolve(employeeId, previousDate);
+  const flex = flexibleSchedule(previous);
+  if (flex) return direction === "exit" && validFlexibleExit(flex, relativeMinute(previousDate, accessTime)) ? previousDate : date;
   if (!previous || !isOvernightShift(previous)) return date;
   const current = resolve(employeeId, date);
   const end = parseHHMM(previous.endTime);
@@ -48,15 +52,81 @@ export function groupPdksWorkDays<
   readings: readonly T[],
   employeeId: Id<"employees">,
   resolve: PdksShiftResolver,
+  manualEntryFor?: (employeeId: Id<"employees">, date: string) => string | undefined,
+  eligibleEntry?: (reading: T) => boolean,
 ): Map<string, T[]> {
   const result = new Map<string, T[]>();
-  for (const reading of readings) {
-    const key = pdksWorkDay(
+  // Entries open their calendar day. A previous open session can start a night
+  // tail; subsequent directed exits on that tail retain its last-exit rule.
+  const active = new Map<string, { first: string; open: boolean; nightTail?: boolean }>();
+  const markConflict = (workDate: string) => {
+    const prior = result.get(workDate);
+    if (prior) result.set(workDate, prior.map(item => ({ ...item, flexibleConflict: true })));
+  };
+  for (const reading of [...readings].sort((a, b) => a.accessTime.localeCompare(b.accessTime))) {
+    const date = trDateKey(reading.accessTime);
+    const previousDate = addWorkDate(date, -1);
+    const currentFlex = flexibleSchedule(resolve(employeeId, date));
+    const previousFlex = flexibleSchedule(resolve(employeeId, previousDate));
+    let key = pdksWorkDay(
       reading.accessTime,
       employeeId,
       resolve,
       reading.direction,
     );
+    if ((currentFlex || previousFlex) && (!("accessStatus" in reading) || reading.accessStatus === "izin_verildi")) {
+      // Preserve the fixed night rule when only the current schedule is flexible.
+      key = previousFlex || reading.direction === "entry" ? date : key;
+      let conflict = false;
+      for (const [workDate, flex] of [[previousDate, previousFlex], [date, currentFlex]] as const) {
+        const manualEntry = manualEntryFor?.(employeeId, workDate);
+        if (flex && manualEntry && !active.has(workDate)) {
+          const iso = `${workDate}T${manualEntry}:00+03:00`;
+          if (Date.parse(iso) <= Date.parse(reading.accessTime) && validFlexibleEntry(flex, relativeMinute(workDate, iso))) active.set(workDate, { first: new Date(iso).toISOString(), open: true });
+        }
+      }
+      const previous = active.get(previousDate);
+      const current = active.get(date);
+      const previousExit = previousFlex && previous && !current
+        && validFlexibleExit(previousFlex, relativeMinute(previousDate, reading.accessTime), relativeMinute(previousDate, previous.first));
+      const currentEntry = currentFlex && validFlexibleEntry(currentFlex, relativeMinute(date, reading.accessTime))
+        && (!eligibleEntry || eligibleEntry(reading));
+      const undirected = reading.direction !== "entry" && reading.direction !== "exit";
+      // An undirected repeat on a closed night tail stays on D unless it can open D+1.
+      if (undirected && previousExit && (previous.open || previous.nightTail && !currentEntry)) {
+        if (currentEntry) {
+          conflict = true;
+          previous.open = false;
+          markConflict(previousDate);
+          active.set(date, { first: reading.accessTime, open: true });
+        } else {
+          key = previousDate;
+          previous.open = false;
+          previous.nightTail = true;
+        }
+      } else if (reading.direction === "exit" && previousExit && (previous.open || previous.nightTail)) {
+        // A tail already closed on D+1 may extend to its last exit on D+1.
+        // An ordinary session closed on D must never consume an orphan D+1 exit.
+        key = previousDate;
+        previous.open = false;
+        previous.nightTail = true;
+      } else if ((reading.direction === "entry" || undirected && key === date) && currentEntry) {
+        if (previous?.open && previousFlex && validFlexibleExit(previousFlex, relativeMinute(previousDate, reading.accessTime), relativeMinute(previousDate, previous.first))) {
+          conflict = true;
+          markConflict(previousDate);
+        }
+        active.set(date, { first: current?.first ?? reading.accessTime, open: true });
+      } else if (reading.direction === "exit" && currentFlex && current
+          && validFlexibleExit(currentFlex, relativeMinute(date, reading.accessTime), relativeMinute(date, current.first))) {
+        current.open = false;
+      }
+      if (conflict) {
+        const bucket = result.get(key) ?? [];
+        bucket.push({ ...reading, flexibleConflict: true });
+        result.set(key, bucket);
+        continue;
+      }
+    }
     const bucket = result.get(key) ?? [];
     bucket.push(reading);
     result.set(key, bucket);
@@ -64,6 +134,15 @@ export function groupPdksWorkDays<
   for (const bucket of result.values())
     bucket.sort((a, b) => a.accessTime.localeCompare(b.accessTime));
   return result;
+}
+
+/** Gate loaders by assigned schedules in the requested scope, including night tails. */
+export function hasFlexiblePdksShift(
+  employees: readonly Doc<"employees">[], resolve: PdksShiftResolver, startDate: string, endDate: string,
+) {
+  const dates: string[] = [];
+  for (let date = addWorkDate(startDate, -1), last = addWorkDate(endDate, 1); date <= last; date = addWorkDate(date, 1)) dates.push(date);
+  return employees.some(employee => dates.some(date => flexibleSchedule(resolve(employee._id, date))));
 }
 
 /** Include the following calendar day; consumers retain only requested work days. */
@@ -76,8 +155,10 @@ export function manualPdksTimes(
   manual: { entryTime?: string; exitTime?: string } | undefined,
   shift: PdksShift | null,
 ) {
-  const nextDay =
-    isOvernightShift(shift) &&
+  const flex = flexibleSchedule(shift);
+  const nextDay = flex
+    ? flex.checkOutEndDayOffset === 1 && !!manual?.entryTime && !!manual.exitTime && manual.exitTime <= manual.entryTime
+    : isOvernightShift(shift) &&
     !!manual?.entryTime &&
     !!manual.exitTime &&
     (manual.exitTime < manual.entryTime ||
@@ -98,6 +179,11 @@ export function manualPdksTimes(
 export function buildPdksWorkDateResolver(
   employees: readonly Doc<"employees">[],
   resolve: PdksShiftResolver,
+  options?: {
+    readings: readonly Doc<"cardReadings">[];
+    manualEntryFor?: (employeeId: Id<"employees">, date: string) => string | undefined;
+    eligibleEntry?: (reading: Doc<"cardReadings">) => boolean;
+  },
 ) {
   const byId = new Map(
     employees.map((employee) => [String(employee._id), employee]),
@@ -105,15 +191,39 @@ export function buildPdksWorkDateResolver(
   const byCard = new Map(
     employees.map((employee) => [employee.cardNumber, employee]),
   );
+  const employeeFor = (reading: Pick<Doc<"cardReadings">, "employeeId" | "cardNo">) =>
+    (reading.employeeId ? byId.get(String(reading.employeeId)) : undefined) ?? byCard.get(reading.cardNo);
+  // Build once on first use, after callers have loaded date-specific policies.
+  let workDates: Map<string, string> | undefined;
+  function preparedWorkDates() {
+    if (workDates) return workDates;
+    workDates = new Map();
+    const byEmployee = new Map<string, { employee: Doc<"employees">; readings: Doc<"cardReadings">[] }>();
+    for (const reading of options?.readings ?? []) {
+      const employee = employeeFor(reading);
+      if (!employee || reading.direction === "entry" && options?.eligibleEntry && !options.eligibleEntry(reading)) continue;
+      const bucket = byEmployee.get(String(employee._id)) ?? { employee, readings: [] };
+      bucket.readings.push(reading);
+      byEmployee.set(String(employee._id), bucket);
+    }
+    for (const { employee, readings } of byEmployee.values()) {
+      for (const [date, grouped] of groupPdksWorkDays(readings, employee._id, resolve, options?.manualEntryFor, options?.eligibleEntry)) {
+        for (const reading of grouped) workDates.set(String(reading._id), date);
+      }
+    }
+    return workDates;
+  }
   return (
     reading: Pick<
       Doc<"cardReadings">,
       "accessTime" | "employeeId" | "cardNo" | "direction"
-    >,
+    > & { _id?: Id<"cardReadings"> },
   ) => {
-    const employee =
-      (reading.employeeId ? byId.get(String(reading.employeeId)) : undefined) ??
-      byCard.get(reading.cardNo);
+    const employee = employeeFor(reading);
+    const day = trDateKey(reading.accessTime);
+    if (options && employee && reading._id && (flexibleSchedule(resolve(employee._id, day)) || flexibleSchedule(resolve(employee._id, addWorkDate(day, -1))))) {
+      return preparedWorkDates().get(String(reading._id)) ?? day;
+    }
     return employee
       ? pdksWorkDay(
           reading.accessTime,
@@ -121,6 +231,6 @@ export function buildPdksWorkDateResolver(
           resolve,
           reading.direction,
         )
-      : trDateKey(reading.accessTime);
+      : day;
   };
 }

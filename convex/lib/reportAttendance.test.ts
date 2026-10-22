@@ -266,3 +266,16 @@ it("ay ortasında ayrılan personeli raporda tutar ve son gününden sonra devam
   expect(summary.absentDays).toBeLessThan(fullMonth.days.filter(day => day.payrollCode === "DV").length);
   expect((await loadAttendanceReport(ctx, [projectId], 2026, 2)).rows).toHaveLength(0);
 });
+
+it("esnek rapor hedef/eksik/fazla dakikayı koşullu taşır; fixed çıktıya alan eklemez", () => {
+  const emp = employee("flex");
+  const input = params(emp);
+  input.periodDateKeys = ["2026-01-02"];
+  input.startDate = "2026-01-02";
+  input.availableDateKeys = new Set(input.periodDateKeys);
+  input.manualPdksByEmpDate = new Map([[`${emp._id}__2026-01-02`, { entryTime: "09:00", exitTime: "16:00", manualEntry: true } as Doc<"pdksRecords">]]);
+  const fixed = summarizeAttendance(input, "2026-01-03");
+  expect(fixed).not.toHaveProperty("requiredNetMinutes");
+  input.resolveShift = () => ({ scheduleType: "flexible", startTime: "05:00", endTime: "22:00", flexible: { requiredNetMinutes: 480, checkInStart: "05:00", checkInEnd: "22:00", checkOutStart: "05:00", checkOutEnd: "14:00", checkOutEndDayOffset: 1, maxSpanMinutes: 960, breakMode: "duration", breakMinutes: 60 } }) as Doc<"shifts">;
+  expect(summarizeAttendance(input, "2026-01-03")).toMatchObject({ requiredNetMinutes: 480, shortfallMinutes: 120, excessMinutes: 0, presentDays: 1, absentDays: 0 });
+});

@@ -1,3 +1,4 @@
+import { flexibleExitEnd, flexibleSchedule, validateFlexible, type ShiftSchedule } from "./pdksFlexible";
 import { trDateKey } from "./trDate";
 const DAY = 86400000;
 const CODES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -16,7 +17,14 @@ export function minute(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
 }
-export function validateShift(shift: {startTime: string; endTime: string; breakStart?: string; breakEnd?: string; lateToleranceMinutes?: number; earlyExitToleranceMinutes?: number; overtimeStartToleranceMinutes?: number}) {
+export function validateShift(shift: ShiftSchedule & { breakStart?: string; breakEnd?: string; lateToleranceMinutes?: number; earlyExitToleranceMinutes?: number; overtimeStartToleranceMinutes?: number}) {
+  if (shift.scheduleType === "flexible") {
+    validateFlexible(shift.flexible);
+    for (const value of [shift.lateToleranceMinutes, shift.earlyExitToleranceMinutes, shift.overtimeStartToleranceMinutes]) {
+      if (value !== undefined && (!Number.isInteger(value) || value < 0 || value > 240)) throw new Error("Tolerans 0–240 arasında tam sayı olmalıdır");
+    }
+    return;
+  }
   const start = minute(shift.startTime);
   let end = minute(shift.endTime);
   if (start === end) throw new Error("Başlangıç ve bitiş aynı olamaz");
@@ -36,29 +44,33 @@ export interface ScheduleRange { startDate: string; endDate: string; weekPattern
 export function appliesOn(range: ScheduleRange, day: string): boolean {
   return day >= range.startDate && day <= range.endDate && (!range.weekPattern?.length || range.weekPattern.includes(CODES[new Date(`${day}T12:00:00Z`).getUTCDay()]));
 }
-export function scheduleIntervals(range: ScheduleRange, shift: {startTime: string; endTime: string}): [number, number][] {
-  const startMinute = minute(shift.startTime); let endMinute = minute(shift.endTime);
-  if (endMinute <= startMinute) endMinute += 1440;
+export function scheduleIntervals(range: ScheduleRange, shift: ShiftSchedule): [number, number][] {
+  const flex = flexibleSchedule(shift);
+  const startMinute = minute(flex?.checkInStart ?? shift.startTime);
+  let endMinute = flex ? Math.min(flexibleExitEnd(flex), minute(flex.checkInEnd) + flex.maxSpanMinutes) : minute(shift.endTime);
+  if (!flex && endMinute <= startMinute) endMinute += 1440;
   const result: [number, number][] = [];
   for (let date = Date.parse(range.startDate); date <= Date.parse(range.endDate); date += DAY) {
     if (appliesOn(range, trDateKey(new Date(date).toISOString()))) result.push([date / 60000 + startMinute, date / 60000 + endMinute]);
   }
   return result;
 }
-export function schedulesOverlap(a: ScheduleRange, aShift: {startTime: string; endTime: string}, b: ScheduleRange, bShift: {startTime: string; endTime: string}): boolean {
+export function schedulesOverlap(a: ScheduleRange, aShift: ShiftSchedule, b: ScheduleRange, bShift: ShiftSchedule): boolean {
   const ai = scheduleIntervals(a, aShift); const bi = scheduleIntervals(b, bShift);
   return ai.some(([start, end]) => bi.some(([otherStart, otherEnd]) => start < otherEnd && end > otherStart));
 }
-export function assignmentTouchesDay(range: ScheduleRange, shift: {startTime: string; endTime: string}, day: string): boolean {
+export function assignmentTouchesDay(range: ScheduleRange, shift: ShiftSchedule, day: string): boolean {
   const start = Date.parse(day) / 60000;
   return scheduleIntervals(range, shift).some(([s, e]) => s < start + 1440 && e > start);
 }
-export function overlapOnDay(a: ScheduleRange, aShift: {startTime: string; endTime: string}, b: ScheduleRange, bShift: {startTime: string; endTime: string}, day: string): boolean {
+export function overlapOnDay(a: ScheduleRange, aShift: ShiftSchedule, b: ScheduleRange, bShift: ShiftSchedule, day: string): boolean {
   const start = Date.parse(day) / 60000;
   return scheduleIntervals(a, aShift).some(([s, e]) => scheduleIntervals(b, bShift).some(([bs, be]) => Math.max(s, bs, start) < Math.min(e, be, start + 1440)));
 }
 
 /** Shared display for every shift picker and summary. */
-export function shiftTimeLabel(shift: { startTime: string; endTime: string }) {
+export function shiftTimeLabel(shift: ShiftSchedule) {
+  const flex = flexibleSchedule(shift);
+  if (flex) return `Esnek · ${Math.floor(flex.requiredNetMinutes / 60)} sa${flex.requiredNetMinutes % 60 ? ` ${flex.requiredNetMinutes % 60} dk` : ""}`;
   return `${shift.startTime}–${shift.endTime}${shift.endTime < shift.startTime ? " (+1 gün)" : ""}`;
 }

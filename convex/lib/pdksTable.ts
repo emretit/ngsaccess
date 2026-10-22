@@ -1,3 +1,4 @@
+import { flexibleMinuteFields, type FlexibleMinutes } from "./pdksFlexible";
 import { employedOn } from "./employment";
 import type { PdksPolicyResolver } from "./pdksRules";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
@@ -37,6 +38,8 @@ export type PdksDayStatus =
 
 /** Absence needs project data and a known employment period; time before shift start is pending. */
 export function classifyPdksDay(params: {
+  pendingUntil?: number;
+  durationMeasured?: boolean;
   attendanceDecision?: "present" | "absent" | "incomplete";
   date: string;
   today?: string;
@@ -59,10 +62,12 @@ export function classifyPdksDay(params: {
     mode: "calendar",
     classification: params.classification === "halfDayHoliday" ? "holiday" : params.classification,
   });
+  if (params.pendingUntil !== undefined && !params.durationMeasured && !params.hasLeave
+      && params.classification === "workday" && (params.now ?? Date.now()) <= params.pendingUntil) return "future";
   if (params.attendanceDecision !== undefined) {
     // Rest days and approved leave never become missing-data/review days.
     if (status === "weekend" || status === "holiday" || status === "leave") return status;
-    if (params.attendanceDecision !== "present" && params.shiftEnd) {
+    if (params.pendingUntil === undefined && params.attendanceDecision !== "present" && params.shiftEnd) {
       const endDate = params.shiftStart && params.shiftEnd <= params.shiftStart
         ? addWorkDate(params.date, 1) : params.date;
       const threshold = Date.parse(`${endDate}T${params.shiftEnd}:00+03:00`) + (params.earlyExitTolerance ?? 0) * 60000;
@@ -115,7 +120,7 @@ export type PdksDayDetail = {
   breakViolation: boolean;
 };
 
-export type PdksTableDayCell = {
+export type PdksTableDayCell = FlexibleMinutes & {
   durationMeasured?: boolean;
   punchQuality?: import("./pdksEvidence").PunchQuality;
   date: string;
@@ -134,7 +139,7 @@ export type PdksTableDayCell = {
   detail?: PdksDayDetail;
 };
 
-export type PdksTableRow = {
+export type PdksTableRow = FlexibleMinutes & {
   incompleteDays?: number;
   durationMeasured?: boolean;
   punchQuality?: import("./pdksEvidence").PunchQuality;
@@ -263,7 +268,7 @@ export function computePdksTableRow(params: {
   const { employee, empKey, workSettings, overtimeRates } = params;
   const empId = employee?._id;
   const byDate = empId
-    ? groupPdksWorkDays(params.empReadings, empId, params.resolveShift)
+    ? groupPdksWorkDays(params.empReadings, empId, params.resolveShift, (id, date) => params.manualPdksByEmpDate.get(`${id}__${date}`)?.entryTime)
     : new Map<string, Doc<"cardReadings">[]>();
   const hourlyRate = resolveHourlyRate({
     hourlyRate: employee?.hourlyRate,
@@ -285,6 +290,7 @@ export function computePdksTableRow(params: {
     const settings = settingsForShift(shift, workSettings);
     const day = computePdksDay({
       policy: params.policyFor?.(date),
+      hasLeave: !!leave,
       date,
       readings,
       manual,
@@ -309,6 +315,8 @@ export function computePdksTableRow(params: {
       today: params.today,
       dataAvailable: employee !== null && (params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!manual)),
       classification: day.classification,
+      pendingUntil: day.pendingUntil,
+      durationMeasured: day.durationMeasured,
       attendanceDecision: day.attendanceDecision,
     hasAttendance: day.hasAttendance,
       hasLeave: !!leave,
@@ -321,7 +329,8 @@ export function computePdksTableRow(params: {
     });
     const cell: PdksTableDayCell = {
       date,
-      ...(params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
+      ...flexibleMinuteFields(day),
+      ...(day.scheduleType === "flexible" || params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
       firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
       lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
       totalMinutes: day.totalMinutes,
@@ -339,8 +348,8 @@ export function computePdksTableRow(params: {
       detail: {
         dayType: day.classification,
         shiftName: shift?.name ?? null,
-        plannedStart: settings.workStartTime,
-        plannedEnd: settings.workEndTime,
+        plannedStart: day.scheduleType === "flexible" ? "Esnek" : settings.workStartTime,
+        plannedEnd: day.scheduleType === "flexible" ? "Esnek" : settings.workEndTime,
         isEarlyExit: day.isEarlyExit,
         earlyExitMinutes: day.earlyExitMinutes,
         readingCount: readings.filter((r) => r.accessStatus === "izin_verildi")
@@ -355,10 +364,10 @@ export function computePdksTableRow(params: {
                 direction: r.direction ?? "unknown",
               }))
           : [],
-        plannedBreakStart: shift?.breakStart ?? null,
-        plannedBreakEnd: shift?.breakEnd ?? null,
+        plannedBreakStart: day.scheduleType === "flexible" ? null : shift?.breakStart ?? null,
+        plannedBreakEnd: day.scheduleType === "flexible" ? null : shift?.breakEnd ?? null,
         breakViolation:
-          manual?.entryTime && manual.exitTime
+          day.scheduleType === "flexible" || manual?.entryTime && manual.exitTime
             ? false
             : computeBreakViolation({
                 punchTimes: readings
@@ -392,7 +401,15 @@ export function computePdksTableRow(params: {
   const { overtimeMinutes } = periodOvertime;
   const leaveRecord = calculations.find((c) => c.leave)?.leave;
   const status = first?.cell.status ?? "noData";
+  const flexibleDays = calculations.filter(c => c.day.scheduleType === "flexible");
   return {
+    ...(flexibleDays.length ? {
+      scheduleType: "flexible" as const,
+      requiredNetMinutes: flexibleDays.reduce((sum, c) => sum + (c.day.requiredNetMinutes ?? 0), 0),
+      shortfallMinutes: flexibleDays.some(c => c.day.shortfallMinutes === null) ? null : flexibleDays.reduce((sum, c) => sum + (c.day.shortfallMinutes ?? 0), 0),
+      excessMinutes: flexibleDays.reduce((sum, c) => sum + (c.day.excessMinutes ?? 0), 0),
+      leaveWorkWarning: flexibleDays.some(c => c.day.leaveWorkWarning),
+    } : {}),
     incompleteDays: calculations.filter(c => c.cell.status === "incomplete").length,
     durationMeasured: calculations.every(c => c.day.durationMeasured),
     punchQuality: first?.day.punchQuality ?? "noPunch",

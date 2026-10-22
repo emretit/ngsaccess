@@ -1,5 +1,5 @@
 import type { Doc, Id } from "../_generated/dataModel";
-import { shiftTimeLabel, appliesOn, minute, scheduleIntervals, validateRange, type ScheduleRange } from "./shiftUx";
+import { shiftTimeLabel, scheduleIntervals, validateRange, type ScheduleRange } from "./shiftUx";
 
 const DAY = 86_400_000;
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -15,7 +15,7 @@ export function validateAssignRange(range: ScheduleRange): void {
   if (range.weekPattern?.some(code => !WEEKDAYS.includes(code))) throw new Error("Geçersiz tekrar günü");
 }
 
-export type ShiftClock = Pick<Doc<"shifts">, "startTime" | "endTime">;
+export type ShiftClock = Pick<Doc<"shifts">, "startTime" | "endTime" | "scheduleType" | "flexible">;
 export interface ExistingShiftAssignment extends ScheduleRange {
   assignmentId: Id<"shiftAssignments">;
   shiftId: Id<"shifts">;
@@ -86,7 +86,7 @@ export function evaluateShiftAssignment(input: {
     const other = scheduleIntervals(range, existing.shift);
     if (intervalsOverlap(intervals, other)) {
       const { shift, ...assignment } = existing;
-      base.conflict = { ...assignment, startTime: shift.startTime, endTime: shift.endTime };
+      base.conflict = { ...assignment, ...shift };
       break;
     }
   }
@@ -102,12 +102,6 @@ export function assignmentIntersectsRange(range: ScheduleRange, shift: ShiftCloc
   const last = range.endDate < end ? range.endDate : end;
   const visibleStart = Date.parse(start) / 60000;
   const visibleEnd = Date.parse(shiftDateOffset(end, 1)) / 60000;
-  const startMinute = minute(shift.startTime);
-  let endMinute = minute(shift.endTime);
-  if (endMinute <= startMinute) endMinute += 1440;
-  for (let date = first; date <= last; date = shiftDateOffset(date, 1)) {
-    const day = Date.parse(date) / 60000;
-    if (appliesOn(range, date) && day + startMinute < visibleEnd && day + endMinute > visibleStart) return true;
-  }
-  return false;
+  return scheduleIntervals({ ...range, startDate: first, endDate: last }, shift)
+    .some(([startMinute, endMinute]) => startMinute < visibleEnd && endMinute > visibleStart);
 }

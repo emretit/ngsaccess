@@ -2,7 +2,8 @@ import { shortDate } from "../lib/planning";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import type { Id } from "../../../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../../../convex/_generated/dataModel";
+import { DEFAULT_FLEXIBLE } from "../../../../convex/lib/pdksFlexible";
 import { minute } from "../../../../convex/lib/shiftUx";
 import {
   Dialog,
@@ -18,22 +19,9 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { errorMessage } from "@/lib/notify";
 import { istanbulToday } from "../lib/planning";
-import { shiftFormSchema, type ShiftFormValues } from "./shiftFormSchema";
-export interface ShiftFormPayload {
-  name: string;
-  startTime: string;
-  endTime: string;
-  breakStart?: string | null;
-  breakEnd?: string | null;
-  lateToleranceMinutes?: number | null;
-  earlyExitToleranceMinutes?: number | null;
-  overtimeStartToleranceMinutes?: number | null;
-  overtimeEnabled: boolean;
-  isActive: boolean;
-}
-export interface EditingShift extends ShiftFormPayload {
-  _id: Id<"shifts">;
-}
+import { shiftPayloadSchema, type ShiftFormPayload, type ShiftFormValues } from "./shiftFormSchema";
+export type { ShiftFormPayload } from "./shiftFormSchema";
+export type EditingShift = Pick<Doc<"shifts">, "_id" | "name" | "startTime" | "endTime" | "scheduleType" | "flexible" | "breakStart" | "breakEnd" | "lateToleranceMinutes" | "earlyExitToleranceMinutes" | "overtimeStartToleranceMinutes"> & { overtimeEnabled: boolean; isActive: boolean };
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -54,6 +42,8 @@ export function AddShiftDialog({
   onClose,
 }: Props) {
   const [values, setValues] = useState<ShiftFormValues>(() => ({
+    scheduleType: editingShift?.scheduleType ?? "fixed",
+    flexible: editingShift?.flexible ?? { ...DEFAULT_FLEXIBLE },
     name: editingShift?.name ?? "",
     startTime: editingShift?.startTime ?? "",
     endTime: editingShift?.endTime ?? "",
@@ -111,7 +101,7 @@ export function AddShiftDialog({
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (lock.current || (editingShift && (!usage || usageStale))) return;
-    const parsed = shiftFormSchema.safeParse({
+    const parsed = shiftPayloadSchema.safeParse({
       ...values,
       ...(!breakEnabled ? { breakStart: "", breakEnd: "" } : {}),
     });
@@ -129,17 +119,9 @@ export function AddShiftDialog({
     setServerError("");
     lock.current = true;
     setPending(true);
-    const data = parsed.data;
-    const payload: ShiftFormPayload = {
-      ...data,
-      breakStart: data.breakStart || null,
-      breakEnd: data.breakEnd || null,
-      lateToleranceMinutes: data.lateToleranceMinutes ?? null,
-      earlyExitToleranceMinutes: data.earlyExitToleranceMinutes ?? null,
-      overtimeStartToleranceMinutes: data.overtimeStartToleranceMinutes ?? null,
-    };
+    const payload: ShiftFormPayload = parsed.data;
     try {
-      if (editingShift) await onUpdate(editingShift._id, payload);
+      if (editingShift && editingShift.scheduleType !== "flexible" && values.scheduleType !== "flexible") await onUpdate(editingShift._id, payload);
       else await onAdd(payload);
       setBaseline(JSON.stringify([values, breakEnabled]));
       onClose();
@@ -246,13 +228,26 @@ export function AddShiftDialog({
                     </p>
                   )}
                   <p>
-                    Saat ve mola değişiklikleri geçmiş atamaların görünümünü de
-                    değiştirir. Pasifleştirme mevcut atamaları silmez.
+                    {editingShift.scheduleType === "flexible" || values.scheduleType === "flexible"
+                      ? "Yeni tanım kaydedilir; geçmiş atamalar korunur. Yeni tanımı gelecek tarihli atayın."
+                      : "Saat ve mola değişiklikleri geçmiş atamaların görünümünü de değiştirir. Pasifleştirme mevcut atamaları silmez."}
                   </p>
                 </div>
               ))}
             <fieldset disabled={pending} className="space-y-4">
               {textFields(["name"])}
+              <FormFieldWrapper htmlFor="shift-scheduleType" label="Vardiya türü">
+                <select id="shift-scheduleType" className="w-full rounded-md border bg-surface p-2" value={values.scheduleType ?? "fixed"}
+                  onChange={e => { setValues({ ...values, scheduleType: e.target.value === "flexible" ? "flexible" : "fixed" }); setErrors({}); }}>
+                  <option value="fixed">Sabit</option><option value="flexible">Esnek</option>
+                </select>
+              </FormFieldWrapper>
+              {(values.scheduleType === "flexible" || editingShift?.scheduleType === "flexible") && (
+                <p role="status" className="text-sm text-muted-foreground">Esnek vardiya değişikliğinde yeni tanım oluşturulur. Geçmiş hesapları korumak için yeni tanımı gelecek tarihli atayın.</p>
+              )}
+              {values.scheduleType === "flexible" ? (
+                <FlexibleFields value={values.flexible ?? DEFAULT_FLEXIBLE} error={errors.flexible} onChange={flexible => setValues({ ...values, flexible })} />
+              ) : <>
               <div className="grid grid-cols-2 gap-3">
                 {textFields(["startTime", "endTime"])}
               </div>
@@ -282,6 +277,7 @@ export function AddShiftDialog({
                   {duration.net} dk
                 </p>
               )}
+              </>}
               <label className="flex gap-2 items-center text-sm">
                 <input
                   type="checkbox" className="size-6 shrink-0 accent-primary"
@@ -325,7 +321,7 @@ export function AddShiftDialog({
                       "earlyExitToleranceMinutes",
                       "overtimeStartToleranceMinutes",
                     ] as const
-                  ).map((key) => (
+                  ).filter(key => values.scheduleType !== "flexible" || key === "overtimeStartToleranceMinutes").map((key) => (
                     <FormFieldWrapper
                       key={key}
                       htmlFor={`shift-${key}`}
@@ -379,7 +375,7 @@ export function AddShiftDialog({
                 disabled={pending || (!!editingShift && (!usage || usageStale))}
                 type="submit"
               >
-                {pending ? "Kaydediliyor…" : "Kaydet"}
+                {pending ? "Kaydediliyor…" : editingShift && (values.scheduleType === "flexible" || editingShift.scheduleType === "flexible") ? "Yeni tanım olarak kaydet" : "Kaydet"}
               </Button>
             </div>
           </form>
@@ -388,4 +384,38 @@ export function AddShiftDialog({
       {guard.dialog}
     </>
   );
+}
+
+function FlexibleFields({ value, error, onChange }: {
+  value: NonNullable<ShiftFormValues["flexible"]>;
+  error?: string;
+  onChange: (value: NonNullable<ShiftFormValues["flexible"]>) => void;
+}) {
+  return <fieldset className="space-y-3" aria-describedby={error ? "flexible-error" : undefined}>
+    <legend className="text-sm font-medium">Esnek çalışma pencereleri</legend>
+    {error && <p id="flexible-error" role="alert" className="text-sm text-danger">{error}</p>}
+    <div className="grid grid-cols-2 gap-3">
+      {([ ["requiredNetMinutes", "Günlük net hedef (dk)"], ["maxSpanMinutes", "Azami oturum (dk)"] ] as const).map(([key, label]) =>
+        <FormFieldWrapper key={key} htmlFor={`flex-${key}`} label={label}>
+          <Input id={`flex-${key}`} type="number" min={1} max={1440} step={1} aria-invalid={!!error} value={Number.isNaN(value[key]) ? "" : value[key]} onChange={e => onChange({ ...value, [key]: e.target.value === "" ? Number.NaN : Number(e.target.value) })} />
+        </FormFieldWrapper>)}
+      {([ ["checkInStart", "En erken giriş"], ["checkInEnd", "En geç giriş"], ["checkOutStart", "En erken çıkış (giriş günü)"], ["checkOutEnd", "En geç çıkış"] ] as const).map(([key, label]) =>
+        <FormFieldWrapper key={key} htmlFor={`flex-${key}`} label={label}>
+          <Input id={`flex-${key}`} type="time" aria-invalid={!!error} value={value[key]} onChange={e => onChange({ ...value, [key]: e.target.value })} />
+        </FormFieldWrapper>)}
+    </div>
+    <FormFieldWrapper htmlFor="flex-dayOffset" label="En geç çıkış günü">
+      <select id="flex-dayOffset" className="w-full rounded-md border bg-surface p-2" value={value.checkOutEndDayOffset} onChange={e => onChange({ ...value, checkOutEndDayOffset: e.target.value === "1" ? 1 : 0 })}>
+        <option value={0}>Giriş günü</option><option value={1}>Ertesi gün (+1)</option>
+      </select>
+    </FormFieldWrapper>
+    <FormFieldWrapper htmlFor="flex-breakMode" label="Mola modu">
+      <select id="flex-breakMode" className="w-full rounded-md border bg-surface p-2" value={value.breakMode} onChange={e => onChange({ ...value, breakMode: e.target.value === "duration" ? "duration" : "existingLegal" })}>
+        <option value="duration">Süre molası</option><option value="existingLegal">Mevcut otomatik mola</option>
+      </select>
+    </FormFieldWrapper>
+    {value.breakMode === "duration" && <FormFieldWrapper htmlFor="flex-breakMinutes" label="Mola süresi (dk)">
+      <Input id="flex-breakMinutes" type="number" min={0} max={1439} step={1} aria-invalid={!!error} value={value.breakMinutes ?? ""} onChange={e => onChange({ ...value, breakMinutes: e.target.value === "" ? undefined : Number(e.target.value) })} />
+    </FormFieldWrapper>}
+  </fieldset>;
 }

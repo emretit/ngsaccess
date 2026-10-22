@@ -1,3 +1,4 @@
+import { flexibleMinuteFields } from "./pdksFlexible";
 import type { PdksPolicyResolver } from "./pdksRules";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
 import { classifyPdksDay } from "./pdksTable";
@@ -28,6 +29,7 @@ export function computePayrollCell(params: {
 }) {
   const { date, dayShift, workSettings } = params;
   const day = computePdksDay({
+    hasLeave: params.hasLeave,
       policy: params.policyFor?.(date),
     date,
     readings: params.dayReadings,
@@ -52,6 +54,8 @@ export function computePayrollCell(params: {
       params.firstRecordDate !== undefined ? dayShift !== null : undefined,
     lateTolerance: settings.maxLateMinutes,
     classification: day.classification,
+    pendingUntil: day.pendingUntil,
+    durationMeasured: day.durationMeasured,
     attendanceDecision: day.attendanceDecision,
     hasAttendance: day.hasAttendance,
     hasLeave: params.hasLeave,
@@ -64,7 +68,8 @@ export function computePayrollCell(params: {
   });
   return {
     date,
-    ...(params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
+    ...flexibleMinuteFields(day),
+    ...(day.scheduleType === "flexible" || params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
     overtimeSegments: day.overtimeSegments,
     status,
     payrollCode:

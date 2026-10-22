@@ -952,6 +952,18 @@ export default defineSchema({
   shifts: defineTable({
     name: v.string(),
     projectId: v.optional(v.id("projects")),
+    scheduleType: v.optional(v.union(v.literal("fixed"), v.literal("flexible"))),
+    flexible: v.optional(v.object({
+      requiredNetMinutes: v.number(),
+      checkInStart: v.string(),
+      checkInEnd: v.string(),
+      checkOutStart: v.string(),
+      checkOutEnd: v.string(),
+      checkOutEndDayOffset: v.union(v.literal(0), v.literal(1)),
+      maxSpanMinutes: v.number(),
+      breakMode: v.union(v.literal("duration"), v.literal("existingLegal")),
+      breakMinutes: v.optional(v.number()),
+    })),
     startTime: v.string(),
     endTime: v.string(),
     breakStart: v.optional(v.string()),

@@ -1,3 +1,4 @@
+import { flexibleMinuteFields } from "./pdksFlexible";
 import type { PdksPolicyResolver } from "./pdksRules";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
 import { classifyPdksDay } from "./pdksTable";
@@ -28,7 +29,11 @@ export function computeAttendanceDetailDay(params: {
   overtimeRates?: EffectiveOvertimeRates;
 }) {
   const { date, dayShift, workSettings } = params;
+  const leave = params.leaves.find(
+    (l) => date >= l.startDate && date <= l.endDate,
+  );
   const day = computePdksDay({
+    hasLeave: !!leave,
       policy: params.policyFor?.(date),
     date,
     readings: params.dayReadings,
@@ -40,9 +45,6 @@ export function computeAttendanceDetailDay(params: {
     holiday: params.holiday,
     holidayMap: params.holidayMap,
   });
-  const leave = params.leaves.find(
-    (l) => date >= l.startDate && date <= l.endDate,
-  );
   const settings = settingsForShift(dayShift, workSettings);
   const status = classifyPdksDay({
     date,
@@ -55,6 +57,8 @@ export function computeAttendanceDetailDay(params: {
       params.firstRecordDate !== undefined ? dayShift !== null : undefined,
     lateTolerance: settings.maxLateMinutes,
     classification: day.classification,
+    pendingUntil: day.pendingUntil,
+    durationMeasured: day.durationMeasured,
     attendanceDecision: day.attendanceDecision,
     hasAttendance: day.hasAttendance,
     hasLeave: !!leave,
@@ -67,6 +71,7 @@ export function computeAttendanceDetailDay(params: {
   });
   return {
     date,
+    ...flexibleMinuteFields(day),
     durationMeasured: day.durationMeasured,
     punchQuality: day.punchQuality,
     overtimeSegments: day.overtimeSegments,

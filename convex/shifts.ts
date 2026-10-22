@@ -379,8 +379,19 @@ export const list = authedQuery({
   },
 });
 
+const scheduleArgs = {
+  scheduleType: v.optional(v.union(v.literal("fixed"), v.literal("flexible"))),
+  flexible: v.optional(v.object({
+    requiredNetMinutes: v.number(), checkInStart: v.string(), checkInEnd: v.string(),
+    checkOutStart: v.string(), checkOutEnd: v.string(),
+    checkOutEndDayOffset: v.union(v.literal(0), v.literal(1)), maxSpanMinutes: v.number(),
+    breakMode: v.union(v.literal("duration"), v.literal("existingLegal")), breakMinutes: v.optional(v.number()),
+  })),
+};
+
 export const create = authedMutation({
   args: {
+    ...scheduleArgs,
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     startTime: v.string(),
@@ -395,12 +406,16 @@ export const create = authedMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
+    if (args.projectId ? !allowedProjectIds.some((id) => id === args.projectId) : ctx.user.role !== "super_admin") {
+      throw new Error("Bu vardiyayı oluşturma yetkiniz yok");
     }
     const now = new Date().toISOString();
     const fields = { ...toPatch(args), name: args.name, startTime: args.startTime, endTime: args.endTime };
     validateShift(fields);
+    if (fields.scheduleType === "flexible" && fields.flexible) {
+      fields.startTime = fields.flexible.checkInStart;
+      fields.endTime = fields.flexible.checkInEnd;
+    }
     return await ctx.db.insert("shifts", {
       ...fields,
       isActive: args.isActive ?? true,
@@ -413,6 +428,7 @@ export const create = authedMutation({
 
 export const update = authedMutation({
   args: {
+    ...scheduleArgs,
     shiftId: v.id("shifts"),
     name: v.optional(v.string()),
     startTime: v.optional(v.string()),
@@ -434,6 +450,9 @@ export const update = authedMutation({
     }
     const { shiftId, ...updates } = args;
     const patch = toPatch(updates);
+    if (shift.scheduleType === "flexible" || patch.scheduleType === "flexible") {
+      throw new Error("Esnek vardiya değişikliği için yeni tanım oluşturun ve gelecek tarihli atama yapın; geçmiş hesaplar değiştirilmez");
+    }
     validateShift({ ...shift, ...patch });
     await ctx.db.patch(shiftId, { ...patch, updatedAt: new Date().toISOString() });
   },

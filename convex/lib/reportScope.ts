@@ -30,7 +30,7 @@ export async function resolveReportScope(ctx: QueryCtx, projectId?: Id<"projects
   return { projectIds, scopeLabel: await reportScopeLabel(ctx, projectIds, projectId === undefined) };
 }
 
-export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects">[], startISO: string, endISO: string, prepared?: { policies: PdksProjectPolicies; workDate: (reading: Doc<"cardReadings">) => string }) {
+export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects">[], startISO: string, endISO: string, prepared?: { policies: PdksProjectPolicies; workDate?: (reading: Doc<"cardReadings">) => string; raw?: boolean }) {
   const startDate = addWorkDate(trDateKey(startISO), -1);
   const endDate = trDateKey(endISO);
   const policies = prepared?.policies ?? await loadPdksPolicies(ctx, projectIds, startDate, endDate);
@@ -38,16 +38,26 @@ export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects
   const readings = (await Promise.all(projectIds.map(projectId => {
     const query = ctx.db.query("cardReadings").withIndex("by_project_access_time", q => q.eq("projectId", projectId).gte("accessTime", startISO).lte("accessTime", endISO));
     // Preserve the pre-W5 legacy bound/range exactly; only versioned projects use the new cap.
-    return activeProjects.includes(projectId) ? query.take(20001) : query.collect();
+    return (activeProjects.includes(projectId) || prepared?.raw) ? query.take(20001) : query.collect();
   }))).flat();
+  if ((prepared?.raw ? readings.length : readings.filter(r => r.projectId && activeProjects.includes(r.projectId)).length) > 20000) throw new Error("Rapor okuma sınırı aşıldı; tarih aralığını daraltın");
+  if (prepared?.raw) return readings;
   if (!activeProjects.length) return filterPdksReadings(readings);
-  if (readings.filter(r => r.projectId && activeProjects.includes(r.projectId)).length > 20000) throw new Error("Rapor okuma sınırı aşıldı; tarih aralığını daraltın");
   let workDate = prepared?.workDate;
   if (!workDate) {
     const employees = (await Promise.all(activeProjects.map(projectId => ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).take(10001)))).flat();
     if (employees.length > 10000) throw new Error("Rapor personel sınırı aşıldı; proje seçin");
     const shifts = await buildBoundedShiftResolver(ctx, employees);
-    workDate = buildPdksWorkDateResolver(employees, shifts.resolve);
+    const flexible = [...shifts.shifts.values()].some(shift => shift.scheduleType === "flexible");
+    const manualLists = flexible ? await Promise.all(employees.map(employee => ctx.db.query("pdksRecords")
+      .withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", startDate).lte("date", endDate)).take(1001))) : [];
+    const manual = manualLists.flat();
+    if (manualLists.some(list => list.length > 1000) || manual.length > 10000) throw new Error("Rapor manuel kayıt sınırı aşıldı; tarih aralığını daraltın");
+    const manualByDate = new Map(manual.filter(record => record.manualEntry && record.projectId !== undefined && projectIds.includes(record.projectId)).map(record => [`${record.employeeId}__${record.date}`, record]));
+    workDate = buildPdksWorkDateResolver(employees, shifts.resolve, flexible ? {
+      readings, manualEntryFor: (id, date) => manualByDate.get(`${id}__${date}`)?.entryTime,
+      eligibleEntry: reading => filterPdksReadings([reading], undefined, r => policies(r.projectId, trDateKey(r.accessTime))).length > 0,
+    } : undefined);
   }
   const dateFor = workDate;
   return filterPdksReadings(readings, undefined, r => policies(r.projectId, dateFor(r)));
@@ -70,4 +80,53 @@ export async function resolveScheduleScope(ctx: QueryCtx, schedule: Doc<"reportS
   const projectIds = selectScheduleProjectIds(user, allowed, schedule.projectId);
   if (!projectIds) return null;
   return { projectIds, scopeLabel: await reportScopeLabel(ctx, projectIds, schedule.projectId === undefined) };
+}
+
+/** Discover actual usage before opening any per-employee assignment queries.
+ * Reuse the bounded project employee scan when a managed report is loaded. */
+export async function flexibleReportProjects(
+  ctx: QueryCtx, projectIds: readonly Id<"projects">[], startDate: string, endDate: string,
+  employeesByProject = new Map<Id<"projects">, Doc<"employees">[]>(),
+) {
+  if (!projectIds.length) return new Set<Id<"projects">>();
+  const scopes = [...new Set<Id<"projects"> | undefined>([...projectIds, undefined])];
+  const definitions = await Promise.all(scopes.map(projectId => ctx.db.query("shifts")
+    .withIndex("by_project", q => q.eq("projectId", projectId)).take(1001)));
+  if (definitions.some(list => list.length > 1000)) throw new Error("Vardiya tanımı sınırı aşıldı; proje kapsamını daraltın");
+  const flexible = definitions.flat().filter(shift => shift.scheduleType === "flexible");
+  const projects = new Set<Id<"projects">>();
+  const dayBefore = addWorkDate(startDate, -1);
+  const assignmentsByShift = new Map<Id<"shifts">, Doc<"shiftAssignments">[]>();
+  for (const projectId of projectIds) {
+    const relevant = flexible.filter(shift => !shift.projectId || shift.projectId === projectId);
+    if (!relevant.length) continue;
+    let employees = employeesByProject.get(projectId);
+    if (!employees) {
+      employees = await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).take(10001);
+      if (employees.length > 10000) throw new Error("Esnek vardiya keşfi personel sınırı aşıldı; proje kapsamını daraltın");
+      employeesByProject.set(projectId, employees);
+    }
+    const shiftIds = new Set(relevant.map(shift => shift._id));
+    if (employees.some(employee => employee.shiftId && shiftIds.has(employee.shiftId))) {
+      projects.add(projectId);
+      continue;
+    }
+    const employeeIds = new Set(employees.map(employee => employee._id));
+    for (const shift of relevant) {
+      let assignments = assignmentsByShift.get(shift._id);
+      if (!assignments) {
+        // Newest first: recent assignments are the ones likely to intersect the period.
+        assignments = await ctx.db.query("shiftAssignments").withIndex("by_shift", q => q.eq("shiftId", shift._id)).order("desc").take(1001);
+        assignmentsByShift.set(shift._id, assignments);
+      }
+      // Fail-safe: a truncated assignment list cannot prove non-use, so take the flexible path.
+      if (assignments.length > 1000 || assignments.some(assignment => (assignment.projectId === projectId || assignment.projectId === undefined)
+          && employeeIds.has(assignment.employeeId) && assignment.startDate <= endDate
+          && assignment.endDate >= (shift.flexible?.checkOutEndDayOffset === 1 ? dayBefore : startDate))) {
+        projects.add(projectId);
+        break;
+      }
+    }
+  }
+  return projects;
 }

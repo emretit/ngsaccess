@@ -88,7 +88,7 @@ export const getSgkMonthlyReport = authedQuery({
               }, 0)
           : 0;
 
-        const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
+        const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
 
         const dayReadingsMap = new Map<string, typeof granted>();
         for (const r of granted) {
@@ -207,7 +207,7 @@ export const getOvertimeSummaryReport = authedQuery({
       const department = foundDepartment?.projectId === first.projectId ? foundDepartment : null;
       const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
 
-      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
+      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
       const dayReadingsMap = new Map<string, typeof granted>();
       for (const r of granted) {
         const dateKey = ruleReport.workDate(r);
@@ -337,7 +337,7 @@ export const getDepartmentCostReport = authedQuery({
       const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
       const deptName = department?.name ?? "Belirtilmemiş";
 
-      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
+      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
       const dayReadingsMap = new Map<string, typeof granted>();
       for (const r of granted) {
         const dateKey = ruleReport.workDate(r);

@@ -59,7 +59,7 @@ export function ShiftDayDetails({
             <p className="font-medium">{shift.name}</p>
             <p className="text-sm tabular-nums">
               {continuation
-                ? `Önceki günden · 00:00–${shift.endTime}`
+                ? shift.scheduleType === "flexible" ? `Önceki günden · ${shiftTimeLabel(shift)}` : `Önceki günden · 00:00–${shift.endTime}`
                 : shiftTimeLabel(shift)}
             </p>
             <p className="text-sm">

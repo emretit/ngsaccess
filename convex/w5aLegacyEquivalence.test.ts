@@ -8,6 +8,7 @@ import { getPdksTableData } from "./cardReadings";
 import { getSgkMonthlyReport, getOvertimeSummaryReport, getDepartmentCostReport, getAttendanceSummaryReport } from "./reports";
 import { getActivitySummary, getAnnualOvertimeBalance } from "./dashboard";
 import { buildAphbForMonth } from "./sgkExport";
+import { DEFAULT_FLEXIBLE } from "./lib/pdksFlexible";
 const modules = import.meta.glob("./**/*.ts");
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-23T17:00:00.000Z")); });
 afterEach(() => vi.useRealTimers());
@@ -50,38 +51,59 @@ it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK ayn�
     ["annual", getAnnualOvertimeBalance, { projectId: ids.projectId, year: 2026 }],
     ["sgk", buildAphbForMonth, { projectId: ids.projectId, year: 2026, month: 10 }],
   ] as const;
-  for (const [name, registered, args] of cases) {
-    const reads: unknown[][] = [];
-    await caller.run(async ctx => {
-      function trace(target: object, calls: unknown[]): object {
-        return new Proxy(target, { get(obj, key) {
-          const value: unknown = Reflect.get(obj, key);
-          if (typeof value !== "function") return value;
-          return (...values: unknown[]) => {
-            // Capture actual index bounds, not callback identity.
-            calls.push([String(key), ...values.filter(value => typeof value !== "function")]);
-            if (key === "withIndex" && typeof values[1] === "function") {
-              const callback = values[1];
-              values[1] = (query: object) => Reflect.apply(callback, undefined, [trace(query, calls)]);
-            }
-            const result: unknown = Reflect.apply(value, obj, values);
-            return result !== null && typeof result === "object" && ["withIndex", "eq", "gte", "lte", "gt", "lt", "order", "filter"].includes(String(key)) ? trace(result, calls) : result;
+  const baseline = new Map<string, { reads: string[]; result: unknown }>();
+  for (const otherFlexible of [false, true]) {
+    if (otherFlexible) await t.run(async ctx => {
+      const projectId = await ctx.db.insert("projects", { name: "Başka esnek proje" });
+      const shiftId = await ctx.db.insert("shifts", { projectId, name: "Başka esnek", scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE, startTime: "05:00", endTime: "22:00", createdAt: "", updatedAt: "" });
+      const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Başka", lastName: "Kişi", email: "other@test", cardNumber: "other", isActive: true });
+      await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
+    });
+    for (const [name, registered, args] of cases) {
+      const reads: unknown[][] = [];
+      await caller.run(async ctx => {
+        function trace(target: object, calls: unknown[]): object {
+          return new Proxy(target, { get(obj, key) {
+            const value: unknown = Reflect.get(obj, key);
+            if (typeof value !== "function") return value;
+            return (...values: unknown[]) => {
+              // Capture actual index bounds, not callback identity.
+              calls.push([String(key), ...values.filter(value => typeof value !== "function")]);
+              if (key === "withIndex" && typeof values[1] === "function") {
+                const callback = values[1];
+                values[1] = (query: object) => Reflect.apply(callback, undefined, [trace(query, calls)]);
+              }
+              const result: unknown = Reflect.apply(value, obj, values);
+              return result !== null && typeof result === "object" && ["withIndex", "eq", "gte", "lte", "gt", "lt", "order", "filter"].includes(String(key)) ? trace(result, calls) : result;
+            };
+          } });
+        }
+        const db = new Proxy(ctx.db, { get(target, key) {
+          if (key !== "query") return Reflect.get(target, key);
+          return (table: string) => {
+            const calls: unknown[] = [table];
+            if (table !== "pdksRuleVersions" && table !== "pdksCheckpointSelections") reads.push(calls);
+            return trace(Reflect.apply(target.query, target, [table]) as object, calls);
           };
         } });
-      }
-      const db = new Proxy(ctx.db, { get(target, key) {
-        if (key !== "query") return Reflect.get(target, key);
-        return (table: string) => {
-          const calls: unknown[] = [table];
-          if (table !== "pdksRuleVersions" && table !== "pdksCheckpointSelections") reads.push(calls);
-          return trace(Reflect.apply(target.query, target, [table]) as object, calls);
-        };
-      } });
-      const handler = registered as unknown as { _handler: (ctx: QueryCtx, args: object) => Promise<unknown> };
-      const result = await handler._handler({ ...ctx, db }, args);
-      if (name === "sgk" && result !== null && typeof result === "object" && "employees" in result) delete result.employees;
-      const normalizedReads = reads.map(read => JSON.stringify(stable(read))).sort();
-      expect({ reads: normalizedReads, result: stable(result) }, name).toMatchSnapshot(name);
-    });
+        const handler = registered as unknown as { _handler: (ctx: QueryCtx, args: object) => Promise<unknown> };
+        const result = await handler._handler({ ...ctx, db }, args);
+        if (name === "sgk" && result !== null && typeof result === "object" && "employees" in result) delete result.employees;
+        // Coordinator-approved W5.3 metadata gate only; all DTOs and other DB traces remain strict.
+        const discovery = reads.filter(read => read[0] === "shifts" && read.some(call => Array.isArray(call) && call[0] === "withIndex" && call[1] === "by_project"));
+        for (const read of discovery) {
+          const scope: unknown = Array.isArray(read[2]) ? read[2][2] : null;
+          expect(scope === undefined || scope === ids.projectId).toBe(true);
+          expect(read).toEqual(["shifts", ["withIndex", "by_project"], ["eq", "projectId", scope], ["export"], ["take", 1001]]);
+        }
+        const normalizedReads = reads.filter(read => !discovery.includes(read)).map(read => JSON.stringify(stable(read))).sort();
+        const actual = { reads: normalizedReads, result: stable(result) };
+        if (otherFlexible) expect(actual, `${name}: başka projedeki esnek atama sabit DTO/DB izini değiştirmez`).toEqual(baseline.get(name));
+        else {
+          expect(actual, name).toMatchSnapshot(name);
+          baseline.set(name, actual);
+        }
+      });
+    }
   }
 });

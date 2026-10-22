@@ -104,6 +104,10 @@ export function thresholdsForShift(
   shift: Doc<"shifts"> | null,
   settings: EffectiveWorkSettings,
 ): ShiftThresholds {
+  // Flexible windows are eligibility bounds, never lateness/early-exit hours.
+  if (shift?.scheduleType === "flexible") return {
+    shiftStartMin: 0, shiftEndMin: 1440, lateThresholdMin: 1440, earlyThresholdMin: 0,
+  };
   const startStr = shift?.startTime ?? settings.workStartTime;
   const endStr = shift?.endTime ?? settings.workEndTime;
   const shiftStartMin = parseHHMM(startStr);

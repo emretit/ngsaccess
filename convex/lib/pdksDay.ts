@@ -1,3 +1,4 @@
+import { flexibleSchedule, flexibleBreak, flexibleReadings, flexiblePendingUntil, relativeMinute, validFlexibleEntry, validFlexibleExit } from "./pdksFlexible";
 import { resolveAttendanceEvidence } from "./pdksEvidence";
 import { LEGACY_PDKS_POLICY, type PdksDayPolicy } from "./pdksRules";
 import type { Doc } from "../_generated/dataModel";
@@ -48,6 +49,7 @@ function recurringWindows(
  * day's timeline; legal breaks without a scheduled window are allocated proportionally. */
 export function computePdksDay(params: {
   policy?: PdksDayPolicy;
+  hasLeave?: boolean;
   date: string;
   readings: readonly Doc<"cardReadings">[];
   manual?: Doc<"pdksRecords">;
@@ -61,10 +63,14 @@ export function computePdksDay(params: {
 }) {
   const { date, shift, manual, workSettings } = params;
   const rates = params.overtimeRates ?? DEFAULT_OVERTIME_RATES;
-  const readings = params.readings
+  const flex = flexibleSchedule(shift);
+  const candidateReadings = params.readings
     .filter((r) => r.accessStatus === "izin_verildi")
     .slice()
     .sort((a, b) => a.accessTime.localeCompare(b.accessTime));
+  const provisionalManual = manualPdksTimes(date, manual, shift);
+  const validManualEntry = provisionalManual.entryISO && (!flex || validFlexibleEntry(flex, relativeMinute(date, provisionalManual.entryISO))) ? provisionalManual.entryISO : undefined;
+  const readings = flex ? flexibleReadings(flex, date, candidateReadings, validManualEntry) : candidateReadings;
   const rawEntry = readings[0]?.accessTime;
   const fallbackEntry = rawEntry
     ? `${String(Math.floor(isoTimeToTRMinutes(rawEntry) / 60)).padStart(2, "0")}:${String(isoTimeToTRMinutes(rawEntry) % 60).padStart(2, "0")}`
@@ -79,8 +85,30 @@ export function computePdksDay(params: {
   const directedEntry = readings.find(r => r.direction === "entry")?.accessTime;
   const directedFallback = directedEntry ? `${String(Math.floor(isoTimeToTRMinutes(directedEntry) / 60)).padStart(2, "0")}:${String(isoTimeToTRMinutes(directedEntry) % 60).padStart(2, "0")}` : undefined;
   const evidenceManualTimes = manualPdksTimes(date, manual ? { ...manual, entryTime: manual.entryTime ?? directedFallback } : undefined, shift);
-  const evidence = (params.policy ?? LEGACY_PDKS_POLICY).punchMode === "requirements"
+  const flexEntry = validManualEntry ?? readings.find(r => r.direction === "entry")?.accessTime;
+  const validManualExit = evidenceManualTimes.exitISO && (!flex || validFlexibleExit(flex, relativeMinute(date, evidenceManualTimes.exitISO), flexEntry ? relativeMinute(date, flexEntry) : undefined)) ? evidenceManualTimes.exitISO : undefined;
+  let evidence = flex
+    ? resolveAttendanceEvidence(readings, { entryISO: validManualEntry, exitISO: validManualExit }, params.policy ?? LEGACY_PDKS_POLICY, { scheduleType: "flexible" })
+    : (params.policy ?? LEGACY_PDKS_POLICY).punchMode === "requirements"
     ? resolveAttendanceEvidence(readings, { entryISO: manual?.entryTime ? evidenceManualTimes.entryISO : undefined, exitISO: evidenceManualTimes.exitISO }, params.policy ?? LEGACY_PDKS_POLICY) : null;
+  if (flex && evidence?.durationMeasured) {
+    const entryMinute = evidence.firstISO ? relativeMinute(date, evidence.firstISO) : undefined;
+    const validFirst = entryMinute !== undefined && validFlexibleEntry(flex, entryMinute);
+    const validLast = evidence.lastISO && validFlexibleExit(flex, relativeMinute(date, evidence.lastISO), validFirst ? entryMinute : undefined);
+    if (!validFirst || !validLast) {
+      evidence = resolveAttendanceEvidence([], {
+        entryISO: validFirst ? evidence.firstISO ?? undefined : undefined,
+        exitISO: validLast ? evidence.lastISO ?? undefined : undefined,
+      }, params.policy ?? LEGACY_PDKS_POLICY);
+    }
+  }
+  if (flex && evidence && readings.some(reading => "flexibleConflict" in reading && reading.flexibleConflict === true)) {
+    evidence.decision = "incomplete";
+    evidence.punchQuality = "undirected";
+    evidence.durationMeasured = false;
+    evidence.attendanceCredit = false;
+    evidence.lastISO = null;
+  }
   const firstISO = evidence ? evidence.firstISO : manual?.entryTime
     ? (manualTimes.entryISO ?? null)
     : (rawEntry ?? null);
@@ -100,7 +128,7 @@ export function computePdksDay(params: {
     firstISO && lastISO ? Math.max(0, minutesBetweenISO(firstISO, lastISO)) : 0;
   const interval = { start: entry ?? 0, end: exit ?? entry ?? 0 };
   const scheduledBreaks =
-    shift?.breakStart && shift.breakEnd
+    !flex && shift?.breakStart && shift.breakEnd
       ? recurringWindows(
           shift.breakStart,
           shift.breakEnd,
@@ -114,7 +142,7 @@ export function computePdksDay(params: {
   );
   const breakMinutes = Math.min(
     rawTotalMinutes,
-    scheduledBreakMinutes || legalBreakMinutes(rawTotalMinutes),
+    flex ? flexibleBreak(flex, rawTotalMinutes) : scheduledBreakMinutes || legalBreakMinutes(rawTotalMinutes),
   );
   const totalMinutes = rawTotalMinutes - breakMinutes;
   const netOverlap = (window: Interval) => {
@@ -139,6 +167,7 @@ export function computePdksDay(params: {
     return rawTotalMinutes > 0 ? (raw * totalMinutes) / rawTotalMinutes : 0;
   };
   const classification = classifyDay(date, params.workingDays, params.holiday);
+  const requiredNetMinutes = flex ? params.hasLeave || classification === "weekend" || classification === "holiday" ? 0 : classification === "halfDayHoliday" ? flex.requiredNetMinutes / 2 : flex.requiredNetMinutes : undefined;
   const shiftStart = parseHHMM(shift?.startTime ?? workSettings.workStartTime);
   const shiftEnd =
     parseHHMM(shift?.endTime ?? workSettings.workEndTime) +
@@ -146,14 +175,17 @@ export function computePdksDay(params: {
   const tolerance =
     shift?.overtimeStartToleranceMinutes ??
     workSettings.overtimeStartToleranceMinutes;
-  const overtimeThreshold = shiftEnd + tolerance;
+  const netThreshold = (requiredNetMinutes ?? 0) + tolerance;
+  const overtimeThreshold = flex
+    ? interval.start + (totalMinutes > 0 ? netThreshold * rawTotalMinutes / totalMinutes : 0)
+    : shiftEnd + tolerance;
   const nightWindows = recurringWindows(
     rates.nightShiftStart, rates.nightShiftEnd, interval.start, interval.end,
   );
   const rawNightMinutes = nightWindows.reduce(
     (sum, window) => sum + overlap(interval, window), 0,
   );
-  const nightMinutes = Math.min(totalMinutes, Math.round(
+  let nightMinutes = Math.min(totalMinutes, Math.round(
     nightWindows.reduce((sum, window) => sum + netOverlap(window), 0),
   ));
   const boundaries = new Set([interval.start, interval.end]);
@@ -186,7 +218,10 @@ export function computePdksDay(params: {
       Math.round(netOverlap({ start: interval.start, end: start })));
     // Preserve the daily-cell rule: unspecified legal breaks are deducted from
     // normal time first; explicitly scheduled breaks are deducted where taken.
-    const dailyCandidate = premium ? netMinutes : start >= overtimeThreshold
+    const dailyCandidate = flex
+      ? premium ? netMinutes : Math.max(0, Math.round(netOverlap({ start: interval.start, end })) - netThreshold)
+        - Math.max(0, Math.round(netOverlap({ start: interval.start, end: start })) - netThreshold)
+      : premium ? netMinutes : start >= overtimeThreshold
       ? Math.max(0, end - start - scheduledBreaks.reduce(
           (sum, pause) => sum + overlap(window, pause), 0)) : 0;
     return {
@@ -202,6 +237,7 @@ export function computePdksDay(params: {
       isNight,
     };
   });
+  if (flex) nightMinutes = portions.reduce((sum, portion) => sum + (portion.isNight ? portion.netMinutes : 0), 0);
   const dailyTotal = shift?.overtimeEnabled === false ? 0 : Math.min(
     totalMinutes, portions.reduce((sum, p) => sum + p.dailyOvertimeMinutes, 0),
   );
@@ -229,9 +265,9 @@ export function computePdksDay(params: {
   const earlyTolerance =
     shift?.earlyExitToleranceMinutes ?? workSettings.earlyExitToleranceMinutes;
   const lateMinutes =
-    entry === undefined ? 0 : Math.max(0, entry - shiftStart - lateTolerance);
+    flex || entry === undefined ? 0 : Math.max(0, entry - shiftStart - lateTolerance);
   const earlyExitMinutes =
-    exit === undefined ? 0 : Math.max(0, shiftEnd - earlyTolerance - exit);
+    flex || exit === undefined ? 0 : Math.max(0, shiftEnd - earlyTolerance - exit);
   const weightedOvertimeMinutes = overtimeSegments.reduce(
     (sum, segment) => sum + segment.dailyOvertimeMinutes * segment.multiplier, 0,
   );
@@ -239,6 +275,14 @@ export function computePdksDay(params: {
     overtimeMinutes > 0 ? weightedOvertimeMinutes / overtimeMinutes : 0;
   return {
     date,
+    ...(flex ? {
+      scheduleType: "flexible" as const,
+      requiredNetMinutes,
+      shortfallMinutes: evidence?.durationMeasured ? Math.max(0, (requiredNetMinutes ?? 0) - totalMinutes) : requiredNetMinutes === 0 ? 0 : null,
+      excessMinutes: evidence?.durationMeasured ? Math.max(0, totalMinutes - (requiredNetMinutes ?? 0)) : 0,
+      pendingUntil: flexiblePendingUntil(flex, date, firstISO),
+      leaveWorkWarning: !!params.hasLeave && (!!firstISO || !!lastISO),
+    } : {}),
     overtimeSegments,
     firstISO,
     lastISO,
