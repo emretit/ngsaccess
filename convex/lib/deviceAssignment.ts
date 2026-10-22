@@ -6,7 +6,7 @@
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
-import { purgeDeviceCascade, deleteGroupDoorsForDoor } from "./deviceHelpers";
+import { purgeDeviceCascade } from "./deviceHelpers";
 import { getProjectIdsForUser, isProjectAllowed } from "./auth";
 import { requirePermission } from "./permissions";
 import { claimAdminDeviceCore } from "./devicePool";
@@ -182,25 +182,11 @@ export async function releaseDeviceCore(
   const device = await ctx.db.get(args.deviceId);
   if (!device) throw new Error("Cihaz bulunamadı");
   await requirePermission(ctx, ctx.user, device.projectId, "devices.manage");
-  if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+  // Projesiz (orphan) cihazı yalnız super_admin bırakabilir.
+  const orphanForSuperAdmin = !device.projectId && ctx.user.role === "super_admin";
+  if (!orphanForSuperAdmin && !isProjectAllowed(allowedProjectIds, device.projectId)) {
     throw new Error("Bu cihaza erişim yetkiniz yok");
   }
-
-  const groupDevices = await ctx.db
-    .query("groupDevices")
-    .withIndex("by_project_device", (q) =>
-      q.eq("projectId", device.projectId).eq("deviceId", args.deviceId),
-    )
-    .collect();
-  await Promise.all(groupDevices.map((gd) => ctx.db.delete(gd._id)));
-
-  const ownedDoors = await ctx.db
-    .query("doors")
-    .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-    .collect();
-  // Sarkan groupDoors bağı kuralı UI'dan silinemez yapar (review-fazb-b3 Y1).
-  await Promise.all(ownedDoors.map((d) => deleteGroupDoorsForDoor(ctx, d._id)));
-  await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
 
   // adminDevices kaydını temizle:
   // - createdFromDevice=true → cihazla birlikte doğdu, birlikte ölmeli
@@ -240,6 +226,6 @@ export async function releaseDeviceCore(
     }
   }
 
-  // devices tablosundan sil
-  await ctx.db.delete(args.deviceId);
+  // Kapılar, okuyucular, kural bağları ve bekleyen Hik işleriyle birlikte sil.
+  await purgeDeviceCascade(ctx, args.deviceId, device.projectId);
 }

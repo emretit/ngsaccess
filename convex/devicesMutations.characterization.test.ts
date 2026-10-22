@@ -215,20 +215,32 @@ describe("devices mutation HEAD characterization", () => {
       if (createdFromDevice) await ctx.db.patch(adminDeviceId, { createdFromDevice: true });
       const zoneId = await ctx.db.insert("zones", { name: "Keep zone", projectId: f.projectId });
       const doorId = await ctx.db.insert("doors", { name: "Delete door", deviceId, zoneId, projectId: f.projectId });
-      await ctx.db.insert("readers", { name: "Preserved dangling reader", doorId, deviceId, zoneId, projectId: f.projectId, direction: "entry", ...timestamps });
+      await ctx.db.insert("readers", { name: "Delete reader", doorId, deviceId, zoneId, projectId: f.projectId, direction: "entry", ...timestamps });
+      await ctx.db.insert("hikPendingOperations", { projectId: f.projectId, deviceId, status: "processing", operation: "openDoor", payload: {}, attemptCount: 0, createdAt: Date.now() });
     });
     const before = await state(f);
     expect(await f.as.mutation(api.devices.releaseDevice, { deviceId })).toBeNull();
     const s = await noExtraEffects(f);
     expect(s.devices).toEqual([]); expect(s.doors).toEqual([]);
-    expect(s.zones).toEqual(before.zones); expect(s.readers).toEqual(before.readers);
+    expect(s.zones).toEqual(before.zones); expect(s.readers).toEqual([]);
     expect(s.adminDevices.map(payload)).toEqual(createdFromDevice ? [] : [{ name: "Pool", brand: "ide_smart", ideUuid: "uuid", ideUser: "user", idePassword: "pass", ideDoorCount: 1, lastSeen: now, ...timestamps }]);
   });
-  it("super-admin release still rejects orphan device", async () => {
+  it("super-admin releases an orphan device with its doors and readers", async () => {
     const f = await fixture("super_admin");
     const deviceId = await f.as.mutation(api.devices.create, { name: "Orphan" });
+    await f.t.run(async ctx => {
+      const doorId = await ctx.db.insert("doors", { name: "Orphan door", deviceId });
+      await ctx.db.insert("readers", { name: "Orphan reader", doorId, deviceId, direction: "entry", ...timestamps });
+    });
+    expect(await f.as.mutation(api.devices.releaseDevice, { deviceId })).toBeNull();
+    const s = await state(f);
+    expect(s.devices).toEqual([]); expect(s.doors).toEqual([]); expect(s.readers).toEqual([]);
+  });
+  it("project admin still cannot release an orphan device", async () => {
+    const f = await fixture();
+    const deviceId = await f.t.run(ctx => ctx.db.insert("devices", { name: "Orphan", isActive: true, status: "active", ...timestamps }));
     const before = await state(f);
-    await expect(f.as.mutation(api.devices.releaseDevice, { deviceId })).rejects.toThrow(/^Bu cihaza erişim yetkiniz yok$/);
+    await expect(f.as.mutation(api.devices.releaseDevice, { deviceId })).rejects.toThrow(/^Bu işlem için yetkiniz yok$/);
     expect(await state(f)).toEqual(before);
   });
 });
