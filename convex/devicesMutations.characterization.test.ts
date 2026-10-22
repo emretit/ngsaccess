@@ -232,3 +232,42 @@ describe("devices mutation HEAD characterization", () => {
     expect(await state(f)).toEqual(before);
   });
 });
+
+describe("Hik project move guard", () => {
+  it.each(["claimDevice", "reassignDevice"] as const)("%s rejects a move without any writes", async mutation => {
+    const f = await fixture("super_admin");
+    const { adminDeviceId, deviceId } = await pool(f, f.projectId);
+    await f.t.run(async ctx => {
+      await ctx.db.patch(adminDeviceId, { brand: "hikvision" });
+      if (deviceId) await ctx.db.patch(deviceId, { brand: "hikvision", hikDevIndex: "registered", hikTransport: "gateway" });
+    });
+    const before = await state(f);
+    await expect(f.as.mutation(api.devices[mutation], { adminDeviceId, projectId: f.otherProjectId, name: "Must not write" }))
+      .rejects.toThrow(/HIK_DEVICE_MOVE_UNSUPPORTED/);
+    expect(await state(f)).toEqual(before);
+  });
+  it("rejects Hik pool assignment and unassignment", async () => {
+    const f = await fixture("super_admin");
+    const { adminDeviceId } = await pool(f);
+    await f.t.run(ctx => ctx.db.patch(adminDeviceId, { brand: "hikvision" }));
+    const before = await state(f);
+    await expect(f.as.mutation(api.devices.claimDevice, { adminDeviceId, projectId: f.projectId })).rejects.toThrow(/HIK_DEVICE_MOVE_UNSUPPORTED/);
+    expect(await state(f)).toEqual(before);
+    await f.t.run(ctx => ctx.db.patch(adminDeviceId, { assignedProjectId: f.projectId }));
+    const assigned = await state(f);
+    await expect(f.as.mutation(api.devices.reassignDevice, { adminDeviceId })).rejects.toThrow(/HIK_DEVICE_MOVE_UNSUPPORTED/);
+    expect(await state(f)).toEqual(assigned);
+  });
+  it("keeps same-project Hik name editing and registration fields", async () => {
+    const f = await fixture("super_admin");
+    const { adminDeviceId, deviceId } = await pool(f, f.projectId);
+    await f.t.run(async ctx => {
+      await ctx.db.patch(adminDeviceId, { brand: "hikvision" });
+      if (deviceId) await ctx.db.patch(deviceId, { brand: "hikvision", hikDevIndex: "registered", hikTransport: "gateway", ehomeID: "ehome" });
+    });
+    await f.as.mutation(api.devices.reassignDevice, { adminDeviceId, projectId: f.projectId, name: "Renamed Hik" });
+    const after = await state(f);
+    expect(after.devices[0]).toMatchObject({ _id: deviceId, name: "Renamed Hik", hikDevIndex: "registered", ehomeID: "ehome" });
+    expect(after.adminDevices[0].name).toBe("Renamed Hik");
+  });
+});

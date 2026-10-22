@@ -45,6 +45,12 @@ export async function claimDeviceCore(
         "Cihazın ataması başka bir oturumda değişti. Listeyi yenileyip tekrar deneyin.",
     });
   }
+  if (adminDevice.brand === "hikvision" && adminDevice.assignedProjectId !== args.projectId) {
+    throw new ConvexError({
+      code: "HIK_DEVICE_MOVE_UNSUPPORTED",
+      message: "Hikvision cihazının projesi değiştirilemez. Cihazı bu projeden silip hedef projede yeniden ekleyin; eklerken cihazdaki eski kişiler temizlenir.",
+    });
+  }
   if (adminDevice.assignedDeviceId) {
     throw new Error("Bu cihaz zaten bir projeye atanmış");
   }
@@ -102,6 +108,13 @@ export async function reassignDeviceCore(
     !allowedProjectIds.some((id) => id === args.projectId)
   ) {
     throw new Error("Bu projeye erişim yetkiniz yok");
+  }
+
+  if (adminDevice.brand === "hikvision" && adminDevice.assignedProjectId !== args.projectId) {
+    throw new ConvexError({
+      code: "HIK_DEVICE_MOVE_UNSUPPORTED",
+      message: "Hikvision cihazının projesi değiştirilemez. Cihazı bu projeden silip hedef projede yeniden ekleyin; eklerken cihazdaki eski kişiler temizlenir.",
+    });
   }
 
   const now = new Date().toISOString();

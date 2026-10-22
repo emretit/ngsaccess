@@ -71,6 +71,7 @@ export function AdminDeviceDialog({
   const [device, setDevice] = useState(openingDevice);
   const wasOpen = useRef(false);
   const isEdit = !!device;
+  const isHik = device?.brand === "hikvision";
 
   const [ideUuid, setIdeUuid] = useState("");
   const [name, setName] = useState("");
@@ -163,7 +164,7 @@ export function AdminDeviceDialog({
     try {
       const target =
         projectId === NO_PROJECT ? undefined : (projectId as Id<"projects">);
-      if (!device.assignedDeviceId && target) {
+      if (!isHik && !device.assignedDeviceId && target) {
         await claimDevice({
           adminDeviceId: device._id,
           expectedAssignedProjectId: device.assignedProjectId ?? null,
@@ -231,7 +232,7 @@ export function AdminDeviceDialog({
               </SheetTitle>
             <SheetDescription className="mt-1 text-sm text-muted-foreground">
               {isEdit
-                ? "İsmi ve proje atamasını değiştirin. Proje değişimi atanmış cihazda kapıları siler; okuma geçmişi korunur."
+                ? isHik ? "Cihaz adını değiştirin." : "İsmi ve proje atamasını değiştirin. Proje değişimi atanmış cihazda kapıları siler; okuma geçmişi korunur."
                 : "Cihaz envantere eklendikten sonra Cihazlar sayfasından projeye atanabilir."}
             </SheetDescription>
             </SheetHeader>
@@ -314,7 +315,7 @@ export function AdminDeviceDialog({
                 <Select
                   value={projectId}
                   onValueChange={setProjectId}
-                  disabled={submitting || projects === undefined}
+                  disabled={isHik || submitting || projects === undefined}
                 >
                   <SelectTrigger id="admin-device-project">
                     <SelectValue placeholder="Projeye atamadan envantere ekle" />
@@ -331,8 +332,9 @@ export function AdminDeviceDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Proje seçilirse cihaz doğrudan atanır; boş bırakılırsa havuzda
-                  kalır.
+                  {isHik
+                    ? "Hikvision cihazının projesi değiştirilemez. Cihazı bu projeden silip hedef projede yeniden ekleyin; eklerken cihazdaki eski kişiler temizlenir."
+                    : "Proje seçilirse cihaz doğrudan atanır; boş bırakılırsa havuzda kalır."}
                 </p>
               </div>
             </div>

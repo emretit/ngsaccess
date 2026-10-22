@@ -116,6 +116,11 @@ export async function runBackfillDeviceFromGroups(
     ),
   );
 
+  await ctx.scheduler.runAfter(0, internal.actions.hikRosterReconcile.reconcileHikDeviceRoster, {
+    deviceId: args.deviceId,
+    dryRun: false,
+    reason: "register",
+  });
   return { employees: empIds.length, rules: ruleIds.length };
 }
 
