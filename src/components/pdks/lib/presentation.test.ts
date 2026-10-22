@@ -166,3 +166,13 @@ it("08-H2 accepts next-day manual exit only for an assigned overnight shift", ()
   expect(validateManual("22:00", "06:00", "Kart unutuldu").exit).toBeDefined();
   expect(validateManual("22:00", "22:00", "Kart unutuldu", true)).toEqual({});
 });
+
+it("shows unmeasured requirements days without replacing actual clocks, and keeps legacy durations", () => {
+  const review: PdksCell = { ...day("incomplete"), durationMeasured: false, punchQuality: "missingExit", firstEntry: "08:30" };
+  expect(displayDuration(0, review.status, review.durationMeasured)).toBe("Süre hesaplanamadı");
+  expect(displayDuration(0, "present")).toBe("00 sa 00 dk");
+  expect(displayTime(review.firstEntry)).toBe("08:30");
+  expect(cellLabel("Ayşe", review.date, review)).toContain("İnceleme, Süre hesaplanamadı, Çıkış okutması yok");
+  const employee: PdksRow = { ...row("Ayşe", 0), status: "incomplete", days: [review] };
+  expect(filterPdksRows([employee], "incomplete")).toEqual([employee]);
+});

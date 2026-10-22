@@ -145,11 +145,11 @@ export function PDKSTableView({
                 </td>
                 <td className="px-2 tabular-nums">{displayTime(r.lastExit)}</td>
                 <td className="px-2 tabular-nums">
-                  {displayDuration(r.totalMinutes, r.status)}
+                  {displayDuration(r.totalMinutes, r.status, r.durationMeasured)}
                   {(r.nightMinutes ?? 0) > 0 && <span className="block text-muted-foreground">Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}</span>}
                 </td>
                 <td className="px-2 tabular-nums">
-                  {displayDuration(r.overtimeMinutes, r.status)}
+                  {displayDuration(r.overtimeMinutes, r.status, r.durationMeasured)}
                 </td>
                 <td className="px-2 py-1">
                   <PdksRowStatus record={r} />

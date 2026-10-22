@@ -37,6 +37,11 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 type ExportType = "Excel" | "CSV" | "PDF" | "payroll" | "aphb";
 type Aphb = FunctionReturnType<typeof api.sgkExport.buildAphbForMonth>;
+export function aphbBlockedByReview(result: Aphb | null): boolean {
+  if (!result) return false;
+  if ("blockedByReview" in result && typeof result.blockedByReview === "boolean") return result.blockedByReview;
+  return result.employees?.some(employee => employee.reviewDays.length > 0) ?? false;
+}
 interface Props {
   records?: PDKSExportRecord[];
   dateRange?: string;
@@ -75,6 +80,9 @@ function ExportPanel({
     [pending, setPending] = useState(false),
     [error, setError] = useState("");
   const [aphb, setAphb] = useState<Aphb | null>(null);
+  const reviewEmployees = aphb?.employees?.filter(employee => employee.reviewDays.length > 0) ?? [];
+  const reviewDays = reviewEmployees.flatMap(employee => employee.reviewDays.map(date => ({ employeeId: employee.employeeId, date })));
+  const reviewBlocked = type === "aphb" && aphbBlockedByReview(aphb);
   const lock = useRef(false);
   const monthly = type === "aphb" || type === "payroll";
   const labels: Record<ExportType, string> = {
@@ -93,7 +101,7 @@ function ExportPanel({
     setType(next);
   };
   const execute = async () => {
-    if (lock.current || !type) return;
+    if (lock.current || !type || reviewBlocked) return;
     lock.current = true;
     setPending(true);
     setError("");
@@ -105,7 +113,7 @@ function ExportPanel({
             year: selectedDate.getFullYear(),
             month: selectedDate.getMonth() + 1,
           });
-          if (!result.xml) throw new Error("Bildirim için veri bulunamadı.");
+          if (!result.xml && !aphbBlockedByReview(result)) throw new Error("Bildirim için veri bulunamadı.");
           setAphb(result);
           return;
         }
@@ -222,6 +230,16 @@ function ExportPanel({
               )}
             </div>
           )}
+          {reviewBlocked && <div role="alert" className="space-y-2 rounded-md border border-warning p-3 text-sm">
+            <h3 className="font-medium">{reviewEmployees.length > 0 ? `${reviewEmployees.length} çalışanın günleri inceleme bekliyor` : "Bazı günler inceleme bekliyor"}</h3>
+            <ul className="list-disc pl-4">{reviewDays.slice(0, 10).map(({ employeeId, date }) => {
+              const record = records.find(row => row.employeeId === employeeId || row.id === employeeId);
+              const employeeNumber = reviewEmployees.findIndex(employee => employee.employeeId === employeeId) + 1;
+              return <li key={`${employeeId}:${date}`}>{record?.name ?? `Çalışan ${employeeNumber}`}: {date}</li>;
+            })}</ul>
+            {reviewDays.length > 10 && <p>ve {reviewDays.length - 10} gün daha</p>}
+            <p>Bu günler kesinleşmeden bildirim indirilemez. Eksik okutmaları PDKS'te elle düzeltin; ay henüz bitmediyse ay sonunu bekleyin.</p>
+          </div>}
           {error && (
             <p role="alert" className="text-sm text-danger">
               {error}
@@ -237,7 +255,7 @@ function ExportPanel({
             </Button>
             <Button
               disabled={
-                pending || !projectId || (!monthly && records.length === 0)
+                pending || reviewBlocked || !projectId || (!monthly && records.length === 0)
               }
               onClick={() => void execute()}
             >

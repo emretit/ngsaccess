@@ -189,6 +189,7 @@ import type * as mobileAccessGateway from "../mobileAccessGateway.js";
 import type * as mobileAttendance from "../mobileAttendance.js";
 import type * as mobileVisitors from "../mobileVisitors.js";
 import type * as onboarding from "../onboarding.js";
+import type * as pdksRules from "../pdksRules.js";
 import type * as pdksRecords from "../pdksRecords.js";
 import type * as peopleActivity from "../peopleActivity.js";
 import type * as positions from "../positions.js";
@@ -398,6 +399,7 @@ declare const fullApi: ApiFromModules<{
   mobileAttendance: typeof mobileAttendance;
   mobileVisitors: typeof mobileVisitors;
   onboarding: typeof onboarding;
+  pdksRules: typeof pdksRules;
   pdksRecords: typeof pdksRecords;
   peopleActivity: typeof peopleActivity;
   positions: typeof positions;

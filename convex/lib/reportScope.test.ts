@@ -87,7 +87,7 @@ describe("PDKS source filtering at loader/handler boundaries", () => {
     const card = { ...reportReadings[0], hikCurrentVerifyMode: "card" };
     const raw = [...reportReadings, card];
     const spy = vi.spyOn(pdksSource, "filterPdksReadings");
-    expect(await readReportReadings(readingContext(raw), [projectId], "start", "end")).toEqual([card]);
+    expect(await readReportReadings(readingContext(raw), [projectId], "2026-06-21T21:00:00.000Z", "2026-06-22T20:59:59.999Z")).toEqual([card]);
     expect(spy).toHaveBeenCalledTimes(1);
     expect(raw).toHaveLength(3);
   });

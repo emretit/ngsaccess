@@ -1,3 +1,10 @@
+import { addWorkDate, buildPdksWorkDateResolver } from "./lib/pdksWorkDay";
+import { buildPeriodDateKeys } from "./lib/pdksCalc";
+import { buildBoundedShiftResolver } from "./lib/shiftResolver";
+import { computePdksTableRow } from "./lib/pdksTable";
+import { filterPdksReadings } from "./lib/pdksSource";
+import { DEFAULT_OVERTIME_RATES, getEffectiveWorkSettings } from "./lib/pdksHelpers";
+import { hasVersionedPdksPolicy, loadPdksPolicies } from "./lib/pdksRules";
 import { v } from "convex/values";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
@@ -105,10 +112,47 @@ export const summary = employeeAuthedQuery({
   handler: async (ctx, args) => {
     const { startISO, endISO } = attendanceDateRange(args.startDate, args.endDate, SUMMARY_MAX_DAYS);
     if (!startISO || !endISO) throw attendanceError("INVALID_ARGUMENT");
+    const employee = ctx.employee;
+    const projectId = employee.projectId;
+    const policies = await loadPdksPolicies(ctx, [projectId], addWorkDate(args.startDate, -1), args.endDate);
+    const policyFor = (date: string) => policies(projectId, date);
+    const dates = buildPeriodDateKeys(args.startDate, args.endDate);
+    const versioned = hasVersionedPdksPolicy(policies, projectId, addWorkDate(args.startDate, -1), args.endDate);
+    const range = versioned ? attendanceDateRange(addWorkDate(args.startDate, -1), addWorkDate(args.endDate, 1)) : { startISO, endISO };
     const rows = await ctx.db.query("cardReadings").withIndex("by_employee_accessTime", q =>
-      q.eq("employeeId", ctx.employee._id).gte("accessTime", startISO).lt("accessTime", endISO))
+      q.eq("employeeId", employee._id).gte("accessTime", range.startISO ?? startISO).lt("accessTime", range.endISO ?? endISO))
       .paginate({ numItems: SUMMARY_MAX_READINGS + 1, cursor: null, maximumRowsRead: SUMMARY_MAX_READINGS + 1, maximumBytesRead: 8 * 1024 * 1024 });
     if (!rows.isDone || rows.page.length > SUMMARY_MAX_READINGS) throw attendanceError("SUMMARY_TOO_LARGE");
-    return summarizeMovements(rows.page, args.startDate, args.endDate, ctx.employee.projectId, new Date().toISOString());
+    const calendarReadings = rows.page.filter(reading => reading.accessTime >= startISO && reading.accessTime < endISO);
+    if (!versioned) {
+      return summarizeMovements(calendarReadings, args.startDate, args.endDate, projectId, new Date().toISOString(), policyFor);
+    }
+    const shifts = await buildBoundedShiftResolver(ctx, [employee]);
+    const resolveShift = (id: Id<"employees">, date: string) => {
+      const shift = shifts.resolve(id, date);
+      return shift?.projectId === projectId ? shift : null;
+    };
+    const workDate = buildPdksWorkDateResolver([employee], resolveShift);
+    const [manual, leaves, projectHolidays, globalHolidays, workSettings, general] = await Promise.all([
+      ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", args.startDate).lte("date", args.endDate)).take(1001),
+      ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", args.endDate)).take(1001),
+      ctx.db.query("holidays").withIndex("by_project_date", q => q.eq("projectId", projectId).gte("date", args.startDate).lte("date", args.endDate)).take(1001),
+      ctx.db.query("holidays").withIndex("by_project_date", q => q.eq("projectId", undefined).gte("date", args.startDate).lte("date", args.endDate)).take(1001),
+      getEffectiveWorkSettings(ctx, projectId),
+      ctx.db.query("generalSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first(),
+    ]);
+    if ([manual, leaves, projectHolidays, globalHolidays].some(list => list.length > 1000)) throw attendanceError("SUMMARY_TOO_LARGE");
+    const included = filterPdksReadings(rows.page, projectId, reading => policyFor(workDate(reading)));
+    const row = computePdksTableRow({
+      policyFor, employee, empKey: employee._id, empReadings: included, departmentName: "", periodDateKeys: dates,
+      availableDateKeys: new Set(included.map(workDate)), startDate: args.startDate, isSingleDay: false, viewMode: "matrix",
+      manualPdksByEmpDate: new Map(manual.filter(record => record.manualEntry && record.projectId === projectId).map(record => [`${employee._id}__${record.date}`, record])),
+      allLeaves: leaves.filter(leave => leave.status === "approved" && (!leave.projectId || leave.projectId === projectId)),
+      holidayMap: new Map([...globalHolidays, ...projectHolidays].map(holiday => [holiday.date, holiday])),
+      workingDays: general?.workingDays?.length ? general.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"],
+      workSettings, overtimeRates: DEFAULT_OVERTIME_RATES, resolveShift, manualEditedBy: null,
+    });
+    const presentDates = new Set(row.days.filter(day => day.status === "present" || day.status === "late").map(day => day.date));
+    return summarizeMovements(calendarReadings, args.startDate, args.endDate, projectId, new Date().toISOString(), policyFor, { workDate, presentDates });
   },
 });

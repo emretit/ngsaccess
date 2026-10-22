@@ -1,8 +1,10 @@
+import { isPdksInProgress } from "../statusMeta";
 import type { PdksRow } from "./presentation";
 import type { PdksDayStatus } from "../../../../convex/lib/pdksTable";
 export interface AnalysisDay {
   date: string;
   counts: Record<PdksDayStatus, number>;
+  inProgress: number;
   totalMinutes: number;
   lateMinutes: number;
   overtimeMinutes: number;
@@ -24,13 +26,15 @@ export function analyzePdksRows(rows: readonly PdksRow[]): AnalysisDay[] {
           holiday: 0,
           future: 0,
           noData: 0,
-          notEmployed: 0,
+          notEmployed: 0, incomplete: 0,
         },
+        inProgress: 0,
         totalMinutes: 0,
         lateMinutes: 0,
         overtimeMinutes: 0,
       };
       item.counts[cell.status]++;
+      if (isPdksInProgress(cell)) item.inProgress++;
       if (cell.status !== "future" && cell.status !== "noData") {
         item.totalMinutes += cell.totalMinutes;
         item.overtimeMinutes += cell.overtimeMinutes;

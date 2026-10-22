@@ -80,6 +80,7 @@ describe("denetim sorgusu", () => {
       "leaves",
       "overtimeRates",
       "pdksRecords",
+      "pdksRuleVersions",
       "projectPrivacySettings",
       "users",
     ]);

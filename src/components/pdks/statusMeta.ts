@@ -37,6 +37,7 @@ function meta(
   };
 }
 export const STATUS_META: Record<DayStatus, StatusMeta> = {
+  incomplete: meta("İnceleme", "—"),
   present: meta("Mevcut", "M", "success"),
   late: meta("Geç", "G", "warning"),
   absent: meta("Devamsız", "D", "danger"),
@@ -48,11 +49,20 @@ export const STATUS_META: Record<DayStatus, StatusMeta> = {
   noData: meta("Veri yok", "—"),
   overtime: meta("Fazla mesai", "FM"),
 };
+export const IN_PROGRESS_META = meta("Devam ediyor", "DE", "info");
+type StatusItem = { status: DayStatus; firstEntry?: string | null };
+export function isPdksInProgress(item: StatusItem): boolean {
+  return item.status === "future" && typeof item.firstEntry === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(item.firstEntry);
+}
+export function statusMetaFor(item: StatusItem): StatusMeta {
+  return isPdksInProgress(item) ? IN_PROGRESS_META : STATUS_META[item.status];
+}
 export const STATUS_FILTER_LABELS = {
   all: "Tümü",
   ...Object.fromEntries(
     Object.entries(STATUS_META).map(([key, value]) => [key, value.label]),
   ),
+  future: `${STATUS_META.future.label} / ${IN_PROGRESS_META.label}`,
 } as Record<"all" | DayStatus, string>;
 export function isDayStatus(s: string): s is DayStatus {
   return Object.prototype.hasOwnProperty.call(STATUS_META, s);

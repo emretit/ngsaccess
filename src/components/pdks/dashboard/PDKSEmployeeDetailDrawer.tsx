@@ -17,8 +17,9 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ManualPdksEditDialog } from "../ManualPdksEditDialog";
-import { STATUS_META } from "../statusMeta";
+import { statusMetaFor } from "../statusMeta";
 import {
+  reviewHint,
   leaveLabel,
   displayTime,
   displayDuration,
@@ -116,12 +117,13 @@ function Detail({
     <div className="mt-5 min-w-0 space-y-4">
       <h2 className="text-lg font-semibold break-words">{name}</h2>
       <PdksExcludedReadingsNotice count={detail.excludedUnknownReadings} />
+      {(detail.summary.incompleteDays ?? 0) > 0 && <p className="text-sm">İnceleme: {detail.summary.incompleteDays}</p>}
       {detail.days.map((day) => (
         <section key={day.date} className="space-y-4 border-t pt-4">
           <h3 className="font-medium">{readableDate(day.date)}</h3>
           <div className="flex flex-wrap gap-2">
-            <StatusBadge tone={STATUS_META[day.status].tone}>
-              {STATUS_META[day.status].label}
+            <StatusBadge tone={statusMetaFor(day).tone}>
+              {statusMetaFor(day).label}
             </StatusBadge>
             {day.isEarlyExit && (
               <StatusBadge tone="warning">Erken çıkış</StatusBadge>
@@ -131,14 +133,15 @@ function Detail({
               {detail.employee.department}
             </span>
           </div>
+          {reviewHint(day) && <p className="text-sm text-muted-foreground">{reviewHint(day)}</p>}
           <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
             {[
               ["İlk giriş", displayTime(day.firstEntry)],
               ["Son çıkış", `${displayTime(day.lastExit)}${day.exitNextDay ? " (ertesi gün)" : ""}`],
-              ["Brüt süre", displayDuration(day.rawTotalMinutes ?? day.totalMinutes, day.status)],
-              ["Toplam süre (mola sonrası)", displayDuration(day.totalMinutes, day.status)],
-              ["Fazla mesai", displayDuration(day.overtimeMinutes, day.status)],
-              ["Gece süresi", displayDuration(day.nightMinutes ?? 0, day.status)],
+              ["Brüt süre", displayDuration(day.rawTotalMinutes ?? day.totalMinutes, day.status, day.durationMeasured)],
+              ["Toplam süre (mola sonrası)", displayDuration(day.totalMinutes, day.status, day.durationMeasured)],
+              ["Fazla mesai", displayDuration(day.overtimeMinutes, day.status, day.durationMeasured)],
+              ["Gece süresi", displayDuration(day.nightMinutes ?? 0, day.status, day.durationMeasured)],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-xs text-muted-foreground">{label}</dt>

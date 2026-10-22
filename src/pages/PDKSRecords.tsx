@@ -28,7 +28,7 @@ import {
 import { PDKSOvertimeAlert } from "@/components/pdks/dashboard/PDKSOvertimeAlert";
 import { PDKSSavedViews } from "@/components/pdks/dashboard/PDKSSavedViews";
 import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";
-import { STATUS_FILTER_LABELS } from "@/components/pdks/statusMeta";
+import { STATUS_FILTER_LABELS, STATUS_META, IN_PROGRESS_META, isPdksInProgress } from "@/components/pdks/statusMeta";
 import { formatDuration } from "@/components/pdks/lib/presentation";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { BulkBar } from "@/components/shared/BulkBar";
@@ -172,6 +172,7 @@ function PDKSContent({
     setDrilldown({ scope, employeeId: employeeId as Id<"employees">, date });
   };
   const passive = (status: "weekend" | "holiday" | "noData" | "future") => allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(d => d.status === status).length : Number(row.status === status)), 0);
+  const inProgress = allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(isPdksInProgress).length : Number(isPdksInProgress(row))), 0);
   const counters = [
     { status: "present", value: summary.present },
     { status: "late", value: summary.late },
@@ -180,7 +181,7 @@ function PDKSContent({
     { status: "weekend", value: passive("weekend") },
     { status: "holiday", value: passive("holiday") },
     { status: "noData", value: passive("noData") },
-    { status: "future", value: passive("future") },
+    { status: "future", value: passive("future") - inProgress },
   ] as const;
   return (
     <div className="min-w-0 max-w-full space-y-4">
@@ -288,10 +289,11 @@ function PDKSContent({
             <span>{summary.totalEmployees} personel</span>
             {counters.map((c) => (
               <span key={c.status}>
-                {STATUS_FILTER_LABELS[c.status]} <strong>{c.value}</strong>{" "}
+                {STATUS_META[c.status].label} <strong>{c.value}</strong>{" "}
                 {filters.reportType === "daily" ? "kişi" : "kişi-gün"}
               </span>
             ))}
+            {inProgress > 0 && <span>{IN_PROGRESS_META.label} <strong>{inProgress}</strong> {filters.reportType === "daily" ? "kişi" : "kişi-gün"}</span>}
             <span>
               Fazla mesai{" "}
               {formatDuration(Math.round(summary.overtimeHours * 60))}

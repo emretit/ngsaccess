@@ -1,3 +1,7 @@
+import { loadRuleReportDays } from "./lib/reportAttendance";
+import { resolveAttendanceEvidence } from "./lib/pdksEvidence";
+import { buildPdksWorkDateResolver, groupPdksWorkDays } from "./lib/pdksWorkDay";
+import type { PdksTableRow } from "./lib/pdksTable";
 import { filterPdksReadings } from "./lib/pdksSource";
 import { summarizeDailyReadings } from "./lib/dashboardActivity";
 import { countDashboardRows } from "./lib/dashboardCounts";
@@ -164,10 +168,12 @@ async function loadPdksDataset(
 ): Promise<{
   employees: Doc<"employees">[];
   readings: Doc<"cardReadings">[];
+  activityReadings: Doc<"cardReadings">[];
   leaves: Doc<"leaves">[];
   deptNameById: Map<string, string>;
   shiftResolver: ShiftResolver;
   workSettings: EffectiveWorkSettings;
+  ruleRows: Map<Id<"employees">, PdksTableRow>;
 }> {
   const allowedProjectIds = await resolveProjectScope(ctx, filters.projectId);
   let employees: Doc<"employees">[] = [];
@@ -219,6 +225,11 @@ async function loadPdksDataset(
     readings = readingResults.flat();
   }
 
+  const ruleReport = await loadRuleReportDays(ctx, allowedProjectIds, trDateKey(rangeStartISO), trDateKey(rangeEndISO), {
+    includeLegacyReadings: false,
+    preloadedReadings: { readings, startISO: rangeStartISO, endISO: rangeEndISO },
+  });
+
   if (filters.companyId) employees = employees.filter((e) => e.companyId === filters.companyId);
   if (filters.departmentId) employees = employees.filter((e) => e.departmentId === filters.departmentId);
   if (filters.positionId) employees = employees.filter((e) => e.positionId === filters.positionId);
@@ -244,7 +255,22 @@ async function loadPdksDataset(
     ? await getEffectiveWorkSettings(ctx, settingsProjectId)
     : DEFAULT_WORK_SETTINGS;
 
-  return { employees, readings: filterPdksReadings(readings, filters.projectId), leaves, deptNameById, shiftResolver, workSettings };
+  const workDate = buildPdksWorkDateResolver(employees, shiftResolver.resolve);
+  const filtered = filterPdksReadings(readings, filters.projectId, r => ruleReport.policies(r.projectId, workDate(r)));
+  const legacy = filtered.filter(r => ruleReport.policies(r.projectId, workDate(r)).punchMode !== "requirements");
+  const versioned: Doc<"cardReadings">[] = [];
+  for (const employee of employees) {
+    for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve)) {
+      const policy = ruleReport.policies(employee.projectId, date);
+      if (policy.punchMode !== "requirements") continue;
+      const cell = ruleReport.ruleRows.get(employee._id)?.days.find(day => day.date === date);
+      if (cell?.status !== "present" && cell?.status !== "late") continue;
+      const evidence = resolveAttendanceEvidence(list, undefined, policy);
+      const selected = list.filter(r => r.accessTime === evidence.firstISO || r.accessTime === evidence.lastISO);
+      versioned.push(...(evidence.durationMeasured ? selected : selected.slice(0, 1)));
+    }
+  }
+  return { employees, readings: [...legacy, ...versioned], activityReadings: filtered, leaves, deptNameById, shiftResolver, workSettings, ruleRows: ruleReport.ruleRows };
 }
 
 function computePdksCoreInMemory(
@@ -355,7 +381,7 @@ export const getAnnualOvertimeBalance = authedQuery({
     const targetYear = args.year ?? Number(trTodayKey().slice(0, 4));
     const { startISO, endISO } = trDayRangeISO(`${targetYear}-01-01`, `${targetYear}-12-31`);
 
-    const { employees, readings, shiftResolver } =
+    const { employees, readings, shiftResolver, ruleRows } =
       await loadPdksDataset(ctx, startISO, endISO, { projectId: args.projectId });
 
     const targetEmployees = args.employeeId
@@ -389,10 +415,10 @@ export const getAnnualOvertimeBalance = authedQuery({
         const net = netWorkMinutes(rawMin, shift);
         const dow = new Date(`${date}T00:00:00.000Z`).getUTCDay();
         const classification: DayEntry["classification"] = dow === 0 || dow === 6 ? "weekend" : "workday";
-        dayEntries.push({ date, netMinutes: net, classification });
+        if (!ruleRows.get(emp._id)?.days.some(day => day.date === date)) dayEntries.push({ date, netMinutes: net, classification });
       }
       const buckets = bucketWeeklyOvertime(dayEntries);
-      const totalMin = buckets.reduce((s, b) => s + b.overtimeMinutes + b.premiumMinutes, 0);
+      const totalMin = buckets.reduce((s, b) => s + b.overtimeMinutes + b.premiumMinutes, 0) + (ruleRows.get(emp._id)?.days.reduce((sum, day) => sum + day.overtimeMinutes, 0) ?? 0);
       const limitMin = ANNUAL_OVERTIME_LIMIT_MINUTES;
       return {
         employeeId: emp._id,
@@ -430,7 +456,7 @@ export const getRepeatLateOffenders = authedQuery({
     start.setUTCDate(start.getUTCDate() - daysBack);
     const { startISO, endISO } = trDayRangeISO(trDateKey(start.toISOString()), trDateKey(end.toISOString()));
 
-    const { employees, readings, shiftResolver, workSettings } =
+    const { employees, readings, shiftResolver, workSettings, ruleRows } =
       await loadPdksDataset(ctx, startISO, endISO, { projectId: args.projectId });
 
     const empById = new Map(employees.map((e) => [String(e._id), e]));
@@ -446,6 +472,7 @@ export const getRepeatLateOffenders = authedQuery({
       const [empKey, dateKey] = key.split("__");
       const emp = empById.get(empKey);
       if (!emp) continue;
+      if (ruleRows.get(emp._id)?.days.some(day => day.date === dateKey)) continue;
       const shift = shiftResolver.resolve(emp._id, dateKey);
       const { lateThresholdMin } = thresholdsForShift(shift, workSettings);
       const arrivalMin = isoTimeToTRMinutes(accessTime);
@@ -454,6 +481,11 @@ export const getRepeatLateOffenders = authedQuery({
       }
     }
 
+    for (const [employeeId, row] of ruleRows) {
+      if (!empById.has(employeeId)) continue;
+      const count = row.days.filter(day => day.status === "late").length;
+      if (count) lateCountByEmp.set(employeeId, (lateCountByEmp.get(employeeId) ?? 0) + count);
+    }
     return [...lateCountByEmp.entries()]
       .filter(([, count]) => count >= minCount)
       .map(([empKey, count]) => {
@@ -590,14 +622,27 @@ export const getActivitySummary = authedQuery({
     const { startISO, endISO } = trDayRangeISO(today, today);
     const dataset = await loadPdksDataset(ctx, startISO, endISO, args);
     const employeeIds = new Set(dataset.employees.map((employee) => employee._id));
-    const readings = dataset.readings.filter((reading) =>
+    const readings = dataset.activityReadings.filter((reading) =>
       reading.employeeId && employeeIds.has(reading.employeeId) && reading.accessStatus === "izin_verildi"
     ).sort((a, b) => a.accessTime.localeCompare(b.accessTime));
-    const daily = summarizeDailyReadings(readings);
+    const daily = summarizeDailyReadings(readings.filter(r => r.direction === "entry" || r.direction === "exit" || (!r.employeeId || !dataset.ruleRows.has(r.employeeId))));
     const { core } = computePdksCoreInMemory(
       dataset.employees, readings.filter((reading) => reading.direction !== "exit"), dataset.leaves,
       { start: startISO, end: endISO }, dataset.deptNameById, dataset.shiftResolver, dataset.workSettings,
     );
+    const ruleCells = [...dataset.ruleRows].filter(([id]) => employeeIds.has(id)).flatMap(([id, row]) => row.days.map(day => ({ id, day })));
+    const governedIds = new Set(ruleCells.map(cell => cell.id));
+    const legacyPresent = new Set(readings.filter(r => r.employeeId && !governedIds.has(r.employeeId)).map(r => r.employeeId));
+    const presentRules = new Set(readings.filter(r => r.employeeId && governedIds.has(r.employeeId) && r.direction === "entry").map(r => r.employeeId));
+    if (governedIds.size) {
+      core.presentToday = legacyPresent.size + presentRules.size;
+      const firstEntries = new Map<Id<"employees">, Doc<"cardReadings">>();
+      for (const reading of readings) {
+        if (!reading.employeeId || reading.direction === "exit" || (governedIds.has(reading.employeeId) && reading.direction !== "entry") || firstEntries.has(reading.employeeId)) continue;
+        firstEntries.set(reading.employeeId, reading);
+      }
+      core.lateArrivals = new Set([...firstEntries].filter(([id, reading]) => isoTimeToTRMinutes(reading.accessTime) > thresholdsForShift(dataset.shiftResolver.resolve(id, today), dataset.workSettings).lateThresholdMin).map(([id]) => id)).size;
+    }
     const settingsProjectId = args.projectId ?? dataset.employees[0]?.projectId;
     const settings = settingsProjectId
       ? await ctx.db.query("workSettings").withIndex("by_project", (q) => q.eq("projectId", settingsProjectId)).first()
@@ -609,7 +654,8 @@ export const getActivitySummary = authedQuery({
       averageFirstEntry: daily.averageFirstEntry,
       averageLastExit: daily.averageLastExit,
       lateArrivals: hasReadings ? core.lateArrivals : null,
-      presentToday: hasReadings ? core.presentToday : null,
+      presentToday: hasReadings || ruleCells.length ? core.presentToday : null,
+      incompleteDays: ruleCells.filter(c => c.day.status === "incomplete").length,
       insideBuilding: hasReadings ? daily.insideBuilding : null,
     };
   },

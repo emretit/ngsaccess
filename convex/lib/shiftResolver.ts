@@ -44,6 +44,20 @@ export async function buildShiftResolver(
     ),
   ]);
 
+  return createShiftResolver(employees, allShifts, assignmentLists);
+}
+
+/** Extra versioned/mobile paths load only referenced shifts and bounded assignments. */
+export async function buildBoundedShiftResolver(ctx: AnyCtx, employees: Doc<"employees">[]): Promise<ShiftResolver> {
+  const assignmentLists = await Promise.all(employees.map(employee => ctx.db.query("shiftAssignments").withIndex("by_employee", q => q.eq("employeeId", employee._id)).take(1001)));
+  if (assignmentLists.some(list => list.length > 1000) || assignmentLists.flat().length > 10000) throw new Error("Vardiya atama sınırı aşıldı; tarih aralığını daraltın");
+  const ids = [...new Set([...employees.flatMap(employee => employee.shiftId ? [employee.shiftId] : []), ...assignmentLists.flat().map(assignment => assignment.shiftId)])];
+  const allShifts = (await Promise.all(ids.map(id => ctx.db.get(id)))).filter((shift): shift is NonNullable<typeof shift> => shift !== null);
+  return createShiftResolver(employees, allShifts, assignmentLists);
+}
+
+function createShiftResolver(employees: Doc<"employees">[], allShifts: Doc<"shifts">[], assignmentLists: Doc<"shiftAssignments">[][]): ShiftResolver {
+  const employeeIds = employees.map(employee => employee._id);
   const shiftMap = new Map<string, Doc<"shifts">>();
   for (const s of allShifts) shiftMap.set(String(s._id), s);
 

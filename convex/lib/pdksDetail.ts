@@ -1,3 +1,4 @@
+import type { PdksPolicyResolver } from "./pdksRules";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
 import { classifyPdksDay } from "./pdksTable";
 import type { Doc } from "../_generated/dataModel";
@@ -12,6 +13,7 @@ import { calculatePeriodOvertime, type OvertimeDay } from "./overtimeCalc";
 import { computePdksDay } from "./pdksDay";
 
 export function computeAttendanceDetailDay(params: {
+  policyFor?: PdksPolicyResolver;
   date: string;
   availableDateKeys: ReadonlySet<string>;
   firstRecordDate?: string | null;
@@ -27,6 +29,7 @@ export function computeAttendanceDetailDay(params: {
 }) {
   const { date, dayShift, workSettings } = params;
   const day = computePdksDay({
+      policy: params.policyFor?.(date),
     date,
     readings: params.dayReadings,
     manual: params.manualDay,
@@ -43,13 +46,16 @@ export function computeAttendanceDetailDay(params: {
   const settings = settingsForShift(dayShift, workSettings);
   const status = classifyPdksDay({
     date,
-    dataAvailable: params.availableDateKeys.has(date),
+    dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manualDay),
     firstRecordDate: params.firstRecordDate,
-    shiftStart: dayShift?.startTime,
+    shiftStart: dayShift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
+    shiftEnd: settings.workEndTime,
+    earlyExitTolerance: settings.earlyExitToleranceMinutes,
     hasAssignedShift:
       params.firstRecordDate !== undefined ? dayShift !== null : undefined,
     lateTolerance: settings.maxLateMinutes,
     classification: day.classification,
+    attendanceDecision: day.attendanceDecision,
     hasAttendance: day.hasAttendance,
     hasLeave: !!leave,
     isLate: day.isLate,
@@ -61,6 +67,8 @@ export function computeAttendanceDetailDay(params: {
   });
   return {
     date,
+    durationMeasured: day.durationMeasured,
+    punchQuality: day.punchQuality,
     overtimeSegments: day.overtimeSegments,
     firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
     lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
@@ -72,7 +80,7 @@ export function computeAttendanceDetailDay(params: {
     isLate: day.isLate,
     isEarlyExit: day.isEarlyExit,
     payrollCode:
-      status === "future" || status === "noData" || status === "notEmployed"
+      status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
         ? "—"
         : code,
     overtimeMinutes: day.overtimeMinutes,
@@ -103,10 +111,12 @@ export function summarizeAttendanceDays(
       if (d.status === "present" || d.status === "late") acc.workedDays += 1;
       if (d.status === "late") acc.lateDays += 1;
       if (d.status === "absent") acc.absentDays += 1;
+      if (d.status === "incomplete") acc.incompleteDays += 1;
       if (d.status === "leave") acc.leaveDays += 1;
       return acc;
     },
-    { totalMinutes: 0, workedDays: 0, lateDays: 0, absentDays: 0, leaveDays: 0 },
+    { incompleteDays: 0, totalMinutes: 0, workedDays: 0, lateDays: 0, absentDays: 0, leaveDays: 0 },
   );
-  return { ...totals, ...calculatePeriodOvertime(days, options) };
+  const { incompleteDays, ...legacyTotals } = totals;
+  return { ...legacyTotals, ...(days.length ? { incompleteDays } : {}), ...calculatePeriodOvertime(days, options) };
 }

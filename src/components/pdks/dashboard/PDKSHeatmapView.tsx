@@ -1,6 +1,6 @@
 import { eachDayOfInterval, format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { STATUS_META } from "../statusMeta";
+import { STATUS_META, IN_PROGRESS_META, statusMetaFor } from "../statusMeta";
 import {
   cellLabel,
   formatDuration,
@@ -39,6 +39,7 @@ export function PDKSHeatmapView({
               {m.code}: {m.label}
             </span>
           ))}
+        <span className={IN_PROGRESS_META.textClass}>DE: {IN_PROGRESS_META.label}</span>
         <span className="text-muted-foreground">Süre: sa:dk</span>
       </div>
       <div
@@ -79,7 +80,7 @@ export function PDKSHeatmapView({
                 {dates.map((date) => {
                   const cell = cells.get(date);
                   const status = cell?.status ?? "noData";
-                  const meta = STATUS_META[status];
+                  const meta = statusMetaFor(cell ?? { status });
                   const duration =
                     !cell ||
                     status === "future" ||

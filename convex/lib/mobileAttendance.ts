@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
-import { isPdksEligibleReading } from "./pdksSource";
+import type { PdksPolicyResolver } from "./pdksRules";
+import { filterPdksReadings } from "./pdksSource";
 
 export const ATTENDANCE_TIME_ZONE = "Europe/Istanbul" as const;
 export const SUMMARY_MAX_DAYS = 93;
@@ -110,7 +111,8 @@ export type MovementDay = {
  * pairing (pdksWorkDay). A 01:00 exit belongs to its own Istanbul calendar day. */
 export function summarizeMovements(
   readings: readonly Doc<"cardReadings">[], startDate: string, endDate: string,
-  projectId: Doc<"employees">["projectId"], generatedAt: string,
+  projectId: Doc<"employees">["projectId"], generatedAt: string, policyFor?: PdksPolicyResolver,
+  rules?: { workDate: (reading: Doc<"cardReadings">) => string; presentDates: ReadonlySet<string> },
 ) {
   attendanceDateRange(startDate, endDate, SUMMARY_MAX_DAYS);
   const days: MovementDay[] = [];
@@ -135,7 +137,7 @@ export function summarizeMovements(
     if (reading.accessStatus === "reddedildi") {
       day.deniedCount++;
     } else if (reading.accessStatus !== "izin_verildi" || !projectId || reading.projectId !== projectId ||
-        !isPdksEligibleReading(reading) || (reading.direction !== "entry" && reading.direction !== "exit")) {
+        !filterPdksReadings([reading], projectId, policyFor ? r => policyFor(rules?.workDate(r) ?? new Date(Date.parse(r.accessTime) + ISTANBUL_OFFSET_MS).toISOString().slice(0, 10)) : undefined).length || (reading.direction !== "entry" && reading.direction !== "exit")) {
       day.unknownCount++;
       day.lastDirection = "unknown";
     } else if (reading.direction === "entry") {
@@ -155,7 +157,10 @@ export function summarizeMovements(
     totals.exitCount += day.exitCount;
     totals.deniedCount += day.deniedCount;
     totals.unknownCount += day.unknownCount;
-    if (day.entryCount > 0) totals.presentDays++;
+    const policy = policyFor?.(day.date);
+    if (policy?.punchMode === "requirements") {
+      if (rules?.presentDates.has(day.date)) totals.presentDays++;
+    } else if (day.entryCount > 0) totals.presentDays++;
   }
   return { startDate, endDate, timeZone: ATTENDANCE_TIME_ZONE, generatedAt, days, totals };
 }

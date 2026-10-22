@@ -1,9 +1,10 @@
+import { matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
 import { parseCardReaderBody } from "./cardReaderParse";
 import type { Doc } from "../_generated/dataModel";
 
 export type PdksReadingSource = "card" | "pin" | "qr" | "mobile" | "manual" | "biometric" | "unknown";
 export type PdksSourceReading = Partial<Pick<Doc<"cardReadings">,
-  "projectId" | "cardNo" | "rawData" | "ideIoId" | "hikCurrentVerifyMode" | "hikMajorEventType" | "hikSubEventType" | "hikDevIndex" | "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL"
+  "deviceId" | "accessTime" | "projectId" | "cardNo" | "rawData" | "ideIoId" | "hikCurrentVerifyMode" | "hikMajorEventType" | "hikSubEventType" | "hikDevIndex" | "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL"
 >>;
 
 function object(value: unknown): Record<string, unknown> {
@@ -75,10 +76,12 @@ export function isPdksEligibleReading(reading: PdksSourceReading): boolean {
   return source !== "biometric" && source !== "unknown";
 }
 
-/** Shared calculation boundary. An explicit project excludes unassigned and foreign rows too. */
-export function filterPdksReadings<T extends PdksSourceReading>(readings: readonly T[], projectId?: string): T[] {
-  return readings.filter(reading =>
-    (projectId === undefined || reading.projectId === projectId) && isPdksEligibleReading(reading));
+/** Shared source, tenant and checkpoint decision; no database access. */
+export function isPdksIncludedReading(reading: PdksSourceReading, projectId?: string, policy?: PdksDayPolicy): boolean {
+  return (projectId === undefined || reading.projectId === projectId) && isPdksEligibleReading(reading) && (!policy || matchesPdksCheckpoint(reading, policy));
+}
+export function filterPdksReadings<T extends PdksSourceReading>(readings: readonly T[], projectId?: string, policyFor?: (reading: T) => PdksDayPolicy): T[] {
+  return readings.filter(reading => isPdksIncludedReading(reading, projectId, policyFor?.(reading)));
 }
 
 export function countPdksReadingSources(readings: readonly PdksSourceReading[]): Record<PdksReadingSource, number> {

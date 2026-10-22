@@ -35,6 +35,12 @@ export function reportExportTable(report: Report, canSeePay = true) {
       rows = report.data.rows.map((r) => [r.department, r.overtimeHours, r.employeeCount, r.cost ?? "—"]);
       break;
   }
+  if (report.type === "sgk" || report.type === "attendance") {
+    if (report.data.rows.some(row => (row.incompleteDays ?? 0) > 0)) {
+      headers.push("İnceleme (gün)");
+      rows = rows.map((row, index) => [...row, report.data.rows[index]?.incompleteDays ?? 0]);
+    }
+  }
   if (!canSeePay && (report.type === "overtime" || report.type === "department")) {
     headers = headers.slice(0, -1);
     rows = rows.map(row => row.slice(0, -1));
@@ -88,6 +94,7 @@ export async function exportScopedSgkPdf(data: FunctionReturnType<typeof api.rep
     if (line) lines.push(line);
     return lines;
   };
+  const columnWidth = table.headers.length > 8 ? 1904 / table.headers.length : 238;
   let y = 0;
   let page = 0;
   const savePage = () => {
@@ -102,15 +109,15 @@ export async function exportScopedSgkPdf(data: FunctionReturnType<typeof api.rep
       y += 10;
     }
     context.font = "bold 20px sans-serif";
-    table.headers.forEach((header, index) => context.fillText(header, 50 + index * 238, y, 228));
+    table.headers.forEach((header, index) => context.fillText(header, 50 + index * columnWidth, y, columnWidth - 10));
     y += 40; context.font = "20px sans-serif";
   };
   startPage();
   for (const row of table.rows) {
-    const lines = row.map((cell) => wrap(String(cell ?? ""), 224));
+    const lines = row.map((cell) => wrap(String(cell ?? ""), columnWidth - 14));
     const height = Math.max(...lines.map((cell) => cell.length), 1) * 26 + 12;
     if (y + height > 1350) { savePage(); startPage(); }
-    lines.forEach((cell, index) => cell.forEach((line, lineIndex) => context.fillText(line, 50 + index * 238, y + lineIndex * 26, 224)));
+    lines.forEach((cell, index) => cell.forEach((line, lineIndex) => context.fillText(line, 50 + index * columnWidth, y + lineIndex * 26, columnWidth - 14)));
     y += height;
   }
   savePage();

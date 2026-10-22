@@ -4,7 +4,7 @@ import {
   readableDate,
   type PdksRow,
 } from "../lib/presentation";
-import { STATUS_META } from "../statusMeta";
+import { STATUS_META, IN_PROGRESS_META } from "../statusMeta";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import {
   ResponsiveContainer,
@@ -64,6 +64,7 @@ export function PDKSChartView({
             <h3 className="text-sm font-medium">{readableDate(day.date)}</h3>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               {Object.entries(day.counts)
+                .map(([key, count]) => [key, key === "future" ? count - day.inProgress : count] as const)
                 .filter(([, count]) => count > 0)
                 .map(([key, count]) => {
                   const meta = STATUS_META[key as keyof typeof STATUS_META];
@@ -73,6 +74,9 @@ export function PDKSChartView({
                     </StatusBadge>
                   );
                 })}
+              {day.inProgress > 0 && <StatusBadge tone={IN_PROGRESS_META.tone}>
+                {IN_PROGRESS_META.label} {day.inProgress}
+              </StatusBadge>}
             </div>
             <p className="mt-2 text-xs text-muted-foreground tabular-nums">
               Toplam {formatDuration(day.totalMinutes)} · Geç kalma{" "}

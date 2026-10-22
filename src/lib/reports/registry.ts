@@ -36,7 +36,7 @@ function department(key: string, label: string, value: (row: DepartmentReportRow
   return { key, label, ...durationColumn(key), value: row => row.kind === 'department' ? value(row) : null, defaultVisible: true };
 }
 function attendance(key: keyof AttendanceCounts, label: string): ReportColumn {
-  return { key, label, value: row => row.kind === 'monthly' || row.kind === 'department' ? row.attendance[key] : null, defaultVisible: true, align: 'right' };
+  return { key, label, value: row => row.kind === 'monthly' || row.kind === 'department' ? row.attendance[key] ?? null : null, defaultVisible: true, align: 'right' };
 }
 export const DAILY_COLUMNS: readonly ReportColumn[] = [
   daily('date', 'Tarih', row => formatReportDate(row.cell.date)),
@@ -55,6 +55,7 @@ const MONTHLY_TOTALS = [
   monthly('duration', 'Toplam süre', row => formatMinutes(row.totals.totalMinutes)), monthly('overtime', 'Fazla mesai', row => formatMinutes(row.totals.overtimeMinutes)),
   monthly('leaveDays', 'İzin (gün)', row => row.totals.leaveDays, 'right'), monthly('absentDays', 'Devamsız (gün)', row => row.totals.absentDays, 'right'), monthly('lateDays', 'Geç (gün)', row => row.totals.lateDays, 'right'),
 ];
+const INCOMPLETE_DAYS: ReportColumn = { key: "incompleteDays", label: "İnceleme (gün)", defaultVisible: false, align: "right", value: row => row.kind === "monthly" ? row.totals.incompleteDays ?? row.attendance.incompleteDays ?? null : row.kind === "department" ? row.attendance.incompleteDays ?? null : null };
 const ATTENDANCE_COUNTS = [attendance('workedDays', 'Çalışılan gün'), attendance('holidayWorkedDays', 'Tatilde çalışma (gün)'), attendance('lateDays', 'Geç (gün)'), attendance('earlyExitDays', 'Erken çıkış (gün)'), attendance('absentDays', 'Devamsız'), attendance('leaveDays', 'İzinli')];
 const PUNCHES = daily('punches', 'Okutmalar', row => formatPunches(row.cell) || null);
 const dailyColumns = (...keys: string[]): ReportColumn[] => keys.flatMap(key => DAILY_COLUMNS.filter(column => column.key === key));
@@ -102,7 +103,8 @@ const FOCUSED_COLUMNS: Record<string, readonly string[]> = {
 export const REPORTS: readonly ReportDefinition[] = REPORT_DEFINITIONS.map(def => {
   if (def.dataSource !== 'pdksMatrix') {
     const focused = FOCUSED_COLUMNS[def.slug];
-    return focused ? { ...def, columns: def.columns.map(column => ({ ...column, defaultVisible: focused.includes(column.key) })) } : def;
+    const columns = def.dataSource === "monthlyPayroll" ? [...def.columns, INCOMPLETE_DAYS] : def.columns;
+    return focused ? { ...def, columns: columns.map(column => ({ ...column, defaultVisible: focused.includes(column.key) })) } : { ...def, columns };
   }
   const focused = FOCUSED_COLUMNS[def.slug] ?? def.columns.map(column => column.key);
   const all = [...def.columns, ...DAILY_COLUMNS.filter(column => !def.columns.some(existing => existing.key === column.key))];

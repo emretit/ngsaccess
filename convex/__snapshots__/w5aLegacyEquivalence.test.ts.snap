@@ -1,0 +1,316 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > annual 1`] = `
+{
+  "reads": [
+    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2025-12-31T21:00:00.000Z"],["lte","accessTime","2026-12-31T20:59:59.999Z"],["export"],["collect"]]",
+    "["departments",["collect"]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["filter"],["collect"]]",
+    "["leaves",["filter"],["collect"]]",
+    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
+    "["shifts",["collect"]]",
+    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
+    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+  ],
+  "result": [
+    {
+      "employeeId": "employeeId",
+      "exceedsDaily11h": [],
+      "firstName": "Ada",
+      "lastName": "Test",
+      "limitHours": 270,
+      "remainingHours": 270,
+      "totalOvertimeHours": 0,
+      "totalOvertimeMinutes": 0,
+      "utilizationPct": 0,
+    },
+  ],
+}
+`;
+
+exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > attendanceReport 1`] = `
+{
+  "reads": [
+    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-11-01T20:59:59.999Z"],["export"],["collect"]]",
+    "["cardReadings",["withIndex","by_project_employee_time"],["eq","projectId","projectId"],["eq","employeeId","employeeId"],["export"],["order","asc"],["take",20]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
+    "["generalSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+    "["holidays",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
+    "["holidays",["withIndex","by_project"],["eq","projectId",null],["export"],["collect"]]",
+    "["leaves",["withIndex","by_employee_start"],["eq","employeeId","employeeId"],["lte","startDate","2026-10-31"],["export"],["collect"]]",
+    "["overtimeRates",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+    "["pdksRecords",["withIndex","by_employee_date"],["eq","employeeId","employeeId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",
+    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
+    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
+    "["shifts",["collect"]]",
+    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
+    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+  ],
+  "result": {
+    "completedThrough": "2026-10-22",
+    "endDate": "2026-10-31",
+    "month": 10,
+    "reliabilityNote": "Güvenilirlik sınırı: İşe giriş tarihi tutulmadığından ay ortasında işe başlayanlar ayrıştırılamaz; ayrılanların son çalışma gününden sonraki günleri hesaplanmaz. Günler PDKS tablo motoruyla hesaplanır; yarım tatil günleri PDKS gibi tatil sayılır. Devam oranı, tamamlanmış beklenen günlerden izinler çıkarılarak hesaplanır. Tek izinli okuma veya manuel giriş devam kabul edilir; bu bir bordro onayı değildir.",
+    "rows": [
+      {
+        "absentDays": 0,
+        "department": "Departmansız",
+        "devamOrani": null,
+        "employeeId": "employeeId",
+        "expectedDays": 0,
+        "leaveDays": 0,
+        "name": "Ada Test",
+        "presentDays": 0,
+        "projectId": "projectId",
+        "reliabilityNote": "",
+      },
+    ],
+    "scopeLabel": "Legacy",
+    "startDate": "2026-10-01",
+    "year": 2026,
+  },
+}
+`;
+
+exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > dashboard 1`] = `
+{
+  "reads": [
+    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-10-22T21:00:00.000Z"],["lte","accessTime","2026-10-23T20:59:59.999Z"],["export"],["collect"]]",
+    "["departments",["collect"]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["filter"],["collect"]]",
+    "["leaves",["filter"],["collect"]]",
+    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
+    "["shifts",["collect"]]",
+    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
+    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+  ],
+  "result": {
+    "averageFirstEntry": "08:00",
+    "averageLastExit": "17:00",
+    "insideBuilding": 0,
+    "lateArrivals": 0,
+    "presentToday": 1,
+    "workHours": null,
+  },
+}
+`;
+
+exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > departmentReport 1`] = `
+{
+  "reads": [
+    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
+    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
+    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+  ],
+  "result": {
+    "hourlyRate": null,
+    "month": 10,
+    "overtimeMultiplier": null,
+    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+    "rows": [
+      {
+        "cost": 0,
+        "department": "Belirtilmemiş",
+        "employeeCount": 1,
+        "overtimeHours": 1,
+      },
+    ],
+    "scopeLabel": "Legacy",
+    "year": 2026,
+  },
+}
+`;
+
+exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > overtimeReport 1`] = `
+{
+  "reads": [
+    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
+    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
+    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+  ],
+  "result": {
+    "endDate": "2026-10-31",
+    "month": 10,
+    "overtimeMultiplier": null,
+    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+    "rows": [
+      {
+        "department": "Bilinmiyor",
+        "employeeId": "projectId:employeeId",
+        "name": "Ada Test",
+        "overtimeHours": 1,
+        "overtimePayTRY": null,
+      },
+    ],
+    "scopeLabel": "Legacy",
+    "startDate": "2026-10-01",
+    "totalOvertimeHours": 1,
+    "totalOvertimePayTRY": 0,
+    "year": 2026,
+  },
+}
+`;
+
+exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > sgk 1`] = `
+{
+  "reads": [
+    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
+    "["companies",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
+    "["generalSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+    "["holidays",["withIndex","by_project_date"],["eq","projectId","projectId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",
+    "["holidays",["withIndex","by_project_date"],["eq","projectId",null],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",
+    "["leaves",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
+    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
+  ],
+  "result": {
+    "filename": "aphb-2026-10.xml",
+    "warnings": [
+      "Ada Test: T.C. kimlik numarası eksik; bildirimden önce tamamlayın.",
+    ],
+    "xml": "<?xml version="1.0" encoding="UTF-8"?>
+<aphb year="2026" month="10">
+  <isveren>
+    <unvan>Şirket</unvan>
+  </isveren>
+  <calisanlar>
+    <calisan>
+      <tcKimlikNo></tcKimlikNo>
+      <adSoyad>Ada Test</adSoyad>
+      <calismaGunu>9</calismaGunu>
+      <fazlaMesaiSaati>0.0</fazlaMesaiSaati>
+      <eksikGunSayisi>21</eksikGunSayisi>
+      <eksikGunNedeni>15</eksikGunNedeni>
+    </calisan>
+  </calisanlar>
+</aphb>",
+  },
+}
+`;
+
+exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > sgkReport 1`] = `
+{
+  "reads": [
+    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
+    "["leaves",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
+    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
+  ],
+  "result": {
+    "endDate": "2026-10-31",
+    "month": 10,
+    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+    "rows": [
+      {
+        "adSoyad": "Ada Test",
+        "calismaGunu": 1,
+        "departman": "Bilinmiyor",
+        "fazlaMesaiSaat": 1,
+        "izinGunu": 0,
+        "sicilNo": "123",
+        "tcNo": "-",
+        "toplamSaat": 9,
+      },
+    ],
+    "scopeLabel": "Legacy",
+    "startDate": "2026-10-01",
+    "year": 2026,
+  },
+}
+`;
+
+exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > table 1`] = `
+{
+  "reads": [
+    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-10-18T21:00:00.000Z"],["lte","accessTime","2026-10-24T20:59:59.999Z"],["export"],["collect"]]",
+    "["cardReadings",["withIndex","by_project_employee_time"],["eq","projectId","projectId"],["eq","employeeId","employeeId"],["export"],["order","asc"],["take",20]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
+    "["generalSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+    "["holidays",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
+    "["holidays",["withIndex","by_project"],["eq","projectId",null],["export"],["collect"]]",
+    "["leaves",["withIndex","by_employee_start"],["eq","employeeId","employeeId"],["lte","startDate","2026-10-23"],["export"],["collect"]]",
+    "["overtimeRates",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+    "["pdksRecords",["withIndex","by_employee_date"],["eq","employeeId","employeeId"],["gte","date","2026-10-19"],["lte","date","2026-10-23"],["export"],["collect"]]",
+    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
+    "["shifts",["collect"]]",
+    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
+    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
+  ],
+  "result": [
+    {
+      "cardNumber": "123",
+      "days": [
+        {
+          "date": "2026-10-23",
+          "detail": {
+            "breakViolation": false,
+            "dayType": "workday",
+            "earlyExitMinutes": 0,
+            "isEarlyExit": false,
+            "isManual": false,
+            "plannedBreakEnd": null,
+            "plannedBreakStart": null,
+            "plannedEnd": "17:00",
+            "plannedStart": "08:00",
+            "punches": [],
+            "readingCount": 2,
+            "shiftName": "Gündüz",
+          },
+          "firstEntry": "08:00",
+          "isLate": false,
+          "lastExit": "17:00",
+          "lateMinutes": 0,
+          "leaveType": null,
+          "nightMinutes": 0,
+          "overtimeMinutes": 0,
+          "payrollCode": "N",
+          "rawTotalMinutes": 540,
+          "status": "present",
+          "totalMinutes": 480,
+        },
+      ],
+      "department": "",
+      "detailedLogs": [
+        {
+          "action": "Giriş",
+          "direction": "entry",
+          "location": "Bilinmiyor",
+          "time": "08:00",
+        },
+        {
+          "action": "Çıkış",
+          "direction": "exit",
+          "location": "Bilinmiyor",
+          "time": "17:00",
+        },
+      ],
+      "employeeId": "123",
+      "excludedUnknownReadings": 0,
+      "firstEntry": "08:00",
+      "hourlyRate": null,
+      "id": "employeeId",
+      "isEarlyExit": false,
+      "isLate": false,
+      "isManual": false,
+      "lastExit": "17:00",
+      "leaveType": "",
+      "manualEditedBy": null,
+      "manualNote": null,
+      "name": "Ada Test",
+      "nightMinutes": 0,
+      "overtime": "0m",
+      "overtimeHours": 0,
+      "overtimeMinutes": 0,
+      "overtimeMultiplier": 0,
+      "overtimePayTRY": null,
+      "payrollCode": "N",
+      "payrollEmployeeCode": "",
+      "rawTotalMinutes": 540,
+      "status": "present",
+      "totalHours": "8h 0m",
+      "totalMinutes": 480,
+      "yearlyOvertimeLimit": 270,
+    },
+  ],
+}
+`;

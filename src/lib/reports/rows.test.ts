@@ -134,3 +134,20 @@ describe('attendance correction regressions', () => {
     expect(formatPunches(cell)).not.toContain('okutma daha');
   });
 });
+
+it('offers a hidden review-day column, counts review days separately and aggregates departments', async () => {
+  const { REPORTS } = await import('./registry');
+  const sheet = monthlySheet();
+  const cell = sheet.rows[0].cells[0];
+  sheet.rows[0].cells = [{ ...cell, status: 'incomplete', payrollCode: '—', durationMeasured: false, totalMinutes: 0 }];
+  sheet.rows[0].totals = { ...sheet.rows[0].totals, incompleteDays: 1 };
+  const row = buildMonthlyStatusRows(sheet)[0];
+  const department = buildDepartmentRows([row])[0];
+  expect(row.attendance).toMatchObject({ incompleteDays: 1, workedDays: 0, absentDays: 0 });
+  expect(department.attendance.incompleteDays).toBe(1);
+  for (const report of REPORTS.filter(item => item.dataSource === 'monthlyPayroll')) {
+    const column = report.columns.find(item => item.key === 'incompleteDays');
+    expect(column?.defaultVisible).toBe(false); expect(column?.label).toBe('İnceleme (gün)'); expect(column?.value(report.monthlyRows === 'departments' ? department : row)).toBe(1);
+    expect(report.columns.filter(item => item.defaultVisible).map(item => item.key)).not.toContain('incompleteDays');
+  }
+});

@@ -1,3 +1,5 @@
+import { resolveAttendanceEvidence } from "./pdksEvidence";
+import { LEGACY_PDKS_POLICY, type PdksDayPolicy } from "./pdksRules";
 import type { Doc } from "../_generated/dataModel";
 import { legalBreakMinutes } from "./breakDeduction";
 import { minutesBetweenISO } from "./pdksCalc";
@@ -45,6 +47,7 @@ function recurringWindows(
 /** One calculation for table, detail and payroll. All minutes are on the shift-start
  * day's timeline; legal breaks without a scheduled window are allocated proportionally. */
 export function computePdksDay(params: {
+  policy?: PdksDayPolicy;
   date: string;
   readings: readonly Doc<"cardReadings">[];
   manual?: Doc<"pdksRecords">;
@@ -73,10 +76,15 @@ export function computePdksDay(params: {
       : undefined,
     shift,
   );
-  const firstISO = manual?.entryTime
+  const directedEntry = readings.find(r => r.direction === "entry")?.accessTime;
+  const directedFallback = directedEntry ? `${String(Math.floor(isoTimeToTRMinutes(directedEntry) / 60)).padStart(2, "0")}:${String(isoTimeToTRMinutes(directedEntry) % 60).padStart(2, "0")}` : undefined;
+  const evidenceManualTimes = manualPdksTimes(date, manual ? { ...manual, entryTime: manual.entryTime ?? directedFallback } : undefined, shift);
+  const evidence = (params.policy ?? LEGACY_PDKS_POLICY).punchMode === "requirements"
+    ? resolveAttendanceEvidence(readings, { entryISO: manual?.entryTime ? evidenceManualTimes.entryISO : undefined, exitISO: evidenceManualTimes.exitISO }, params.policy ?? LEGACY_PDKS_POLICY) : null;
+  const firstISO = evidence ? evidence.firstISO : manual?.entryTime
     ? (manualTimes.entryISO ?? null)
     : (rawEntry ?? null);
-  const lastISO =
+  const lastISO = evidence ? evidence.lastISO :
     manualTimes.exitISO ??
     (readings.length > 1
       ? (readings[readings.length - 1]?.accessTime ?? null)
@@ -249,7 +257,10 @@ export function computePdksDay(params: {
     earlyExitMinutes,
     exitNextDay: exit !== undefined && exit >= 1440,
     isOvernightShift: isOvernightShift(shift),
-    hasAttendance: !!firstISO || !!lastISO,
+    hasAttendance: evidence ? evidence.attendanceCredit : !!firstISO || !!lastISO,
+    attendanceDecision: evidence?.decision,
+    durationMeasured: evidence?.durationMeasured ?? (!!firstISO && !!lastISO),
+    punchQuality: evidence?.punchQuality ?? (firstISO && lastISO ? "ok" as const : firstISO ? "missingExit" as const : lastISO ? "missingEntry" as const : "noPunch" as const),
     overtimePayTRY:
       params.hourlyRate != null && overtimeMinutes > 0
         ? (weightedOvertimeMinutes / 60) * params.hourlyRate

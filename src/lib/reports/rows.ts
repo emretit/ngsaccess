@@ -8,7 +8,7 @@ export type MonthlySheet = FunctionReturnType<typeof api.cardReadings.getMonthly
 export type DailyReportRow = { kind: 'daily'; id: string; name: string; department: string; payrollCode: string; cell: DailyCell };
 export interface AttendanceCounts {
   workedDays: number; holidayWorkedDays: number; lateDays: number; earlyExitDays: number; absentDays: number;
-  leaveDays: number; weekendDays: number; holidayDays: number;
+  leaveDays: number; weekendDays: number; holidayDays: number; incompleteDays?: number;
 }
 export type MonthlyReportRow = MonthlySheet['rows'][number] & { kind: 'monthly'; id: string; attendance: AttendanceCounts };
 export type DepartmentReportRow = {
@@ -47,6 +47,8 @@ export function countAttendance(cells: MonthlyReportRow['cells']): AttendanceCou
   const counts: AttendanceCounts = { workedDays: 0, holidayWorkedDays: 0, lateDays: 0, earlyExitDays: 0, absentDays: 0, leaveDays: 0, weekendDays: 0, holidayDays: 0 };
   for (const cell of cells) {
     if (cell.status === 'future' || cell.status === 'noData') continue;
+    if (cell.durationMeasured !== undefined) counts.incompleteDays ??= 0;
+    if (cell.status === 'incomplete') { counts.incompleteDays = (counts.incompleteDays ?? 0) + 1; continue; }
     if (cell.payrollCode === 'N') counts.workedDays += 1;
     if ((cell.classification === 'weekend' || cell.classification === 'holiday') && cell.totalMinutes > 0) counts.holidayWorkedDays += 1;
     if (cell.classification === 'workday' && cell.isLate) counts.lateDays += 1;
@@ -66,6 +68,7 @@ export function buildDepartmentRows(rows: readonly MonthlyReportRow[]): Departme
       attendance: { workedDays: 0, holidayWorkedDays: 0, lateDays: 0, earlyExitDays: 0, absentDays: 0, leaveDays: 0, weekendDays: 0, holidayDays: 0 },
       totalMinutes: 0, overtimeMinutes: 0, attendanceRate: null,
     };
+    if (row.attendance.incompleteDays !== undefined) department.attendance.incompleteDays = (department.attendance.incompleteDays ?? 0) + row.attendance.incompleteDays;
     department.personCount += 1;
     department.totalMinutes += row.totals.totalMinutes;
     department.overtimeMinutes += row.totals.overtimeMinutes;

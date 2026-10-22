@@ -1,3 +1,4 @@
+import { loadPdksPolicies } from "./lib/pdksRules";
 import { employedDuring, employedOn } from "./lib/employment";
 import { genericReaderTokenAllowed } from "./lib/mobileAccess";
 import { stream } from "convex-helpers/server/stream";
@@ -374,7 +375,8 @@ export const getPdksTableData = authedQuery({
         v.literal("holiday"),
         v.literal("future"),
         v.literal("noData"),
-        v.literal("notEmployed")
+        v.literal("notEmployed"),
+        v.literal("incomplete")
       )
     ),
     person: v.optional(v.string()),
@@ -465,7 +467,10 @@ export const getPdksTableData = authedQuery({
     }
 
     const sourceReadings = readings;
-    readings = filterPdksReadings(readings, args.projectId);
+    const tableBoundaryShiftResolver = await buildShiftResolver(ctx, availabilityEmployees);
+    const tableBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId));
+    const policies = await loadPdksPolicies(ctx, availabilityEmployees.map(e => e.projectId), overtimeRange.startDate, overtimeRange.endDate);
+    readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, tableBoundaryWorkDate(r)));
 
     readings.sort(
       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
@@ -486,7 +491,7 @@ export const getPdksTableData = authedQuery({
           .query("generalSettings")
           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
           .first(),
-        buildShiftResolver(ctx, availabilityEmployees),
+        Promise.resolve(tableBoundaryShiftResolver),
       ]);
     const workingDays =
       generalSettings?.workingDays && generalSettings.workingDays.length > 0
@@ -525,7 +530,7 @@ export const getPdksTableData = authedQuery({
     const tableDepartments = await Promise.all([...new Set(employees.flatMap(e => e.departmentId ? [e.departmentId] : []))].map(id => ctx.db.get(id)));
     const tableDeptById = new Map(tableDepartments.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [String(d._id), d]));
 
-    const tableWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(shiftResolver.resolve(id, date), args.projectId));
+    const tableWorkDate = tableBoundaryWorkDate;
     const tablePeriodDates = new Set(periodDateKeys);
     const sourceReadingsByEmployee = buildPdksEmployeeReadingMap({
       employees,
@@ -548,8 +553,9 @@ export const getPdksTableData = authedQuery({
           ? await ctx.db.get(manualToday.editedBy)
           : null;
 
-        const firstRecordDate = employee ? await pdksFirstRecordDate(ctx, employee, empReadings, tableManualDates.get(employee._id) ?? [], tableWorkDate) : null;
+        const firstRecordDate = employee ? await pdksFirstRecordDate(ctx, employee, empReadings, tableManualDates.get(employee._id) ?? [], tableWorkDate, policies) : null;
         const row = computePdksTableRow({
+          policyFor: date => policies(employee?.projectId, date),
           availableDateKeys: tableAvailableDates.get(employee?.projectId) ?? new Set<string>(),
           firstRecordDate,
           empKey,
@@ -663,7 +669,10 @@ export const getMonthlyPayrollSheet = authedQuery({
     }
 
     employees = employees.filter(employee => employedDuring(employee, startDate, endDate));
-    readings = filterPdksReadings(readings, args.projectId);
+    const payrollBoundaryShiftResolver = await buildShiftResolver(ctx, employees);
+    const payrollBoundaryWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId));
+    const policies = await loadPdksPolicies(ctx, employees.map(e => e.projectId), overtimeRange.startDate, overtimeRange.endDate);
+    readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, payrollBoundaryWorkDate(r)));
 
     const [workSettings, holidayMap, generalSettings, payrollShiftResolver] =
       await Promise.all([
@@ -673,7 +682,7 @@ export const getMonthlyPayrollSheet = authedQuery({
           .query("generalSettings")
           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
           .first(),
-        buildShiftResolver(ctx, employees),
+        Promise.resolve(payrollBoundaryShiftResolver),
       ]);
     const workingDays =
       generalSettings?.workingDays && generalSettings.workingDays.length > 0
@@ -707,7 +716,7 @@ export const getMonthlyPayrollSheet = authedQuery({
 
     const payrollEmployeesById = new Map(employees.map(e => [String(e._id), e]));
     const payrollEmployeeReadings = buildPdksEmployeeReadingMap({ employees, readings });
-    const payrollWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId));
+    const payrollWorkDate = payrollBoundaryWorkDate;
     const payrollAvailableDates = pdksAvailableDatesByProject(readings, payrollWorkDate);
     const payrollManualDates = pdksManualDatesByEmployee(manualByEmpDate.values());
     const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
@@ -733,10 +742,11 @@ export const getMonthlyPayrollSheet = authedQuery({
           monthlyHoursBase: workSettings.monthlyHoursBase,
         }) : null;
 
-        const firstRecordDate = await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate);
+        const firstRecordDate = await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate, policies);
         const availableDateKeys = payrollAvailableDates.get(emp.projectId) ?? new Set<string>();
         const allCells = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).filter(date => employedOn(emp, date)).map((d) =>
           computePayrollCell({
+            policyFor: date => policies(emp.projectId, date),
             availableDateKeys,
             firstRecordDate,
             date: d,
@@ -775,18 +785,21 @@ export const getMonthlyPayrollSheet = authedQuery({
           (acc, c) => {
             acc.totalMinutes += c.totalMinutes;
             if (c.payrollCode === "İZN") acc.leaveDays += 1;
+            if (c.status === "incomplete") acc.incompleteDays += 1;
             if (c.payrollCode === "DV") acc.absentDays += 1;
-            if (c.isLate) acc.lateDays += 1;
+            if (c.isLate && c.status !== "incomplete") acc.lateDays += 1;
             return acc;
           },
           {
             totalMinutes: 0,
             leaveDays: 0,
+            incompleteDays: 0,
             absentDays: 0,
             lateDays: 0,
           }
         );
 
+        const { incompleteDays, ...legacyTotals } = totals;
         return {
           employeeId: emp._id,
           payrollCode: emp.payrollCode ?? "",
@@ -796,7 +809,8 @@ export const getMonthlyPayrollSheet = authedQuery({
           hourlyRate: empHourlyRate,
           cells,
           totals: {
-            ...totals,
+            ...legacyTotals,
+            ...(cells.some(c => c.durationMeasured !== undefined) ? { incompleteDays } : {}),
             overtimeMinutes: periodOvertime.overtimeMinutes,
             overtimePayTRY: periodOvertime.overtimePayTRY,
             exceedsDaily11h: periodOvertime.exceedsDaily11h,
@@ -1323,7 +1337,10 @@ export const getEmployeeAttendanceDetail = authedQuery({
       .withIndex("by_project", q => q.eq("projectId", employee.projectId)).collect();
 
     const sourceReadings = readings;
-    readings = filterPdksReadings(readings, args.projectId);
+    const detailBoundaryShiftResolver = await buildShiftResolver(ctx, availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate)));
+    const detailBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId));
+    const policies = await loadPdksPolicies(ctx, availabilityEmployees.map(e => e.projectId), overtimeRange.startDate, overtimeRange.endDate);
+    readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, detailBoundaryWorkDate(r)));
 
     readings.sort(
       (a, b) =>
@@ -1357,7 +1374,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
         employee.companyId ? ctx.db.get(employee.companyId) : Promise.resolve(null),
         employee.positionId ? ctx.db.get(employee.positionId) : Promise.resolve(null),
         employee.shiftId ? ctx.db.get(employee.shiftId) : Promise.resolve(null),
-        buildShiftResolver(ctx, availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate))),
+        Promise.resolve(detailBoundaryShiftResolver),
       ]);
 
     const workingDays =
@@ -1380,11 +1397,12 @@ export const getEmployeeAttendanceDetail = authedQuery({
       sourceReadings.filter(r => detailPeriodDates.has(detailWorkDate(r))),
       employee.projectId,
     );
-    const availableDateKeys = await readPdksAvailableDateKeys(ctx, employee.projectId, periodDateKeys, detailWorkDate);
-    const firstRecordDate = await pdksFirstRecordDate(ctx, employee, readings, [...manualByDate.keys()], detailWorkDate);
+    const availableDateKeys = await readPdksAvailableDateKeys(ctx, employee.projectId, periodDateKeys, detailWorkDate, policies);
+    const firstRecordDate = await pdksFirstRecordDate(ctx, employee, readings, [...manualByDate.keys()], detailWorkDate, policies);
     const scopedLeaves = leaves.filter(l => pdksLeaveMatchesProject(l, employee.projectId));
     const allDays = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).filter(date => employedOn(employee, date)).map((dk) =>
       computeAttendanceDetailDay({
+        policyFor: date => policies(employee.projectId, date),
         availableDateKeys,
         firstRecordDate,
         date: dk,
@@ -1431,6 +1449,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
         workedDays: summary.workedDays,
         lateDays: summary.lateDays,
         absentDays: summary.absentDays,
+        incompleteDays: summary.incompleteDays,
         leaveDays: summary.leaveDays,
         overtimeMinutes: summary.overtimeMinutes,
         overtimePayTRY: summary.overtimePayTRY,

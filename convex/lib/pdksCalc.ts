@@ -18,7 +18,8 @@ export type DayStatus =
   | "absent"
   | "leave"
   | "weekend"
-  | "holiday";
+  | "holiday"
+  | "incomplete";
 
 /**
  * `startDate`..`endDate` (dahil) arası YYYY-MM-DD anahtarları, UTC gün döngüsüyle.
@@ -112,10 +113,11 @@ export function computeBreakViolation(params: {
   });
 }
 
-/** summary modu yalnız bu 4 değeri üretir (hafta sonu/tatil yok). */
-export type SummaryDayStatus = "present" | "late" | "absent" | "leave";
+/** Legacy summary has four states; requirements may additionally need review. */
+export type SummaryDayStatus = "present" | "late" | "absent" | "leave" | "incomplete";
 
 interface DayStatusInput {
+  attendanceDecision?: "present" | "absent" | "incomplete";
   classification: "workday" | "weekend" | "holiday" | "halfDayHoliday";
   hasAttendance: boolean;
   hasLeave: boolean;
@@ -142,6 +144,12 @@ export function resolveDayStatus(
   opts: { mode: "summary" | "calendar" } & DayStatusInput,
 ): DayStatus {
   const { mode, classification, hasAttendance, hasLeave, isLate } = opts;
+  if (opts.attendanceDecision !== undefined) {
+    if (mode === "calendar" && (classification === "holiday" || classification === "halfDayHoliday")) return "holiday";
+    if (mode === "calendar" && classification === "weekend") return "weekend";
+    if (hasLeave) return "leave";
+    if (opts.attendanceDecision === "incomplete") return "incomplete";
+  }
 
   if (mode === "summary") {
     if (hasLeave && !hasAttendance) return "leave";

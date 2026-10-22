@@ -1,3 +1,5 @@
+import { employedOn } from "./employment";
+import type { PdksPolicyResolver } from "./pdksRules";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
 import { trTodayKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -19,7 +21,7 @@ import {
 import { calculatePeriodOvertime, overtimePeriodRange } from "./overtimeCalc";
 import { computePdksDay } from "./pdksDay";
 import { pdksLeaveMatchesProject } from "./pdksAvailability";
-import { groupPdksWorkDays } from "./pdksWorkDay";
+import { addWorkDate, groupPdksWorkDays } from "./pdksWorkDay";
 
 export type PdksDayStatus =
   | "present"
@@ -30,15 +32,19 @@ export type PdksDayStatus =
   | "holiday"
   | "future"
   | "noData"
-  | "notEmployed";
+  | "notEmployed"
+  | "incomplete";
 
 /** Absence needs project data and a known employment period; time before shift start is pending. */
 export function classifyPdksDay(params: {
+  attendanceDecision?: "present" | "absent" | "incomplete";
   date: string;
   today?: string;
   dataAvailable: boolean;
   firstRecordDate?: string | null;
   shiftStart?: string;
+  shiftEnd?: string;
+  earlyExitTolerance?: number;
   hasAssignedShift?: boolean;
   lateTolerance?: number;
   now?: number;
@@ -53,6 +59,20 @@ export function classifyPdksDay(params: {
     mode: "calendar",
     classification: params.classification === "halfDayHoliday" ? "holiday" : params.classification,
   });
+  if (params.attendanceDecision !== undefined) {
+    // Rest days and approved leave never become missing-data/review days.
+    if (status === "weekend" || status === "holiday" || status === "leave") return status;
+    if (params.attendanceDecision !== "present" && params.shiftEnd) {
+      const endDate = params.shiftStart && params.shiftEnd <= params.shiftStart
+        ? addWorkDate(params.date, 1) : params.date;
+      const threshold = Date.parse(`${endDate}T${params.shiftEnd}:00+03:00`) + (params.earlyExitTolerance ?? 0) * 60000;
+      if ((params.now ?? Date.now()) <= threshold) return "future";
+    }
+    if (status === "absent" && params.firstRecordDate === null && !params.hasAttendance) return "noData";
+    if (!params.hasAttendance && params.firstRecordDate && params.date < params.firstRecordDate) return "notEmployed";
+    if (status === "absent" && !params.dataAvailable) return "noData";
+    return status;
+  }
   if (status !== "absent") return status;
   if (!params.hasAttendance && params.firstRecordDate && params.date < params.firstRecordDate)
     return "notEmployed";
@@ -96,6 +116,8 @@ export type PdksDayDetail = {
 };
 
 export type PdksTableDayCell = {
+  durationMeasured?: boolean;
+  punchQuality?: import("./pdksEvidence").PunchQuality;
   date: string;
   firstEntry: string | null;
   lastExit: string | null;
@@ -113,6 +135,9 @@ export type PdksTableDayCell = {
 };
 
 export type PdksTableRow = {
+  incompleteDays?: number;
+  durationMeasured?: boolean;
+  punchQuality?: import("./pdksEvidence").PunchQuality;
   id: string;
   name: string;
   employeeId: string;
@@ -160,7 +185,8 @@ export type PdksTableStatusFilter =
   | "holiday"
   | "future"
   | "noData"
-  | "notEmployed";
+  | "notEmployed"
+  | "incomplete";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   annual: "Yıllık",
@@ -207,6 +233,7 @@ export function buildPdksEmployeeReadingMap(params: {
 }
 
 export function computePdksTableRow(params: {
+  policyFor?: PdksPolicyResolver;
   today?: string;
   now?: number;
   firstRecordDate?: string | null;
@@ -248,14 +275,16 @@ export function computePdksTableRow(params: {
   const periodEnd = sortedDates[sortedDates.length - 1] ?? params.startDate;
   const range = overtimePeriodRange(periodStart, periodEnd, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
   const allCalculations = buildPeriodDateKeys(range.startDate, range.endDate).map((date) => {
-    const readings = byDate.get(date) ?? [];
+    const outsideEmployment = params.policyFor?.(date).punchMode === "requirements" && employee !== null && !employedOn(employee, date);
+    const readings = outsideEmployment ? [] : byDate.get(date) ?? [];
     const shift = empId ? params.resolveShift(empId, date) : null;
-    const manual = params.manualPdksByEmpDate.get(`${empKey}__${date}`);
+    const manual = outsideEmployment ? undefined : params.manualPdksByEmpDate.get(`${empKey}__${date}`);
     const leave = params.allLeaves.find(
       (l) => l.employeeId === empId && pdksLeaveMatchesProject(l, employee?.projectId) && date >= l.startDate && date <= l.endDate,
     );
     const settings = settingsForShift(shift, workSettings);
     const day = computePdksDay({
+      policy: params.policyFor?.(date),
       date,
       readings,
       manual,
@@ -267,18 +296,21 @@ export function computePdksTableRow(params: {
       holiday: params.holidayMap.get(date),
       holidayMap: params.holidayMap,
     });
-    const status = classifyPdksDay({
+    const status = outsideEmployment ? "notEmployed" : classifyPdksDay({
       date,
       firstRecordDate: params.firstRecordDate,
-      shiftStart: shift?.startTime,
+      shiftStart: shift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
+      shiftEnd: settings.workEndTime,
+      earlyExitTolerance: settings.earlyExitToleranceMinutes,
       hasAssignedShift:
         params.firstRecordDate !== undefined ? shift !== null : undefined,
       lateTolerance: settings.maxLateMinutes,
       now: params.now,
       today: params.today,
-      dataAvailable: employee !== null && params.availableDateKeys.has(date),
+      dataAvailable: employee !== null && (params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!manual)),
       classification: day.classification,
-      hasAttendance: day.hasAttendance,
+      attendanceDecision: day.attendanceDecision,
+    hasAttendance: day.hasAttendance,
       hasLeave: !!leave,
       isLate: day.isLate,
     });
@@ -289,6 +321,7 @@ export function computePdksTableRow(params: {
     });
     const cell: PdksTableDayCell = {
       date,
+      ...(params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
       firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
       lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
       totalMinutes: day.totalMinutes,
@@ -300,7 +333,7 @@ export function computePdksTableRow(params: {
       isLate: day.isLate,
       lateMinutes: day.lateMinutes,
       payrollCode:
-        status === "future" || status === "noData" || status === "notEmployed"
+        status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
           ? "—"
           : code,
       detail: {
@@ -360,6 +393,9 @@ export function computePdksTableRow(params: {
   const leaveRecord = calculations.find((c) => c.leave)?.leave;
   const status = first?.cell.status ?? "noData";
   return {
+    incompleteDays: calculations.filter(c => c.cell.status === "incomplete").length,
+    durationMeasured: calculations.every(c => c.day.durationMeasured),
+    punchQuality: first?.day.punchQuality ?? "noPunch",
     id: empKey,
     name: employee
       ? `${employee.firstName} ${employee.lastName}`.trim()

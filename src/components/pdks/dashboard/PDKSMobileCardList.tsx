@@ -53,13 +53,13 @@ export function PDKSMobileCardList({
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Toplam</dt>
-                  <dd>{displayDuration(r.totalMinutes, r.status)}</dd>
+                  <dd>{displayDuration(r.totalMinutes, r.status, r.durationMeasured)}</dd>
                 </div>
               </dl>
               {(r.nightMinutes ?? 0) > 0 && <p className="mt-2 text-xs tabular-nums">Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}</p>}
               {r.overtimeMinutes > 0 && (
                 <p className="mt-2 text-xs tabular-nums">
-                  Fazla mesai: {displayDuration(r.overtimeMinutes, r.status)}
+                  Fazla mesai: {displayDuration(r.overtimeMinutes, r.status, r.durationMeasured)}
                 </p>
               )}
             </div>

@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { isPdksEligibleReading } from "./pdksSource";
+import { loadPdksRulePolicy, type PdksPolicyResolver, type PdksProjectPolicies } from "./pdksRules";
+import { isPdksIncludedReading } from "./pdksSource";
 import { pdksWorkDayRange } from "./pdksWorkDay";
 import { trDateKey } from "./trDate";
 
@@ -11,12 +12,20 @@ export function pdksAvailableDateKeys(readings: readonly Doc<"cardReadings">[], 
 
 /** Scan at most 20 indexed candidates; if all are excluded, use the selected period.
  * Unproven earlier history stays noData instead of manufacturing absences. */
-export async function pdksFirstRecordDate(ctx: QueryCtx, employee: Doc<"employees">, readings: readonly Doc<"cardReadings">[], manualDates: readonly string[] = [], workDay: (reading: Doc<"cardReadings">) => string = reading => trDateKey(reading.accessTime)): Promise<string | null> {
+export async function pdksFirstRecordDate(ctx: QueryCtx, employee: Doc<"employees">, readings: readonly Doc<"cardReadings">[], manualDates: readonly string[] = [], workDay: (reading: Doc<"cardReadings">) => string = reading => trDateKey(reading.accessTime), policies?: PdksProjectPolicies): Promise<string | null> {
   const candidates = await ctx.db.query("cardReadings")
     .withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", employee._id))
     .order("asc").take(20);
-  const eligibleCandidates = candidates.filter(r => r.projectId === employee.projectId && isPdksEligibleReading(r));
-  const periodReadings = readings.filter(r => r.projectId === employee.projectId && (r.employeeId === employee._id || r.cardNo === employee.cardNumber) && isPdksEligibleReading(r));
+  // At most 20 historical dates, each with one predecessor lookup and bounded targets.
+  const historical = new Map<string, PdksPolicyResolver>();
+  const historyStart = policies?.historyStart(employee.projectId);
+  if (historyStart) {
+    const dates = [...new Set(candidates.map(workDay).filter(date => date < historyStart))];
+    await Promise.all(dates.map(async date => historical.set(date, await loadPdksRulePolicy(ctx, employee.projectId, date, date))));
+  }
+  const policyFor = (reading: Doc<"cardReadings">) => historical.get(workDay(reading))?.(workDay(reading)) ?? policies?.(reading.projectId, workDay(reading));
+  const eligibleCandidates = candidates.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r)));
+  const periodReadings = readings.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r))).filter(r => r.employeeId === employee._id || r.cardNo === employee.cardNumber);
   const allowed = [...eligibleCandidates, ...periodReadings].filter(r => r.accessStatus === "izin_verildi");
   // Rejected attempts only preserve the legacy fallback when no granted record is known.
   const history = allowed.length > 0 ? allowed : [...eligibleCandidates.slice(0, 1), ...periodReadings];
@@ -52,12 +61,12 @@ export function pdksLeaveMatchesProject(leave: Pick<Doc<"leaves">, "projectId">,
 
 /** Indexed existence checks stop at the first eligible reading for each work day.
  * Include next-calendar-day exits and use all project employees' shift assignments. */
-export async function readPdksAvailableDateKeys(ctx: QueryCtx, projectId: Id<"projects"> | undefined, dates: readonly string[], workDate: (reading: Doc<"cardReadings">) => string): Promise<Set<string>> {
+export async function readPdksAvailableDateKeys(ctx: QueryCtx, projectId: Id<"projects"> | undefined, dates: readonly string[], workDate: (reading: Doc<"cardReadings">) => string, policies?: PdksProjectPolicies): Promise<Set<string>> {
   const available = await Promise.all(dates.map(async date => {
     const { startISO, endISO } = pdksWorkDayRange(date, date);
     const candidates = ctx.db.query("cardReadings").withIndex("by_project_access_time", q => q.eq("projectId", projectId).gte("accessTime", startISO).lte("accessTime", endISO));
     for await (const reading of candidates) {
-      if (isPdksEligibleReading(reading) && workDate(reading) === date) return date;
+      if (isPdksIncludedReading(reading, projectId, policies?.(reading.projectId, workDate(reading))) && workDate(reading) === date) return date;
     }
     return null;
   }));

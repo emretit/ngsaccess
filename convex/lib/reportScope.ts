@@ -1,3 +1,7 @@
+import { hasVersionedPdksPolicy, loadPdksPolicies, type PdksProjectPolicies } from "./pdksRules";
+import { buildBoundedShiftResolver } from "./shiftResolver";
+import { buildPdksWorkDateResolver, addWorkDate } from "./pdksWorkDay";
+import { trDateKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { resolveProjectScope, selectProjectScope } from "./projectScope";
@@ -26,11 +30,27 @@ export async function resolveReportScope(ctx: QueryCtx, projectId?: Id<"projects
   return { projectIds, scopeLabel: await reportScopeLabel(ctx, projectIds, projectId === undefined) };
 }
 
-export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects">[], startISO: string, endISO: string) {
-  const readings = (await Promise.all(projectIds.map((projectId) => ctx.db.query("cardReadings")
-    .withIndex("by_project_access_time", (q) => q.eq("projectId", projectId).gte("accessTime", startISO).lte("accessTime", endISO))
-    .collect()))).flat();
-  return filterPdksReadings(readings);
+export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects">[], startISO: string, endISO: string, prepared?: { policies: PdksProjectPolicies; workDate: (reading: Doc<"cardReadings">) => string }) {
+  const startDate = addWorkDate(trDateKey(startISO), -1);
+  const endDate = trDateKey(endISO);
+  const policies = prepared?.policies ?? await loadPdksPolicies(ctx, projectIds, startDate, endDate);
+  const activeProjects = projectIds.filter(id => hasVersionedPdksPolicy(policies, id, startDate, endDate));
+  const readings = (await Promise.all(projectIds.map(projectId => {
+    const query = ctx.db.query("cardReadings").withIndex("by_project_access_time", q => q.eq("projectId", projectId).gte("accessTime", startISO).lte("accessTime", endISO));
+    // Preserve the pre-W5 legacy bound/range exactly; only versioned projects use the new cap.
+    return activeProjects.includes(projectId) ? query.take(20001) : query.collect();
+  }))).flat();
+  if (!activeProjects.length) return filterPdksReadings(readings);
+  if (readings.filter(r => r.projectId && activeProjects.includes(r.projectId)).length > 20000) throw new Error("Rapor okuma sınırı aşıldı; tarih aralığını daraltın");
+  let workDate = prepared?.workDate;
+  if (!workDate) {
+    const employees = (await Promise.all(activeProjects.map(projectId => ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).take(10001)))).flat();
+    if (employees.length > 10000) throw new Error("Rapor personel sınırı aşıldı; proje seçin");
+    const shifts = await buildBoundedShiftResolver(ctx, employees);
+    workDate = buildPdksWorkDateResolver(employees, shifts.resolve);
+  }
+  const dateFor = workDate;
+  return filterPdksReadings(readings, undefined, r => policies(r.projectId, dateFor(r)));
 }
 
 export function selectScheduleProjectIds(user: Doc<"users"> | null, allowed: Id<"projects">[], projectId?: Id<"projects">) {

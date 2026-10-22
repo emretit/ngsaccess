@@ -1,3 +1,4 @@
+import type { PdksPolicyResolver } from "./pdksRules";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
 import { classifyPdksDay } from "./pdksTable";
 import type { Doc } from "../_generated/dataModel";
@@ -10,6 +11,7 @@ import { settingsForShift } from "./shiftResolver";
 import { computePdksDay } from "./pdksDay";
 
 export function computePayrollCell(params: {
+  policyFor?: PdksPolicyResolver;
   date: string;
   availableDateKeys: ReadonlySet<string>;
   firstRecordDate?: string | null;
@@ -26,6 +28,7 @@ export function computePayrollCell(params: {
 }) {
   const { date, dayShift, workSettings } = params;
   const day = computePdksDay({
+      policy: params.policyFor?.(date),
     date,
     readings: params.dayReadings,
     manual: params.manual,
@@ -40,13 +43,16 @@ export function computePayrollCell(params: {
   const settings = settingsForShift(dayShift, workSettings);
   const status = classifyPdksDay({
     date,
-    dataAvailable: params.availableDateKeys.has(date),
+    dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manual),
     firstRecordDate: params.firstRecordDate,
-    shiftStart: dayShift?.startTime,
+    shiftStart: dayShift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
+    shiftEnd: settings.workEndTime,
+    earlyExitTolerance: settings.earlyExitToleranceMinutes,
     hasAssignedShift:
       params.firstRecordDate !== undefined ? dayShift !== null : undefined,
     lateTolerance: settings.maxLateMinutes,
     classification: day.classification,
+    attendanceDecision: day.attendanceDecision,
     hasAttendance: day.hasAttendance,
     hasLeave: params.hasLeave,
     isLate: day.isLate,
@@ -58,10 +64,11 @@ export function computePayrollCell(params: {
   });
   return {
     date,
+    ...(params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
     overtimeSegments: day.overtimeSegments,
     status,
     payrollCode:
-      status === "future" || status === "noData" || status === "notEmployed"
+      status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
         ? "—"
         : code,
     totalMinutes: day.totalMinutes,

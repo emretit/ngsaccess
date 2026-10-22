@@ -237,6 +237,27 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_ide_device", ["ideDeviceId"]),
 
+  pdksRuleVersions: defineTable({
+    projectId: v.id("projects"),
+    effectiveFrom: v.string(),
+    punchMode: v.union(v.literal("legacy"), v.literal("requirements")),
+    requireCheckIn: v.optional(v.boolean()),
+    requireCheckOut: v.optional(v.boolean()),
+    missingRequiredPunch: v.optional(v.union(v.literal("absent"), v.literal("review"))),
+    noPunch: v.optional(v.union(v.literal("absent"), v.literal("review"))),
+    checkpointMode: v.union(v.literal("all"), v.literal("selected")),
+    createdAt: v.string(),
+    createdBy: v.id("users"),
+  }).index("by_projectId_and_effectiveFrom", ["projectId", "effectiveFrom"]),
+  pdksCheckpointSelections: defineTable({
+    projectId: v.id("projects"),
+    ruleVersionId: v.id("pdksRuleVersions"),
+    targetType: v.union(v.literal("door"), v.literal("device")),
+    deviceId: v.id("devices"),
+    doorId: v.optional(v.id("doors")),
+    ioId: v.optional(v.number()),
+  }).index("by_ruleVersionId", ["ruleVersionId"]),
+
   doors: defineTable({
     name: v.string(),
     projectId: v.optional(v.id("projects")),

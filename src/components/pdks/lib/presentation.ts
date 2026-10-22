@@ -1,6 +1,6 @@
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../../convex/_generated/api";
-import { STATUS_META } from "../statusMeta";
+import { STATUS_META, statusMetaFor } from "../statusMeta";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 export type PdksRow = FunctionReturnType<
@@ -21,13 +21,28 @@ export function formatDuration(minutes: number, compact = false): string {
   const m = String(safe % 60).padStart(2, "0");
   return compact ? `${h}:${m}` : `${h} sa ${m} dk`;
 }
-export function displayDuration(minutes: number, status: PdksCell["status"]): string {
+export function displayDuration(minutes: number, status: PdksCell["status"], durationMeasured?: boolean): string {
+  if (durationMeasured === false) return "Süre hesaplanamadı";
   return minutes === 0 && status !== "present" && status !== "late" || status === "future" || status === "noData" || status === "notEmployed" ? "—" : formatDuration(minutes);
 }
 export function timeMinutes(value: string | null): number | null {
   if (!value || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
   const [h, m] = value.split(":").map(Number);
   return h * 60 + m;
+}
+export function punchQualityHint(quality: string | undefined): string {
+  switch (quality) {
+    case "missingExit": return "Çıkış okutması yok";
+    case "missingEntry": return "Giriş okutması yok";
+    case "noPunch": return "Okutma yok";
+    case "undirected": return "Yön bilgisi yok";
+    default: return "";
+  }
+}
+/** Legacy rows also carry punchQuality; the hint is shown only where the rule decision needs it. */
+export function reviewHint(item: { status: string; punchQuality?: string; durationMeasured?: boolean } | undefined): string {
+  if (!item || (item.status !== "incomplete" && item.durationMeasured !== false)) return "";
+  return punchQualityHint(item.punchQuality);
 }
 export function displayTime(value: string | null): string {
   return timeMinutes(value) === null ? "—" : (value ?? "—");
@@ -48,9 +63,9 @@ export function compareRows(
     result = a[key] - b[key];
   else
     result = (
-      key === "status" ? STATUS_META[a.status].label : a[key]
+      key === "status" ? statusMetaFor(a).label : a[key]
     ).localeCompare(
-      key === "status" ? STATUS_META[b.status].label : b[key],
+      key === "status" ? statusMetaFor(b).label : b[key],
       "tr",
     );
   return direction === "asc" ? result : -result;
@@ -63,10 +78,10 @@ export function readableDate(date: string): string {
 export function cellLabel(name: string, date: string, cell?: PdksCell): string {
   const status = cell?.status ?? "noData";
   const duration =
-    status === "future" || status === "noData" || status === "notEmployed"
+    cell?.durationMeasured === false ? "Süre hesaplanamadı" : status === "future" || status === "noData" || status === "notEmployed"
       ? "Süre yok"
       : `${Math.floor((cell?.totalMinutes ?? 0) / 60)} saat ${(cell?.totalMinutes ?? 0) % 60} dakika`;
-  return `${name}, ${readableDate(date)}, ${STATUS_META[status].label}, ${duration}`;
+  return `${name}, ${readableDate(date)}, ${statusMetaFor(cell ?? { status }).label}, ${duration}${reviewHint(cell) ? `, ${reviewHint(cell)}` : ""}`;
 }
 export function periodTotals(days: readonly PdksCell[]) {
   return days.reduce(

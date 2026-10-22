@@ -3,10 +3,9 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
 import { resolveProjectScope } from "./lib/projectScope";
-import { filterPdksReadings } from "./lib/pdksSource";
-import { buildAphbXml, type AphbEmployeeEntry } from "./lib/sgkCodes";
+import { loadRuleReportDays } from "./lib/reportAttendance";
+import { buildAphbXml } from "./lib/sgkCodes";
 import { calculateSgkEksikGun } from "./lib/sgkEksikGun";
-import { trDateKey, trDayRangeISO } from "./lib/trDate";
 
 export const buildAphbForMonth = authedQuery({
   args: {
@@ -31,22 +30,17 @@ export const buildAphbForMonth = authedQuery({
     const lastDay = new Date(Date.UTC(args.year, args.month, 0)).getUTCDate();
     const startDate = `${args.year}-${monthStr}-01`;
     const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
     const monthDays = Array.from({ length: lastDay }, (_, i) =>
       `${args.year}-${monthStr}-${String(i + 1).padStart(2, "0")}`,
     );
 
     // Aylık bildirimin tüm kayıtları gerekir; sorgular seçili proje/ay ile sınırlıdır.
-    const [company, projectEmployees, readings, generalSettings, projectHolidays, globalHolidays] =
+    const [company, projectEmployees, generalSettings, projectHolidays, globalHolidays] =
       await Promise.all([
         ctx.db.query("companies")
           .withIndex("by_project", (q) => q.eq("projectId", targetProjectId)).first(),
         ctx.db.query("employees")
           .withIndex("by_project", (q) => q.eq("projectId", targetProjectId)).collect(),
-        ctx.db.query("cardReadings")
-          .withIndex("by_project_access_time", (q) =>
-            q.eq("projectId", targetProjectId).gte("accessTime", startISO).lte("accessTime", endISO),
-          ).collect(),
         ctx.db.query("generalSettings")
           .withIndex("by_project", (q) => q.eq("projectId", targetProjectId)).first(),
         ctx.db.query("holidays")
@@ -61,22 +55,23 @@ export const buildAphbForMonth = authedQuery({
     const holidayMap = new Map(
       [...globalHolidays, ...projectHolidays].map((holiday) => [holiday.date, holiday]),
     );
+    const ruleReport = await loadRuleReportDays(ctx, [targetProjectId], startDate, endDate);
     const empIds = new Set(projectEmployees.map((employee) => employee._id));
     const employeesWithReadings = new Set<Id<"employees">>();
     const readingsByEmpDay = new Map<Id<"employees">, Set<string>>();
-    for (const reading of filterPdksReadings(readings, targetProjectId)) {
+    for (const reading of ruleReport.readings) {
       if (!reading.employeeId || !empIds.has(reading.employeeId)) continue;
       employeesWithReadings.add(reading.employeeId);
-      if (reading.accessStatus !== "izin_verildi") continue;
+      if (reading.accessStatus !== "izin_verildi" || ruleReport.policies(targetProjectId, ruleReport.workDate(reading)).punchMode === "requirements") continue;
       const workedDays = readingsByEmpDay.get(reading.employeeId) ?? new Set<string>();
-      workedDays.add(trDateKey(reading.accessTime));
+      workedDays.add(ruleReport.workDate(reading));
       readingsByEmpDay.set(reading.employeeId, workedDays);
     }
     const employees = projectEmployees.filter(
       (employee) => employedDuring(employee, startDate, endDate) || employeesWithReadings.has(employee._id),
     );
     const warnings: string[] = [];
-    const entries: AphbEmployeeEntry[] = await Promise.all(employees.map(async (employee) => {
+    const entries = await Promise.all(employees.map(async (employee) => {
       // Çalışana bağlı eski (projectId'siz) izinler de korunur.
       const employeeLeaves = await ctx.db.query("leaves")
         .withIndex("by_employee", (q) => q.eq("employeeId", employee._id)).collect();
@@ -85,14 +80,23 @@ export const buildAphbForMonth = authedQuery({
         (leave.projectId === undefined || leave.projectId === targetProjectId) &&
         leave.startDate <= endDate && leave.endDate >= startDate,
       );
+      const ruleDays = ruleReport.ruleRows.get(employee._id)?.days ?? [];
+      const reviewDays = ruleDays.filter(day => day.status === "incomplete" || day.status === "noData").map(day => day.date);
+      const workedDays = readingsByEmpDay.get(employee._id) ?? new Set<string>();
+      for (const day of ruleDays) {
+        workedDays.delete(day.date);
+        if (day.status === "present" || day.status === "late") workedDays.add(day.date);
+      }
       const result = calculateSgkEksikGun({
         monthDays: employee.employmentEndDate ? monthDays.filter(date => employedOn(employee, date)) : monthDays,
         workingDays: generalSettings?.workingDays,
         holidayMap,
-        workedDays: readingsByEmpDay.get(employee._id) ?? new Set<string>(),
+        workedDays,
         approvedLeaves,
       });
       return {
+        employeeId: employee._id,
+        reviewDays,
         tcKimlikNo: employee.tcNo?.trim() ?? "",
         adSoyad: `${employee.firstName} ${employee.lastName}`.trim(),
         cumulativeWorkdays: employee.employmentEndDate && employee.employmentEndDate < endDate
@@ -104,13 +108,16 @@ export const buildAphbForMonth = authedQuery({
       };
     }));
     for (const entry of entries) {
+      if (entry.reviewDays.length) warnings.push(`${entry.adSoyad}: ${entry.reviewDays.length} gün inceleme bekliyor; APHB XML üretimi engellendi, bildirimden önce düzeltin.`);
       if (!entry.tcKimlikNo) {
         warnings.push(`${entry.adSoyad}: T.C. kimlik numarası eksik; bildirimden önce tamamlayın.`);
       }
     }
 
+    const blockedByReview = entries.some(entry => entry.reviewDays.length > 0);
     return {
-      xml: buildAphbXml({
+      blockedByReview,
+      xml: blockedByReview ? "" : buildAphbXml({
         year: args.year,
         month: args.month,
         companyName: company?.name ?? "Şirket",
@@ -118,6 +125,7 @@ export const buildAphbForMonth = authedQuery({
       }),
       filename: `aphb-${args.year}-${monthStr}.xml`,
       warnings,
+      employees: entries.map(entry => ({ employeeId: entry.employeeId, reviewDays: entry.reviewDays })),
     };
   },
 });

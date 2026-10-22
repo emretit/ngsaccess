@@ -1,12 +1,11 @@
 import { canSeePay, maskPay } from "./lib/payVisibility";
-import { trDateKey, trDayRangeISO } from "./lib/trDate";
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { requireAdmin } from "./lib/auth";
-import { resolveReportScope, readReportReadings, reportPeriod, resolveScheduleScope } from "./lib/reportScope";
-import { loadAttendanceReport } from "./lib/reportAttendance";
+import { resolveReportScope, reportPeriod, resolveScheduleScope } from "./lib/reportScope";
+import { loadAttendanceReport, loadRuleReportDays } from "./lib/reportAttendance";
 import {
   getEffectiveWorkSettings,
   resolveHourlyRate,
@@ -34,10 +33,10 @@ export const getSgkMonthlyReport = authedQuery({
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
     const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
-    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
+    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
+    const readings = ruleReport.readings;
 
     readings.sort(
       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
@@ -50,11 +49,17 @@ export const getSgkMonthlyReport = authedQuery({
       employeeMap.get(key)?.push(r);
     }
 
+    for (const [id, employee] of ruleReport.ruleEmployees) {
+      const key = `${employee.projectId}:${id}`;
+      if (!employeeMap.has(key)) employeeMap.set(key, []);
+    }
+
     const allLeaves = (await Promise.all(projectIds.map((projectId) => ctx.db.query("leaves").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect()))).flat().filter((l) => l.status === "approved");
 
     const reportRows = await Promise.all(
-      Array.from(employeeMap.entries()).map(async ([, empReadings]) => {
-        const first = empReadings[0];
+      Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
+        const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
+        const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
         const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
         const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
         const foundDepartment = employee?.departmentId
@@ -83,11 +88,11 @@ export const getSgkMonthlyReport = authedQuery({
               }, 0)
           : 0;
 
-        const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
+        const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
 
         const dayReadingsMap = new Map<string, typeof granted>();
         for (const r of granted) {
-          const dateKey = trDateKey(r.accessTime);
+          const dateKey = ruleReport.workDate(r);
           if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
           dayReadingsMap.get(dateKey)?.push(r);
         }
@@ -106,10 +111,12 @@ export const getSgkMonthlyReport = authedQuery({
           }
         }
 
-        const workDays = dayReadingsMap.size;
-        const overtimeMinutes = workDays <= 1
-          ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
-          : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
+        const ruleDays = empId ? ruleReport.ruleRows.get(empId)?.days ?? [] : [];
+        totalMinutes += ruleDays.reduce((sum, day) => sum + day.totalMinutes, 0);
+        const incompleteDays = ruleDays.filter(day => day.status === "incomplete").length;
+        const workDays = dayReadingsMap.size + ruleDays.filter(day => day.status === "present" || day.status === "late").length;
+        const legacyMinutes = totalMinutes - ruleDays.reduce((sum, day) => sum + day.totalMinutes, 0);
+        const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, legacyMinutes - STANDARD_DAY_MINUTES) : Math.max(0, legacyMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
 
         const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
         const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
@@ -119,6 +126,7 @@ export const getSgkMonthlyReport = authedQuery({
           adSoyad: first.employeeName ?? (employee ? `${employee.firstName} ${employee.lastName}` : "Bilinmiyor"),
           sicilNo: employee?.cardNumber ?? first.cardNo ?? "-",
           departman: department?.name ?? "Bilinmiyor",
+          incompleteDays,
           calismaGunu: workDays,
           toplamSaat: totalHours,
           fazlaMesaiSaat: overtimeHours,
@@ -162,9 +170,9 @@ export const getOvertimeSummaryReport = authedQuery({
       ? `${year}-${String(month).padStart(2, "0")}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`
       : `${year}-12-31`;
 
-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
-    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
+    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
+    const readings = ruleReport.readings;
 
     const employeeMap = new Map<string, typeof readings>();
     for (const r of readings) {
@@ -174,6 +182,10 @@ export const getOvertimeSummaryReport = authedQuery({
     }
 
 
+    for (const [id, employee] of ruleReport.ruleEmployees) {
+      const key = `${employee.projectId}:${id}`;
+      if (!employeeMap.has(key)) employeeMap.set(key, []);
+    }
     let totalOvertimeHours = 0;
     let totalOvertimePayTRY = 0;
     const rows: {
@@ -185,7 +197,8 @@ export const getOvertimeSummaryReport = authedQuery({
     }[] = [];
 
     for (const [empKey, empReadings] of employeeMap) {
-      const first = empReadings[0];
+      const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
+      const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
       const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
       const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
       const foundDepartment = employee?.departmentId
@@ -194,10 +207,10 @@ export const getOvertimeSummaryReport = authedQuery({
       const department = foundDepartment?.projectId === first.projectId ? foundDepartment : null;
       const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
 
-      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
+      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
       const dayReadingsMap = new Map<string, typeof granted>();
       for (const r of granted) {
-        const dateKey = trDateKey(r.accessTime);
+        const dateKey = ruleReport.workDate(r);
         if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
         dayReadingsMap.get(dateKey)?.push(r);
       }
@@ -216,10 +229,8 @@ export const getOvertimeSummaryReport = authedQuery({
         }
       }
 
-      const workDays = dayReadingsMap.size;
-      const overtimeMinutes = workDays <= 1
-        ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
-        : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
+      const ruleDays = employee ? ruleReport.ruleRows.get(employee._id)?.days ?? [] : [];
+      const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES) : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
       totalOvertimeHours += overtimeHours;
 
@@ -293,9 +304,9 @@ export const getDepartmentCostReport = authedQuery({
     reportPeriod(args.year, args.month);
     const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
     const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(new Date(args.year, args.month, 0).getDate()).padStart(2, "0")}`;
-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
-    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
+    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
+    const readings = ruleReport.readings;
 
     const employeeMap = new Map<string, typeof readings>();
     for (const r of readings) {
@@ -304,14 +315,19 @@ export const getDepartmentCostReport = authedQuery({
       employeeMap.get(key)?.push(r);
     }
 
+    for (const [id, employee] of ruleReport.ruleEmployees) {
+      const key = `${employee.projectId}:${id}`;
+      if (!employeeMap.has(key)) employeeMap.set(key, []);
+    }
     const fallbackRate = args.hourlyRate;
     const byDept = new Map<
       string,
       { overtimeHours: number; cost: number; employeeCount: number }
     >();
 
-    for (const empReadings of employeeMap.values()) {
-      const first = empReadings[0];
+    for (const [empKey, empReadings] of employeeMap) {
+      const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
+      const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
       const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
       const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
       const foundDepartment = employee?.departmentId
@@ -321,10 +337,10 @@ export const getDepartmentCostReport = authedQuery({
       const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
       const deptName = department?.name ?? "Belirtilmemiş";
 
-      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
+      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
       const dayReadingsMap = new Map<string, typeof granted>();
       for (const r of granted) {
-        const dateKey = trDateKey(r.accessTime);
+        const dateKey = ruleReport.workDate(r);
         if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
         dayReadingsMap.get(dateKey)?.push(r);
       }
@@ -343,10 +359,8 @@ export const getDepartmentCostReport = authedQuery({
         }
       }
 
-      const workDays = dayReadingsMap.size;
-      const overtimeMinutes = workDays <= 1
-        ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
-        : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
+      const ruleDays = employee ? ruleReport.ruleRows.get(employee._id)?.days ?? [] : [];
+      const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES) : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
 
       if (overtimeHours > 0) {
