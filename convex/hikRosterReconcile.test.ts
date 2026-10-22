@@ -40,3 +40,35 @@ it("includes rule employees, visitors, fingerprint and queued identities only in
   await t.run(ctx => ctx.db.patch(deviceId, { hikTransport: "localBridge" }));
   expect(await t.query(internal.hikRosterReconcile.getExpectedRoster, { deviceId })).toMatchObject({ employeeNos: null, skippedReason: "unsupported_device" });
 });
+
+it.each([true, false])("resumes pending cleanup once on online events, already online=%s", async alreadyOnline => {
+  const t = convexTest(schema, modules);
+  const deviceId = await t.run(ctx => ctx.db.insert("devices", {
+    name: "Hik", createdAt: "now", updatedAt: "now", brand: "hikvision",
+    hikTransport: "gateway", hikDevIndex: "index", hikIsupOnline: alreadyOnline,
+  }));
+  await t.mutation(internal.hikRosterReconcile.markReconcilePending, { deviceId, hint: "Cleanup pending" });
+  expect(await t.run(ctx => ctx.db.get(deviceId))).toMatchObject({
+    hikRosterReconcilePending: true, hikOfflineHint: "Cleanup pending",
+  });
+  const at = Date.now();
+  for (const offset of [0, 1]) await t.mutation(internal.devices.applyIsupStatus, {
+    deviceId, devIndex: "index", status: "online", at: at + offset,
+  });
+  expect((await t.run(ctx => ctx.db.get(deviceId)))?.hikRosterReconcilePending).toBeUndefined();
+  const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(jobs).toHaveLength(1);
+  expect(jobs[0]).toMatchObject({
+    name: "actions/hikRosterReconcile:reconcileHikDeviceRoster",
+    args: [{ deviceId, dryRun: false, reason: "register", attempt: 0 }],
+  });
+});
+it("does not schedule cleanup on online events without the pending flag", async () => {
+  const t = convexTest(schema, modules);
+  const deviceId = await t.run(ctx => ctx.db.insert("devices", {
+    name: "Hik", createdAt: "now", updatedAt: "now", brand: "hikvision",
+    hikTransport: "gateway", hikDevIndex: "index", hikIsupOnline: false,
+  }));
+  await t.mutation(internal.devices.applyIsupStatus, { deviceId, devIndex: "index", status: "online", at: Date.now() });
+  expect(await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toEqual([]);
+});

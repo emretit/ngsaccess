@@ -1,4 +1,4 @@
-import { asKeyPart } from "../hikvisionSync";
+import { asKeyPart } from "./hikKeyPart";
 
 /** Reuse Hik queue identity normalization: trim only, never numeric/IDE coercion.
  * Keep the original device spelling for the actual deletion request. */

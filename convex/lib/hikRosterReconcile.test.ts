@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { asKeyPart } from "./hikKeyPart";
 import { planHikRosterReconcile } from "./hikRosterReconcile";
 
 describe("Hik roster deletion safety", () => {
@@ -23,4 +24,9 @@ it("allows an authoritative empty registration roster but keeps other safety gua
   expect(planHikRosterReconcile(["old", "other"], new Set(), true)).toEqual({ safe: true, toDelete: ["old", "other"] });
   expect(planHikRosterReconcile(["old"], null, true)).toMatchObject({ safe: false, skippedReason: "expected_unavailable" });
   expect(planHikRosterReconcile([" "], new Set(), true)).toMatchObject({ safe: false, skippedReason: "invalid_identity" });
+});
+
+it("preserves the shared key helper behavior after extraction", () => {
+  expect([" 00123 ", 0, -12, " ", null, undefined, {}, [], NaN, Infinity].map(asKeyPart))
+    .toEqual(["00123", "0", "-12", null, null, null, null, null, null, null]);
 });

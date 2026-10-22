@@ -1,3 +1,4 @@
+import { asKeyPart } from "./lib/hikKeyPart";
 import { requirePermission, getProjectIdsWithPermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { internal } from "./_generated/api";
@@ -503,12 +504,6 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-export function asKeyPart(value: unknown): string | null {
-  if (typeof value === "string" && value.trim().length > 0) return value.trim();
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return null;
 }
 
 function stablePayloadKey(value: unknown): string {

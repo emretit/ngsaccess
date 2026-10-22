@@ -397,6 +397,8 @@ export default defineSchema({
     hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
     hikLastSeenAt: v.optional(v.number()),
     hikOfflineHint: v.optional(v.string()),
+    // Exhausted registration cleanup retries; resume on the next ISUP online event.
+    hikRosterReconcilePending: v.optional(v.boolean()),
     hikIsupOnline: v.optional(v.boolean()),
     hikIsupStatusAt: v.optional(v.number()),
     hikIsupOfflineSince: v.optional(v.number()),

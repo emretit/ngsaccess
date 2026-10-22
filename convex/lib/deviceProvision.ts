@@ -12,6 +12,27 @@ import {
 } from "./deviceHelpers";
 import { deviceActive } from "./deviceUx";
 
+/** Global physical identity: includes inactive devices and devices in other projects. */
+export async function assertEhomeIdAvailable(
+  ctx: MutationCtx,
+  ehomeID: string | undefined,
+  exceptDeviceId?: Id<"devices">,
+) {
+  const normalized = ehomeID?.trim();
+  if (!normalized) return;
+  const matches = await ctx.db
+    .query("devices")
+    .withIndex("by_ehome_id", (q) => q.eq("ehomeID", normalized))
+    // At most one match can be the exempt device; two detect every conflict.
+    .take(2);
+  if (matches.some((device) => device._id !== exceptDeviceId)) {
+    throw new ConvexError({
+      code: "HIK_EHOME_ID_IN_USE",
+      message: "Bu Device ID (ehomeID) başka bir cihaz kaydında kullanılıyor. Önce eski kaydı silin, sonra tekrar ekleyin.",
+    });
+  }
+}
+
 export type CreateArgs = {
   name: string;
   projectId?: Id<"projects">;
@@ -58,6 +79,8 @@ export async function createCore(
   }
   const now = new Date().toISOString();
   const { newZoneName, ...deviceArgs } = args;
+  const ehomeID = args.ehomeID?.trim();
+  await assertEhomeIdAvailable(ctx, ehomeID);
   const zoneId =
     args.zoneId || newZoneName?.trim()
       ? await resolveOrCreateZone(ctx, {
@@ -72,6 +95,7 @@ export async function createCore(
       : undefined;
   const deviceId = await ctx.db.insert("devices", {
     ...deviceArgs,
+    ehomeID,
     zoneId,
     isActive: deviceActive(args.status, args.isActive),
     status: deviceActive(args.status, args.isActive) ? "active" : "inactive",
@@ -242,6 +266,8 @@ export async function createHikDeviceCore(
     doorCount,
   ).maxReadersPerDoor;
   const readersPerDoor = Math.max(1, Math.min(args.readersPerDoor, maxReaders));
+  const ehomeID = args.ehomeID?.trim();
+  await assertEhomeIdAvailable(ctx, ehomeID);
 
   const deviceId = await ctx.db.insert("devices", {
     name: args.name,
@@ -252,7 +278,7 @@ export async function createHikDeviceCore(
     deviceSerial: args.deviceSerial,
     deviceUsername: args.deviceUsername,
     devicePassword: args.devicePassword,
-    ehomeID: args.ehomeID,
+    ehomeID,
     ehomeKey: args.ehomeKey,
     hikModel: args.hikModel,
     hikTransport: args.hikTransport,

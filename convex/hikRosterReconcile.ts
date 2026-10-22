@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { resolveRuleDeviceTargets } from "./lib/peopleHikSnapshot";
 
 const READ_LIMIT = 8000;
@@ -73,5 +73,17 @@ export const getExpectedRoster = internalQuery({
     }
     if (employeeNos.size > READ_LIMIT) throw new Error("Hik roster identity limit exceeded");
     return { device, employeeNos: [...employeeNos], skippedReason: null };
+  },
+});
+
+
+// Persist cleanup failures independently of transient gateway/ISUP hints.
+export const markReconcilePending = internalMutation({
+  args: { deviceId: v.id("devices"), hint: v.string() },
+  handler: async (ctx, { deviceId, hint }) => {
+    const device = await ctx.db.get(deviceId);
+    if (!device) return null;
+    await ctx.db.patch(deviceId, { hikRosterReconcilePending: true, hikOfflineHint: hint });
+    return null;
   },
 });

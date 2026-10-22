@@ -141,7 +141,7 @@ it.each(["device_roster_unavailable", "incomplete_device_roster"])("writes the v
     hint: "Cihazdaki eski kişiler temizlenemedi (cihaz çevrimdışı). Cihaz çevrimiçi olunca destekle iletişime geçin.",
   });
   const call = f.runMutation.mock.calls[0] as unknown as [Parameters<typeof getFunctionName>[0], object];
-  expect(getFunctionName(call[0])).toBe("devices:setHikOfflineHint");
+  expect(getFunctionName(call[0])).toBe("hikRosterReconcile:markReconcilePending");
 });
 it("retains per-deletion project checks between full roster refreshes", async () => {
   pages(["old-a", "old-b"]);
@@ -158,4 +158,59 @@ it("never retries unsupported or unavailable expected registration rosters", asy
   expect(await f.run(false, "register")).toMatchObject({ skippedReason: "expected_unavailable" });
   expect(f.runAfter).not.toHaveBeenCalled();
   expect(wire.search).not.toHaveBeenCalled();
+});
+
+it("retries HTTP-success empty responses with no total", async () => {
+  wire.search.mockResolvedValue({ ok: true, persons: [], nextPosition: 0 });
+  const f = fixture();
+  expect(await f.run(false, "register")).toMatchObject({ skippedReason: "device_roster_unavailable" });
+  expect(f.runAfter).toHaveBeenCalledWith(60_000, expect.anything(), expect.objectContaining({ attempt: 1 }));
+  expect(wire.remove).not.toHaveBeenCalled();
+});
+it("accepts an explicitly empty device roster without retries", async () => {
+  pages([]);
+  const f = fixture([]);
+  expect(await f.run(false, "register")).toEqual({ onDevice: 0, expected: 0, extra: 0, deleted: 0, failed: 0 });
+  expect(f.runAfter).not.toHaveBeenCalled();
+  expect(f.runMutation).not.toHaveBeenCalled();
+  expect(wire.remove).not.toHaveBeenCalled();
+});
+it("rejects a missing total on the last empty page too", async () => {
+  wire.search.mockResolvedValueOnce({ ok: true, persons: [{ employeeNo: "old" }], total: 1, nextPosition: 1 })
+    .mockResolvedValue({ ok: true, persons: [], nextPosition: 1 });
+  const f = fixture();
+  expect(await f.run(false, "register")).toMatchObject({ skippedReason: "device_roster_unavailable" });
+  expect(f.runAfter).toHaveBeenCalledTimes(1);
+  expect(wire.remove).not.toHaveBeenCalled();
+});
+it.each([0, 1, 2, 3, 4])("retries three failed deletions out of ten at registration attempt %i", async attempt => {
+  pages(Array.from({ length: 10 }, (_, i) => "old-" + i));
+  wire.remove.mockImplementation(async (_index: string, employeeNo: string) => ({ ok: !["old-1", "old-4", "old-7"].includes(employeeNo) }));
+  const f = fixture();
+  expect(await f.run(false, "register", attempt)).toMatchObject({ extra: 10, deleted: 7, failed: 3 });
+  expect(f.runAfter).toHaveBeenCalledTimes(1);
+  expect(f.runAfter).toHaveBeenCalledWith([1, 5, 15, 30, 60][attempt] * 60_000, expect.anything(), {
+    deviceId: "device", dryRun: false, reason: "register", attempt: attempt + 1,
+  });
+});
+it("marks exhausted deletion retries as pending with a visible hint", async () => {
+  pages(["old"]);
+  wire.remove.mockResolvedValue({ ok: false });
+  const f = fixture();
+  expect(await f.run(false, "register", 5)).toMatchObject({ deleted: 0, failed: 1 });
+  expect(f.runAfter).not.toHaveBeenCalled();
+  expect(f.runMutation).toHaveBeenCalledWith(expect.anything(), {
+    deviceId: "device",
+    hint: "Cihazdaki eski kişiler temizlenemedi (cihaz çevrimdışı). Cihaz çevrimiçi olunca destekle iletişime geçin.",
+  });
+  const call = f.runMutation.mock.calls[0] as unknown as [Parameters<typeof getFunctionName>[0], object];
+  expect(getFunctionName(call[0])).toBe("hikRosterReconcile:markReconcilePending");
+});
+it("schedules only the bounded retry when a 500-person batch partly fails", async () => {
+  pages(Array.from({ length: 501 }, (_, i) => "old-" + i), 30);
+  wire.remove.mockResolvedValueOnce({ ok: false });
+  const f = fixture();
+  expect(await f.run(false, "register")).toMatchObject({ deleted: 499, failed: 1 });
+  expect(f.runAfter).toHaveBeenCalledTimes(1);
+  expect(f.runAfter).toHaveBeenCalledWith(60_000, expect.anything(), expect.objectContaining({ attempt: 1 }));
 });

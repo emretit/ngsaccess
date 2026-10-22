@@ -137,6 +137,7 @@ import type * as lib_hikEventCodes from "../lib/hikEventCodes.js";
 import type * as lib_hikGateway from "../lib/hikGateway.js";
 import type * as lib_hikModels from "../lib/hikModels.js";
 import type * as lib_hikReaderNumbers from "../lib/hikReaderNumbers.js";
+import type * as lib_hikKeyPart from "../lib/hikKeyPart.js";
 import type * as lib_hikRosterReconcile from "../lib/hikRosterReconcile.js";
 import type * as lib_hikSync from "../lib/hikSync.js";
 import type * as lib_hikWake from "../lib/hikWake.js";
@@ -356,6 +357,7 @@ declare const fullApi: ApiFromModules<{
   "lib/hikGateway": typeof lib_hikGateway;
   "lib/hikModels": typeof lib_hikModels;
   "lib/hikReaderNumbers": typeof lib_hikReaderNumbers;
+  "lib/hikKeyPart": typeof lib_hikKeyPart;
   "lib/hikRosterReconcile": typeof lib_hikRosterReconcile;
   "lib/hikSync": typeof lib_hikSync;
   "lib/hikWake": typeof lib_hikWake;

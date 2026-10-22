@@ -26,7 +26,8 @@ export const reconcileHikDeviceRoster = internalAction({
     const allowEmptyExpected = args.reason === "register";
     const finish = async (skippedReason?: string): Promise<Result> => {
       if (!args.dryRun && args.reason === "register" &&
-          (skippedReason === "device_roster_unavailable" || skippedReason === "incomplete_device_roster")) {
+          (skippedReason === "device_roster_unavailable" || skippedReason === "incomplete_device_roster" ||
+           (!skippedReason && result.failed > 0))) {
         const attempt = args.attempt ?? 0;
         const delay = RETRY_DELAYS[attempt];
         if (delay !== undefined) {
@@ -34,7 +35,7 @@ export const reconcileHikDeviceRoster = internalAction({
             ...args, attempt: attempt + 1,
           });
         } else {
-          await ctx.runMutation(internal.devices.setHikOfflineHint, {
+          await ctx.runMutation(internal.hikRosterReconcile.markReconcilePending, {
             deviceId: args.deviceId,
             hint: "Cihazdaki eski kişiler temizlenemedi (cihaz çevrimdışı). Cihaz çevrimiçi olunca destekle iletişime geçin.",
           });
@@ -71,6 +72,8 @@ export const reconcileHikDeviceRoster = internalAction({
           total = Math.max(total, page.total);
         }
         if (page.persons.length === 0) {
+          // HTTP 200 can still contain a gateway error, with no roster total.
+          if (page.total === undefined) return finish("device_roster_unavailable");
           if (persons.length < total) return finish("incomplete_device_roster");
           complete = true;
           break;
@@ -121,9 +124,10 @@ export const reconcileHikDeviceRoster = internalAction({
         else result.failed++;
       } catch { result.failed++; }
     }
-    // A fresh scan handles shifting offsets. Stop automatic retries if every
-    // attempt fails, so a broken/offline device cannot create an endless loop.
-    if (plan.toDelete.length > DELETE_LIMIT && result.deleted > 0) {
+    // Registration failures use the bounded retry chain in finish, never both
+    // that chain and a 500-person continuation. Manual behavior stays unchanged.
+    if (plan.toDelete.length > DELETE_LIMIT && result.deleted > 0 &&
+        !(args.reason === "register" && result.failed > 0)) {
       await ctx.scheduler.runAfter(1000, internal.actions.hikRosterReconcile.reconcileHikDeviceRoster, args);
     }
     return finish();

@@ -20,7 +20,7 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { validateDeviceDoor, deviceActive } from "./lib/deviceUx";
 import { claimDeviceCore, reassignDeviceCore, releaseDeviceCore } from "./lib/deviceAssignment";
-import { createCore, createIdePanelCore, createHikDeviceCore } from "./lib/deviceProvision";
+import { assertEhomeIdAvailable, createCore, createIdePanelCore, createHikDeviceCore } from "./lib/deviceProvision";
 import {
   resolveAuthorizedEmployeeIds,
   rosterCardNumbersWithBiometric,
@@ -234,6 +234,15 @@ export const update = authedMutation({
       if (v === undefined) continue;
       if (!manager && DEVICE_SECRET_FIELD_SET.has(k)) continue;
       clean[k] = v;
+    }
+    // Aynı ehomeID iki cihaz kaydında olamaz (iki proje aynı fiziksel cihaza yazar). Yalnız
+    // değişince kontrol: eski çift kayıtlar başka alan güncellemesinde kilitlenmesin.
+    if (typeof clean.ehomeID === "string") {
+      const ehomeID = clean.ehomeID.trim();
+      if (ehomeID !== (device.ehomeID ?? "").trim()) {
+        await assertEhomeIdAvailable(ctx, ehomeID, deviceId);
+      }
+      clean.ehomeID = ehomeID;
     }
     if (args.status !== undefined || args.isActive !== undefined) {
       const active = deviceActive(args.status, args.isActive ?? device.isActive);
@@ -985,6 +994,12 @@ export const applyIsupStatus = internalMutation({
     // Equal-time retries also cannot undo a newer transition with the same timestamp.
     if (device.hikIsupStatusAt !== undefined && args.at <= device.hikIsupStatusAt) return true;
     const online = args.status === "online";
+    if (online && device.hikRosterReconcilePending === true) {
+      await ctx.db.patch(device._id, { hikRosterReconcilePending: undefined });
+      await ctx.scheduler.runAfter(0, internal.actions.hikRosterReconcile.reconcileHikDeviceRoster, {
+        deviceId: device._id, dryRun: false, reason: "register", attempt: 0,
+      });
+    }
     const offlineFrom = device.hikIsupOfflineSince;
     if (online === device.hikIsupOnline) {
       await ctx.db.patch(device._id, { hikIsupStatusAt: args.at });
