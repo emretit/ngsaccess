@@ -130,3 +130,26 @@ describe("reader-purpose token trust boundary using real wrappers", () => {
   });
 
 });
+
+describe("generic card reader rule schedule", () => {
+  it.each([
+    ["08:59:59.999", false], ["09:00:00", true], ["18:00:59.999", true], ["18:01:00", false],
+  ])("Istanbul %s -> granted %s with denial audit", async (time, granted) => {
+    const { t, deviceId } = await fixture();
+    vi.setSystemTime(new Date(`2026-10-19T${time}+03:00`));
+    expect(await t.mutation(internal.cardReadings.processCardReading, { cardNo: "synthetic-card", deviceSerial: "synthetic-serial-a", authedDeviceId: deviceId })).toEqual({ granted });
+    const row = await t.run(ctx => ctx.db.query("cardReadings").first());
+    expect(row?.accessStatus).toBe(granted ? "izin_verildi" : "reddedildi");
+    expect(row?.hikDenialReason).toBe(granted ? undefined : "Zaman penceresi dışında");
+  });
+  it("an additional open rule permits a card despite a closed matching rule", async () => {
+    const { t, deviceId, employeeId, projectId, ruleId } = await fixture();
+    await t.run(async ctx => {
+      await ctx.db.patch(ruleId, { days: ["Tuesday"] });
+      const open = await ctx.db.insert("accessRules", { projectId, name: "Always open", isActive: true });
+      await ctx.db.insert("groupMembers", { projectId, groupId: open, employeeId, createdAt: now });
+      await ctx.db.insert("groupDevices", { projectId, groupId: open, deviceId, createdAt: now });
+    });
+    expect(await t.mutation(internal.cardReadings.processCardReading, { cardNo: "synthetic-card", deviceSerial: "synthetic-serial-a", authedDeviceId: deviceId })).toEqual({ granted: true });
+  });
+});

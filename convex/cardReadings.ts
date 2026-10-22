@@ -1170,15 +1170,17 @@ export const processCardReading = internalMutation({
       )
       .collect();
     const employeeGroupIds = employeeAccessGroups.map((gm) => gm.groupId);
-    const activeRuleIds = await resolveActiveMatchingRuleIds(
+    const { activeRuleIds, openRuleIds } = await resolveActiveMatchingRuleIds(
       ctx,
       deviceGroupIds,
       employeeGroupIds,
+      Date.now(),
     );
     const hasAccess = canEmployeeAccessDevice({
       deviceGroupIds,
       employeeGroupIds,
       activeRuleIds,
+      openRuleIds,
     });
 
     // 5. Kayıt oluştur
@@ -1198,6 +1200,7 @@ export const processCardReading = internalMutation({
       direction: cardDirection,
       rawData: args.rawBody,
       ...hikFields,
+      ...(!hasAccess && activeRuleIds.size > 0 ? { hikDenialReason: "Zaman penceresi dışında" } : {}),
       createdAt: accessTime,
       updatedAt: accessTime,
     });

@@ -311,7 +311,9 @@ describe("diff operation correlation at the action boundary", () => {
     expect(runMutation.mock.calls[0][1]).toMatchObject({ deviceId: "bridge", operation: "deleteCard", runId: "run" });
   });
   it("plan-only diff calls avoid every employee, while omitted optional args preserve full sync", async () => {
-    const runQuery = vi.fn(async () => ({ rule, devices: [device], employees: [employee, { ...employee, _id: "unchanged" }] }));
+    const runQuery = vi.fn(async (ref: Ref, args: { employeeIds?: string[] }) => getFunctionName(ref) === "hikvisionSync:getEmployeesWithDevices"
+      ? args.employeeIds?.map(id => ({ employee: { ...employee, _id: id }, deviceRules: [{ device, rule }] }))
+      : { rule, devices: [device], employees: [employee, { ...employee, _id: "unchanged" }] });
     const runMutation = vi.fn(async (_ref: Ref, _args: object) => "op");
     await invoke(syncWeekPlanToDevicesInternal, { runQuery, runMutation }, { accessRuleId: "rule", runId: "run", targetEmployeeIds: [] });
     const writes = () => runMutation.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:enqueueLocalBridgeOperation").map(([, args]) => args);
@@ -319,7 +321,10 @@ describe("diff operation correlation at the action boundary", () => {
     runMutation.mockClear();
     await invoke(syncWeekPlanToDevicesInternal, { runQuery, runMutation }, { accessRuleId: "rule" });
     expect(writes()).toHaveLength(3);
-    expect(writes().slice(1)).toEqual([expect.objectContaining({ operation: "addPerson" }), expect.objectContaining({ operation: "addPerson" })]);
+    expect(runQuery.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:getEmployeeWithDevices")).toHaveLength(0);
+    expect(runQuery.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:getEmployeesWithDevices")).toHaveLength(1);
+    expect(runMutation.mock.calls.filter(([ref, args]) => getFunctionName(ref) === "hikvisionSync:resolveTargetFailures" && "employeeIds" in args)).toHaveLength(1);
+    expect(writes().filter(op => "operation" in op && op.operation === "addPerson")).toHaveLength(2);
   });
   it("stamps the actual IDE orphan deletion operation", async () => {
     const runMutation = vi.fn(async (_ref: Ref, _args: object) => "op");

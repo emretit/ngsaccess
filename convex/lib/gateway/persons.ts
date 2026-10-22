@@ -13,18 +13,51 @@ export interface PersonRecord {
   employeeNo: string;
   name: string;
   userType?: "normal" | "visitor" | "blackList" | "administrators";
-  /** Cihazdaki kapı sayısı — `RightPlan` her kapı için bir entry üretir (1..doorCount). */
+  /** Legacy all-door fallback only; explicit doorPlans takes precedence. */
   doorCount?: number;
   /**
-   * Hangi planTemplate'e bağlı. Zorunlu — undefined gelirse caller'da sync engellenir;
+   * Legacy single plan (required when doorPlans is omitted);
    * çünkü cihazda Template/1 default 24/7 plan olduğu için sessiz fallback kişiyi
    * istenmeyen şekilde 24 saat geçerli yapardı.
    */
-  planTemplateNo: number;
+  planTemplateNo?: number;
+  /** Explicit per-door plans; an empty list is unauthorized and never falls back. */
+  doorPlans?: DoorPlan[];
   /** Çalışan inaktifse `false`. Default true. */
   validEnable?: boolean;
   beginTime?: string;
   endTime?: string;
+}
+
+export interface DoorPlan {
+  doorNo: number;
+  planTemplateNos: number[];
+}
+
+/** Merge device-leg (all doors) and door-leg (explicit numbers) rules. */
+export function buildDoorPlans(
+  doorCount: number,
+  rules: readonly { planTemplateNo: number; doorNos?: readonly (number | undefined)[] }[],
+): { doorPlans: DoorPlan[]; warnings: string[] } {
+  const plans = new Map<number, Set<number>>();
+  const warnings: string[] = [];
+  for (const rule of rules) {
+    if (!Number.isInteger(rule.planTemplateNo) || rule.planTemplateNo < 1) throw new Error("Invalid planTemplateNo");
+    const doors = rule.doorNos ?? Array.from({ length: doorCount }, (_, i) => i + 1);
+    for (const doorNo of doors) {
+      if (doorNo === undefined || !Number.isInteger(doorNo) || doorNo < 1 || doorNo > doorCount) {
+        warnings.push(`hikDoorNo missing/invalid: ${String(doorNo)} (plan ${rule.planTemplateNo})`);
+        continue;
+      }
+      const numbers = plans.get(doorNo) ?? new Set<number>();
+      numbers.add(rule.planTemplateNo);
+      plans.set(doorNo, numbers);
+    }
+  }
+  return {
+    doorPlans: [...plans].sort(([a], [b]) => a - b).map(([doorNo, numbers]) => ({ doorNo, planTemplateNos: [...numbers].sort((a, b) => a - b) })),
+    warnings,
+  };
 }
 
 /** Bugünden başlayan geniş validity window — accessRule'da explicit tarih alanı yok. */
@@ -40,19 +73,18 @@ function defaultValidBegin(): string {
 // 2037-12-31 universal güvenli.
 const DEFAULT_VALID_END = "2037-12-31T23:59:59";
 
-function buildPersonFields(p: PersonRecord) {
-  if (!p.planTemplateNo) {
-    throw new Error(
-      `[hikGateway] planTemplateNo zorunlu — ${p.employeeNo} için kuralın hikWeekPlanNo'su atanmamış`,
-    );
+export function buildPersonPayload(p: PersonRecord) {
+  let doorPlans = p.doorPlans;
+  if (doorPlans === undefined) {
+    if (!p.planTemplateNo) throw new Error(`[hikGateway] planTemplateNo zorunlu — ${p.employeeNo}`);
+    if (p.doorCount === undefined) console.warn(`[hikGateway] doorCount belirsiz, 1 varsayılıyor — ${p.employeeNo}`);
+    doorPlans = buildDoorPlans(Math.max(1, p.doorCount ?? 1), [{ planTemplateNo: p.planTemplateNo }]).doorPlans;
   }
-  if (p.doorCount === undefined) {
-    console.warn(
-      `[hikGateway] doorCount belirsiz, 1 varsayılıyor — ${p.employeeNo}; cihazda hikDoorCount set edilmemiş olabilir`,
-    );
+  if (doorPlans.length === 0) throw new Error(`[hikGateway] unauthorized: no covered doors — ${p.employeeNo}`);
+  for (const plan of doorPlans) {
+    if (!Number.isInteger(plan.doorNo) || plan.doorNo < 1 || !plan.planTemplateNos.length ||
+        plan.planTemplateNos.some(no => !Number.isInteger(no) || no < 1)) throw new Error("Invalid door plan");
   }
-  const doorCount = Math.max(1, p.doorCount ?? 1);
-  const doorNos = Array.from({ length: doorCount }, (_, i) => i + 1);
   return {
     employeeNo: p.employeeNo,
     name: p.name,
@@ -63,10 +95,10 @@ function buildPersonFields(p: PersonRecord) {
       endTime: p.endTime ?? DEFAULT_VALID_END,
       timeType: "local",
     },
-    doorRight: doorNos.join(","),
-    RightPlan: doorNos.map((doorNo) => ({
+    doorRight: doorPlans.map(p => p.doorNo).join(","),
+    RightPlan: doorPlans.map(({ doorNo, planTemplateNos }) => ({
       doorNo,
-      planTemplateNo: String(p.planTemplateNo),
+      planTemplateNo: planTemplateNos.join(","),
     })),
   };
 }
@@ -78,7 +110,7 @@ export async function addPersonToDevice(
   const result = await gatewayApiCall(
     "/ISAPI/AccessControl/UserInfo/Record",
     "POST",
-    { UserInfo: [buildPersonFields(person)] },
+    { UserInfo: [buildPersonPayload(person)] },
     devIndex,
   );
   return parseHikJsonStatus(result);
@@ -96,7 +128,7 @@ async function setupPersonOnDevice(
   return gatewayApiCallChecked(
     "/ISAPI/AccessControl/UserInfo/SetUp",
     "PUT",
-    { UserInfo: buildPersonFields(person) },
+    { UserInfo: buildPersonPayload(person) },
     devIndex,
   );
 }

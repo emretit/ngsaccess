@@ -7,6 +7,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r1"],
         employeeGroupIds: ["r1"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set(["r1"]),
       }),
     ).toBe(true);
@@ -17,6 +18,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r1"],
         employeeGroupIds: ["r1"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set<string>(),
       }),
     ).toBe(false);
@@ -27,6 +29,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r1"],
         employeeGroupIds: ["r2"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set(["r1", "r2"]),
       }),
     ).toBe(false);
@@ -37,6 +40,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r3"],
         employeeGroupIds: ["r1", "r2", "r3"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set(["r3"]),
       }),
     ).toBe(true);
@@ -47,6 +51,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r1", "r2"],
         employeeGroupIds: ["r1", "r2"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set<string>(),
       }),
     ).toBe(false);
@@ -57,6 +62,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r1", "r2"],
         employeeGroupIds: ["r1", "r2"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set(["r2"]),
       }),
     ).toBe(true);
@@ -67,6 +73,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: [],
         employeeGroupIds: ["r1"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set(["r1"]),
       }),
     ).toBe(false);
@@ -77,6 +84,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r1"],
         employeeGroupIds: [],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set(["r1"]),
       }),
     ).toBe(false);
@@ -88,6 +96,7 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r1"],
         employeeGroupIds: ["r2"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set(["r1"]),
       }),
     ).toBe(false);
@@ -99,8 +108,16 @@ describe("accessDecision – canEmployeeAccessDevice", () => {
       canEmployeeAccessDevice({
         deviceGroupIds: ["r1", "r2"],
         employeeGroupIds: ["r2", "r3"],
+        openRuleIds: new Set(["r1", "r2", "r3"]),
         activeRuleIds: new Set(["r1"]),
       }),
     ).toBe(false);
   });
+});
+
+it("active but closed denies; either matching rule open grants", () => {
+  const params = { deviceGroupIds: ["r1", "r2"], employeeGroupIds: ["r1", "r2"], activeRuleIds: new Set(["r1", "r2"]) };
+  expect(canEmployeeAccessDevice({ ...params, openRuleIds: new Set<string>() })).toBe(false);
+  expect(canEmployeeAccessDevice({ ...params, openRuleIds: new Set(["r2"]) })).toBe(true);
+  expect(canEmployeeAccessDevice({ ...params, activeRuleIds: new Set(["r1"]), openRuleIds: new Set(["r2"]) })).toBe(false);
 });

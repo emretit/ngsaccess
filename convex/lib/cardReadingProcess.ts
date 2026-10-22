@@ -7,6 +7,7 @@
  * `resolveActiveMatchingRuleIds`) `MutationCtx` alır. Güvenlik-hassas cross-tenant /
  * cihaz-doğrulama mantığı `cardReadings.processCardReading` içinde YERİNDE kalır.
  */
+import { isRuleOpenAt } from "./ruleSchedule";
 import { trDateKey, trDayRangeISO } from "./trDate";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -81,13 +82,14 @@ export async function resolveActiveMatchingRuleIds(
   ctx: MutationCtx,
   deviceGroupIds: Id<"accessRules">[],
   employeeGroupIds: Id<"accessRules">[],
-): Promise<Set<Id<"accessRules">>> {
+  nowMs: number,
+): Promise<{ activeRuleIds: Set<Id<"accessRules">>; openRuleIds: Set<Id<"accessRules">> }> {
   const employeeSet = new Set(employeeGroupIds);
   const matching = deviceGroupIds.filter((gid) => employeeSet.has(gid));
   const rules = await Promise.all(matching.map((gid) => ctx.db.get(gid)));
-  return new Set(
-    rules
-      .filter((r): r is NonNullable<typeof r> => r?.isActive === true)
-      .map((r) => r._id),
-  );
+  const activeRules = rules.filter((r): r is NonNullable<typeof r> => r?.isActive === true);
+  return {
+    activeRuleIds: new Set(activeRules.map(r => r._id)),
+    openRuleIds: new Set(activeRules.filter(r => isRuleOpenAt(r, nowMs)).map(r => r._id)),
+  };
 }

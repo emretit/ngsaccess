@@ -4,6 +4,7 @@ import { isBiometricEnabled } from "./lib/privacySettings";
 import { v } from "convex/values";
 import { scheduleBridgeWakeForProject } from "./hikBridge";
 import { internalQuery, internalMutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation, adminMutation } from "./lib/customFunctions";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
@@ -36,98 +37,148 @@ const hikOperationValidator = v.union(
 /**
  * Çalışanın erişim grupları üzerinden bağlı olduğu cihazları ve kuralları getirir.
  */
+type EmployeeDeviceRule = {
+  device: {
+    _id: Id<"devices">;
+    name: string;
+    brand?: "hikvision" | "other" | "ide_smart";
+    projectId?: Id<"projects">;
+    hikDevIndex?: string;
+    ehomeID?: string;
+    deviceIp?: string;
+    deviceSerial?: string;
+    hikTransport?: "gateway" | "localBridge";
+    hikDoorCount?: number;
+  };
+  /** undefined = explicit device leg; [] = no usable selected door. */
+  doorNos?: number[];
+  rule: {
+    _id: Id<"accessRules">;
+    name?: string;
+    hikWeekPlanNo?: number;
+    idePermissionNo?: number;
+    startTime?: string;
+    endTime?: string;
+    days?: string[];
+  };
+};
+type RuleScopeCache = Map<string, Promise<EmployeeDeviceRule[]>>;
+
 export const getEmployeeWithDevices = internalQuery({
   args: { employeeId: v.id("employees") },
+  handler: (ctx, args) => employeeWithDevices(ctx, args.employeeId),
+});
+
+export const getEmployeesWithDevices = internalQuery({
+  args: { employeeIds: v.array(v.id("employees")) },
   handler: async (ctx, args) => {
-    const employee = await ctx.db.get(args.employeeId);
-    if (!employee) return null;
-
-    // Employee'nin dahil olduğu grupları bul
-    const groupMemberships = await ctx.db
-      .query("groupMembers")
-      .withIndex("by_project_employee", (q) =>
-        q.eq("projectId", employee.projectId).eq("employeeId", args.employeeId),
-      )
-      .collect();
-
-    const deviceRules: {
-      device: {
-        _id: Id<"devices">;
-        name: string;
-        brand?: "hikvision" | "other" | "ide_smart";
-        projectId?: Id<"projects">;
-        hikDevIndex?: string;
-        ehomeID?: string;
-        deviceIp?: string;
-        deviceSerial?: string;
-        hikTransport?: "gateway" | "localBridge";
-        hikDoorCount?: number;
-      };
-      rule: {
-        _id: Id<"accessRules">;
-        name?: string;
-        hikWeekPlanNo?: number;
-        idePermissionNo?: number;
-        startTime?: string;
-        endTime?: string;
-        days?: string[];
-      };
-    }[] = [];
-
-    for (const gm of groupMemberships) {
-      const rule = await ctx.db.get(gm.groupId);
-      if (!rule || !rule.isActive) continue;
-
-      const groupDevices = await ctx.db
-        .query("groupDevices")
-        .withIndex("by_project_group", (q) =>
-          q.eq("projectId", employee.projectId).eq("groupId", gm.groupId),
-        )
-        .collect();
-
-      for (const gd of groupDevices) {
-        const device = await ctx.db.get(gd.deviceId);
-        if (!device || !device.isActive) continue;
-
-        deviceRules.push({
-          device: {
-            _id: device._id,
-            name: device.name,
-            brand: device.brand,
-            projectId: device.projectId,
-            hikDevIndex: device.hikDevIndex,
-            ehomeID: device.ehomeID,
-            deviceIp: device.deviceIp,
-            deviceSerial: device.deviceSerial,
-            hikTransport: device.hikTransport,
-            hikDoorCount: device.hikDoorCount,
-          },
-          rule: {
-            _id: rule._id,
-            name: rule.name,
-            hikWeekPlanNo: rule.hikWeekPlanNo,
-            idePermissionNo: rule.idePermissionNo,
-            startTime: rule.startTime,
-            endTime: rule.endTime,
-            days: rule.days,
-          },
-        });
-      }
-    }
-
-    return {
-      employee: {
-        _id: employee._id,
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        cardNumber: employee.cardNumber,
-        projectId: employee.projectId,
-        isActive: employee.isActive,
-      },
-      deviceRules,
-    };
+    if (args.employeeIds.length > 20) throw new Error("Çalışan toplu okuma sınırı aşıldı");
+    const scopes: RuleScopeCache = new Map();
+    return await Promise.all(args.employeeIds.map(id => employeeWithDevices(ctx, id, scopes)));
   },
 });
+
+async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, scopes: RuleScopeCache = new Map()) {
+  const employee = await ctx.db.get(employeeId);
+  if (!employee) return null;
+
+  // Employee'nin dahil olduğu grupları bul
+  const groupMemberships = await ctx.db
+    .query("groupMembers")
+    .withIndex("by_project_employee", (q) =>
+      q.eq("projectId", employee.projectId).eq("employeeId", employeeId),
+    )
+    .take(4097);
+
+  if (groupMemberships.length > 4096) throw new Error("Employee rule limit exceeded");
+
+  const deviceRules: EmployeeDeviceRule[] = [];
+
+  for (const gm of groupMemberships) {
+    const key = `${employee.projectId}:${gm.groupId}`;
+    let scope = scopes.get(key);
+    if (!scope) {
+      scope = (async () => {
+        const resolved: EmployeeDeviceRule[] = [];
+        const rule = await ctx.db.get(gm.groupId);
+        if (!rule || !rule.isActive || rule.projectId !== employee.projectId) return [];
+
+        const groupDevices = await ctx.db
+          .query("groupDevices")
+          .withIndex("by_project_group", (q) =>
+            q.eq("projectId", employee.projectId).eq("groupId", gm.groupId),
+          )
+          .take(4097);
+
+        const doorLinks = await ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", rule._id)).take(4097);
+        if (groupDevices.length > 4096 || doorLinks.length > 4096) throw new Error("Rule scope limit exceeded");
+        const selectedDoors = await Promise.all(doorLinks.map(link => ctx.db.get(link.doorId)));
+        const byDevice = new Map<Id<"devices">, number[] | undefined>();
+        for (const gd of groupDevices) byDevice.set(gd.deviceId, undefined);
+        const selectedByDevice = new Map<Id<"devices">, number[]>();
+        for (const [index, door] of selectedDoors.entries()) {
+          const snapshotDeviceId = doorLinks[index]?.deviceId;
+          // A stale snapshot can suppress a fallback but must never grant rights.
+          if (snapshotDeviceId && snapshotDeviceId !== door?.deviceId) {
+            if (!selectedByDevice.has(snapshotDeviceId)) selectedByDevice.set(snapshotDeviceId, []);
+          }
+          if (!door?.deviceId) continue;
+          const numbers = selectedByDevice.get(door.deviceId) ?? [];
+          if (door.projectId === employee.projectId) numbers.push(door.hikDoorNo ?? 0);
+          selectedByDevice.set(door.deviceId, numbers);
+        }
+        // Explicit selected doors narrow device membership for that rule/device.
+        // Unknown deleted/unassigned mappings must not reopen the device default.
+        for (const [deviceId, numbers] of selectedByDevice) byDevice.set(deviceId, numbers);
+        for (const [deviceId, doorNos] of byDevice) {
+          const device = await ctx.db.get(deviceId);
+          if (!device || !device.isActive || device.projectId !== employee.projectId) continue;
+          if (device.brand !== "hikvision" && !groupDevices.some(link => link.deviceId === deviceId)) continue;
+
+          resolved.push({
+            ...(doorNos === undefined || device.brand !== "hikvision" ? {} : { doorNos }),
+            device: {
+              _id: device._id,
+              name: device.name,
+              brand: device.brand,
+              projectId: device.projectId,
+              hikDevIndex: device.hikDevIndex,
+              ehomeID: device.ehomeID,
+              deviceIp: device.deviceIp,
+              deviceSerial: device.deviceSerial,
+              hikTransport: device.hikTransport,
+              hikDoorCount: device.hikDoorCount,
+            },
+            rule: {
+              _id: rule._id,
+              name: rule.name,
+              hikWeekPlanNo: rule.hikWeekPlanNo,
+              idePermissionNo: rule.idePermissionNo,
+              startTime: rule.startTime,
+              endTime: rule.endTime,
+              days: rule.days,
+            },
+          });
+        }
+        return resolved;
+      })();
+      scopes.set(key, scope);
+    }
+    deviceRules.push(...await scope);
+  }
+
+  return {
+    employee: {
+      _id: employee._id,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      cardNumber: employee.cardNumber,
+      projectId: employee.projectId,
+      isActive: employee.isActive,
+    },
+    deviceRules,
+  };
+}
 
 /**
  * Erişim kuralının bağlı olduğu cihazları ve çalışanları getirir.
@@ -144,7 +195,7 @@ export const getAccessRuleWithDevices = internalQuery({
       .withIndex("by_project_group", (q) =>
         q.eq("projectId", rule.projectId).eq("groupId", args.accessRuleId),
       )
-      .collect();
+      .take(4097);
 
     const devices: {
       _id: Id<"devices">;
@@ -158,9 +209,19 @@ export const getAccessRuleWithDevices = internalQuery({
       hikDoorCount?: number;
     }[] = [];
 
-    for (const gd of groupDevices) {
-      const device = await ctx.db.get(gd.deviceId);
-      if (!device || !device.isActive) continue;
+    if (groupDevices.length > 4096) throw new Error("Rule device limit exceeded");
+    const deviceIds = new Set(groupDevices.map(gd => gd.deviceId));
+    const doorLinks = await ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", rule._id)).take(4097);
+    if (doorLinks.length > 4096) throw new Error("Rule door limit exceeded");
+    for (const link of doorLinks) {
+      const door = await ctx.db.get(link.doorId);
+      if (!door?.deviceId || door.projectId !== rule.projectId) continue;
+      const device = await ctx.db.get(door.deviceId);
+      if (device?.brand === "hikvision") deviceIds.add(device._id);
+    }
+    for (const deviceId of deviceIds) {
+      const device = await ctx.db.get(deviceId);
+      if (!device || !device.isActive || device.projectId !== rule.projectId) continue;
       devices.push({
         _id: device._id,
         name: device.name,
@@ -180,7 +241,8 @@ export const getAccessRuleWithDevices = internalQuery({
       .withIndex("by_project_group", (q) =>
         q.eq("projectId", rule.projectId).eq("groupId", args.accessRuleId),
       )
-      .collect();
+      .take(4097);
+    if (groupMembers.length > 4096) throw new Error("Kural çalışan sınırı aşıldı");
 
     const employees: {
       _id: Id<"employees">;
@@ -224,10 +286,15 @@ export const getAccessRuleWithDevices = internalQuery({
 export const assignWeekPlanNo = internalMutation({
   args: {
     accessRuleId: v.id("accessRules"),
-    weekPlanNo: v.number(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.accessRuleId, { hikWeekPlanNo: args.weekPlanNo });
+    const rule = await ctx.db.get(args.accessRuleId);
+    if (!rule) throw new Error("Kural bulunamadı");
+    if (rule.hikWeekPlanNo) return rule.hikWeekPlanNo;
+    const highest = await ctx.db.query("accessRules").withIndex("by_hikWeekPlanNo").order("desc").first();
+    const weekPlanNo = Math.max(1, highest?.hikWeekPlanNo ?? 1) + 1;
+    await ctx.db.patch(rule._id, { hikWeekPlanNo: weekPlanNo });
+    return weekPlanNo;
   },
 });
 
@@ -296,14 +363,8 @@ export const listActiveRuleIdsForBackfill = internalQuery({
 export const getMaxWeekPlanNo = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const rules = await ctx.db.query("accessRules").collect();
-    let max = 1;
-    for (const r of rules) {
-      if (r.hikWeekPlanNo && r.hikWeekPlanNo > max) {
-        max = r.hikWeekPlanNo;
-      }
-    }
-    return max;
+    const highest = await ctx.db.query("accessRules").withIndex("by_hikWeekPlanNo").order("desc").first();
+    return Math.max(1, highest?.hikWeekPlanNo ?? 1);
   },
 });
 
@@ -806,6 +867,7 @@ export const resolveTargetFailures = internalMutation({
       ),
     ),
     employeeId: v.optional(v.id("employees")),
+    employeeIds: v.optional(v.array(v.id("employees"))),
     accessRuleId: v.optional(v.id("accessRules")),
   },
   handler: async (ctx, args) => {
@@ -815,7 +877,8 @@ export const resolveTargetFailures = internalMutation({
       .withIndex("by_device_status", (q) =>
         q.eq("deviceId", args.deviceId).eq("status", "failed"),
       )
-      .collect();
+      .take(4097);
+    if (matches.length > 4096) throw new Error("Senkron hatası sınırı aşıldı");
 
     const now = Date.now();
     const writes: Promise<unknown>[] = [];
@@ -826,6 +889,7 @@ export const resolveTargetFailures = internalMutation({
       const payload = (f.payload ?? {}) as Record<string, unknown>;
       // employeeId/accessRuleId verilmişse sadece eşleşenleri temizle.
       if (args.employeeId && payload.employeeId !== args.employeeId) continue;
+      if (args.employeeIds && !args.employeeIds.some(id => payload.employeeId === id)) continue;
       if (args.accessRuleId && payload.accessRuleId !== args.accessRuleId) continue;
       writes.push(
         ctx.db.patch(f._id, { status: "done", completedAt: now }),
