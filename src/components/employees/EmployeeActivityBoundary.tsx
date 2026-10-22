@@ -35,7 +35,7 @@ export class EmployeeActivityBoundary extends Component<
           <h3 className="text-base font-semibold">{this.props.title}</h3>
           <ErrorState compact description={this.props.description} />
           <div className="flex justify-center">
-            <Button
+            <Button className="max-sm:min-h-11"
               variant="outline"
               size="sm"
               onClick={() =>

@@ -52,13 +52,13 @@ describe("çalışan rıza kartı", () => {
     // Rol değişse bile önceden açılmış diyalog/onay arayüzde kalmamalı.
     mocks.states = [{ id: "consent-a", label: "Yüz Tanıma" }, "photo", "eski not", false];
     const html = render();
-    expect(html).toContain("KVKK Rızalar");
+    expect(html).toContain("KVKK rızaları");
     expect(html).toContain("Yüz Tanıma");
     expect(html).toContain("Aktif");
     expect(html).toContain("Alındı:");
     expect(html).toContain("19.10.2026 09:00");
     expect(html).not.toContain("Rıza Kaydı");
-    expect(html).not.toContain("Rıza Al");
+    expect(html).not.toContain("Rıza al");
     expect(html).not.toContain("İptal");
     expect(mocks.buttons.filter(button => button["aria-label"]?.includes("rızası"))).toHaveLength(0);
     expect(mocks.confirm).toBeNull();
@@ -106,7 +106,7 @@ describe("çalışan rıza kartı", () => {
     render();
     const error = new ConvexError({ code: "BIOMETRIC_DISABLED", message: "Biyometri modülü kapalı." });
     mocks.grant.mockRejectedValueOnce(error);
-    await mocks.buttons.find(button => typeof button.onClick === "function" && button["aria-label"] === undefined && button.disabled === false && button.children === "Rıza Al")?.onClick?.();
+    await mocks.buttons.find(button => typeof button.onClick === "function" && button["aria-label"] === undefined && button.disabled === false && button.children === "Rıza al")?.onClick?.();
     expect(mocks.error).toHaveBeenCalledWith("Rıza alınamadı", error);
   });
 });

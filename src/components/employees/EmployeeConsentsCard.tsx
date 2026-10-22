@@ -106,7 +106,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
   if (consents === undefined) {
     return (
       <section className="space-y-3 border-t pt-5">
-        <h3 className="text-base font-semibold">KVKK Rızalar</h3>
+        <h3 className="text-base font-semibold">KVKK rızaları</h3>
         <SectionSkeleton rows={2} label="Rızalar yükleniyor" />
       </section>
     );
@@ -114,14 +114,14 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
 
   return (
     <section className="space-y-3 border-t pt-5">
-      <h3 className="text-base font-semibold">KVKK Rızalar</h3>
+      <h3 className="text-base font-semibold">KVKK rızaları</h3>
       <p className="text-xs text-muted-foreground">
         Biyometri yalnız erişim kontrolü için değerlendirilir. Rıza yoksa yüz/parmak izi kaydı eklenemez. Yasal danışmanınıza doğrulatın.
       </p>
       <details className="text-xs">
         <summary className="cursor-pointer font-medium">Aydınlatma metni şablonu</summary>
         <pre className="mt-3 whitespace-pre-wrap break-words font-sans text-muted-foreground">{BIOMETRIC_NOTICE_TEMPLATE}</pre>
-        <Button type="button" variant="outline" size="sm" className="mt-3" onClick={async () => {
+        <Button type="button" variant="outline" size="sm" className="max-sm:min-h-11 mt-3" onClick={async () => {
           try { await navigator.clipboard.writeText(BIOMETRIC_NOTICE_TEMPLATE); notify.success("Şablon kopyalandı"); }
           catch (error: unknown) { notify.error("Şablon kopyalanamadı", error); }
         }}>Şablonu kopyala</Button>
@@ -173,7 +173,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                     variant="outline"
                     aria-label={`${meta.label} rızasını iptal et`}
                     onClick={() => setRevokeTarget({ id: active.id, label: meta.label })}
-                    className="gap-1.5"
+                    className="max-sm:min-h-11 gap-1.5"
                   >
                     <ShieldX className="h-3.5 w-3.5" />
                     İptal
@@ -184,10 +184,10 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                     aria-label={`${meta.label} rızası al`}
                     disabled={type.startsWith("biometric_") && biometricModule?.enabled !== true}
                     onClick={() => setGrantingType(type)}
-                    className="gap-1.5"
+                    className="max-sm:min-h-11 gap-1.5"
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    Rıza Al
+                    Rıza al
                   </Button>
                 )}
               </div>}
@@ -227,7 +227,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                 />
               </div>
               <DialogFooter>
-                <Button
+                <Button className="max-sm:min-h-11"
                   variant="outline"
                   onClick={() => {
                     setGrantingType(null);
@@ -237,8 +237,8 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                 >
                   İptal
                 </Button>
-                <Button onClick={handleGrant} disabled={submitting || (grantingType?.startsWith("biometric_") === true && biometricModule?.enabled !== true)}>
-                  {submitting ? "Kaydediliyor..." : "Rıza Al"}
+                <Button className="max-sm:min-h-11" onClick={handleGrant} disabled={submitting || (grantingType?.startsWith("biometric_") === true && biometricModule?.enabled !== true)}>
+                  {submitting ? "Kaydediliyor..." : "Rıza al"}
                 </Button>
               </DialogFooter>
             </DialogContent>

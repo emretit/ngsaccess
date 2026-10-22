@@ -1,5 +1,5 @@
 import { departmentPath } from "../lib/departmentPath";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type RefObject } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Employee } from "@/types/employee";
@@ -28,36 +28,56 @@ export interface EmployeeFormData {
   projectId?: Id<"projects">;
 }
 
-export const useEmployeeFormData = (employee?: Employee | null) => {
+export function employeeFormValues(employee?: Employee | null, projectId?: Id<"projects">): EmployeeFormData {
+  return {
+    firstName: employee?.firstName || "",
+    lastName: employee?.lastName || "",
+    email: employee?.email || "",
+    tcNo: employee?.tcNo || "",
+    cardNumber: employee?.cardNumber || "",
+    payrollCode: employee?.payrollCode || "",
+    companyId: employee?.companyId ?? null,
+    departmentId: employee?.departmentId ?? null,
+    positionId: employee?.positionId ?? null,
+    accessRuleId: null,
+    shift: employee?.shift ?? null,
+    shiftId: employee?.shiftId ?? null,
+    photoUrl: employee?.photoUrl ?? null,
+    photoStorageId: employee?.photoStorageId,
+    notes: employee?.notes || "",
+    isActive: employee?.isActive ?? true,
+    hourlyRate: employee?.hourlyRate ?? null,
+    monthlySalary: employee?.monthlySalary ?? null,
+    projectId: employee?.projectId ?? projectId,
+  };
+}
+
+export interface EmployeeFormDraft {
+  formData: EmployeeFormData;
+  initialData?: string;
+  photoPreview: string | null;
+  source: { identity: string; signature: string };
+}
+interface FormDataOptions {
+  saving?: boolean;
+  saved?: boolean;
+  draft?: RefObject<EmployeeFormDraft | undefined>;
+}
+export const useEmployeeFormData = (employee?: Employee | null, { saving = false, saved = false, draft }: FormDataOptions = {}) => {
   const { projectId } = useActiveProjectScope();
   const [defaultProjectId] = useState(projectId);
 
-  const [formData, setFormData] = useState<EmployeeFormData>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    tcNo: "",
-    cardNumber: "",
-    payrollCode: "",
-    companyId: null,
-    departmentId: null,
-    positionId: null,
-    accessRuleId: null,
-    shift: null,
-    shiftId: null,
-    photoUrl: null,
-    notes: "",
-    isActive: true,
-    hourlyRate: null,
-    monthlySalary: null,
-  });
+  const identity = `${defaultProjectId ?? ""}/${employee?._id ?? "new"}`;
+  // The drawer retains this snapshot when a local query error unmounts the form.
+  const cached = draft?.current?.source.identity === identity ? draft.current : undefined;
+  const [formData, setFormData] = useState<EmployeeFormData>(() => cached?.formData ?? employeeFormValues(employee, defaultProjectId));
+  const [initialData, setInitialData] = useState<string | undefined>(() => cached?.initialData ?? JSON.stringify(employeeFormValues(employee, defaultProjectId)));
 
-  const [initialData, setInitialData] = useState<string>();
   const resetFormData = (data: EmployeeFormData) => {
     setFormData(data);
     setInitialData(JSON.stringify(data));
   };
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(() => cached ? cached.photoPreview : employee?.photoUrl ?? null);
 
   const departmentsData = useQuery(
     api.departments.list,
@@ -93,58 +113,28 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
     .filter((p) => p.projectId === defaultProjectId)
     .map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
 
+  const incoming = JSON.stringify(employeeFormValues(employee, defaultProjectId));
+  const [source, setSource] = useState(() => cached?.source ?? { identity, signature: incoming });
+  const remoteChanged = source.identity === identity && source.signature !== incoming;
+  const reloadLatest = () => {
+    const values = employeeFormValues(employee, defaultProjectId);
+    resetFormData(values);
+    setPhotoPreview(values.photoUrl);
+    setSource({ identity, signature: incoming });
+  };
   useEffect(() => {
-    if (employee && employee.projectId === defaultProjectId) {
-      resetFormData({
-        firstName: employee.firstName || "",
-        lastName: employee.lastName || "",
-        email: employee.email || "",
-        tcNo: employee.tcNo || "",
-        cardNumber: employee.cardNumber || "",
-        payrollCode: employee.payrollCode || "",
-        companyId: employee.companyId ?? null,
-        departmentId: employee.departmentId ?? null,
-        positionId: employee.positionId ?? null,
-        accessRuleId: null,
-        shift: employee.shift ?? null,
-        shiftId: employee.shiftId ?? null,
-        photoUrl: employee.photoUrl ?? null,
-        photoStorageId: employee.photoStorageId,
-        notes: employee.notes || "",
-        isActive: employee.isActive ?? true,
-        hourlyRate: employee.hourlyRate ?? null,
-        monthlySalary: employee.monthlySalary ?? null,
-        projectId: employee.projectId ?? defaultProjectId,
-      });
-      setPhotoPreview(employee.photoUrl ?? null);
-    } else {
-      resetFormData({
-        firstName: "",
-        lastName: "",
-        email: "",
-        tcNo: "",
-        cardNumber: "",
-        payrollCode: "",
-        companyId: null,
-        departmentId: null,
-        positionId: null,
-        accessRuleId: null,
-        shift: null,
-        shiftId: null,
-        photoUrl: null,
-        notes: "",
-        isActive: true,
-        hourlyRate: null,
-        monthlySalary: null,
-        projectId: defaultProjectId,
-      });
-      setPhotoPreview(null);
+    if (saving) return;
+    if (source.identity !== identity || initialData === undefined ||
+      (source.signature !== incoming && (saved || JSON.stringify(formData) === initialData))) {
+      reloadLatest();
     }
-    // Form sadece düzenlenen kişi (employee._id) değiştiğinde reset edilir.
-    // employee prop'u her parent re-render'da yeni referans alabilir; tüm objeyi
-    // dep'e koymak form'u sürekli resetler ve kullanıcının yazdıkları kaybolur.
+    // Compare serialized field contents, never the reactive object's identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employee?._id, defaultProjectId]);
+  }, [identity, incoming, saving, saved, initialData, formData, source]);
+
+  useEffect(() => {
+    if (draft) draft.current = { formData, initialData, photoPreview, source };
+  }, [draft, formData, initialData, photoPreview, source]);
 
   return {
     formData,
@@ -157,5 +147,7 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
     photoPreview,
     setPhotoPreview,
     optionsLoading,
+    remoteChanged: remoteChanged && JSON.stringify(formData) !== initialData && !saving && !saved,
+    reloadLatest,
   };
 };

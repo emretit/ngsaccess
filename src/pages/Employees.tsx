@@ -3,6 +3,7 @@ import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import DepartmentTree from "@/components/departments/DepartmentTree";
+import type { Id } from "../../convex/_generated/dataModel";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
 import type { Employee } from "@/types/employee";
 import EmployeeTable from "@/components/employees/EmployeeTable";
@@ -65,7 +66,12 @@ function EmployeePage() {
     : 10;
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [viewMode, setViewMode] = useState(false);
+  const [continuingEmployeeId, setContinuingEmployeeId] = useState<Id<"employees"> | null>(null);
+  useEffect(() => {
+    if (!continuingEmployeeId) return;
+    const saved = employees.find(item => item._id === continuingEmployeeId);
+    if (saved) { setEditingEmployee(saved); setContinuingEmployeeId(null); }
+  }, [employees, continuingEmployeeId]);
   const previousProject = useRef(projectId);
   const filtered = useMemo(
     () => filterAndSortEmployees(employees, q, department, status, sort),
@@ -116,11 +122,10 @@ function EmployeePage() {
   const close = () => {
     setIsPanelOpen(false);
     setEditingEmployee(null);
-    setViewMode(false);
+    setContinuingEmployeeId(null);
   };
-  const open = (employee: Employee | null, detail: boolean) => {
+  const open = (employee: Employee | null) => {
     setEditingEmployee(employee);
-    setViewMode(detail);
     setIsPanelOpen(true);
   };
   if ((projectLoading || isLoading) && !isPanelOpen)
@@ -146,7 +151,7 @@ function EmployeePage() {
         title="Kişiler"
         primaryAction={
           isAdmin
-            ? { label: "Personel ekle", onClick: () => open(null, false) }
+            ? { label: "Personel ekle", onClick: () => open(null) }
             : undefined
         }
       />
@@ -207,8 +212,7 @@ function EmployeePage() {
               onSortChange={(value) => update({ sort: value })}
               showDepartment={!department}
               employees={filtered.slice((page - 1) * size, page * size)}
-              onEdit={(employee) => open(employee, false)}
-              onViewDetails={(employee) => open(employee, true)}
+              onViewDetails={(employee) => open(employee)}
               onRefresh={refetch}
             />
           )}
@@ -229,13 +233,16 @@ function EmployeePage() {
         isOpen={isPanelOpen}
         onClose={close}
         employee={editingEmployee}
-        viewMode={viewMode}
+        loadingEmployee={continuingEmployeeId !== null}
+        onContinue={({ employeeId }) => {
+          refetch();
+          const saved = employees.find(item => item._id === employeeId);
+          if (saved) setEditingEmployee(saved);
+          else setContinuingEmployeeId(employeeId);
+        }}
         onSave={() => {
-          if (viewMode) setViewMode(false);
-          else {
-            refetch();
-            close();
-          }
+          refetch();
+          if (!editingEmployee) close();
         }}
       />
       {importDialogOpen && isAdmin && <EmployeeImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} projectId={projectId} />}

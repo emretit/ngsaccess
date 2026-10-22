@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import EmployeeFormFields from "./EmployeeFormFields";
 import type { EmployeeFormData } from "./hooks/useEmployeeFormData";
 const formData: EmployeeFormData = { firstName: "", lastName: "", email: "", tcNo: "", cardNumber: "", payrollCode: "", companyId: null, departmentId: null, positionId: null, accessRuleId: null, shift: null, shiftId: null, photoUrl: null, notes: "", isActive: true, hourlyRate: null, monthlySalary: null };
@@ -13,4 +14,27 @@ it("02-O8: gives access its own fieldset and unambiguous empty option", () => {
 it("02-D7: focuses first name only for a new employee", () => {
   expect(render(true)).toMatch(/id="employee-firstName"[^>]*autofocus=""/);
   expect(render(false)).not.toContain('autofocus=""');
+});
+it("emp-drawer #6/#15: mode-specific email help, TC hint, both tied to inputs", () => {
+  const fresh = render(false);
+  expect(fresh).toContain("Mobil giriş kurulum bağlantısı bu adrese gönderilir.");
+  expect(fresh).toMatch(/id="employee-email"[^>]*aria-describedby="employee-email-hint"/);
+  expect(fresh).toMatch(/id="employee-tcNo"[^>]*inputMode="numeric"[^>]*aria-describedby="employee-tcNo-hint"|id="employee-tcNo"[^>]*aria-describedby="employee-tcNo-hint"[^>]*inputMode="numeric"/);
+  const edit = renderToStaticMarkup(<MemoryRouter><EmployeeFormFields formData={{ ...formData, monthlySalary: 1000, notes: "x" }} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} isEditing /></MemoryRouter>);
+  expect(edit).not.toContain("bu adrese gönderilir");
+  expect(edit).toContain("Mobil giriş bağlantısı gönder");
+  expect(edit).toContain('href="/access-control"');
+  expect(edit).toContain("(2 dolu)");
+});
+
+it("düzenlemede mevcut aktif/pasif üyelikleri ek kural seçiminin üstünde gösterir", () => {
+  const html = renderToStaticMarkup(<MemoryRouter><EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} isEditing memberships={[{ _id: "a", name: "Gündüz", isActive: true }, { _id: "b", name: "Gece", isActive: false }]} /></MemoryRouter>);
+  expect(html).toContain("Gündüz"); expect(html).toContain("Gece");
+  expect(html).toContain("Aktif"); expect(html).toContain("Pasif");
+  expect(html.indexOf("Gündüz")).toBeLessThan(html.indexOf("Ek erişim kuralı"));
+  expect(html).toContain("Ek kural seçilmedi");
+});
+it("boş katalog yardımlarını ve düzenlemede boş üyelik bilgisini gösterir", () => {
+  const html = renderToStaticMarkup(<MemoryRouter><EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} isEditing memberships={[]} /></MemoryRouter>);
+  for (const text of ["Henüz şirket tanımlı değil.", "Henüz departman tanımlı değil.", "Henüz pozisyon tanımlı değil.", "Etkin erişim kuralı yok.", "Bu kişiye erişim kuralı atanmamış."]) expect(html).toContain(text);
 });

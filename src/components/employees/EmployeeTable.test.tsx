@@ -17,7 +17,7 @@ vi.mock("./EmployeePasswordResetDialog", () => ({ EmployeePasswordResetDialog: (
 vi.mock("./EmployeeBulkActions", () => ({ EmployeeBulkActions: ({ onSyncToDevices }: { onSyncToDevices: () => void }) => { mocks.bulkSend = onSyncToDevices; return <div>Toplu işlemler</div>; } }));
 vi.mock("./EmployeeSyncConfirmDialog", () => ({ EmployeeSyncConfirmDialog: ({ onConfirm }: { onConfirm: () => void }) => { mocks.confirm = onConfirm; return <div>Gönderim onayı</div>; } }));
 const employee: Employee = { _id: "e" as Id<"employees">, firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", isActive: true };
-function render(employees = [employee]) { mocks.cursor = 0; mocks.items = []; return renderToStaticMarkup(<EmployeeTable employees={employees} onEdit={() => {}} onViewDetails={() => {}} />); }
+function render(employees = [employee]) { mocks.cursor = 0; mocks.items = []; return renderToStaticMarkup(<EmployeeTable employees={employees} onViewDetails={() => {}} />); }
 beforeEach(() => { vi.clearAllMocks(); mocks.states = []; mocks.selected = []; mocks.confirm = undefined; mocks.sync.mockResolvedValue({ synced: 1, failed: 0, errors: [] }); });
 it("02-O2: row send opens confirmation and calls device action only after confirmation", () => {
   render();

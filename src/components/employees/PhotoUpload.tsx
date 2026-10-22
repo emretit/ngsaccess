@@ -13,38 +13,33 @@ export default function PhotoUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex flex-col items-center mb-2">
-      <div className="relative w-24 h-24 mb-2">
-        {photoPreview ? (
-          <img
-            src={photoPreview}
-            alt="Personel fotoğrafı"
-            className="w-24 h-24 rounded-full object-cover border-2 border-border"
-          />
-        ) : (
-          <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
-            <Camera className="w-8 h-8 text-muted-foreground" />
-          </div>
-        )}
-        <button
-          type="button"
-          aria-label="Personel fotoğrafı seç"
-          onClick={() => fileInputRef.current?.click()}
-          className="absolute bottom-0 right-0 bg-primary text-primary-foreground h-11 w-11 flex items-center justify-center rounded-full"
-        >
-          <Upload className="w-3.5 h-3.5" />
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={onPhotoChange}
-          className="hidden"
-          accept="image/jpeg,image/png,image/webp"
+    <div className="relative h-16 w-16 shrink-0">
+      {photoPreview ? (
+        <img
+          src={photoPreview}
+          alt="Personel fotoğrafı"
+          className="h-16 w-16 rounded-full border-2 border-border object-cover"
         />
-      </div>
-      <span className="text-xs text-muted-foreground">
-        Fotoğraf eklemek için tıklayın
-      </span>
+      ) : (
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+          <Camera className="h-6 w-6 text-muted-foreground" />
+        </div>
+      )}
+      <button
+        type="button"
+        aria-label="Personel fotoğrafı seç"
+        onClick={() => fileInputRef.current?.click()}
+        className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground before:absolute before:-inset-1.5"
+      >
+        <Upload className="h-3.5 w-3.5" />
+      </button>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={onPhotoChange}
+        className="hidden"
+        accept="image/jpeg,image/png,image/webp"
+      />
     </div>
   );
 }

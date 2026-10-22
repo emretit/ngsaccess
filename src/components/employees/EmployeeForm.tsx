@@ -1,30 +1,47 @@
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { Employee } from "@/types/employee";
 import PhotoUpload from "./PhotoUpload";
 import FormActions from "./FormActions";
 import EmployeeFormFields from "./EmployeeFormFields";
+import type { EmployeeFormDraft } from "./hooks/useEmployeeFormData";
 import { useEmployeeFormData } from "./hooks/useEmployeeFormData";
+import type { EmployeeSaveResult } from "./hooks/useEmployeeFormSubmit";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { Button } from "@/components/ui/button";
 import { useEmployeeFormSubmit } from "./hooks/useEmployeeFormSubmit";
 import { usePhotoUpload } from "./hooks/usePhotoUpload";
 import { employeeFormSchema } from "./hooks/useEmployeeFormSchema";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { cn } from "@/lib/utils";
 
 interface EmployeeFormProps {
   employee?: Employee | null;
+  /** Ayrıntı drawer'ı içinde, kendi kaydırma alanı olmadan çizilir. */
+  embedded?: boolean;
+  draft?: RefObject<EmployeeFormDraft | undefined>;
+  /** Varsayılan: yalnız yeni kayıtta Ad alanına odaklan. */
+  autoFocusFirstName?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onPendingChange?: (pending: boolean) => void;
   onClose: () => void;
-  onSave: (payload?: unknown) => void;
+  onExit?: () => void;
+  onContinue?: (payload: EmployeeSaveResult) => void;
+  onSave: (payload: EmployeeSaveResult) => void;
 }
 
 export default function EmployeeForm({
   employee,
+  embedded = false,
+  draft,
+  autoFocusFirstName = !employee,
   onClose,
   onSave,
+  onExit = onClose,
+  onContinue,
   onDirtyChange,
   onPendingChange,
 }: EmployeeFormProps) {
@@ -40,20 +57,7 @@ export default function EmployeeForm({
     Partial<Record<string, string>>
   >({});
 
-  const {
-    formData,
-    initialData,
-    setFormData,
-    departments,
-    companies,
-    accessRules,
-    positions,
-    photoPreview,
-    setPhotoPreview,
-    optionsLoading,
-  } = useEmployeeFormData(employee);
-
-  const { isLoading, handleSubmit, stages, serverError } =
+  const { isLoading, handleSubmit, stages, serverError, savedResult } =
     useEmployeeFormSubmit(employee, onClose, onSave, (key, message) => {
       setFieldErrors({ [key]: message });
       requestAnimationFrame(() =>
@@ -67,16 +71,33 @@ export default function EmployeeForm({
     error: photoError,
   } = usePhotoUpload();
 
+  const {
+    formData,
+    initialData,
+    setFormData,
+    departments,
+    companies,
+    accessRules,
+    positions,
+    photoPreview,
+    setPhotoPreview,
+    optionsLoading,
+    remoteChanged,
+    reloadLatest,
+  } = useEmployeeFormData(employee, { saving: isLoading || uploading, saved: stages.length > 0, draft });
+
+  const dirty =
+    initialData !== undefined &&
+    JSON.stringify(formData) !== initialData &&
+    stages.length === 0;
+  const reloadGuard = useUnsavedChangesGuard(dirty);
   useEffect(() => {
-    onDirtyChange?.(
-      initialData !== undefined &&
-        JSON.stringify(formData) !== initialData &&
-        stages.length === 0,
-    );
-  }, [formData, initialData, stages.length, onDirtyChange]);
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
   useEffect(() => {
     onPendingChange?.(isLoading || uploading);
   }, [isLoading, uploading, onPendingChange]);
+  useEffect(() => () => onPendingChange?.(false), [onPendingChange]);
   const currentEmployee = useQuery(
     api.employees.getById,
     employee ? { employeeId: employee._id } : "skip",
@@ -111,38 +132,44 @@ export default function EmployeeForm({
       return;
     }
     setFieldErrors({});
-    handleSubmit(formData);
+    handleSubmit(formData, employee ? initialData : undefined);
   };
 
+  if (employee && currentEmployee === null && embedded) return null;
   if (employee && currentEmployee === null)
     return (
       <EmptyState
         title="Personel kaydı artık bulunamıyor."
-        action={{ label: "Listeye dön", onClick: onClose }}
+        action={{ label: "Listeye dön", onClick: onExit }}
       />
     );
   return (
     <form
       onSubmit={onSubmit}
-      className="flex h-full min-h-0 flex-col"
+      className={embedded ? "min-w-0" : "flex h-full min-h-0 flex-col"}
+      aria-busy={isLoading}
       noValidate
     >
+      {reloadGuard.dialog}
+      {remoteChanged && (
+        <div role="status" className="mb-3 text-sm">
+          <p>Bu kayıt siz düzenlerken değişti. Kaydederseniz yalnız sizin değiştirdiğiniz alanlar yazılır.</p>
+          <Button type="button" variant="outline" className="max-sm:min-h-11" onClick={() => reloadGuard.requestClose(() => { reloadLatest(); setFieldErrors({}); })}>Güncel hali yükle</Button>
+        </div>
+      )}
+      {isLoading && <p role="status" className="sr-only">Kaydediliyor</p>}
       <fieldset
         disabled={isLoading || uploading || stages.length > 0}
-        className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto p-5"
+        className={
+          embedded
+            ? "min-w-0"
+            : "min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-4"
+        }
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           {uploading && (
             <p role="status" className="text-xs text-muted-foreground">
               Fotoğraf yükleniyor…
-            </p>
-          )}
-          {employee && (
-            <p className="text-xs text-muted-foreground">
-              Mevcut erişim üyelikleri:{" "}
-              {memberships === undefined
-                ? "Yükleniyor…"
-                : memberships.map((rule) => rule.name).join(", ") || "Yok"}
             </p>
           )}
 
@@ -150,7 +177,9 @@ export default function EmployeeForm({
             <SectionSkeleton label="Form bilgileri yükleniyor" />
           ) : (
             <EmployeeFormFields
-              autoFocusFirstName={!employee}
+              autoFocusFirstName={autoFocusFirstName}
+              isEditing={!!employee}
+              memberships={memberships}
               formData={formData}
               setFormData={setFormData}
               companies={companies}
@@ -159,14 +188,16 @@ export default function EmployeeForm({
               positions={positions}
               photo={
                 <>
-                  <p className="text-xs text-muted-foreground">
-                    JPEG, PNG veya WebP · en çok 5 MB. Fotoğraf personel
-                    profilinde kullanılır.
-                  </p>
-                  <PhotoUpload
-                    photoPreview={photoPreview}
-                    onPhotoChange={onPhotoChange}
-                  />
+                  <div className="flex items-center gap-4">
+                    <PhotoUpload
+                      photoPreview={photoPreview}
+                      onPhotoChange={onPhotoChange}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      JPEG, PNG veya WebP · en çok 5 MB. Fotoğraf personel
+                      profilinde kullanılır.
+                    </p>
+                  </div>
                   {photoError && (
                     <p role="alert" className="text-sm text-destructive">
                       {photoError}
@@ -180,32 +211,35 @@ export default function EmployeeForm({
         </div>
       </fieldset>
       {serverError && (
-        <p role="alert" className="px-5 py-2 text-sm text-destructive">
+        <p role="alert" className={cn("py-2 text-sm text-destructive", !embedded && "px-5")}>
           {serverError}
         </p>
       )}
       {stages.length > 0 && (
         <div
           role="status"
-          className="max-h-40 shrink-0 space-y-2 overflow-y-auto border-t px-5 py-3 text-sm"
+          className={cn("max-h-40 shrink-0 space-y-2 overflow-y-auto border-t py-3 text-sm", !embedded && "px-5")}
         >
           {stages.map((stage) => (
             <p key={stage}>{stage}</p>
           ))}
         </div>
       )}
-      {stages.length > 0 && !isLoading ? (
-        <button
-          type="button"
-          className="min-h-11 rounded-md border px-4 text-sm"
-          onClick={() => onSave()}
-        >
-          Tamam
-        </button>
-      ) : (
+      {stages.length > 0 && !isLoading && savedResult ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button type="button" variant="outline" className="max-sm:min-h-11" onClick={() => onSave(savedResult)}>Tamam</Button>
+            {!employee && onContinue && <Button type="button" className="max-sm:min-h-11" onClick={() => onContinue(savedResult)}>Ayrıntılara devam et</Button>}
+          </div>
+          {!employee && <p className="text-xs text-muted-foreground">Rıza ve parmak izi işlemleri kişinin ayrıntılarında.</p>}
+        </div>
+      ) : (!embedded || dirty || isLoading || uploading) && (
         <FormActions
           isLoading={isLoading || optionsLoading || uploading}
+          busyLabel={isLoading ? "Kaydediliyor" : uploading ? "Fotoğraf yükleniyor" : "Yükleniyor"}
           onClose={onClose}
+          cancelLabel={embedded ? "Değişiklikleri geri al" : undefined}
+          className={embedded ? "-mx-5 -bottom-4 mt-4" : undefined}
         />
       )}
     </form>

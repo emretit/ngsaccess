@@ -34,7 +34,6 @@ interface EmployeeTableProps {
   employees: Employee[];
   sort?: string;
   onSortChange?: (sort: string) => void;
-  onEdit: (employee: Employee) => void;
   onViewDetails: (employee: Employee) => void;
   onRefresh?: () => void;
   /** Departman filtresi aktifken sütun her satırda aynı değeri tekrarlar; gizlenir. */
@@ -45,7 +44,6 @@ export default function EmployeeTable({
   employees,
   sort = "name:asc",
   onSortChange,
-  onEdit,
   onViewDetails,
   onRefresh,
   showDepartment = true,
@@ -405,13 +403,10 @@ export default function EmployeeTable({
                       <DropdownMenuItem
                         onSelect={() => onViewDetails(employee)}
                       >
-                        Ayrıntı
+                        {isAdmin ? "Düzenle" : "Ayrıntı"}
                       </DropdownMenuItem>
                       {isAdmin && (
                         <>
-                          <DropdownMenuItem onSelect={() => onEdit(employee)}>
-                            Düzenle
-                          </DropdownMenuItem>
                           <DropdownMenuItem
                             disabled={
                               syncAction.pending || bulkSyncAction.pending

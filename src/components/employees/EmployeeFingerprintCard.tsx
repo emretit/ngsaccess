@@ -36,7 +36,7 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
   const fingerInputId = useId();
   const device = data?.devices.find(item => item._id === deviceId) ?? data?.devices[0];
   const hasConsent = consents?.some(consent => consent.consentType === "biometric_fingerprint" && !consent.revokedAt) === true;
-  const reason = !data || !consents ? "Parmak izi bilgileri yükleniyor…" : !hasConsent ? "Parmak izi için açık rıza gerekli. KVKK Rızalar bölümünden ekleyin." : !data.active ? "Pasif kişiye parmak izi kaydedilemez." : !device ? "Kişinin erişim kapsamında uygun Hik gateway cihazı bulunamadı." : "";
+  const reason = !data || !consents ? "Parmak izi bilgileri yükleniyor…" : !hasConsent ? "Parmak izi için açık rıza gerekli. KVKK rızaları bölümünden ekleyin." : !data.active ? "Pasif kişiye parmak izi kaydedilemez." : !device ? "Kişinin erişim kapsamında uygun Hik gateway cihazı bulunamadı." : "";
   const { run, pending } = useAsyncAction(async () => {
     if (!device || reason) return;
     setConfirmOpen(false);
@@ -65,13 +65,13 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
     <p className="text-sm text-muted-foreground">Kart numarası değişirse parmak izi kayıtları silinir, yeniden kayıt gerekir.</p>
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1"><label htmlFor={deviceInputId} className="text-sm">Cihaz</label>
-        <select id={deviceInputId} className="h-10 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2" value={device?._id ?? ""} disabled={pending} onChange={event => setDeviceId(event.target.value)}>
+        <select id={deviceInputId} className="max-sm:min-h-11 h-10 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2" value={device?._id ?? ""} disabled={pending} onChange={event => setDeviceId(event.target.value)}>
           {!device && <option value="">Uygun cihaz yok</option>}
           {data?.devices.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}
         </select>
       </div>
       <div className="space-y-1"><label htmlFor={fingerInputId} className="text-sm">Parmak</label>
-        <select id={fingerInputId} className="h-10 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2" value={fingerNo} disabled={pending} onChange={event => setFingerNo(Number(event.target.value))}>
+        <select id={fingerInputId} className="max-sm:min-h-11 h-10 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2" value={fingerNo} disabled={pending} onChange={event => setFingerNo(Number(event.target.value))}>
           {fingerNames.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}
         </select>
       </div>
@@ -79,18 +79,18 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
     {device && !device.capabilitiesScanned && <p className="text-sm text-muted-foreground">Cihaz özellikleri taranmadı; Cihazlar &gt; cihaz &gt; Özellikleri tara</p>}
     <p id={reasonId} className="text-sm text-muted-foreground">{reason}</p>
     <div className="flex flex-wrap gap-2">
-      <Button type="button" aria-describedby={reasonId} disabled={!!reason || pending} onClick={() => setConfirmOpen(true)}>{pending ? "Cihaz yanıtı bekleniyor…" : "Kaydı başlat"}</Button>
-      {pending && <Button type="button" variant="outline" disabled={!attempt || cancellation.pending} onClick={() => void cancellation.run()}>İptal</Button>}
+      <Button className="max-sm:min-h-11" type="button" aria-describedby={reasonId} disabled={!!reason || pending} onClick={() => setConfirmOpen(true)}>{pending ? "Cihaz yanıtı bekleniyor…" : "Kaydı başlat"}</Button>
+      {pending && <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={!attempt || cancellation.pending} onClick={() => void cancellation.run()}>İptal</Button>}
     </div>
     <p role="status" aria-live="polite" className="text-sm">{status}</p>
     <ul className="divide-y">{data?.enrollments.map(row => <li key={row._id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
       <span>Kayıtlı: {fingerNames[row.fingerNo - 1] ?? `Parmak ${row.fingerNo}`} · {row.deviceName} · {formatTrDateTime(new Date(row.enrolledAt))}</span>
-      <Button type="button" variant="outline" disabled={pending} aria-label={`${fingerNames[row.fingerNo - 1] ?? `Parmak ${row.fingerNo}`} · ${row.deviceName} kaydını sil`} onClick={() => setRemoveTarget(row._id)}>Sil</Button>
+      <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={pending} aria-label={`${fingerNames[row.fingerNo - 1] ?? `Parmak ${row.fingerNo}`} · ${row.deviceName} kaydını sil`} onClick={() => setRemoveTarget(row._id)}>Sil</Button>
     </li>)}</ul>
     {data?.enrollments.length === 0 && <p className="text-sm text-muted-foreground">Bu kişi için cihazda kayıtlı parmak izi yok.</p>}
     <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}><DialogContent>
       <DialogHeader><DialogTitle>Parmak izi kaydını başlat</DialogTitle><DialogDescription>Cihazda parmağınızı okutun; yaklaşık 30 saniye beklenir. {device?.name} · {fingerNames[fingerNo - 1]}</DialogDescription></DialogHeader>
-      <DialogFooter><Button type="button" variant="outline" onClick={() => setConfirmOpen(false)}>Vazgeç</Button><Button type="button" disabled={pending || !!reason} onClick={() => void run()}>Kaydı başlat</Button></DialogFooter>
+      <DialogFooter><Button className="max-sm:min-h-11" type="button" variant="outline" onClick={() => setConfirmOpen(false)}>Vazgeç</Button><Button className="max-sm:min-h-11" type="button" disabled={pending || !!reason} onClick={() => void run()}>Kaydı başlat</Button></DialogFooter>
     </DialogContent></Dialog>
     <ConfirmDestructive open={removeTarget !== null} onOpenChange={open => { if (!open) setRemoveTarget(null); }} title="Parmak izi kaydını sil" objectName="Seçili cihazdaki parmak izi" effects={["Parmak izi bu cihazdan silinir; yeniden kayıt gerekir."]} confirmLabel="Sil" onConfirm={async () => { if (removeTarget) await remove({ enrollmentId: removeTarget }); }} />
   </section>;

@@ -11,7 +11,7 @@ export function EmployeeEmploymentActions({ employee }: { employee: EmploymentEm
   const reinstate = useMutation(api.employeeTermination.reinstate);
   if (employee.isVisitor || (!employee.employmentEndDate && employee.isActive !== true)) return null;
   return <>
-    <Button variant="outline" onClick={() => setOpen(true)}>{employee.employmentEndDate ? "Geri al" : "İşten çıkar"}</Button>
+    <Button className="max-sm:min-h-11" variant="outline" onClick={() => setOpen(true)}>{employee.employmentEndDate ? "Geri al" : "İşten çıkar"}</Button>
     {employee.employmentEndDate ? <ConfirmDestructive open={open} onOpenChange={setOpen} title="İşten ayrılma geri alınsın mı?" objectName={`${employee.firstName} ${employee.lastName}`} effects={["Kişi yeniden aktif olur; kartı cihazlara gönderilir."]} confirmLabel="Geri al" onConfirm={() => reinstate({ employeeId: employee._id })} /> : open && <EmployeeTerminateDialog employee={employee} open onOpenChange={setOpen} />}
   </>;
 }

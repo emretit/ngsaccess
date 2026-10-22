@@ -7,14 +7,42 @@ import { Employee } from "@/types/employee";
 import { EmployeeFormData } from "./useEmployeeFormData";
 import { employeeFormSchema } from "./useEmployeeFormSchema";
 
+import type { Id } from "../../../../convex/_generated/dataModel";
+import type { FunctionArgs } from "convex/server";
+
+type UpdateArgs = FunctionArgs<typeof api.employees.update>;
+const DIFFABLE = ["projectId", "firstName", "lastName", "email", "tcNo", "cardNumber", "payrollCode", "companyId", "departmentId", "positionId", "shiftId", "shift", "notes", "isActive", "hourlyRate", "monthlySalary"] as const satisfies readonly (keyof EmployeeFormData & keyof UpdateArgs)[];
+
+/**
+ * Düzenlemede yalnız kullanıcının taslakta değiştirdiği alanlar gönderilir: form açıkken başka yerde
+ * yapılan değişiklik (ör. aynı drawer'da "Geri al" ile isActive) eski taslak değeriyle ezilmez.
+ */
+export function onlyChangedFields(args: UpdateArgs, formData: EmployeeFormData, baseline?: string): UpdateArgs {
+  if (!baseline) return args;
+  const parsed: unknown = JSON.parse(baseline);
+  if (typeof parsed !== "object" || parsed === null) return args;
+  const base = parsed as Record<string, unknown>;
+  const same = (key: keyof EmployeeFormData) =>
+    JSON.stringify(formData[key] ?? null) === JSON.stringify(base[key] ?? null);
+  const result: UpdateArgs = { ...args };
+  for (const key of DIFFABLE) if (same(key)) delete result[key];
+  if (same("photoUrl") && same("photoStorageId")) {
+    delete result.photoUrl;
+    delete result.photoStorageId;
+  }
+  return result;
+}
+
+export type EmployeeSaveResult = { employeeId: Id<"employees"> };
 export type { EmployeeFormData };
 
 export const useEmployeeFormSubmit = (
   employee: Pick<Employee, "_id"> | null | undefined,
   _onClose: () => void,
-  _onSave: (payload?: unknown) => void,
+  _onSave: (payload: EmployeeSaveResult) => void,
   onFieldError?: (key: string, message: string) => void,
 ) => {
+  const [savedResult, setSavedResult] = useState<EmployeeSaveResult>();
   const [stages, setStages] = useState<string[]>([]);
   const [serverError, setServerError] = useState<string>();
   const append = (message: string) =>
@@ -33,7 +61,7 @@ export const useEmployeeFormSubmit = (
   const editingId = employee?._id;
 
   const { run: handleSubmit, pending: isLoading } = useAsyncAction(
-    async (formData: EmployeeFormData) => {
+    async (formData: EmployeeFormData, baseline?: string) => {
       const parsed = employeeFormSchema.safeParse(formData);
       if (!parsed.success) {
         const firstError = parsed.error.issues[0];
@@ -68,7 +96,7 @@ export const useEmployeeFormSubmit = (
       let savedId = editingId;
       try {
         if (editingId) {
-          await updateEmployee({
+          await updateEmployee(onlyChangedFields({
             employeeId: editingId,
             projectId: formData.projectId,
             ...sharedPayload,
@@ -83,7 +111,7 @@ export const useEmployeeFormSubmit = (
             notes: formData.notes.trim() || null,
             hourlyRate: parsed.data.hourlyRate ?? null,
             monthlySalary: parsed.data.monthlySalary ?? null,
-          });
+          }, formData, baseline));
         } else
           savedId = await createEmployee({
             projectId: formData.projectId,
@@ -105,6 +133,7 @@ export const useEmployeeFormSubmit = (
       }
       append("Personel kaydedildi.");
       if (!savedId) return;
+      setSavedResult({ employeeId: savedId });
       if (!editingId) {
         try {
           const result = await sendSetupEmail({
@@ -137,5 +166,5 @@ export const useEmployeeFormSubmit = (
     },
     { error: "Personel kaydedilemedi" },
   );
-  return { isLoading, handleSubmit, stages, serverError };
+  return { isLoading, handleSubmit, stages, serverError, savedResult };
 };
