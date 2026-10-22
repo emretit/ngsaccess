@@ -331,47 +331,14 @@ async function processGenericCardReading(
     return { granted: false };
   }
 
-  // Token yoluyla aynı erişim penceresi + son çalışma günü (dahil) sonrası ret;
-  // işten çıkış cron'u isActive'i kapatana kadarki boşlukta kart geçmesin.
+  // Token yoluyla aynı kurallar: erişim penceresi + son çalışma günü (dahil) sonrası ret
+  // (işten çıkış cron'u isActive'i kapatana kadarki boşlukta kart geçmesin), cihaz yok
+  // ya da pasif cihaz ret. Hepsi aynı ret satırını yazar.
   if (!employee.isActive || !employeeWithinAccessEpoch(employee, Date.parse(accessTime)) ||
-      !employedOn(employee, trDateKey(accessTime))) {
+      !employedOn(employee, trDateKey(accessTime)) || !device || device.isActive === false) {
     await ctx.db.insert("cardReadings", {
       projectId: projectForRow(employee.projectId, device?.projectId),
       deviceId: device?._id,
-      employeeId: employee._id,
-      cardNo: args.cardNo,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
-      accessTime,
-      accessStatus: "reddedildi",
-      rawData: args.rawBody,
-      ...hikFields,
-      createdAt: accessTime,
-      updatedAt: accessTime,
-    });
-    return { granted: false };
-  }
-
-  if (!device) {
-    await ctx.db.insert("cardReadings", {
-      projectId: projectForRow(employee.projectId, undefined),
-      employeeId: employee._id,
-      cardNo: args.cardNo,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
-      accessTime,
-      accessStatus: "reddedildi",
-      rawData: args.rawBody,
-      ...hikFields,
-      createdAt: accessTime,
-      updatedAt: accessTime,
-    });
-    return { granted: false };
-  }
-
-  // Pasif cihaz token yolunda olduğu gibi kartla da kapı açmaz.
-  if (device.isActive === false) {
-    await ctx.db.insert("cardReadings", {
-      projectId: projectForRow(employee.projectId, device.projectId),
-      deviceId: device._id,
       employeeId: employee._id,
       cardNo: args.cardNo,
       employeeName: `${employee.firstName} ${employee.lastName}`,
