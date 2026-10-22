@@ -1,3 +1,5 @@
+"use node";
+
 import { buildDoorStatusSegments } from "./doorStatusPlan";
 import { internal } from "../_generated/api";
 import { type ActionCtx } from "../_generated/server";

@@ -1,3 +1,5 @@
+"use node";
+
 import { internal } from "../_generated/api";
 import { type ActionCtx } from "../_generated/server";
 import { isProjectAllowed, isManager } from "./auth";
