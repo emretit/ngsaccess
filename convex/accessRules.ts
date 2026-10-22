@@ -1,8 +1,10 @@
+import { listAccessRules } from "./lib/accessRuleRead";
+import { createAccessRuleWithGroups } from "./lib/accessRuleWrite";
 import { planRemovedEmployeeHik, reconcileRemovedEmployeeHik, snapshotRuleHikEmployees, resolveRuleDeviceTargets, hikSnapshotValidator, type HikSnapshot } from "./lib/peopleHikSnapshot";
 import { validateScheduleBinding, assertIdeScheduleCapacity } from "./accessScheduleTemplates";
 import { resolveProjectScope } from "./lib/projectScope";
 import { assertAccessProjectUnchanged } from "./lib/accessScope";
-import { validateAccessRelations, validateRuleAccessRelations } from "./lib/accessScopeRelations";
+import { validateRuleAccessRelations } from "./lib/accessScopeRelations";
 import { toPatch } from "./lib/nullablePatch";
 import { assertAccessSchedule, assertAccessScheduleUpdate } from "./lib/accessRuleUx";
 
@@ -116,80 +118,7 @@ export const list = authedQuery({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
-    const rules = (await Promise.all(allowedProjectIds.map(projectId =>
-      ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
-    ))).flat();
-
-    return await Promise.all(
-      rules.map(async (rule) => {
-        const groupMembers = await ctx.db
-          .query("groupMembers")
-          .withIndex("by_project_group", (q) =>
-            q.eq("projectId", rule.projectId).eq("groupId", rule._id),
-          )
-          .collect();
-
-        const membersWithEmployees = await Promise.all(
-          groupMembers.map(async (gm) => {
-            const employee = await ctx.db.get(gm.employeeId);
-            return {
-              ...gm,
-              employees: employee
-                ? {
-                    id: employee._id,
-                    firstName: employee.firstName,
-                    lastName: employee.lastName,
-                    email: employee.email,
-                  }
-                : null,
-            };
-          })
-        );
-
-        const groupDevices = await ctx.db
-          .query("groupDevices")
-          .withIndex("by_project_group", (q) =>
-            q.eq("projectId", rule.projectId).eq("groupId", rule._id),
-          )
-          .collect();
-
-        const devicesWithDetails = await Promise.all(
-          groupDevices.map(async (gd) => {
-            const device = await ctx.db.get(gd.deviceId);
-            return {
-              ...gd,
-              devices: device
-                ? {
-                    id: device._id,
-                    name: device.name,
-                    brand: device.brand,
-                    ideUuid: device.ideUuid,
-                    deviceSerial: device.deviceSerial,
-                    zoneId: device.zoneId,
-                    doorId: device.doorId,
-                  }
-                : null,
-            };
-          })
-        );
-
-        const groupDoors = await ctx.db
-          .query("groupDoors")
-          .withIndex("by_group", (q) => q.eq("groupId", rule._id))
-          .collect();
-
-        return {
-          ...rule,
-          groupMembers: membersWithEmployees,
-          groupDevices: devicesWithDetails,
-          groupDoors: groupDoors.map((gd) => ({
-            doorId: gd.doorId,
-            deviceId: gd.deviceId,
-          })),
-        };
-      })
-    );
+    return await listAccessRules(ctx, args);
   },
 });
 
@@ -947,86 +876,7 @@ export const createWithGroups = adminMutation({
     doorIds: v.optional(v.array(v.id("doors"))),
   },
   handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
-    if (!args.projectId) throw new Error("Önce bir proje seçin");
-    await validateAccessRelations(ctx, args.projectId, args);
-    const { employeeIds, deviceIds, doorIds, ...ruleData } = args;
-    await validateScheduleBinding(ctx, args.projectId, args.scheduleTemplateId);
-    assertAccessSchedule(args);
-    if (!args.name.trim()) throw new Error("Kural adı zorunludur");
-    const now = new Date().toISOString();
-    const ruleId = await ctx.db.insert("accessRules", {
-      ...ruleData,
-      scheduleTemplateId: ruleData.scheduleTemplateId ?? undefined,
-      isActive: ruleData.isActive ?? true,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    if (employeeIds?.length) {
-      await Promise.all(
-        employeeIds.map((empId) =>
-          ctx.db.insert("groupMembers", {
-            groupId: ruleId,
-            employeeId: empId,
-            projectId: args.projectId,
-            createdAt: now,
-          })
-        )
-      );
-    }
-
-    if (deviceIds?.length) {
-      await Promise.all(
-        deviceIds.map((devId) =>
-          ctx.db.insert("groupDevices", {
-            groupId: ruleId,
-            deviceId: devId,
-            projectId: args.projectId,
-            createdAt: now,
-          })
-        )
-      );
-    }
-
-    // Kural bazlı kapı seçimi (IDE permission.io kaynağı). doorId → o kapının paneli.
-    if (doorIds?.length) {
-      await Promise.all(
-        doorIds.map(async (doorId) => {
-          const door = await ctx.db.get(doorId);
-          await ctx.db.insert("groupDoors", {
-            groupId: ruleId,
-            doorId,
-            deviceId: door?.deviceId,
-            projectId: args.projectId,
-            createdAt: now,
-          });
-        })
-      );
-    }
-
-    if (args.scheduleTemplateId) await assertIdeScheduleCapacity(ctx, args.projectId, undefined, [ruleId]);
-    const syncJobs: Promise<unknown>[] = [
-      ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
-        accessRuleId: ruleId,
-      }),
-      ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
-        accessRuleId: ruleId,
-      }),
-    ];
-    for (const empId of employeeIds ?? []) {
-      syncJobs.push(
-        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
-          employeeId: empId,
-        }),
-        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
-          employeeId: empId,
-        }),
-      );
-    }
-    await Promise.all(syncJobs);
-
-    return ruleId;
+    return await createAccessRuleWithGroups(ctx, args);
   },
 });
 
