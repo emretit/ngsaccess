@@ -3,28 +3,40 @@ import type { MutationCtx } from "../_generated/server";
 import { notifyAlarmIfNeeded } from "./alarmNotify";
 
 export const DEVICE_ONLINE_WINDOW_MS = 5 * 60 * 1000;
+export const HIK_ISUP_FRESHNESS_MS = 2.5 * 60 * 60 * 1000;
 
 type ConnectionSignal = {
   brand?: string; hikTransport?: string; hikLastSeenAt?: number;
   lastSeen?: string | null; hikOfflineHint?: string;
+  hikIsupOnline?: boolean; hikIsupStatusAt?: number; hikIsupOfflineSince?: number;
 };
 
 const isHikGateway = (device: ConnectionSignal) => device.brand === "hikvision" && device.hikTransport !== "localBridge";
 
-export function deviceLastSignal(device: ConnectionSignal): number | undefined {
+export function hasFreshIsupStatus(device: ConnectionSignal, now = Date.now()): boolean {
+  return isHikGateway(device) && typeof device.hikIsupOnline === "boolean" &&
+    device.hikIsupStatusAt !== undefined && Number.isFinite(device.hikIsupStatusAt) &&
+    device.hikIsupStatusAt >= now - HIK_ISUP_FRESHNESS_MS && device.hikIsupStatusAt <= now + 120_000;
+}
+
+export function deviceLastSignal(device: ConnectionSignal, now = Date.now()): number | undefined {
+  if (hasFreshIsupStatus(device, now)) {
+    return device.hikIsupOnline ? device.hikIsupStatusAt : device.hikIsupOfflineSince;
+  }
   const signal = isHikGateway(device)
     ? device.hikLastSeenAt ?? (device.lastSeen ? Date.parse(device.lastSeen) : undefined)
     : device.lastSeen ? Date.parse(device.lastSeen) : undefined;
   return signal !== undefined && Number.isFinite(signal) ? signal : undefined;
 }
 
-/** Hik gateway/ISAPI devices only signal on card events, so a quiet night is not an outage. */
-export function hasPeriodicHeartbeat(device: ConnectionSignal): boolean {
-  return !isHikGateway(device);
+/** ISUP snapshots establish continuity even when there are no card events. */
+export function hasPeriodicHeartbeat(device: ConnectionSignal, now = Date.now()): boolean {
+  return !isHikGateway(device) || hasFreshIsupStatus(device, now);
 }
 
 export function deviceConnection(device: ConnectionSignal, now: number): "online" | "offline" | "never" {
-  const signal = deviceLastSignal(device);
+  if (hasFreshIsupStatus(device, now)) return device.hikIsupOnline ? "online" : "offline";
+  const signal = deviceLastSignal(device, now);
   if (device.hikOfflineHint) return "offline";
   if (signal === undefined) return "never";
   return signal <= now && signal > now - DEVICE_ONLINE_WINDOW_MS ? "online" : "offline";
@@ -34,6 +46,7 @@ export function deviceConnection(device: ConnectionSignal, now: number): "online
 export async function recordConnectivityTransition(
   ctx: MutationCtx, device: Doc<"devices">, nowMs: number,
 ): Promise<boolean> {
+  if (hasFreshIsupStatus(device, nowMs)) return false;
   const offlineFrom = deviceLastSignal(device);
   if (offlineFrom === undefined || offlineFrom >= nowMs ||
     deviceConnection(device, nowMs) !== "offline") return false;

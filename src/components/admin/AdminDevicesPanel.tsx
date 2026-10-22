@@ -98,7 +98,7 @@ function AdminDevicesContent() {
   const create = () => setDialog({ device: null });
   const primaryInHeader = useAdminPrimaryAction("Cihaz kaydet", create);
   const status = (device: AdminDevice) => {
-    const connection = deviceConnection({ lastSeen: device.lastSeen }, now);
+    const connection = deviceConnection(device, now);
     return (
       <StatusBadge tone={connection === "online" ? "success" : "neutral"}>
         {connection === "online"

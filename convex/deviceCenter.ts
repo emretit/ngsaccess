@@ -155,6 +155,9 @@ export const getOverview = authedQuery({
         hikModel: device.hikModel,
         hikLastSeenAt: device.hikLastSeenAt,
         hikOfflineHint: device.hikOfflineHint,
+        hikIsupOnline: device.hikIsupOnline,
+        hikIsupStatusAt: device.hikIsupStatusAt,
+        hikIsupOfflineSince: device.hikIsupOfflineSince,
         ideUuid: device.ideUuid,
       },
       doors: doors.map((door) => {

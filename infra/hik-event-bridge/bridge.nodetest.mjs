@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MultipartStreamParser, digestAuthorization, parseDigestChallenge, resolveToken, shouldForward, toCardReaderBody, withTimeOffset,
+  createBridge, MultipartStreamParser, digestAuthorization, parseDigestChallenge, resolveToken, shouldForward, toCardReaderBody, withTimeOffset,
 } from './bridge.mjs';
 import { parseCardReaderBody } from '../../convex/lib/cardReaderParse.ts';
 
@@ -107,4 +107,180 @@ test('kartsız erişim event’i cihaz seri no ile ayrıştırılır', () => {
   assert.equal(parsed.serial, 'FK5305278');
   assert.equal(parsed.hikMajorEventType, 5);
   assert.equal(parsed.hikSubEventType, 27);
+});
+
+const config = {
+  gatewayUrl: 'http://gateway', username: 'admin', password: 'test-password',
+  convexSiteUrl: 'https://example.convex.site', tokens: { 'dev-1': 'token-1' },
+};
+const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
+
+test('devStatusChanged doğru URL, Bearer, zaman ve gövdeyle mevcut kuyruktan gönderilir', async (t) => {
+  const calls = [];
+  const logs = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push({ url, ...options });
+    return new Response(null, { status: 200 });
+  });
+  const receivedAt = Date.parse('2026-10-22T12:00:00Z');
+  t.mock.method(Date, 'now', () => receivedAt);
+  const bridge = createBridge({ ...config, eventTimeOffset: '+03:00' }, { log: entry => logs.push(entry) });
+  bridge.handlePart(JSON.stringify({ EventNotificationAlert: { eventType: 'devStatusChanged', devIndex: 'dev-1', status: 'offline', dateTime: '2026-10-22T12:00:00Z' } }));
+  await bridge.drain();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://example.convex.site/hik-gateway/device-status');
+  assert.equal(calls[0].headers.Authorization, 'Bearer token-1');
+  assert.deepEqual(JSON.parse(calls[0].body), { devIndex: 'dev-1', status: 'offline', at: Date.parse('2026-10-22T12:00:00Z') });
+  assert.equal(logs.find(entry => entry.event === 'forward').status, 200);
+  bridge.enqueue({ eventType: 'devStatusChanged', devIndex: 'dev-1', status: 'online' });
+  await bridge.drain();
+  assert.equal(JSON.parse(calls[1].body).at, receivedAt);
+  for (const skew of [-3, 3]) {
+    bridge.enqueue({ eventType: 'devStatusChanged', devIndex: 'dev-1', status: 'offline', dateTime: new Date(receivedAt + skew * 3600_000).toISOString() });
+  }
+  await bridge.drain();
+  assert.deepEqual(calls.slice(2).map(call => JSON.parse(call.body).at), [receivedAt, receivedAt]);
+});
+
+test('addressChange/heartBeat ve geçersiz durum yok sayılır; eksik token skip olur', async (t) => {
+  const calls = [];
+  const logs = [];
+  t.mock.method(globalThis, 'fetch', async (...args) => { calls.push(args); return new Response(); });
+  const bridge = createBridge(config, { log: entry => logs.push(entry) });
+  for (const eventType of ['heartBeat', 'addressChange']) bridge.handlePart(JSON.stringify({ EventNotificationAlert: { eventType, devIndex: 'dev-1', status: 'online' } }));
+  bridge.enqueue({ eventType: 'devStatusChanged', devIndex: 'unknown', status: 'offline' });
+  bridge.enqueue({ eventType: 'devStatusChanged', devIndex: 'dev-1', status: 'invalid' });
+  await bridge.drain();
+  assert.equal(calls.length, 0);
+  assert.deepEqual(logs, [{ event: 'skip', reason: 'no_token', type: 'devStatusChanged', devIndex: 'unknown', deviceStatus: 'offline', source: undefined }]);
+});
+
+test('durum ve kart olayları aynı maxQueue sınırını kullanır ve kişi verisi loglanmaz', async (t) => {
+  const calls = [];
+  const logs = [];
+  t.mock.method(globalThis, 'fetch', async (...args) => { calls.push(args); return new Response(); });
+  const bridge = createBridge({ ...config, maxQueue: 1, tokens: { ...config.tokens, [cardAlert.devIndex]: 'card-token' } }, { log: entry => logs.push(entry) });
+  bridge.enqueue({ ...cardAlert, dateTime: new Date().toISOString() });
+  bridge.enqueue({ eventType: 'devStatusChanged', devIndex: 'dev-1', status: 'offline' });
+  await bridge.drain();
+  assert.equal(calls.length, 1);
+  assert.equal(logs.find(entry => entry.event === 'drop').reason, 'queue_full');
+  assert.equal(logs.some(entry => 'card' in entry || 'response' in entry), false);
+});
+
+test('snapshot yalnız token sahibi cihazları gönderir; eksik/bozuk liste offline sayılmaz', async (t) => {
+  const posts = [];
+  let malformed = false;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url.includes('/deviceList')) return Response.json(malformed ? {} : { SearchResult: { MatchList: [
+      { Device: { devIndex: 'dev-1', devStatus: 'online' } },
+      { Device: { devIndex: 'unknown', devStatus: 'offline' } },
+      { Device: { devIndex: 'dev-2', devStatus: 'offline', EhomeParams: { EhomeID: 'panel-2' } } },
+    ] } });
+    posts.push({ url, ...options });
+    return new Response();
+  });
+  const logs = [];
+  const bridge = createBridge({ ...config, tokens: { ...config.tokens, 'panel-2': 'token-2' } }, { log: entry => logs.push(entry) });
+  await bridge.snapshot(); await bridge.drain();
+  assert.equal(posts.length, 2);
+  assert.equal(posts[1].headers.Authorization, 'Bearer token-2');
+  assert.deepEqual(posts.map(post => JSON.parse(post.body).source), ['snapshot', 'snapshot']);
+  assert.deepEqual(posts.map(post => JSON.parse(post.body).status), ['online', 'offline']);
+  malformed = true;
+  await bridge.snapshot(); await bridge.drain();
+  assert.equal(posts.length, 2);
+  assert.equal(logs.at(-1).event, 'snapshot_failed');
+});
+
+test('abonelik snapshotları 5 dk içinde atlanır; saatlik timer ve daha geç yeniden abonelik çalışır', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.parse('2026-10-22T12:00:00Z') });
+  let streamController;
+  let subscriptions = 0;
+  let snapshots = 0;
+  const posts = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url.includes('/subscribeDeviceMgmt?')) {
+      subscriptions++;
+      const stream = new ReadableStream({ start(controller) {
+        streamController = controller;
+        controller.enqueue(part({ SubscribeDeviceMgmtRsp: { id: subscriptions } }));
+        options.signal.addEventListener('abort', () => controller.error(new Error('aborted')), { once: true });
+      } });
+      return new Response(stream, { headers: { 'Content-Type': 'multipart/mixed; boundary=boundary' } });
+    }
+    if (url.includes('/deviceList')) {
+      snapshots++;
+      return Response.json({ SearchResult: { MatchList: [{ Device: { devIndex: 'dev-1', devStatus: 'online' } }] } });
+    }
+    if (url.includes('/unSubscribeDeviceMgmt/')) return new Response();
+    posts.push(JSON.parse(options.body));
+    return new Response();
+  });
+  const bridge = createBridge({ ...config, heartbeatTimeoutMs: 2 * 3600_000 }, { log: () => {} });
+  const running = bridge.run();
+  await flush(); await bridge.drain();
+  assert.equal(snapshots, 1);
+  t.mock.timers.tick(3600_000);
+  await flush(); await bridge.drain();
+  assert.equal(snapshots, 2);
+  assert.equal(posts.length, 2);
+  assert.ok(posts.every(post => post.source === 'snapshot'));
+  streamController.close();
+  await flush();
+  t.mock.timers.tick(1000);
+  await flush(); await bridge.drain();
+  assert.equal(subscriptions, 2);
+  assert.equal(snapshots, 2);
+  t.mock.timers.tick(5 * 60_000);
+  streamController.close();
+  await flush();
+  t.mock.timers.tick(1000);
+  await flush(); await bridge.drain();
+  assert.equal(subscriptions, 3);
+  assert.equal(snapshots, 3);
+  bridge.stop();
+  await running;
+  t.mock.timers.tick(3600_000);
+  await flush();
+  assert.equal(snapshots, 3);
+});
+
+test('durum gönderimi 5xx sonrası aynı gövdeyle yeniden denenir', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push({ url, ...options });
+    return new Response(null, { status: calls.length === 1 ? 503 : 200 });
+  });
+  const bridge = createBridge(config, { log: () => {} });
+  bridge.enqueue({ eventType: 'devStatusChanged', devIndex: 'dev-1', status: 'offline' });
+  await flush();
+  t.mock.timers.tick(2000);
+  await bridge.drain();
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].body, calls[1].body);
+});
+
+
+test('snapshot sayacı kuyruk dolu düşmeleri saymaz', async (t) => {
+  const logs = [];
+  const posts = [];
+  let releasePost;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url.includes('/deviceList')) return Response.json({ SearchResult: { MatchList: [
+      { Device: { devIndex: 'dev-1', devStatus: 'online' } },
+      { Device: { devIndex: 'dev-2', devStatus: 'offline' } },
+    ] } });
+    posts.push(JSON.parse(options.body));
+    await new Promise(resolve => { releasePost = resolve; });
+    return new Response();
+  });
+  const bridge = createBridge({ ...config, maxQueue: 1, tokens: { ...config.tokens, 'dev-2': 'token-2' } }, { log: entry => logs.push(entry) });
+  await bridge.snapshot();
+  assert.equal(logs.find(entry => entry.event === 'snapshot').devices, 1);
+  assert.equal(logs.filter(entry => entry.reason === 'queue_full').length, 1);
+  releasePost();
+  await bridge.drain();
+  assert.equal(posts.length, 1);
 });

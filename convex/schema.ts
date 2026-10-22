@@ -384,6 +384,9 @@ export default defineSchema({
     hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
     hikLastSeenAt: v.optional(v.number()),
     hikOfflineHint: v.optional(v.string()),
+    hikIsupOnline: v.optional(v.boolean()),
+    hikIsupStatusAt: v.optional(v.number()),
+    hikIsupOfflineSince: v.optional(v.number()),
     // En son işlenen event'in serialNo'su — sonraki event'in frontSerialNo'su ile karşılaştırılır.
     // Eşleşmezse aradaki event'ler düşmüş demektir (Phase 5.2'de AcsEvent backfill).
     hikLastSerialNo: v.optional(v.number()),

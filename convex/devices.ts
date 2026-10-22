@@ -1,4 +1,6 @@
-import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
+import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS, hasFreshIsupStatus } from "./lib/deviceConnection";
+import { internal } from "./_generated/api";
+import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { listMobileTargets } from "./lib/mobileAccess";
 import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
@@ -417,7 +419,7 @@ export const updateLastSeen = internalMutation({
       await ctx.db.patch(device._id, {
         lastSeen: now,
         hikLastSeenAt: Date.parse(now),
-        hikOfflineHint: undefined,
+        hikOfflineHint: hasFreshIsupStatus(device) ? device.hikOfflineHint : undefined,
       });
     } else if (!deviceId && ideUuid) {
       // Cihaz henüz projeye atanmamış (adminDevices'ta) olabilir — orada da lastSeen güncelle.
@@ -1256,7 +1258,7 @@ export const applyGatewayHeartbeat = internalMutation({
     const now = Date.now();
     // Throttle erken dönüşünden önce eski sinyalle karşılaştır.
     const reconnected = args.online ? await recordConnectivityTransition(ctx, device, now) : false;
-    const offlineHint = args.online ? undefined : "Gateway çevrimdışı";
+    const offlineHint = hasFreshIsupStatus(device, now) ? device.hikOfflineHint : args.online ? undefined : "Gateway çevrimdışı";
     const deviceIp = device.deviceIp || args.deviceIp || undefined;
     const model = device.hikModel || args.model || undefined;
     const changed = device.hikOfflineHint !== offlineHint ||
@@ -1276,5 +1278,94 @@ export const applyGatewayHeartbeat = internalMutation({
       ...(args.online ? { lastSeen: nowIso } : {}),
     });
     return true;
+  },
+});
+
+/** Same-outage marker makes retries and an old scheduled confirmation harmless. */
+async function isupOutageAlarm(ctx: MutationCtx, deviceId: Id<"devices">, offlineFrom: number) {
+  const events = await ctx.db.query("deviceEvents")
+    .withIndex("by_device_category_label_event_time", q => q.eq("deviceId", deviceId)
+      .eq("category", "exception").eq("label", "Arıza: cihaz çevrimdışı")
+      .gte("eventTime", new Date(offlineFrom).toISOString()))
+    .order("desc").take(10);
+  return events.find(event => {
+    try {
+      const data: unknown = JSON.parse(event.rawData ?? "null");
+      return typeof data === "object" && data !== null &&
+        "source" in data && data.source === "isup" &&
+        "offlineFrom" in data && data.offlineFrom === offlineFrom;
+    } catch {
+      return false;
+    }
+  }) ?? null;
+}
+
+export const applyIsupStatus = internalMutation({
+  args: {
+    deviceId: v.id("devices"), devIndex: v.string(),
+    status: v.union(v.literal("online"), v.literal("offline")), at: v.number(),
+    source: v.optional(v.literal("snapshot")),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device || device.brand !== "hikvision" || device.hikTransport === "localBridge" ||
+      device.hikDevIndex !== args.devIndex) return false;
+    const now = Date.now();
+    if (!Number.isFinite(args.at) || args.at < now - 10 * 60_000 || args.at > now + 120_000) return false;
+    // Equal-time retries also cannot undo a newer transition with the same timestamp.
+    if (device.hikIsupStatusAt !== undefined && args.at <= device.hikIsupStatusAt) return true;
+    const online = args.status === "online";
+    const offlineFrom = device.hikIsupOfflineSince;
+    if (online === device.hikIsupOnline) {
+      await ctx.db.patch(device._id, { hikIsupStatusAt: args.at });
+      return true;
+    }
+    if (online && offlineFrom !== undefined && args.at - offlineFrom >= DEVICE_ONLINE_WINDOW_MS) {
+      const nowIso = new Date(now).toISOString();
+      const endIso = new Date(args.at).toISOString();
+      await ctx.db.insert("deviceEvents", {
+        deviceId: device._id, projectId: device.projectId, source: "hikvision",
+        category: "status", severity: "warning", label: "Çevrimdışı dönemi",
+        eventTime: endIso, createdAt: nowIso, updatedAt: nowIso,
+        rawData: JSON.stringify({ offlineFrom, offlineTo: args.at, durationMs: args.at - offlineFrom }),
+      });
+    }
+    if (online && offlineFrom !== undefined) {
+      const alarm = await isupOutageAlarm(ctx, device._id, offlineFrom);
+      if (alarm && !alarm.resolvedAt) {
+        await ctx.db.patch(alarm._id, { resolvedAt: new Date(args.at).toISOString(), updatedAt: new Date(now).toISOString() });
+      }
+    }
+    await ctx.db.patch(device._id, {
+      hikIsupOnline: online, hikIsupStatusAt: args.at,
+      hikIsupOfflineSince: online ? undefined : args.at,
+      hikOfflineHint: online ? undefined : "Cihaz gateway bağlantısı koptu",
+    });
+    if (!online) {
+      await ctx.scheduler.runAfter(Math.max(0, args.at + DEVICE_ONLINE_WINDOW_MS - now), internal.devices.confirmIsupOffline, {
+        deviceId: device._id, offlineFrom: args.at,
+      });
+    }
+    return true;
+  },
+});
+
+export const confirmIsupOffline = internalMutation({
+  args: { deviceId: v.id("devices"), offlineFrom: v.number() },
+  handler: async (ctx, args): Promise<null> => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device || device.brand !== "hikvision" || device.hikTransport === "localBridge" ||
+      device.hikIsupOnline !== false || device.hikIsupOfflineSince !== args.offlineFrom ||
+      Date.now() - args.offlineFrom < DEVICE_ONLINE_WINDOW_MS) return null;
+    if (await isupOutageAlarm(ctx, device._id, args.offlineFrom)) return null;
+    const now = new Date().toISOString();
+    const eventId = await ctx.db.insert("deviceEvents", {
+      deviceId: device._id, projectId: device.projectId, source: "hikvision",
+      category: "exception", severity: "warning", label: "Arıza: cihaz çevrimdışı",
+      eventTime: now, createdAt: now, updatedAt: now,
+      rawData: JSON.stringify({ source: "isup", offlineFrom: args.offlineFrom }),
+    });
+    await notifyAlarmIfNeeded(ctx, eventId);
+    return null;
   },
 });

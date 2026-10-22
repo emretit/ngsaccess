@@ -222,6 +222,15 @@ export const adminListPage = superAdminQuery({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    // Assigned inventory rows get the live signal fields from their project device.
+    const signals = new Map<Id<"devices">, Promise<Doc<"devices"> | null>>();
+    const signalFor = async (device: Doc<"adminDevices">) => {
+      if (!device.assignedDeviceId) return device;
+      let signal = signals.get(device.assignedDeviceId);
+      if (!signal) { signal = ctx.db.get(device.assignedDeviceId); signals.set(device.assignedDeviceId, signal); }
+      const assigned = await signal;
+      return assigned?.brand === "hikvision" && assigned.hikTransport !== "localBridge" ? assigned : device;
+    };
     const projects = new Map<Id<"projects">, Promise<Doc<"projects"> | null>>();
     const projectFor = (id: Id<"projects"> | undefined) => {
       if (!id) return Promise.resolve(null);
@@ -235,16 +244,26 @@ export const adminListPage = superAdminQuery({
       if (args.assignment === "pool" && device.assignedDeviceId) return false;
       if (args.assignment === "assigned" && !device.assignedDeviceId) return false;
       if (args.assignment && args.assignment !== "pool" && args.assignment !== "assigned" && device.assignedProjectId !== args.assignment) return false;
-      if (args.connection && deviceConnection(device, now) !== args.connection) return false;
+      if (args.connection && deviceConnection(await signalFor(device), now) !== args.connection) return false;
       if (!args.search?.trim()) return true;
       const project = await projectFor(device.assignedProjectId);
       return adminSearch(args.search, device.name, device.ideUuid, device.deviceSerial, device.brand, project?.name);
     }).paginate(adminPaginationOptions(args.paginationOpts));
     return { ...result, filterScope: "server" as const, totalScanned, evaluatedAt: now,
-      page: await Promise.all(result.page.map(async device => ({
-        ...adminDeviceRow(device, (await projectFor(device.assignedProjectId))?.name ?? null),
-        connectionStatus: deviceConnection(device, now),
-      }))),
+      page: await Promise.all(result.page.map(async device => {
+        const signal = await signalFor(device);
+        return {
+          ...adminDeviceRow(device, (await projectFor(device.assignedProjectId))?.name ?? null),
+          lastSeen: signal.lastSeen,
+          ...("hikTransport" in signal ? { hikTransport: signal.hikTransport } : {}),
+          ...("hikLastSeenAt" in signal ? { hikLastSeenAt: signal.hikLastSeenAt } : {}),
+          ...("hikOfflineHint" in signal ? { hikOfflineHint: signal.hikOfflineHint } : {}),
+          ...("hikIsupOnline" in signal ? { hikIsupOnline: signal.hikIsupOnline } : {}),
+          ...("hikIsupStatusAt" in signal ? { hikIsupStatusAt: signal.hikIsupStatusAt } : {}),
+          ...("hikIsupOfflineSince" in signal ? { hikIsupOfflineSince: signal.hikIsupOfflineSince } : {}),
+          connectionStatus: deviceConnection(signal, now),
+        };
+      })),
     };
   },
 });

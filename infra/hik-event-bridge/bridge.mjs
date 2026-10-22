@@ -148,55 +148,75 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
   let queued = 0;
   let stopped = false;
   let current = null;
+  let snapshotPending = null;
+  let lastSnapshotAt = null;
 
-  async function post(alert, token) {
-    const url = `${convexSiteUrl}/card-reader`;
+  async function post(path, body, token) {
+    const url = `${convexSiteUrl}${path}`;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(toCardReaderBody(alert)),
+          body: JSON.stringify(body),
           signal: AbortSignal.timeout(15_000),
         });
-        const text = await res.text();
-        if (res.ok || res.status < 500) return { status: res.status, body: text.slice(0, 200) };
+        await res.body?.cancel();
+        if (res.ok || res.status < 500) return { status: res.status };
         log({ event: 'post_retry', attempt, status: res.status });
       } catch (error) {
         log({ event: 'post_retry', attempt, error: String(error) });
       }
       await sleep(attempt * 2000);
     }
-    return { status: 0, body: 'failed' };
+    return { status: 0 };
+  }
+
+  function enqueuePost(path, body, token, summary) {
+    if (!token) {
+      log({ event: 'skip', reason: 'no_token', ...summary });
+      return false;
+    }
+    if (queued >= maxQueue) {
+      log({ event: 'drop', reason: 'queue_full', ...summary });
+      return false;
+    }
+    queued++;
+    queue = queue.then(async () => {
+      const result = await post(path, body, token);
+      log({ event: 'forward', ...summary, status: result.status });
+    }).finally(() => { queued--; });
+    return true;
+  }
+
+  function enqueueStatus(alert, source) {
+    if (typeof alert.devIndex !== 'string' || !['online', 'offline'].includes(alert.status)) return;
+    // Live status and snapshots share the bridge clock, regardless of gateway clock skew.
+    const at = source === 'snapshot' ? alert.at : Date.now();
+    return enqueuePost('/hik-gateway/device-status', {
+      devIndex: alert.devIndex, status: alert.status, at, ...(source ? { source } : {}),
+    }, resolveToken(tokens, alert), {
+      type: 'devStatusChanged', devIndex: alert.devIndex, deviceStatus: alert.status, source,
+    });
   }
 
   function enqueue(rawAlert) {
+    if (rawAlert.eventType === 'devStatusChanged') {
+      enqueueStatus(rawAlert);
+      return;
+    }
     const alert = { ...rawAlert, dateTime: withTimeOffset(rawAlert.dateTime, eventTimeOffset) };
     const ace = alert.AccessControllerEvent;
     const decision = shouldForward(alert, { now: Date.now(), maxAgeMs });
     const summary = {
       devIndex: alert.devIndex, deviceID: alert.deviceID, dateTime: alert.dateTime,
       major: ace?.majorEventType, minor: ace?.subEventType, serialNo: ace?.serialNo,
-      card: ace?.cardNo ? `…${String(ace.cardNo).slice(-4)}` : undefined,
     };
     if (!decision.forward) {
       if (decision.reason === 'too_old') log({ event: 'skip', reason: decision.reason, ...summary });
       return;
     }
-    const token = resolveToken(tokens, alert);
-    if (!token) {
-      log({ event: 'skip', reason: 'no_token', ...summary });
-      return;
-    }
-    if (queued >= maxQueue) {
-      log({ event: 'drop', reason: 'queue_full', ...summary });
-      return;
-    }
-    queued++;
-    queue = queue.then(async () => {
-      const result = await post(alert, token);
-      log({ event: 'forward', ...summary, status: result.status, response: result.body });
-    }).finally(() => { queued--; });
+    enqueuePost('/card-reader', toCardReaderBody(alert), resolveToken(tokens, alert), summary);
   }
 
   function handlePart(body) {
@@ -204,18 +224,56 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
     try {
       parsed = JSON.parse(body);
     } catch {
-      log({ event: 'bad_part', body: body.slice(0, 200) });
+      log({ event: 'bad_part' });
       return null;
     }
     if (parsed.SubscribeDeviceMgmtRsp) return { subscriptionId: parsed.SubscribeDeviceMgmtRsp.id };
     const alert = parsed.EventNotificationAlert;
     if (alert && alert.eventType !== 'heartBeat') {
-      if (alert.eventType === 'devStatusChanged' || alert.eventType === 'addressChange') {
+      if (alert.eventType === 'devStatusChanged') {
         log({ event: 'device_status', type: alert.eventType, devIndex: alert.devIndex, status: alert.status });
       }
       enqueue(alert);
     }
     return null;
+  }
+
+  async function sendSnapshot() {
+    let position = 0;
+    // The request start is conservative: a racing live event must win over this snapshot.
+    const at = Date.now();
+    let sent = 0;
+    for (;;) {
+      const res = await digestFetch(`${gatewayUrl}/ISAPI/ContentMgmt/DeviceMgmt/deviceList?format=json`, {
+        username, password, method: 'POST', signal: AbortSignal.timeout(15_000),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ SearchDescription: { position, maxResult: 200 } }),
+      });
+      if (!res.ok) { await res.body?.cancel(); throw new Error(`device_list_status=${res.status}`); }
+      const data = await res.json();
+      const matches = data?.SearchResult?.MatchList;
+      if (!Array.isArray(matches)) throw new Error('device_list_invalid');
+      for (const item of matches) {
+        const device = item?.Device;
+        if (!device || !['online', 'offline'].includes(device.devStatus)) continue;
+        const alert = { devIndex: device.devIndex, deviceID: device.EhomeParams?.EhomeID, status: device.devStatus, at };
+        if (!resolveToken(tokens, alert)) continue;
+        if (enqueueStatus(alert, 'snapshot')) sent++;
+      }
+      if (matches.length < 200) break;
+      position += matches.length;
+    }
+    lastSnapshotAt = at;
+    log({ event: 'snapshot', devices: sent });
+  }
+
+  function snapshot() {
+    if (!snapshotPending) {
+      snapshotPending = sendSnapshot()
+        .catch(() => log({ event: 'snapshot_failed' }))
+        .finally(() => { snapshotPending = null; });
+    }
+    return snapshotPending;
   }
 
   async function unsubscribe(id) {
@@ -238,6 +296,7 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
       timer = setTimeout(() => controller.abort(new Error('heartbeat_timeout')), heartbeatTimeoutMs);
     };
     let subscriptionId = null;
+    let snapshotTimer;
     try {
       resetTimer();
       const res = await digestFetch(`${gatewayUrl}/ISAPI/Event/notification/subscribeDeviceMgmt?format=json`, {
@@ -248,8 +307,8 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
       const contentType = res.headers.get('content-type') ?? '';
       const boundary = /boundary=("?)([^";]+)\1/i.exec(contentType)?.[2];
       if (!res.ok || !boundary) {
-        const text = await res.text().catch(() => '');
-        throw new Error(`subscribe_failed status=${res.status} body=${text.slice(0, 200)}`);
+        await res.body?.cancel();
+        throw new Error(`subscribe_failed status=${res.status}`);
       }
       const parser = new MultipartStreamParser(boundary, (body) => {
         resetTimer();
@@ -257,12 +316,18 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
         if (meta?.subscriptionId !== undefined) {
           subscriptionId = meta.subscriptionId;
           log({ event: 'subscribed', subscriptionId });
+          if (!snapshotTimer) {
+            if (lastSnapshotAt === null || Date.now() - lastSnapshotAt >= 5 * 60_000) void snapshot();
+            snapshotTimer = setInterval(() => { void snapshot(); }, 60 * 60_000);
+          }
         }
       });
       for await (const chunk of res.body) parser.push(chunk);
       throw new Error('stream_ended');
     } finally {
       clearTimeout(timer);
+      clearInterval(snapshotTimer);
+      await snapshotPending;
       current = null;
       if (subscriptionId !== null) await unsubscribe(subscriptionId);
     }
@@ -290,7 +355,7 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
     current?.abort(new Error('shutdown'));
   }
 
-  return { run, stop, handlePart, enqueue, drain: () => queue };
+  return { run, stop, handlePart, enqueue, snapshot, drain: () => queue };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

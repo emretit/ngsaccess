@@ -11,6 +11,38 @@ const http = httpRouter();
 
 auth.addHttpRoutes(http);
 
+/** Gateway status uses only a device Bearer token; relay/legacy auth is never accepted. */
+http.route({
+  path: "/hik-gateway/device-status",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const credentials = resolveCardReaderAuth({
+      authorizationHeader: request.headers.get("Authorization"),
+      queryToken: null, relayHeader: null, queryRelay: null,
+      relaySecret: undefined, allowUnauthenticated: undefined,
+    });
+    if (credentials.kind !== "token") return new Response(null, { status: 401 });
+    const device = await ctx.runQuery(internal.devices.getByApiToken, { token: credentials.token });
+    if (!device) return new Response(null, { status: 401 });
+    let body: unknown;
+    try { body = await request.json(); } catch { return new Response(null, { status: 400 }); }
+    if (typeof body !== "object" || body === null ||
+      !("devIndex" in body) || typeof body.devIndex !== "string" || !body.devIndex.trim() ||
+      !("status" in body) || (body.status !== "online" && body.status !== "offline") ||
+      !("at" in body) || typeof body.at !== "number" || !Number.isFinite(body.at) ||
+      body.at < Date.now() - 10 * 60_000 || body.at > Date.now() + 120_000 ||
+      ("source" in body && body.source !== "snapshot")) return new Response(null, { status: 400 });
+    if (device.brand !== "hikvision" || device.hikTransport === "localBridge" || device.hikDevIndex !== body.devIndex) {
+      return new Response(null, { status: 403 });
+    }
+    const accepted = await ctx.runMutation(internal.devices.applyIsupStatus, {
+      deviceId: device._id, devIndex: body.devIndex, status: body.status, at: body.at,
+      ...("source" in body ? { source: "snapshot" as const } : {}),
+    });
+    return new Response(null, { status: accepted ? 200 : 403 });
+  }),
+});
+
 const hasHikDeviceEventPayload = (args: {
   major: number | null | undefined;
   minor: number | null | undefined;

@@ -1,6 +1,6 @@
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
-import { deviceConnection, deviceLastSignal, hasPeriodicHeartbeat } from "./lib/deviceConnection";
+import { deviceConnection, deviceLastSignal, hasPeriodicHeartbeat, hasFreshIsupStatus, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
@@ -200,9 +200,10 @@ export const getConnectivityHistory = authedQuery({
         periods.push(period);
       }
     }
-    const signal = deviceLastSignal(device);
-    const periodicHeartbeat = hasPeriodicHeartbeat(device);
-    const ongoing = (periodicHeartbeat || device.hikOfflineHint) && deviceConnection(device, now) === "offline" && signal !== undefined && signal < now
+    const signal = deviceLastSignal(device, now);
+    const periodicHeartbeat = hasPeriodicHeartbeat(device, now);
+    const confirmedIsup = !hasFreshIsupStatus(device, now) || (signal !== undefined && now - signal >= DEVICE_ONLINE_WINDOW_MS);
+    const ongoing = confirmedIsup && (periodicHeartbeat || device.hikOfflineHint) && deviceConnection(device, now) === "offline" && signal !== undefined && signal < now
       ? { since: signal } : undefined;
     const ongoingMs = ongoing ? now - Math.max(cutoff, ongoing.since) : 0;
     return {
