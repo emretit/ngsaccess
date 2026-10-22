@@ -100,6 +100,8 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
 {
   "reads": [
     "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["take",10001]]",
+    "["pdksRecords",["withIndex","by_employee_date"],["eq","employeeId","employeeId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["take",1001]]",
     "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
     "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
   ],
@@ -107,7 +109,7 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
     "hourlyRate": null,
     "month": 10,
     "overtimeMultiplier": null,
-    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma ve manuel PDKS kayıtlarından üretilir; kayıtsız personel bu özete dahil değildir. Eski kurallı günlerde ilk–son süre kullanılır: tek günlük veride 8 saat, birden çok günde takvim haftası başına 45 saat eşiği uygulanır; dönem dışındaki günler hesaba katılmaz. Bordro doğrulaması yerine kullanılmamalıdır.",
     "rows": [
       {
         "cost": 0,
@@ -126,6 +128,8 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
 {
   "reads": [
     "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["take",10001]]",
+    "["pdksRecords",["withIndex","by_employee_date"],["eq","employeeId","employeeId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["take",1001]]",
     "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
     "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
   ],
@@ -133,7 +137,7 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
     "endDate": "2026-10-31",
     "month": 10,
     "overtimeMultiplier": null,
-    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma ve manuel PDKS kayıtlarından üretilir; kayıtsız personel bu özete dahil değildir. Eski kurallı günlerde ilk–son süre kullanılır: tek günlük veride 8 saat, birden çok günde takvim haftası başına 45 saat eşiği uygulanır; dönem dışındaki günler hesaba katılmaz. Bordro doğrulaması yerine kullanılmamalıdır.",
     "rows": [
       {
         "department": "Bilinmiyor",
@@ -158,18 +162,22 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
     "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
     "["companies",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
     "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["take",10001]]",
     "["generalSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
     "["holidays",["withIndex","by_project_date"],["eq","projectId","projectId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",
     "["holidays",["withIndex","by_project_date"],["eq","projectId",null],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",
     "["leaves",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
+    "["pdksRecords",["withIndex","by_employee_date"],["eq","employeeId","employeeId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["take",1001]]",
     "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
   ],
   "result": {
-    "filename": "aphb-2026-10.xml",
+    "filename": "aphb-taslak-resmi-sgk-formati-degildir-2026-10.xml",
     "warnings": [
+      "Taslak — resmi SGK formatı değildir, kontrol edin",
       "Ada Test: T.C. kimlik numarası eksik; bildirimden önce tamamlayın.",
     ],
     "xml": "<?xml version="1.0" encoding="UTF-8"?>
+<!-- Taslak — resmi SGK formatı değildir, kontrol edin -->
 <aphb year="2026" month="10">
   <isveren>
     <unvan>Şirket</unvan>
@@ -179,7 +187,7 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
       <tcKimlikNo></tcKimlikNo>
       <adSoyad>Ada Test</adSoyad>
       <calismaGunu>9</calismaGunu>
-      <fazlaMesaiSaati>0.0</fazlaMesaiSaati>
+      <fazlaMesaiSaati>1.0</fazlaMesaiSaati>
       <eksikGunSayisi>21</eksikGunSayisi>
       <eksikGunNedeni>15</eksikGunNedeni>
     </calisan>
@@ -193,13 +201,15 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
 {
   "reads": [
     "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
+    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["take",10001]]",
     "["leaves",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
+    "["pdksRecords",["withIndex","by_employee_date"],["eq","employeeId","employeeId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["take",1001]]",
     "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
   ],
   "result": {
     "endDate": "2026-10-31",
     "month": 10,
-    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma ve manuel PDKS kayıtlarından üretilir; kayıtsız personel bu özete dahil değildir. Eski kurallı günlerde ilk–son süre kullanılır: tek günlük veride 8 saat, birden çok günde takvim haftası başına 45 saat eşiği uygulanır; dönem dışındaki günler hesaba katılmaz. Bordro doğrulaması yerine kullanılmamalıdır.",
     "rows": [
       {
         "adSoyad": "Ada Test",

@@ -86,7 +86,7 @@ it("D2/ENGEL-1: izin/tatil/hafta sonu reviewDays olmaz, gerçek inceleme XML ür
     await ctx.db.insert("leaves", { projectId: f.projectId, employeeId: f.employeeId, startDate: "2026-10-01", endDate: "2026-10-31", leaveType: "unpaid", status: "approved", createdAt: "", updatedAt: "" });
   });
   const allowed = await f.sgk();
-  expect(allowed).toMatchObject({ blockedByReview: false, filename: "aphb-2026-10.xml", employees: [{ employeeId: f.employeeId, reviewDays: [] }] });
+  expect(allowed).toMatchObject({ blockedByReview: false, filename: "aphb-taslak-resmi-sgk-formati-degildir-2026-10.xml", employees: [{ employeeId: f.employeeId, reviewDays: [] }] });
   expect(allowed.xml).toContain("<eksikGunNedeni>21</eksikGunNedeni>");
   expect(allowed.xml).toContain("<eksikGunSayisi>21</eksikGunSayisi>");
   expect((await f.table("2026-10-23", "2026-10-26"))[0]?.days.map(day => day.status)).toEqual(["leave", "weekend", "weekend", "holiday"]);

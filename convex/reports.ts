@@ -12,12 +12,13 @@ import {
   overtimePayTRY,
 } from "./lib/pdksHelpers";
 
-const STANDARD_DAY_MINUTES = 8 * 60;
-const STANDARD_WEEK_MINUTES = 45 * 60;
+import { legacyAttendanceDays, legacyOvertimeMinutes } from "./lib/legacyOvertime";
+
+const LEGACY_REPORT_RELIABILITY_NOTE = "Güvenilirlik sınırı: Bu rapor okuma ve manuel PDKS kayıtlarından üretilir; kayıtsız personel bu özete dahil değildir. Eski kurallı günlerde ilk–son süre kullanılır: tek günlük veride 8 saat, birden çok günde takvim haftası başına 45 saat eşiği uygulanır; dönem dışındaki günler hesaba katılmaz. Bordro doğrulaması yerine kullanılmamalıdır.";
 
 /**
  * SGK aylık döküm raporu - çalışan başına toplam gün, saat, fazla mesai, izin
- * Türkiye SGK formatına uygun çıktı için kullanılır
+ * Muhasebe kontrolü için özet; resmi SGK formatı değildir
  */
 export const getSgkMonthlyReport = authedQuery({
   args: {
@@ -49,7 +50,7 @@ export const getSgkMonthlyReport = authedQuery({
       employeeMap.get(key)?.push(r);
     }
 
-    for (const [id, employee] of ruleReport.ruleEmployees) {
+    for (const [id, employee] of ruleReport.reportEmployees) {
       const key = `${employee.projectId}:${id}`;
       if (!employeeMap.has(key)) employeeMap.set(key, []);
     }
@@ -58,7 +59,7 @@ export const getSgkMonthlyReport = authedQuery({
 
     const reportRows = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
-        const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
+        const fallback = [...ruleReport.reportEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
         const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
         const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
         const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
@@ -90,33 +91,14 @@ export const getSgkMonthlyReport = authedQuery({
 
         const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
 
-        const dayReadingsMap = new Map<string, typeof granted>();
-        for (const r of granted) {
-          const dateKey = ruleReport.workDate(r);
-          if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
-          dayReadingsMap.get(dateKey)?.push(r);
-        }
-
-        let totalMinutes = 0;
-        for (const dayReadings of dayReadingsMap.values()) {
-          dayReadings.sort(
-            (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
-          );
-          const firstOfDay = dayReadings[0];
-          const lastOfDay = dayReadings[dayReadings.length - 1];
-          if (firstOfDay._id !== lastOfDay._id) {
-            const diff =
-              new Date(lastOfDay.accessTime).getTime() - new Date(firstOfDay.accessTime).getTime();
-            totalMinutes += Math.floor(diff / 60000);
-          }
-        }
+        const dayReadingsMap = legacyAttendanceDays(granted, empId ? ruleReport.legacyManualRecords.get(empId) : [], ruleReport.workDate);
+        let totalMinutes = [...dayReadingsMap.values()].reduce((sum, minutes) => sum + minutes, 0);
 
         const ruleDays = empId ? ruleReport.ruleRows.get(empId)?.days ?? [] : [];
         totalMinutes += ruleDays.reduce((sum, day) => sum + day.totalMinutes, 0);
         const incompleteDays = ruleDays.filter(day => day.status === "incomplete").length;
         const workDays = dayReadingsMap.size + ruleDays.filter(day => day.status === "present" || day.status === "late").length;
-        const legacyMinutes = totalMinutes - ruleDays.reduce((sum, day) => sum + day.totalMinutes, 0);
-        const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, legacyMinutes - STANDARD_DAY_MINUTES) : Math.max(0, legacyMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
+        const overtimeMinutes = legacyOvertimeMinutes(dayReadingsMap) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
 
         const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
         const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
@@ -137,7 +119,7 @@ export const getSgkMonthlyReport = authedQuery({
 
     return {
       scopeLabel,
-      reliabilityNote: "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+      reliabilityNote: LEGACY_REPORT_RELIABILITY_NOTE,
       year,
       month,
       startDate,
@@ -182,7 +164,7 @@ export const getOvertimeSummaryReport = authedQuery({
     }
 
 
-    for (const [id, employee] of ruleReport.ruleEmployees) {
+    for (const [id, employee] of ruleReport.reportEmployees) {
       const key = `${employee.projectId}:${id}`;
       if (!employeeMap.has(key)) employeeMap.set(key, []);
     }
@@ -197,7 +179,7 @@ export const getOvertimeSummaryReport = authedQuery({
     }[] = [];
 
     for (const [empKey, empReadings] of employeeMap) {
-      const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
+      const fallback = [...ruleReport.reportEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
       const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
       const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
       const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
@@ -208,29 +190,10 @@ export const getOvertimeSummaryReport = authedQuery({
       const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
 
       const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
-      const dayReadingsMap = new Map<string, typeof granted>();
-      for (const r of granted) {
-        const dateKey = ruleReport.workDate(r);
-        if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
-        dayReadingsMap.get(dateKey)?.push(r);
-      }
-
-      let totalMinutes = 0;
-      for (const dayReadings of dayReadingsMap.values()) {
-        dayReadings.sort(
-          (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
-        );
-        const firstOfDay = dayReadings[0];
-        const lastOfDay = dayReadings[dayReadings.length - 1];
-        if (firstOfDay._id !== lastOfDay._id) {
-          const diff =
-            new Date(lastOfDay.accessTime).getTime() - new Date(firstOfDay.accessTime).getTime();
-          totalMinutes += Math.floor(diff / 60000);
-        }
-      }
+      const dayReadingsMap = legacyAttendanceDays(granted, employee ? ruleReport.legacyManualRecords.get(employee._id) : [], ruleReport.workDate);
 
       const ruleDays = employee ? ruleReport.ruleRows.get(employee._id)?.days ?? [] : [];
-      const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES) : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
+      const overtimeMinutes = legacyOvertimeMinutes(dayReadingsMap) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
       totalOvertimeHours += overtimeHours;
 
@@ -260,7 +223,7 @@ export const getOvertimeSummaryReport = authedQuery({
 
     return {
       scopeLabel,
-      reliabilityNote: "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+      reliabilityNote: LEGACY_REPORT_RELIABILITY_NOTE,
       year,
       month,
       startDate,
@@ -315,7 +278,7 @@ export const getDepartmentCostReport = authedQuery({
       employeeMap.get(key)?.push(r);
     }
 
-    for (const [id, employee] of ruleReport.ruleEmployees) {
+    for (const [id, employee] of ruleReport.reportEmployees) {
       const key = `${employee.projectId}:${id}`;
       if (!employeeMap.has(key)) employeeMap.set(key, []);
     }
@@ -326,7 +289,7 @@ export const getDepartmentCostReport = authedQuery({
     >();
 
     for (const [empKey, empReadings] of employeeMap) {
-      const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
+      const fallback = [...ruleReport.reportEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
       const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
       const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
       const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
@@ -338,29 +301,10 @@ export const getDepartmentCostReport = authedQuery({
       const deptName = department?.name ?? "Belirtilmemiş";
 
       const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
-      const dayReadingsMap = new Map<string, typeof granted>();
-      for (const r of granted) {
-        const dateKey = ruleReport.workDate(r);
-        if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
-        dayReadingsMap.get(dateKey)?.push(r);
-      }
-
-      let totalMinutes = 0;
-      for (const dayReadings of dayReadingsMap.values()) {
-        dayReadings.sort(
-          (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
-        );
-        const firstOfDay = dayReadings[0];
-        const lastOfDay = dayReadings[dayReadings.length - 1];
-        if (firstOfDay._id !== lastOfDay._id) {
-          const diff =
-            new Date(lastOfDay.accessTime).getTime() - new Date(firstOfDay.accessTime).getTime();
-          totalMinutes += Math.floor(diff / 60000);
-        }
-      }
+      const dayReadingsMap = legacyAttendanceDays(granted, employee ? ruleReport.legacyManualRecords.get(employee._id) : [], ruleReport.workDate);
 
       const ruleDays = employee ? ruleReport.ruleRows.get(employee._id)?.days ?? [] : [];
-      const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES) : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
+      const overtimeMinutes = legacyOvertimeMinutes(dayReadingsMap) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
 
       if (overtimeHours > 0) {
@@ -396,7 +340,7 @@ export const getDepartmentCostReport = authedQuery({
 
     return {
       scopeLabel,
-      reliabilityNote: "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
+      reliabilityNote: LEGACY_REPORT_RELIABILITY_NOTE,
       year: args.year,
       month: args.month,
       hourlyRate: maskPay(fallbackRate ?? null, payVisible),

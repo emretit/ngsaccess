@@ -4,8 +4,9 @@ import type { Id } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
 import { resolveProjectScope } from "./lib/projectScope";
 import { loadRuleReportDays } from "./lib/reportAttendance";
-import { buildAphbXml } from "./lib/sgkCodes";
+import { APHB_DRAFT_WARNING, buildAphbXml } from "./lib/sgkCodes";
 import { calculateSgkEksikGun } from "./lib/sgkEksikGun";
+import { legacyAttendanceDays, legacyOvertimeMinutes } from "./lib/legacyOvertime";
 
 export const buildAphbForMonth = authedQuery({
   args: {
@@ -58,19 +59,19 @@ export const buildAphbForMonth = authedQuery({
     const ruleReport = await loadRuleReportDays(ctx, [targetProjectId], startDate, endDate);
     const empIds = new Set(projectEmployees.map((employee) => employee._id));
     const employeesWithReadings = new Set<Id<"employees">>();
-    const readingsByEmpDay = new Map<Id<"employees">, Set<string>>();
+    const readingsByEmployee = new Map<Id<"employees">, typeof ruleReport.readings>();
     for (const reading of ruleReport.readings) {
       if (!reading.employeeId || !empIds.has(reading.employeeId)) continue;
       employeesWithReadings.add(reading.employeeId);
-      if (reading.accessStatus !== "izin_verildi" || ruleReport.policies(targetProjectId, ruleReport.workDate(reading)).punchMode === "requirements") continue;
-      const workedDays = readingsByEmpDay.get(reading.employeeId) ?? new Set<string>();
-      workedDays.add(ruleReport.workDate(reading));
-      readingsByEmpDay.set(reading.employeeId, workedDays);
+      if (reading.accessStatus !== "izin_verildi" || ruleReport.managesReading(reading)) continue;
+      const readings = readingsByEmployee.get(reading.employeeId) ?? [];
+      readings.push(reading);
+      readingsByEmployee.set(reading.employeeId, readings);
     }
     const employees = projectEmployees.filter(
       (employee) => employedDuring(employee, startDate, endDate) || employeesWithReadings.has(employee._id),
     );
-    const warnings: string[] = [];
+    const warnings: string[] = [APHB_DRAFT_WARNING];
     const entries = await Promise.all(employees.map(async (employee) => {
       // Çalışana bağlı eski (projectId'siz) izinler de korunur.
       const employeeLeaves = await ctx.db.query("leaves")
@@ -82,7 +83,11 @@ export const buildAphbForMonth = authedQuery({
       );
       const ruleDays = ruleReport.ruleRows.get(employee._id)?.days ?? [];
       const reviewDays = ruleDays.filter(day => day.status === "incomplete" || day.status === "noData").map(day => day.date);
-      const workedDays = readingsByEmpDay.get(employee._id) ?? new Set<string>();
+      const legacyDays = legacyAttendanceDays(readingsByEmployee.get(employee._id) ?? [], ruleReport.legacyManualRecords.get(employee._id), ruleReport.workDate);
+      for (const date of legacyDays.keys()) {
+        if (employee.employmentEndDate && !employedOn(employee, date)) legacyDays.delete(date);
+      }
+      const workedDays = new Set(legacyDays.keys());
       for (const day of ruleDays) {
         workedDays.delete(day.date);
         if (day.status === "present" || day.status === "late") workedDays.add(day.date);
@@ -102,7 +107,7 @@ export const buildAphbForMonth = authedQuery({
         cumulativeWorkdays: employee.employmentEndDate && employee.employmentEndDate < endDate
           ? Math.max(0, Math.min(30, monthDays.filter(date => employedOn(employee, date)).length) - result.eksikGunSayisi)
           : result.primGunu,
-        totalOvertimeHours: 0,
+        totalOvertimeHours: (legacyOvertimeMinutes(legacyDays) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0)) / 60,
         eksikGunSayisi: result.eksikGunSayisi,
         eksikGunNedeni: result.eksikGunNedeni,
       };
@@ -123,7 +128,7 @@ export const buildAphbForMonth = authedQuery({
         companyName: company?.name ?? "Şirket",
         employees: entries,
       }),
-      filename: `aphb-${args.year}-${monthStr}.xml`,
+      filename: `aphb-taslak-resmi-sgk-formati-degildir-${args.year}-${monthStr}.xml`,
       warnings,
       employees: entries.map(entry => ({ employeeId: entry.employeeId, reviewDays: entry.reviewDays })),
     };

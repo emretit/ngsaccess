@@ -202,7 +202,7 @@ it("aynı legacy projedeki sabit vardiyanın takvim günleri ve brüt eski SGK h
   expect(sgk.rows.find(row => row.adSoyad === "Sabit Test")).toMatchObject({ calismaGunu: 2, toplamSaat: 0 });
 });
 
-it("legacy keşif ek okumaları: sabitte iki bounded metadata sorgusu; esnekte yalnız gerekli indeksli yüklemeler", async () => {
+it("legacy manuel kayıtlar sınırlı okunur; esnekte yalnız gerekli indeksli yüklemeler", async () => {
   const f = await fixture(false);
   await f.add("22:00", "entry");
   await f.add("06:30", "exit", nextDate);
@@ -225,7 +225,7 @@ it("legacy keşif ek okumaları: sabitte iki bounded metadata sorgusu; esnekte y
     cardReadings: 2, workSettings: 1, overtimeRates: 1, holidays: 2, generalSettings: 1, leaves: 1,
   }, gets: 1 });
   await f.t.run(ctx => ctx.db.patch(f.shiftId, { scheduleType: "fixed", flexible: undefined }));
-  expect(await counts()).toEqual({ tables: { pdksRuleVersions: 2, shifts: 2, cardReadings: 1 }, gets: 0 });
+  expect(await counts()).toEqual({ tables: { pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 1 }, gets: 0 });
 });
 
 it.each(["ham", "manuel"] as const)("dashboard D+1 ham çıkışı D'nin %s giriş politikasını taşır; bugünkü devamı artırmaz", async kind => {
@@ -331,7 +331,7 @@ it("N1: kapalı ayın tüm günleri ölçülür; günlük ve non-null satır hed
   expect(report.rows[0]).toMatchObject({ requiredNetMinutes: row?.requiredNetMinutes, shortfallMinutes: row?.shortfallMinutes, excessMinutes: row?.excessMinutes });
 });
 
-it("D3: 500 kişilik sabit projede kullanılmayan global esnek tanım kişi başı sorgusuz, iki ek bounded keşif sorgusu açar", async () => {
+it("D3: 500 kişilik legacy manuel taramayı global esnek keşif yeniden kullanır; kişi başı vardiya sorgusu açmaz", async () => {
   const f = await fixture(false);
   await f.t.run(async ctx => {
     await ctx.db.patch(f.shiftId, { scheduleType: "fixed", flexible: undefined, startTime: "08:00", endTime: "17:00" });
@@ -354,11 +354,11 @@ it("D3: 500 kişilik sabit projede kullanılmayan global esnek tanım kişi baş
     return { tables, gets, readings: result.readings, rows: [...result.ruleRows] };
   });
   const before = await counts();
-  expect(before).toEqual({ tables: { pdksRuleVersions: 2, shifts: 2, cardReadings: 1 }, gets: 0, readings: [], rows: [] });
+  expect(before).toEqual({ tables: { pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 500 }, gets: 0, readings: [], rows: [] });
   const globalId = await f.t.run(ctx => ctx.db.insert("shifts", { name: "Atanmamış global", startTime: "05:00", endTime: "22:00", scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE, createdAt: "", updatedAt: "" }));
   const after = await counts();
   expect(after).toEqual({ ...before, tables: { ...before.tables, employees: 1, shiftAssignments: 1 } });
-  expect(Object.values(after.tables).reduce((sum, n) => sum + n, 0) - Object.values(before.tables).reduce((sum, n) => sum + n, 0)).toBe(2);
+  expect(Object.values(after.tables).reduce((sum, n) => sum + n, 0) - Object.values(before.tables).reduce((sum, n) => sum + n, 0)).toBe(1);
   await f.t.run(async ctx => {
     const otherProject = await ctx.db.insert("projects", { name: "Globali kullanan başka proje" });
     const otherEmployee = await ctx.db.insert("employees", { projectId: otherProject, firstName: "Başka", lastName: "Kişi", email: "global-other@test", cardNumber: "global-other", isActive: true });

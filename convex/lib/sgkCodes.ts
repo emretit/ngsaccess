@@ -1,5 +1,7 @@
 import { escapeXml } from "./escapers";
 
+export const APHB_DRAFT_WARNING = "Taslak — resmi SGK formatı değildir, kontrol edin";
+
 /**
  * SGK Aylık Prim ve Hizmet Belgesi (APHB) eksik gün nedeni kodları.
  * MUHSGK/APHB eksik gün nedenleri; 02 ve 14 listede bulunmaz.
@@ -78,13 +80,12 @@ export interface AphbDocumentInput {
 }
 
 /**
- * Basit/illustratif APHB XML çıktısı. Resmi formata göre detaylandırmak
- * gerekebilir (e-bildirge XSD). Bu sürüm muhasebenin Excel'e atması veya
- * incelemesi için yeterli yapısal bilgi içerir.
+ * Muhasebe incelemesi için taslak XML; resmi e-bildirge XSD formatı değildir.
  */
 export function buildAphbXml(input: AphbDocumentInput): string {
   const headerParts: string[] = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<!-- ${APHB_DRAFT_WARNING} -->`,
     `<aphb year="${input.year}" month="${input.month}">`,
     `  <isveren>`,
     `    <unvan>${escapeXml(input.companyName)}</unvan>`,

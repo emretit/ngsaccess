@@ -9,6 +9,9 @@
  */
 import { isRuleOpenAt } from "./ruleSchedule";
 import { trDateKey, trDayRangeISO } from "./trDate";
+import { assignmentAppliesOnDate } from "./shiftResolver";
+import { addWorkDate } from "./pdksWorkDay";
+import { clockMinute, flexibleExitEnd, flexibleSchedule } from "./pdksFlexible";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
@@ -29,9 +32,32 @@ export function ideTimeToISO(ideTime: string | undefined): string | undefined {
 }
 
 // Türkiye saatiyle (UTC+3, DST yok) verilen ISO timestamp'inin günü başlangıcının
-// UTC ISO karşılığını döndürür. Toggle'ı günlük resetlemek için kullanılır.
+// UTC ISO karşılığını döndürür.
 export function startOfTurkeyDayISO(nowISO: string): string {
   return trDayRangeISO(trDateKey(nowISO), trDateKey(nowISO)).startISO;
+}
+
+const OVERNIGHT_EXIT_GRACE_MS = 4 * 60 * 60 * 1000;
+const DIRECTION_ASSIGNMENT_LIMIT = 100;
+
+/** Only the cross-day entry branch loads assignments; no shift-table scan. */
+async function directionShift(ctx: MutationCtx, employeeId: Id<"employees">, date: string): Promise<Doc<"shifts"> | null> {
+  const employee = await ctx.db.get(employeeId);
+  if (!employee) return null;
+  const assignments = await ctx.db.query("shiftAssignments")
+    .withIndex("by_employee_end", q => q.eq("employeeId", employeeId).gte("endDate", date))
+    .take(DIRECTION_ASSIGNMENT_LIMIT + 1);
+  // An incomplete assignment set cannot safely infer yesterday's night shift.
+  if (assignments.length > DIRECTION_ASSIGNMENT_LIMIT) return null;
+  const applicable = assignments.filter(assignment => assignmentAppliesOnDate(assignment, date)
+    && (!assignment.projectId || assignment.projectId === employee.projectId))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  for (const assignment of applicable) {
+    const shift = await ctx.db.get(assignment.shiftId);
+    if (shift && (!shift.projectId || shift.projectId === employee.projectId)) return shift;
+  }
+  const shift = employee.shiftId ? await ctx.db.get(employee.shiftId) : null;
+  return shift && (!shift.projectId || shift.projectId === employee.projectId) ? shift : null;
 }
 
 // Cihazın yön ayarına ve toggle state'ine göre okumanın yönünü çözer.
@@ -56,21 +82,46 @@ export async function resolveDirection(
   if (cfg === "entry") return "entry";
   if (cfg === "exit") return "exit";
 
-  // both → çalışan + cihaz çiftine göre toggle
+  // both → aynı projedeki cihazlar arasında çalışan oturumu
   if (!params.employeeId || !params.device) return "entry";
 
-  const startOfDay = startOfTurkeyDayISO(params.nowISO);
+  const employeeId = params.employeeId;
   const last = await ctx.db
     .query("cardReadings")
-    .withIndex("by_employee_device_time", (q) =>
-      q.eq("employeeId", params.employeeId!).eq("deviceId", params.device!._id)
+    .withIndex("by_project_employee_time", (q) =>
+      q.eq("projectId", params.device?.projectId).eq("employeeId", employeeId)
     )
     .filter((q) => q.eq(q.field("accessStatus"), "izin_verildi"))
     .order("desc")
     .first();
 
-  if (!last || last.accessTime < startOfDay) return "entry";
-  return last.direction === "entry" ? "exit" : "entry";
+  if (!last || last.direction !== "entry" || Date.parse(params.nowISO) < Date.parse(last.accessTime)) return "entry";
+  const lastDate = trDateKey(last.accessTime);
+  const currentDate = trDateKey(params.nowISO);
+  if (lastDate === currentDate) return "exit";
+  if (lastDate !== addWorkDate(currentDate, -1)) return "entry";
+
+  const shift = await directionShift(ctx, employeeId, lastDate);
+  if (!shift) return "entry";
+  const flex = flexibleSchedule(shift);
+  if (shift.scheduleType === "flexible" && !flex) return "entry";
+  // Invalid legacy hours are unresolved schedules, so they start a fresh day.
+  let endMinute: number;
+  try {
+    if (flex) {
+      if (flex.checkOutEndDayOffset !== 1) return "entry";
+      endMinute = flexibleExitEnd(flex);
+    } else {
+      const start = clockMinute(shift.startTime);
+      const end = clockMinute(shift.endTime);
+      if (end >= start) return "entry";
+      endMinute = 1440 + end;
+    }
+  } catch {
+    return "entry";
+  }
+  const endMs = Date.parse(`${lastDate}T00:00:00+03:00`) + endMinute * 60000;
+  return Date.parse(params.nowISO) <= endMs + OVERNIGHT_EXIT_GRACE_MS ? "exit" : "entry";
 }
 
 /**

@@ -16,6 +16,9 @@ afterEach(() => vi.useRealTimers());
 // The snapshots were captured by running this same real-convex-test fixture against
 // 2b67349, before W5-A. No query/auth implementation is mocked. Only the new policy
 // metadata queries and additive DTO fields are excluded from the legacy comparison.
+// Faz 3A intentionally updates the report/SGK snapshots: bounded manual reads,
+// accurate reliability text and explicitly marked APHB draft with overtime.
+// Other query outputs and cross-project isolation remain strict.
 it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır", async () => {
   const t = convexTest(schema, modules);
   const ids = await t.run(async ctx => {

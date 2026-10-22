@@ -21,6 +21,13 @@ import { readReportReadings, reportPeriod, flexibleReportProjects } from "./repo
 
 export const ATTENDANCE_RELIABILITY_NOTE = "Güvenilirlik sınırı: İşe giriş tarihi tutulmadığından ay ortasında işe başlayanlar ayrıştırılamaz; ayrılanların son çalışma gününden sonraki günleri hesaplanmaz. Günler PDKS tablo motoruyla hesaplanır; yarım tatil günleri PDKS gibi tatil sayılır. Devam oranı, tamamlanmış beklenen günlerden izinler çıkarılarak hesaplanır. Tek izinli okuma veya manuel giriş devam kabul edilir; bu bir bordro onayı değildir.";
 
+async function readReportManualRecords(ctx: QueryCtx, employeeId: Id<"employees">, startDate: string, endDate: string) {
+  const records = await ctx.db.query("pdksRecords").withIndex("by_employee_date", q =>
+    q.eq("employeeId", employeeId).gte("date", startDate).lte("date", endDate)).take(1001);
+  if (records.length > 1000) throw new Error("Rapor manuel kayıt sınırı aşıldı");
+  return records;
+}
+
 type TableParams = Parameters<typeof computePdksTableRow>[0];
 
 /** Yalnız PDKS hücrelerini birleştirir; yeni gün sınıflandırma kuralı içermez. */
@@ -241,6 +248,17 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
   const readingsByProject = new Map<Id<"projects">, Doc<"cardReadings">[]>();
   const workDates = new Map<string, string>();
   const manualEntriesByEmployee = new Map<string, Doc<"pdksRecords">>();
+  const legacyManualRecords = new Map<Id<"employees">, Doc<"pdksRecords">[]>();
+  const legacyEmployees = new Map<Id<"employees">, Doc<"employees">>();
+  const rememberLegacyManual = (employee: Doc<"employees">, records: Doc<"pdksRecords">[], managedDates = new Set<string>()) => {
+    const legacy = records.filter(record => record.manualEntry && record.projectId === employee.projectId &&
+      record.date >= startDate && record.date <= endDate && employedOn(employee, record.date) &&
+      policies(employee.projectId, record.date).punchMode !== "requirements" && !managedDates.has(record.date));
+    if (legacy.some(record => record.entryTime || record.exitTime)) {
+      legacyManualRecords.set(employee._id, legacy);
+      legacyEmployees.set(employee._id, employee);
+    }
+  };
   const discoveryEmployees = new Map<Id<"projects">, Doc<"employees">[]>();
   const flexibleProjects = await flexibleReportProjects(ctx, projectIds.filter(id => !activeProjects.includes(id)), startDate, endDate, discoveryEmployees);
   const managedProjects = projectIds.filter(id => activeProjects.includes(id) || flexibleProjects.has(id));
@@ -249,6 +267,14 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     const { startISO, endISO } = trDayRangeISO(startDate, endDate);
     const readings = await readReportReadings(ctx, legacyProjects, startISO, endISO, { policies, workDate: r => trDateKey(r.accessTime) });
     for (const id of legacyProjects) readingsByProject.set(id, readings.filter(r => r.projectId === id));
+    for (const projectId of legacyProjects) {
+      const employees = discoveryEmployees.get(projectId) ?? await ctx.db.query("employees")
+        .withIndex("by_project", q => q.eq("projectId", projectId)).take(10001);
+      if (employees.length > 10000) throw new Error("Rapor personel sınırı aşıldı");
+      for (const employee of employees.filter(e => employedDuring(e, startDate, endDate))) {
+        rememberLegacyManual(employee, await readReportManualRecords(ctx, employee._id, startDate, endDate));
+      }
+    }
   }
   for (const projectId of managedProjects) {
     const allEmployees = discoveryEmployees.get(projectId) ?? await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).take(10001);
@@ -256,8 +282,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     const shifts = await buildBoundedShiftResolver(ctx, allEmployees);
     const flexible = [...shifts.shifts.values()].some(shift => shift.scheduleType === "flexible");
     const earlyManual = flexible ? new Map(await Promise.all(allEmployees.filter(e => employedDuring(e, startDate, endDate)).map(async employee => {
-      const records = await ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", addWorkDate(startDate, -7)).lte("date", addWorkDate(endDate, 1))).take(1001);
-      if (records.length > 1000) throw new Error("Rapor kayıt sınırı aşıldı");
+      const records = await readReportManualRecords(ctx, employee._id, addWorkDate(startDate, -7), addWorkDate(endDate, 1));
       return [employee._id, records] as const;
     }))) : undefined;
     const manualEntries = new Map([...(earlyManual?.values() ?? [])].flat().filter(record => record.manualEntry && record.projectId === projectId).map(record => [`${record.employeeId}__${record.date}`, record]));
@@ -266,6 +291,9 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
         const legacyRange = trDayRangeISO(startDate, endDate);
         const readings = await readReportReadings(ctx, [projectId], legacyRange.startISO, legacyRange.endISO, { policies, workDate: r => trDateKey(r.accessTime) });
         readingsByProject.set(projectId, readings);
+        for (const employee of allEmployees.filter(e => employedDuring(e, startDate, endDate))) {
+          rememberLegacyManual(employee, earlyManual?.get(employee._id) ?? await readReportManualRecords(ctx, employee._id, startDate, endDate));
+        }
       }
       continue;
     }
@@ -318,7 +346,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     const employeeReadings = buildPdksEmployeeReadingMap({ employees: allEmployees, readings });
     for (const employee of allEmployees.filter(e => employedDuring(e, startDate, endDate))) {
       const [manual, leaves] = await Promise.all([
-        earlyManual?.get(employee._id) ?? ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", startDate).lte("date", endDate)).take(1001),
+        earlyManual?.get(employee._id) ?? readReportManualRecords(ctx, employee._id, startDate, endDate),
         ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", endDate)).take(1001),
       ]);
       if (manual.length > 1000 || leaves.length > 1000) throw new Error("Rapor kayıt sınırı aşıldı");
@@ -334,6 +362,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
         workSettings, overtimeRates, resolveShift: shifts.resolve, manualEditedBy: null,
       });
       const managedDays = row.days.filter(day => policies(projectId, day.date).punchMode === "requirements" || shifts.resolve(employee._id, day.date)?.scheduleType === "flexible");
+      rememberLegacyManual(employee, records, new Set(managedDays.map(day => day.date)));
       if (managedDays.length) {
         ruleEmployees.set(employee._id, employee);
         result.set(employee._id, { ...row, days: managedDays });
@@ -350,5 +379,6 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
   };
   return { policies, workDate: dateFor, managesReading,
     manualEntryFor: (id: Id<"employees">, date: string) => manualEntriesByEmployee.get(`${id}__${date}`)?.entryTime,
+    legacyManualRecords, reportEmployees: new Map([...legacyEmployees, ...ruleEmployees]),
     ruleRows: result, ruleEmployees, readings: [...readingsByProject.values()].flat() };
 }

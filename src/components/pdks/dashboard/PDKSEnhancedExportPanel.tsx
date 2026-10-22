@@ -90,7 +90,7 @@ function ExportPanel({
     CSV: "CSV",
     PDF: "PDF",
     payroll: "Aylık bordro cetveli",
-    aphb: "SGK aylık bildirim (APHB)",
+    aphb: "SGK aylık bildirim taslağı (APHB)",
   };
   const choose = (next: ExportType) => {
     setError("");
@@ -212,13 +212,13 @@ function ExportPanel({
           {monthly && <p className="text-xs text-muted-foreground">Aylık bordro ve APHB sabit kolonlarla hazırlanır; kolon seçimi uygulanmaz.</p>}
           {type === "aphb" && (
             <p className="text-xs text-muted-foreground">
-              Önce bildirim hazırlanır. Uyarılar indirmeden önce aşağıda
-              gösterilir.
+              Taslak — resmi SGK formatı değildir, kontrol edin.
+              Önce taslak hazırlanır; uyarılar indirmeden önce aşağıda gösterilir.
             </p>
           )}
           {aphb && (
             <div role="status" className="border-y py-3 text-sm">
-              <h3 className="font-medium">APHB kontrol sonucu</h3>
+              <h3 className="font-medium">APHB taslak kontrol sonucu</h3>
               {aphb.warnings.length ? (
                 <ul className="mt-2 list-disc space-y-1 pl-4">
                   {aphb.warnings.map((w, i) => (
