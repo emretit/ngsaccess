@@ -252,11 +252,9 @@ export function parseHikJsonStatus(result: GatewayResponse): {
   // öğe başına iç içe gelir. Tüm iç subStatusCode'lar "ok" ise başarı.
   if (result.status === 200 && data?.statusCode === undefined && nestedSub !== undefined) {
     const codes = collectNestedSubStatusCodes(data);
-    if (codes.length > 0 && codes.every(code => code.toLowerCase() === "ok")) {
-      return { ok: true, alreadyExists: false };
-    }
     const failed = codes.find(code => code.toLowerCase() !== "ok");
     if (failed !== undefined) return { ok: false, alreadyExists: false, error: failed };
+    if (codes.length > 0) return { ok: true, alreadyExists: false };
   }
 
   // Status 200 ama statusCode=1 değil → gateway-level hata
