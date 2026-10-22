@@ -208,7 +208,7 @@ describe("panel-authoritative audit paths", () => {
 });
 
 describe("reader-purpose token guard and consumption", () => {
-  it.each(["unauthed", "hikvision", "ide_smart", "missingToken", "purpose", "used", "expired", "invalidExpiry", "missingSession", "deletedSession", "sessionEmployee", "sessionExpiry", "sessionVersion", "missingEmployee", "tokenProject", "deviceProject", "missingAuth", "password", "authVersion", "inactiveEmployee", "inactiveDevice", "closedSchedule"] as const)("rejects %s with zero audit/scheduler effects", async kind => {
+  it.each(["unauthed", "hikvision", "ide_smart", "missingToken", "purpose", "used", "expired", "invalidExpiry", "missingSession", "deletedSession", "sessionEmployee", "sessionExpiry", "sessionVersion", "missingEmployee", "tokenProject", "deviceProject", "missingAuth", "password", "authVersion", "inactiveEmployee", "endedEmployee", "inactiveDevice", "closedSchedule"] as const)("rejects %s with zero audit/scheduler effects", async kind => {
     const f = await fixture();
     await f.t.run(async ctx => {
       if (kind === "hikvision" || kind === "ide_smart") await ctx.db.patch(f.deviceId, { brand: kind });
@@ -228,6 +228,7 @@ describe("reader-purpose token guard and consumption", () => {
       if (kind === "password") await ctx.db.patch(f.authId, { passwordHash: "" });
       if (kind === "authVersion") await ctx.db.patch(f.authId, { passwordVersion: 2 });
       if (kind === "inactiveEmployee") await ctx.db.patch(f.employeeId, { isActive: false });
+      if (kind === "endedEmployee") await ctx.db.patch(f.employeeId, { employmentEndDate: "2026-10-18" });
       if (kind === "inactiveDevice") await ctx.db.patch(f.deviceId, { isActive: false });
       if (kind === "closedSchedule") await ctx.db.patch(f.ruleId, { days: ["Tuesday"] });
     });

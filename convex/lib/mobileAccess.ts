@@ -3,6 +3,8 @@ import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { accessScheduleError } from "./accessRuleUx";
+import { employedOn } from "./employment";
+import { trDateKey } from "./trDate";
 
 const GRAPH_LIMIT = 500;
 export type MobileTransport = "ide_mqtt" | "hik_local_bridge" | "hik_gateway" | "unsupported";
@@ -45,7 +47,12 @@ export function mobileRuleAllows(rule: Doc<"accessRules">, now: number, template
 }
 
 export function employeeWithinAccessEpoch(employee: Doc<"employees">, now: number): boolean {
-  if (employee.isActive === false) return false;
+  if (employee.isActive === false || !Number.isFinite(now)) return false;
+  // Son çalışma günü (TR, dahil) sonrası ret: işten çıkış cron'u isActive'i kapatana kadarki
+  // boşlukta QR/mobil kapı/check-in de kapansın (kart yolu aynı kuralı uygular). Ziyaretçide
+  // employedOn bitiş tarihine bakmaz; onu erişim penceresi kapatır.
+  if (employee.employmentEndDate && employee.isVisitor !== true &&
+      !employedOn(employee, trDateKey(new Date(now).toISOString()))) return false;
   const start = employee.accessStartsAt === undefined ? -Infinity : Date.parse(employee.accessStartsAt);
   const end = employee.accessExpiresAt === undefined ? Infinity : Date.parse(employee.accessExpiresAt);
   return !Number.isNaN(start) && !Number.isNaN(end) && now >= start && now < end;

@@ -2,7 +2,6 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { employeeWithinAccessEpoch, genericReaderTokenAllowed } from "./mobileAccess";
-import { employedOn } from "./employment";
 import { inferAccessStatus, inferDenialReason } from "./hikEventCodes";
 import { ideResultGranted } from "./cardReaderParse";
 import { canEmployeeAccessDevice } from "./accessDecision";
@@ -331,12 +330,11 @@ async function processGenericCardReading(
     return { granted: false };
   }
 
-  // Erişim penceresi (accessStartsAt/accessExpiresAt) ve pasif cihaz reddi token yoluyla aynı.
-  // Karta ayrıca son çalışma günü (TR, dahil) kontrolü: işten çıkış cron'u isActive'i kapatana
-  // kadarki boşlukta kart geçmesin (token yolu employmentEndDate'e bakmaz). Cihaz yoksa da ret.
-  // Hepsi aynı ret satırını yazar.
+  // Token yoluyla aynı kurallar: erişim penceresi + son çalışma günü (TR, dahil; işten çıkış
+  // cron'u isActive'i kapatana kadarki boşlukta kart geçmesin) ve pasif cihaz reddi. Cihaz
+  // yoksa da ret. Hepsi aynı ret satırını yazar.
   if (!employee.isActive || !employeeWithinAccessEpoch(employee, Date.parse(accessTime)) ||
-      !employedOn(employee, trDateKey(accessTime)) || !device || device.isActive === false) {
+      !device || device.isActive === false) {
     await ctx.db.insert("cardReadings", {
       projectId: projectForRow(employee.projectId, device?.projectId),
       deviceId: device?._id,
