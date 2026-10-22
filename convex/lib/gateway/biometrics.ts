@@ -3,6 +3,7 @@
 import {
   gatewayApiCall,
   gatewayApiCallChecked,
+  gatewayXmlCall,
   gatewayMultipartCall,
   parseHikJsonStatus,
   getCountFromEndpoint,
@@ -12,7 +13,6 @@ import {
   MAX_FINGERPRINTS_PER_PERSON,
   DEFAULT_SEARCH_PAGE_SIZE,
 } from "./core";
-import type { GatewayResponse } from "./core";
 
 export function getFaceCount(devIndex: string) {
   return getCountFromEndpoint(devIndex, "/ISAPI/Intelligent/FDLib/Count", "FDLibCount");
@@ -100,20 +100,21 @@ export async function captureFingerprintLive(
   // enrollment'lar serialize olmasın diye 35s sonra abort et.
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
   const racePromise = Promise.race([
-    gatewayApiCall(
+    // CaptureFingerPrint XML-only (cihaz `format=json`'u yok sayıp XML döner).
+    gatewayXmlCall(
       "/ISAPI/AccessControl/CaptureFingerPrint",
       "POST",
-      { CaptureFingerPrintCond: { fingerNo: opts?.fingerPrintID ?? 1 } },
+      `<?xml version="1.0" encoding="UTF-8"?><CaptureFingerPrintCond version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema"><fingerNo>${opts?.fingerPrintID ?? 1}</fingerNo></CaptureFingerPrintCond>`,
       devIndex,
     ),
-    new Promise<GatewayResponse>((_, reject) => {
+    new Promise<{ status: number; raw: string }>((_, reject) => {
       timeoutHandle = setTimeout(
         () => reject(new Error("captureFingerprintLive timeout")),
         FINGERPRINT_CAPTURE_TIMEOUT_MS,
       );
     }),
   ]);
-  let result: GatewayResponse;
+  let result: { status: number; raw: string };
   try {
     result = await racePromise;
   } catch (e) {
@@ -121,12 +122,12 @@ export async function captureFingerprintLive(
   } finally {
     if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
   }
+  // Only status codes leave this function; the raw body may hold a template.
+  const subStatus = /<subStatusCode>([^<]*)<\/subStatusCode>/.exec(result.raw)?.[1];
   if (result.status !== 200) {
-    return { ok: false, error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}` };
+    return { ok: false, error: `HTTP ${result.status}${subStatus ? `: ${subStatus}` : ""}` };
   }
-  const data = result.data as Record<string, unknown> | undefined;
-  const inner = data?.CaptureFingerPrint as Record<string, unknown> | undefined;
-  const fingerData = inner?.fingerData as string | undefined;
+  const fingerData = /<fingerData>([^<]+)<\/fingerData>/.exec(result.raw)?.[1]?.trim();
   if (!fingerData) {
     return { ok: false, error: "fingerData yanıtta yok (kullanıcı tarama yapmadı?)" };
   }

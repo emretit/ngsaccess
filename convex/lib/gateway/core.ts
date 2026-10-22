@@ -88,6 +88,23 @@ export async function gatewayApiCall(
 }
 
 /**
+ * XML-only ISAPI uçları için passthrough (ör. DS-K1T807 V4.x CaptureFingerPrint `format=json`'u yok sayar).
+ * Gövde ve yanıt biyometrik veri içerebilir; hiçbir koşulda log'lanmaz.
+ */
+export async function gatewayXmlCall(
+  path: string,
+  method: "GET" | "POST" | "PUT",
+  xml: string,
+  devIndex: string,
+): Promise<{ status: number; raw: string }> {
+  const { host, user, pass } = getGatewayConfig();
+  const url = new URL(`${host}${path.startsWith("/") ? path : `/${path}`}`);
+  url.searchParams.set("devIndex", devIndex);
+  const result = await digestFetch(url.toString(), method, xml, user, pass, "application/xml");
+  return { status: result.status, raw: result.body };
+}
+
+/**
  * gatewayApiCall + parseHikJsonStatus ortak shape — write helper'lar için convenience.
  * `alreadyExists=true` durumlarını çağıran taraf görmek isterse `ok` yerine bu field'a baksın.
  */
