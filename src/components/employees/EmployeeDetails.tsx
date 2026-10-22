@@ -12,7 +12,6 @@ import { EmployeeActivityBoundary } from "./EmployeeActivityBoundary";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { EmployeeSyncSection } from "./EmployeeSyncSection";
 import { EmployeeRecentReadings } from "./EmployeeRecentReadings";
 import { EmployeeFingerprintCard } from "./EmployeeFingerprintCard";
 import { EmployeeConsentsCard } from "./EmployeeConsentsCard";
@@ -103,14 +102,7 @@ export default function EmployeeDetails({
           <EmployeeAccessSection employeeId={employee._id} />
         </EmployeeActivityBoundary>
       )}
-      <EmployeeActivityBoundary
-        employeeId={employee._id}
-        projectId={projectId}
-        title="Cihaz senkron durumu"
-        description="Cihaz senkron durumu yüklenemedi."
-      >
-        <EmployeeSyncSection employeeId={employee._id} />
-      </EmployeeActivityBoundary>
+      {/* Cihaz senkron sorunları Kişiler sayfasındaki senkron uyarıları bandında; drawer'da tekrarlanmaz. */}
       <EmployeeActivityBoundary employeeId={employee._id} projectId={projectId} title="Parmak izi" description="Parmak izi kayıtları yüklenemedi.">
         <EmployeeFingerprintCard key={employee._id} employeeId={employee._id} />
       </EmployeeActivityBoundary>

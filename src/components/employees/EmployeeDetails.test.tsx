@@ -20,7 +20,6 @@ vi.mock("convex/react", () => ({ useQuery: (ref: Parameters<typeof getFunctionNa
   return [];
 } }));
 vi.mock("./EmployeeActivityBoundary", () => ({ EmployeeActivityBoundary: ({ title, children }: { title: string; children: ReactNode }) => { scope.boundaries.push(title); return children; } }));
-vi.mock("./EmployeeSyncSection", () => ({ EmployeeSyncSection: () => <div data-testid="sync" /> }));
 vi.mock("./EmployeeRecentReadings", () => ({ EmployeeRecentReadings: () => <div data-testid="readings" /> }));
 vi.mock("./EmployeeConsentsCard", () => ({
   EmployeeConsentsCard: ({ employeeId }: { employeeId: string }) => <div data-testid="consents" data-employee-id={employeeId} />,
