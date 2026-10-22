@@ -58,3 +58,9 @@ it("02-O3: result report keeps raw SDK errors in closed technical details", () =
   const html = render();
   expect(html).toMatch(/<details><summary[^>]*>Teknik ayrıntı<\/summary><p>NET_DVR_SendRemoteConfig failed: 17<\/p><\/details>/);
 });
+it("biyometrik kolonu yöneticiye yüz ve parmak izi durumunu gösterir", () => {
+  const html = render();
+  expect(html).toContain("Biyometrik");
+  expect(html).toContain("Yüz kaydı yok");
+  expect(html).toContain("Parmak izi kaydı yok");
+});

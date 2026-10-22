@@ -4,7 +4,7 @@ import { departmentPath } from "./lib/departmentPath";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { errorMessage, notify } from "@/lib/notify";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -65,6 +65,14 @@ export default function EmployeeTable({
 
   const syncEmployeeToDevices = useAction(
     api.actions.hikvisionSync.syncEmployeeToDevices,
+  );
+  const biometricRows = useQuery(
+    api.employeeBiometrics.summary,
+    isAdmin && projectId ? { projectId } : "skip",
+  );
+  const biometricsByEmployee = useMemo(
+    () => new Map((biometricRows ?? []).map((row) => [row.employeeId, row])),
+    [biometricRows],
   );
   const allDepartments =
     useQuery(api.departments.list, projectId ? { projectId } : "skip") ?? []; // dropdown filter — empty during load is acceptable UX
@@ -318,6 +326,11 @@ export default function EmployeeTable({
                 )}
               {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
               {column("card", "Kart no", "hidden min-[760px]:table-cell")}
+              {isAdmin && (
+                <TableHead className="hidden w-[96px] min-[760px]:table-cell">
+                  Biyometrik
+                </TableHead>
+              )}
               {column("status", "Durum", "w-[180px]")}
               <TableHead className="w-11">
                 <span className="sr-only">İşlemler</span>
@@ -338,6 +351,11 @@ export default function EmployeeTable({
                 handleSelectEmployee={handleSelectEmployee}
                 onViewDetails={onViewDetails}
                 showDepartment={showDepartment}
+                biometrics={
+                  isAdmin
+                    ? (biometricsByEmployee.get(employee._id) ?? null)
+                    : undefined
+                }
                 onSync={(employee) => setSyncRequest({ employees: [employee] })}
                 handlePasswordResetClick={handlePasswordResetClick}
                 handleIndividualDeleteClick={handleIndividualDeleteClick}

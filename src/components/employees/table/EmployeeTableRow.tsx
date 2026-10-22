@@ -1,6 +1,7 @@
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { EmploymentEmployee as Employee } from "../lib/employment";
 import { EmployeeEmploymentBadge } from "../EmployeeEmploymentBadge";
+import { EmployeeBiometricsCell, type EmployeeBiometrics } from "./EmployeeBiometricsCell";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,6 +18,8 @@ interface Props {
   handleSelectEmployee: (checked: boolean, id: Id<"employees">) => void;
   onViewDetails: (employee: Employee) => void;
   showDepartment: boolean;
+  /** undefined = kolon gizli (yönetici değil). */
+  biometrics?: EmployeeBiometrics | null;
   onSync: (employee: Employee) => void;
   handlePasswordResetClick: (employee: Employee) => void;
   handleIndividualDeleteClick: (employee: Employee) => void;
@@ -32,6 +35,7 @@ export function EmployeeTableRow({
   handleSelectEmployee,
   onViewDetails,
   showDepartment,
+  biometrics,
   onSync,
   handlePasswordResetClick,
   handleIndividualDeleteClick,
@@ -92,6 +96,11 @@ export function EmployeeTableRow({
       <TableCell className="hidden truncate tabular-nums min-[760px]:table-cell">
         {employee.cardNumber || "—"}
       </TableCell>
+      {biometrics !== undefined && (
+        <TableCell className="hidden px-2 py-0 min-[760px]:table-cell">
+          <EmployeeBiometricsCell biometrics={biometrics ?? undefined} />
+        </TableCell>
+      )}
       <TableCell className="px-1 py-0">
         <EmployeeEmploymentBadge employee={employee} />
       </TableCell>

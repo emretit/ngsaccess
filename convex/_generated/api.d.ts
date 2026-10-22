@@ -46,6 +46,7 @@ import type * as devices from "../devices.js";
 import type * as doors from "../doors.js";
 import type * as emailVerification from "../emailVerification.js";
 import type * as employeeAuth from "../employeeAuth.js";
+import type * as employeeBiometrics from "../employeeBiometrics.js";
 import type * as employeeCheckIn from "../employeeCheckIn.js";
 import type * as employeeConsents from "../employeeConsents.js";
 import type * as employeeFaces from "../employeeFaces.js";
@@ -257,6 +258,7 @@ declare const fullApi: ApiFromModules<{
   doors: typeof doors;
   emailVerification: typeof emailVerification;
   employeeAuth: typeof employeeAuth;
+  employeeBiometrics: typeof employeeBiometrics;
   employeeCheckIn: typeof employeeCheckIn;
   employeeConsents: typeof employeeConsents;
   employeeFaces: typeof employeeFaces;
