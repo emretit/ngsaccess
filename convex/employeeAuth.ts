@@ -184,6 +184,7 @@ export const signIn = mutation({
     employee: v.object({
       id: v.id("employees"),
       projectId: v.union(v.id("projects"), v.null()),
+      projectName: v.union(v.string(), v.null()),
       firstName: v.string(),
       lastName: v.string(),
       email: v.string(),
@@ -229,6 +230,7 @@ export const signIn = mutation({
     }
 
     const department = await employeeDepartment(ctx, employee);
+    const project = employee.projectId ? await ctx.db.get(employee.projectId) : null;
     const now = new Date();
     const token = generateSessionToken();
     const expiresAt = new Date(now.getTime() + SESSION_TTL_MS).toISOString();
@@ -253,6 +255,7 @@ export const signIn = mutation({
       employee: {
         id: employee._id,
         projectId: employee.projectId ?? null,
+        projectName: project?.name ?? null,
         firstName: employee.firstName,
         lastName: employee.lastName,
         email: employee.email,
@@ -330,6 +333,7 @@ export const me = employeeAuthedQuery({
   returns: v.object({
     id: v.id("employees"),
     projectId: v.union(v.id("projects"), v.null()),
+    projectName: v.union(v.string(), v.null()),
     firstName: v.string(),
     lastName: v.string(),
     email: v.string(),
@@ -341,9 +345,11 @@ export const me = employeeAuthedQuery({
   handler: async (ctx) => {
     const employee = ctx.employee;
     const department = await employeeDepartment(ctx, employee);
+    const project = employee.projectId ? await ctx.db.get(employee.projectId) : null;
     return {
       id: employee._id,
       projectId: employee.projectId ?? null,
+      projectName: project?.name ?? null,
       firstName: employee.firstName,
       lastName: employee.lastName,
       email: employee.email,

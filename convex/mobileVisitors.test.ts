@@ -13,6 +13,7 @@ const update = makeFunctionReference<"mutation">("mobileVisitors:update");
 const cancel = makeFunctionReference<"mutation">("mobileVisitors:cancel");
 const listPage = makeFunctionReference<"query">("mobileVisitors:listPage");
 const detail = makeFunctionReference<"query">("mobileVisitors:detail");
+const getCreateReceipt = makeFunctionReference<"query">("mobileVisitors:getCreateReceipt");
 const checkOut = makeFunctionReference<"mutation">("visitors:checkOut");
 const releaseCard = makeFunctionReference<"mutation">("visitors:releaseCard");
 const webCreate = makeFunctionReference<"mutation">("visitors:create");
@@ -51,6 +52,37 @@ async function created(t: Awaited<ReturnType<typeof setup>>["t"]) {
 }
 
 describe("employee invitation capability through real auth wrappers", () => {
+  it("recovers a create receipt without exposing visitor details or changing data", async () => {
+    const { t } = await setup();
+    const args = { requestId: input.requestId, sessionToken: "host-session" };
+    expect(await t.query(getCreateReceipt, args)).toBeNull();
+    const id = await created(t);
+    const before = await t.run(ctx => ctx.db.get(id));
+    expect(await t.query(getCreateReceipt, args)).toEqual({ id, status: "preRegistered" });
+    expect(await t.run(ctx => ctx.db.get(id))).toEqual(before);
+    await t.run(ctx => ctx.db.patch(id, { visitorStatus: "checkedOut", isActive: false }));
+    expect(await t.query(getCreateReceipt, args)).toEqual({ id, status: "checkedOut" });
+  });
+
+  it("does not disclose receipts to another host or after a project reassignment", async () => {
+    const { t, host, projectB } = await setup();
+    const id = await created(t);
+    for (const sessionToken of ["other-session", "foreign-session"]) {
+      expect(await t.query(getCreateReceipt, { requestId: input.requestId, sessionToken })).toBeNull();
+    }
+    await t.run(ctx => ctx.db.patch(host, { projectId: projectB }));
+    expect(await t.query(getCreateReceipt, { requestId: input.requestId, sessionToken: "host-session" })).toBeNull();
+    expect(await t.run(ctx => ctx.db.get(id))).not.toBeNull();
+  });
+
+  it("validates the create UUID and requires a valid employee session for receipts", async () => {
+    const { t } = await setup();
+    for (const requestId of ["", "invalid", "x".repeat(1000), "11111111-1111-1111-8111-111111111111"]) {
+      await expect(t.query(getCreateReceipt, { requestId, sessionToken: "host-session" })).rejects.toMatchObject({ data: { code: "VISITOR_INVALID" } });
+    }
+    await expect(t.query(getCreateReceipt, { requestId: input.requestId, sessionToken: "missing" })).rejects.toMatchObject({ data: { code: "SESSION_INVALID" } });
+  });
+
   it("writes a real web-visible inactive preregistration without card grants or device jobs", async () => {
     const { t, projectA, host } = await setup();
     const id = await created(t);

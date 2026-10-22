@@ -69,9 +69,36 @@ describe("mobile auth with the real session wrapper and persisted rate limiter",
     vi.advanceTimersByTime(180000);
     const fresh = await t.mutation(api.employeeAuth.signIn, { email: "mobile@example.test", password: currentPassword });
     if ("error" in fresh) throw new Error("Refilled valid sign-in failed");
-    expect(fresh.employee).toMatchObject({ id: employeeId, projectId: null, departmentId: null, photoUrl: null });
-    expect(Object.keys(fresh.employee).sort()).toEqual(["id", "projectId", "firstName", "lastName", "email", "photoUrl", "departmentId", "cardNumber"].sort());
+    expect(fresh.employee).toMatchObject({ id: employeeId, projectId: null, projectName: null, departmentId: null, photoUrl: null });
+    expect(Object.keys(fresh.employee).sort()).toEqual(["id", "projectId", "projectName", "firstName", "lastName", "email", "photoUrl", "departmentId", "cardNumber"].sort());
     await expect(t.query(api.employeeAuth.me, { sessionToken: fresh.token })).resolves.toMatchObject({ id: employeeId });
+  });
+
+  it("returns only the mobile employee's canonical project for sign-in and restore", async () => {
+    const { t, employeeId } = await fixture();
+    const projectId = await t.run(async ctx => {
+      const projectId = await ctx.db.insert("projects", { name: "Mobile project" });
+      const foreignProjectId = await ctx.db.insert("projects", { name: "Web project" });
+      const webUserId = await ctx.db.insert("users", { email: "mobile@example.test", role: "project_admin" });
+      await ctx.db.insert("userProjects", { userId: webUserId, projectId: foreignProjectId });
+      const departmentId = await ctx.db.insert("departments", { name: "Different department", projectId });
+      await ctx.db.patch(employeeId, { projectId, departmentId });
+      return projectId;
+    });
+    const result = await t.mutation(api.employeeAuth.signIn, { email: "mobile@example.test", password: currentPassword });
+    if ("error" in result) throw new Error("Valid mobile sign-in failed");
+    expect(result.employee).toMatchObject({ projectId, projectName: "Mobile project" });
+    await expect(t.query(api.employeeAuth.me, { sessionToken: result.token }))
+      .resolves.toMatchObject({ projectId, projectName: "Mobile project", departmentName: "Different department" });
+    await t.run(ctx => ctx.db.patch(projectId, { name: "Renamed mobile project" }));
+    await expect(t.query(api.employeeAuth.me, { sessionToken: result.token }))
+      .resolves.toMatchObject({ projectName: "Renamed mobile project" });
+    await t.run(ctx => ctx.db.delete(projectId));
+    await expect(t.query(api.employeeAuth.me, { sessionToken: result.token }))
+      .resolves.toMatchObject({ projectName: null });
+    const orphanResult = await t.mutation(api.employeeAuth.signIn, { email: "mobile@example.test", password: currentPassword });
+    if ("error" in orphanResult) throw new Error("Orphan-compatible sign-in changed unexpectedly");
+    expect(orphanResult.employee.projectName).toBeNull();
   });
 
   it("uses the same result and persistent quota for absent accounts", async () => {

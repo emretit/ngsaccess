@@ -19,6 +19,21 @@ export const notice = employeeAuthedQuery({
 
 const statusValidator = v.union(v.literal("active"), v.literal("checkedOut"), v.literal("expired"), v.literal("preRegistered"));
 
+/** Minimal recovery receipt; a null result does not prove a request never ran. */
+export const getCreateReceipt = employeeAuthedQuery({
+  args: { requestId: v.string() },
+  returns: v.union(v.null(), v.object({ id: v.id("employees"), status: statusValidator })),
+  handler: async (ctx, args) => {
+    const projectId = hostProject(ctx.employee);
+    // Match create's UUID contract exactly, without accepting unbounded keys.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(args.requestId)) throw visitorError("VISITOR_INVALID");
+    const previous = await ctx.db.query("employees")
+      .withIndex("by_host_mobile_visitor_request", q => q.eq("hostEmployeeId", ctx.employee._id).eq("mobileVisitorRequestId", args.requestId)).unique();
+    if (!previous || !previous.isVisitor || previous.hostEmployeeId !== ctx.employee._id || previous.projectId !== projectId) return null;
+    return { id: previous._id, status: visitorStatus(previous, Date.now()) };
+  },
+});
+
 export const listPage = employeeAuthedQuery({
   args: { paginationOpts: paginationOptsValidator, search: v.optional(v.string()), status: v.optional(statusValidator) },
   handler: async (ctx, args) => {
