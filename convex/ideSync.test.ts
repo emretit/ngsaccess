@@ -5,6 +5,7 @@ import {
   buildIdePermissionRecord,
   capPermissionNos,
   outOfRangeIoIds,
+  ideUserStartFromAccessStart,
 } from "./ideSync";
 
 describe("ideSync – hhmmToMinutes", () => {
@@ -85,6 +86,28 @@ describe("ideSync – capPermissionNos", () => {
   });
   it("boş giriş → boş", () => {
     expect(capPermissionNos([])).toEqual([]);
+  });
+});
+
+describe("ideSync – ideUserStartFromAccessStart", () => {
+  const now = Date.parse("2026-10-22T09:00:00.000Z");
+  it("gelecek gün başlangıcı → UTC epoch saniye (TR 00:00 dahil)", () => {
+    expect(ideUserStartFromAccessStart("2026-10-31T21:00:00.000Z", now)).toBe(1793480400);
+    expect(ideUserStartFromAccessStart("2026-11-01T00:00:00+03:00", now)).toBe(1793480400);
+  });
+  it("ziyaretçi kayıt anı ve geçmiş tarih → 0 (panel saati geride olsa da ret yok)", () => {
+    expect(ideUserStartFromAccessStart(new Date(now).toISOString(), now)).toBe(0);
+    expect(ideUserStartFromAccessStart("2026-10-21T21:00:00.000Z", now)).toBe(0);
+  });
+  it("ofsetsiz eski ziyaretçi tarihi TR saati sayılır (runtime TZ'sinden bağımsız)", () => {
+    expect(ideUserStartFromAccessStart("2026-10-23T09:00", now)).toBe(ideUserStartFromAccessStart("2026-10-23T09:00+03:00", now));
+    expect(ideUserStartFromAccessStart("2026-10-23T09:00", now)).toBe(Date.parse("2026-10-23T06:00:00.000Z") / 1000);
+  });
+  it("boş/geçersiz → 0 (sınırsız; panel kaydındaki eski start temizlenir)", () => {
+    expect(ideUserStartFromAccessStart(undefined, now)).toBe(0);
+    expect(ideUserStartFromAccessStart("", now)).toBe(0);
+    expect(ideUserStartFromAccessStart("garbage", now)).toBe(0);
+    expect(ideUserStartFromAccessStart("2026-02-30T00:00:00+03:00", now)).toBe(0);
   });
 });
 

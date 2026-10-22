@@ -20,7 +20,7 @@ async function fixture(role: "project_admin" | "project_user" = "project_admin")
 }
 const person = { firstName: "Ada", lastName: "Test", email: "ada@test.example", cardNumber: "123" };
 describe("employee access start", () => {
-  it("normalizes create/update to Turkey midnight, audits, schedules Hik only and clears with null", async () => {
+  it("normalizes create/update to Turkey midnight, audits, schedules Hik and IDE and clears with null", async () => {
     const f = await fixture();
     const employeeId = await f.caller.mutation(api.employees.create, { projectId: f.projectId, ...person, accessStartsAt: "2026-11-01T00:00:00+03:00" });
     const employee = await f.t.run(ctx => ctx.db.get(employeeId));
@@ -34,15 +34,14 @@ describe("employee access start", () => {
     await f.caller.mutation(api.employees.update, { employeeId, accessStartsAt: null });
     expect((await f.t.run(ctx => ctx.db.get(employeeId)))?.accessStartsAt).toBeUndefined();
     const jobs = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
-    expect(jobs.map(job => job.name)).toEqual([
+    expect(jobs.map(job => job.name)).toEqual(Array.from({ length: 3 }, () => [
       "actions/hikvisionSync:syncEmployeeToDevicesInternal", "actions/ideGatewayDevice:syncEmployeeToIdePanels",
-      "actions/hikvisionSync:syncEmployeeToDevicesInternal", "actions/hikvisionSync:syncEmployeeToDevicesInternal",
-    ]);
+    ]).flat());
     const logs = await f.t.run(ctx => ctx.db.query("auditLog").collect());
     expect(logs).toHaveLength(3);
     expect(logs[2]).toMatchObject({ oldValue: { accessStartsAt: "2026-11-01T21:00:00.000Z" }, newValue: { accessStartsAt: null } });
     await f.caller.mutation(api.employees.update, { employeeId, accessStartsAt: null });
-    expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(4);
+    expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(6);
   });
   it.each(["garbage", "2026-02-30T00:00:00+03:00", "2026-11-01", ""])("rejects invalid ISO %s in create and update", async accessStartsAt => {
     const f = await fixture();

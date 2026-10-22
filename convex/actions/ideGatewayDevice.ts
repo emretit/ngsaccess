@@ -8,7 +8,7 @@ import type { DataModel } from "../_generated/dataModel";
 import { authedAction } from "../lib/customFunctions";
 import { isProjectAllowed } from "../lib/auth";
 import type { Id } from "../_generated/dataModel";
-import { buildIdePermissionRecord, capPermissionNos, outOfRangeIoIds } from "../ideSync";
+import { buildIdePermissionRecord, capPermissionNos, ideUserStartFromAccessStart, outOfRangeIoIds } from "../ideSync";
 
 /** Audit only executed commands; never persist gateway payloads or card lists. */
 async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; error?: string }>(
@@ -139,6 +139,7 @@ export const syncEmployeeToIdePanels = internalAction({
       };
     }
     const status: 0 | 1 = data.employee.isActive === false ? 0 : 1;
+    const start = ideUserStartFromAccessStart(data.employee.accessStartsAt, Date.now());
 
     // Panel başına grupla: aynı panele bağlı tüm kuralları topla.
     type IdeRule = (typeof ideRules)[number];
@@ -204,7 +205,7 @@ export const syncEmployeeToIdePanels = internalAction({
         projectId: panel.projectId,
         opType: "upsertUser",
         // create_data: id zaten varsa panel günceller (idempotent varsayımı — canlı doğrulanmalı).
-        payload: { employeeId: args.employeeId, ruleIds: rules.map(dr => dr.rule._id), grantError: uniqueCount > 16 ? "IDE izin sınırı (16) aşıldı" : undefined, mode: "create", userRecord: { id: cardNo, status, permissions } },
+        payload: { employeeId: args.employeeId, ruleIds: rules.map(dr => dr.rule._id), grantError: uniqueCount > 16 ? "IDE izin sınırı (16) aşıldı" : undefined, mode: "create", userRecord: { id: cardNo, status, start, permissions } },
       });
       opIds.push(userOpId);
       queued++;

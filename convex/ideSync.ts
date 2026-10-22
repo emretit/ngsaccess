@@ -8,6 +8,7 @@ import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation } from "./lib/customFunctions";
+import { toUtcISO } from "./lib/trDate";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scanIdeSync, assertSyncScope } from "./lib/syncStatusScope";
@@ -108,6 +109,19 @@ export function capPermissionNos(
   );
   unique.sort((a, b) => a - b);
   return unique.slice(0, max);
+}
+
+/**
+ * employees.accessStartsAt → IDE user.start (UTC epoch saniye, docs §5.1). Yalnız sync anında
+ * gelecekteyse yazılır; geçmiş/şimdi (ör. ziyaretçi kayıt anı) panel saati geride kalırsa
+ * kapıda ret üretirdi. Diğer durumlarda 0 (sınırsız): alan temizlenince eski start da silinir.
+ */
+export function ideUserStartFromAccessStart(accessStartsAt: string | undefined, now: number): number {
+  // Ofsetsiz eski ziyaretçi tarihi TR saatidir (Hik yoluyla aynı ayrıştırma); runtime TZ'sine bırakılmaz.
+  const iso = accessStartsAt ? toUtcISO(accessStartsAt) : undefined;
+  if (!iso) return 0;
+  const ms = Date.parse(iso);
+  return ms > now ? Math.floor(ms / 1000) : 0;
 }
 
 /**

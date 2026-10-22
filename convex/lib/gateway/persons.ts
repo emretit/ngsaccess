@@ -62,12 +62,18 @@ export function buildDoorPlans(
   };
 }
 
-/** Hik local timeType expects Turkey wall-clock time, without an offset. */
-export function hikValidBeginFromAccessStart(accessStartsAt?: string): string | undefined {
+/**
+ * Hik local timeType expects Turkey wall-clock time, without an offset. Only a start that is
+ * still in the future at sync time is written; past/now (e.g. visitor registration time) keeps
+ * the default begin so a device clock running behind cannot reject a just-registered person.
+ */
+export function hikValidBeginFromAccessStart(accessStartsAt: string | undefined, now: number): string | undefined {
   if (!accessStartsAt) return undefined;
   const iso = toUtcISO(accessStartsAt);
   if (!iso) return undefined;
-  return new Date(Date.parse(iso) + 3 * 60 * 60 * 1000).toISOString().slice(0, 19);
+  const ms = Date.parse(iso);
+  if (!(ms > now)) return undefined;
+  return new Date(ms + 3 * 60 * 60 * 1000).toISOString().slice(0, 19);
 }
 
 /** Bugünden başlayan geniş validity window — accessRule'da explicit tarih alanı yok. */

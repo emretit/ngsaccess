@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 import * as actions from "./actions/hikvisionSync";
@@ -298,6 +298,9 @@ describe("gateway card delivery survives supersession cleanup failure", () => {
 });
 
 describe("employee access start reaches every gateway person write", () => {
+  // Yalnız gelecekteki başlangıç cihaza yazılır; sabit saat testi takvimden bağımsız tutar.
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-22T09:00:00.000Z")); });
+  afterEach(() => { vi.useRealTimers(); });
   it("preserves local beginTime on the main sync and queued retry using the latest employee date", async () => {
     const { t, employeeId, deviceId, projectId } = await fixture();
     await t.run(ctx => ctx.db.patch(employeeId, { accessStartsAt: "2026-10-31T21:00:00.000Z" }));
@@ -314,5 +317,22 @@ describe("employee access start reaches every gateway person write", () => {
     });
     await t.action(internal.actions.hikQueueWorker.processHikQueue, {});
     expect(wire.person).toHaveBeenCalledWith("synthetic", expect.objectContaining({ beginTime: "2026-11-02T00:00:00" }));
+  });
+  it("sends a future local beginTime to the Windows bridge and omits it at registration time or when cleared", async () => {
+    const { t, employeeId, r2 } = await fixture("localBridge");
+    await t.run(async ctx => {
+      await ctx.db.patch(r2, { isActive: false });
+      await ctx.db.patch(employeeId, { accessStartsAt: "2026-10-31T21:00:00.000Z" });
+    });
+    const addPerson = async () => {
+      await t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+      const ops = await t.run(ctx => ctx.db.query("hikPendingOperations").take(10));
+      return ops.find(op => op.operation === "addPerson")?.payload as Record<string, unknown> | undefined;
+    };
+    expect(await addPerson()).toMatchObject({ planTemplateNo: 4, beginTime: "2026-11-01T00:00:00" });
+    await t.run(ctx => ctx.db.patch(employeeId, { accessStartsAt: "2026-10-22T09:00:00.000Z" }));
+    expect((await addPerson())?.beginTime).toBeUndefined();
+    await t.run(ctx => ctx.db.patch(employeeId, { accessStartsAt: undefined }));
+    expect((await addPerson())?.beginTime).toBeUndefined();
   });
 });

@@ -256,6 +256,7 @@ export async function syncEmployeeDevices(
           cardNumber: employee.cardNumber, name: `${employee.firstName} ${employee.lastName}`,
           planTemplateNo: doorPlans[0]?.planTemplateNos[0], doorCount: doorCountFor(t.device),
           doorRights: doorPlans.map(p => p.doorNo),
+          beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt, Date.now()),
         }, args.runId);
         return { ok: true as const, device: t.device };
       }
@@ -264,7 +265,7 @@ export async function syncEmployeeDevices(
         employeeNo: employee.cardNumber,
         name: `${employee.firstName} ${employee.lastName}`,
         doorPlans,
-        beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt),
+        beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt, Date.now()),
       });
       if (!personResult.ok) {
         return {

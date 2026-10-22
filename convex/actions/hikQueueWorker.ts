@@ -126,7 +126,7 @@ async function executeOperation(
         name: `${employee.firstName} ${employee.lastName}`,
         planTemplateNo,
         doorCount: c.device.hikDoorCount,
-        beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt),
+        beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt, Date.now()),
       });
       if (result.ok) {
         try {

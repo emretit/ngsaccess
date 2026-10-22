@@ -49,13 +49,14 @@ describe("Hik toplu yanıt durumu", () => {
 
 
 describe("Hik access start validity", () => {
+  const now = Date.parse("2026-10-22T09:00:00.000Z");
   it.each(["2026-11-01T00:00:00+03:00", "2026-10-31T21:00:00.000Z"])("writes Turkey local midnight from %s", accessStartsAt => {
-    expect(buildPersonPayload({ ...person, planTemplateNo: 4, doorCount: 1, beginTime: hikValidBeginFromAccessStart(accessStartsAt) }).Valid)
+    expect(buildPersonPayload({ ...person, planTemplateNo: 4, doorCount: 1, beginTime: hikValidBeginFromAccessStart(accessStartsAt, now) }).Valid)
       .toMatchObject({ beginTime: "2026-11-01T00:00:00", timeType: "local" });
   });
-  it.each([undefined, "", "invalid", "2026-02-30T00:00:00+03:00"])("keeps the default for %s", accessStartsAt => {
-    expect(hikValidBeginFromAccessStart(accessStartsAt)).toBeUndefined();
-    expect(buildPersonPayload({ employeeNo: "123", name: "Test", doorCount: 1, planTemplateNo: 4, beginTime: hikValidBeginFromAccessStart(accessStartsAt) }).Valid.beginTime)
+  it.each([undefined, "", "invalid", "2026-02-30T00:00:00+03:00", "2026-10-22T09:00:00.000Z", "2026-10-21T21:00:00.000Z"])("keeps the default for %s (missing, invalid, visitor registration time or past)", accessStartsAt => {
+    expect(hikValidBeginFromAccessStart(accessStartsAt, now)).toBeUndefined();
+    expect(buildPersonPayload({ employeeNo: "123", name: "Test", doorCount: 1, planTemplateNo: 4, beginTime: hikValidBeginFromAccessStart(accessStartsAt, now) }).Valid.beginTime)
       .toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00$/);
   });
 });

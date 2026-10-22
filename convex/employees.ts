@@ -351,7 +351,7 @@ export const update = authedMutation({
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId,
       });
-      if (activeChanged || groupMemberAdded) await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
         employeeId,
       });
     }

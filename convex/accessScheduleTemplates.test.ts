@@ -324,6 +324,7 @@ describe("audit regressions", () => {
       const ruleId = await ctx.db.insert("accessRules", { projectId: ids.projectId, name: "Other", isActive: true, scheduleTemplateId: otherTemplate, idePermissionNo: 40 });
       await ctx.db.insert("groupMembers", { projectId: ids.projectId, groupId: ruleId, employeeId: ids.employeeId, createdAt: now });
       await ctx.db.insert("groupDevices", { projectId: ids.projectId, groupId: ruleId, deviceId: ids.ideId, createdAt: now });
+      await ctx.db.patch(ids.employeeId, { accessStartsAt: "2026-10-31T21:00:00.000Z" });
       return ruleId;
     });
     await admin.mutation(api.accessScheduleTemplates.update, { templateId, week: week(2) });
@@ -333,7 +334,7 @@ describe("audit regressions", () => {
     expect((await t.run(ctx => ctx.db.get(otherRule)))?.ideExtraPermissionNos).toBeUndefined();
     const ops = await t.run(ctx => ctx.db.query("idePendingOperations").take(20));
     expect(ops.filter(op => op.opType === "deletePermission")).toHaveLength(0);
-    expect(ops.find(op => op.opType === "upsertUser")).toMatchObject({ payload: { userRecord: { permissions: [5, 40, 41] } } });
+    expect(ops.find(op => op.opType === "upsertUser")).toMatchObject({ payload: { userRecord: { start: 1793480400, permissions: [5, 40, 41] } } });
   });
   it("K=0 rule dispatch succeeds without operations, and retired deletion evidence determines its result", async () => {
     for (const retired of [false, true]) {
@@ -366,13 +367,13 @@ describe("audit regressions", () => {
     await t.run(async ctx => {
       await ctx.db.patch(templateId, { week: week(2) });
       await ctx.db.patch(ids.employeeId, { cardNumber: "invalid" });
-      const employeeId = await ctx.db.insert("employees", { projectId: ids.projectId, firstName: "Next", lastName: "Person", email: "next@example.test", cardNumber: "9876", isActive: true });
+      const employeeId = await ctx.db.insert("employees", { projectId: ids.projectId, firstName: "Next", lastName: "Person", email: "next@example.test", cardNumber: "9876", isActive: true, accessStartsAt: "2026-10-31T21:00:00.000Z" });
       await ctx.db.insert("groupMembers", { projectId: ids.projectId, groupId: ruleId, employeeId, createdAt: now });
     });
     const result = await t.action(internal.actions.ideGatewayDevice.syncPermissionToIdePanels, { accessRuleId: ruleId });
     expect(result.ok).toBe(false);
     expect(result.error).toContain("sayısal");
-    expect(await t.run(ctx => ctx.db.query("idePendingOperations").take(20))).toEqual(expect.arrayContaining([expect.objectContaining({ opType: "upsertUser", payload: expect.objectContaining({ userRecord: expect.objectContaining({ id: 9876 }) }) })]));
+    expect(await t.run(ctx => ctx.db.query("idePendingOperations").take(20))).toEqual(expect.arrayContaining([expect.objectContaining({ opType: "upsertUser", payload: expect.objectContaining({ userRecord: expect.objectContaining({ id: 9876, start: 1793480400 }) }) })]));
   });
 });
 
