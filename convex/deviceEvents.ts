@@ -1,3 +1,6 @@
+import { authedQuery } from "./lib/customFunctions";
+import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+import { deviceConnection, deviceLastSignal, hasPeriodicHeartbeat } from "./lib/deviceConnection";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
@@ -154,5 +157,60 @@ export const recordHikDeviceEvent = internalMutation({
     await notifyAlarmIfNeeded(ctx, eventId);
 
     return { inserted: true };
+  },
+});
+
+
+type ConnectivityPeriod = { offlineFrom: number; offlineTo: number; durationMs: number };
+
+function parseConnectivityPeriod(rawData: string | undefined): ConnectivityPeriod | undefined {
+  if (!rawData) return;
+  try {
+    const value: unknown = JSON.parse(rawData);
+    if (typeof value !== "object" || value === null ||
+      !("offlineFrom" in value) || !("offlineTo" in value) || !("durationMs" in value)) return;
+    const { offlineFrom, offlineTo, durationMs } = value;
+    if (typeof offlineFrom !== "number" || typeof offlineTo !== "number" || typeof durationMs !== "number" ||
+      !Number.isFinite(offlineFrom) || !Number.isFinite(offlineTo) || !Number.isFinite(durationMs) ||
+      offlineTo <= offlineFrom || durationMs !== offlineTo - offlineFrom) return;
+    return { offlineFrom, offlineTo, durationMs };
+  } catch { return; }
+}
+
+export const getConnectivityHistory = authedQuery({
+  args: { deviceId: v.id("devices"), days: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    const allowed = await getProjectIdsForUser(ctx);
+    if (!isProjectAllowed(allowed, device.projectId)) throw new Error("Bu cihaza erişim yetkiniz yok");
+    const days = args.days ?? 30;
+    if (!Number.isInteger(days) || days < 1 || days > 30) throw new Error("Gün sayısı 1–30 arasında olmalı");
+    const now = Date.now();
+    const cutoff = now - days * 86400000;
+    // Category + label in the index keep other events (access/alarm/other status) out of the scan and the subscription.
+    const rows = await ctx.db.query("deviceEvents")
+      .withIndex("by_device_category_label_event_time", q => q.eq("deviceId", args.deviceId).eq("category", "status").eq("label", "Çevrimdışı dönemi").gte("eventTime", new Date(cutoff).toISOString()))
+      .order("desc")
+      .take(501);
+    const periods: ConnectivityPeriod[] = [];
+    for (const row of rows.slice(0, 500)) {
+      const period = parseConnectivityPeriod(row.rawData);
+      if (period && period.offlineTo <= now && period.offlineTo >= cutoff) {
+        periods.push(period);
+      }
+    }
+    const signal = deviceLastSignal(device);
+    const periodicHeartbeat = hasPeriodicHeartbeat(device);
+    const ongoing = (periodicHeartbeat || device.hikOfflineHint) && deviceConnection(device, now) === "offline" && signal !== undefined && signal < now
+      ? { since: signal } : undefined;
+    const ongoingMs = ongoing ? now - Math.max(cutoff, ongoing.since) : 0;
+    return {
+      asOf: now,
+      count: periods.length + (ongoing ? 1 : 0),
+      totalMs: periods.reduce((sum, p) => sum + p.offlineTo - Math.max(cutoff, p.offlineFrom), ongoingMs),
+      longestMs: periods.reduce((longest, p) => Math.max(longest, p.offlineTo - Math.max(cutoff, p.offlineFrom)), ongoingMs),
+      periods: periods.slice(0, 20), ...(ongoing ? { ongoing } : {}), truncated: rows.length > 500, periodicHeartbeat,
+    };
   },
 });

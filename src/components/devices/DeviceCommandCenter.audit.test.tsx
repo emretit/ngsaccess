@@ -1,6 +1,7 @@
 vi.mock("@/hooks/useProjectAccess", () => ({
   useProjectAccess: () => ({ isAdmin: mocks.admin }),
 }));
+import { getFunctionName, type FunctionReference } from "convex/server";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import type { Device } from "@/types/device";
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   device: {} as Device,
 }));
 vi.mock("convex/react", () => ({
-  useQuery: () => ({
+  useQuery: (query: FunctionReference<"query">) => getFunctionName(query) === "deviceEvents:getConnectivityHistory" ? { asOf: 0, count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false } : ({
     device: mocks.device,
     limits: { doorsCapped: mocks.limited, readersCapped: false },
     doors: [{ _id: "door", name: "Kapı", hikDoorNo: 1, ioId: 0 }],

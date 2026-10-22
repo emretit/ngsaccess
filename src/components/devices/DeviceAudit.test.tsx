@@ -2,6 +2,7 @@ vi.mock("@/hooks/useProjectAccess", () => ({
   useProjectAccess: () => ({ isAdmin: true }),
 }));
 import type { MouseEvent, ReactNode } from "react";
+import { getFunctionName, type FunctionReference } from "convex/server";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -36,7 +37,9 @@ vi.mock("@/components/ui/table", async (original) => {
   };
 });
 vi.mock("convex/react", () => ({
-  useQuery: mocks.query,
+  useQuery: (query: FunctionReference<"query">, args: unknown) => getFunctionName(query) === "deviceEvents:getConnectivityHistory"
+    ? { asOf: 0, count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false }
+    : mocks.query(query, args),
   useMutation: () => vi.fn(),
   useAction: () => vi.fn(),
 }));

@@ -651,6 +651,7 @@ export default defineSchema({
     .index("by_project_and_event_time", ["projectId", "eventTime"])
     .index("by_project_category_event_time", ["projectId", "category", "eventTime"])
     .index("by_device_and_event_time", ["deviceId", "eventTime"])
+    .index("by_device_category_label_event_time", ["deviceId", "category", "label", "eventTime"])
     .index("by_device_and_hik_serial", ["deviceId", "hikSerialNo"]),
 
   // Alarm e-posta bildirimi ayarı (proje başına tek satır; P1).

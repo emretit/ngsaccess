@@ -1,3 +1,4 @@
+import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
 import { listMobileTargets } from "./lib/mobileAccess";
 import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
@@ -286,6 +287,13 @@ export const update = adminMutation({
       clean.isActive = active;
       clean.status = active ? "active" : "inactive";
     }
+    if (args.lastSeen !== undefined) {
+      const signal = deviceLastSignal({ ...device, lastSeen: args.lastSeen });
+      const nowMs = Date.now();
+      if (signal !== undefined && signal <= nowMs && signal > nowMs - DEVICE_ONLINE_WINDOW_MS && signal !== deviceLastSignal(device)) {
+        await recordConnectivityTransition(ctx, device, signal);
+      }
+    }
     await ctx.db.patch(deviceId, toPatch(clean));
 
     // Panel başka bölgeye taşınırsa (zoneId değişti), o panele bağlı tüm kapıların
@@ -405,9 +413,11 @@ export const updateLastSeen = internalMutation({
       // ETMİYORUZ — /card-reader unauth olduğu için saldırgan forged ipAddress
       // veya devIndex yollayarak cihaz lookup index'lerini bozabilir. Bu alanlar
       // sadece trusted yoldan (gateway register / refreshGatewayDeviceStatus) yazılır.
+      await recordConnectivityTransition(ctx, device, Date.parse(now));
       await ctx.db.patch(device._id, {
         lastSeen: now,
-        hikLastSeenAt: Date.now(),
+        hikLastSeenAt: Date.parse(now),
+        hikOfflineHint: undefined,
       });
     } else if (!deviceId && ideUuid) {
       // Cihaz henüz projeye atanmamış (adminDevices'ta) olabilir — orada da lastSeen güncelle.
@@ -518,6 +528,9 @@ export const markIdeOnline = internalMutation({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args) => {
     const now = new Date().toISOString();
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    await recordConnectivityTransition(ctx, device, Date.parse(now));
     await ctx.db.patch(args.deviceId, {
       lastSeen: now,
       status: "active",
@@ -1240,17 +1253,21 @@ export const applyGatewayHeartbeat = internalMutation({
       }
     }
     const now = Date.now();
+    // Throttle erken dönüşünden önce eski sinyalle karşılaştır.
+    const reconnected = args.online ? await recordConnectivityTransition(ctx, device, now) : false;
     const offlineHint = args.online ? undefined : "Gateway çevrimdışı";
     const deviceIp = device.deviceIp || args.deviceIp || undefined;
     const model = device.hikModel || args.model || undefined;
     const changed = device.hikOfflineHint !== offlineHint ||
       device.deviceIp !== deviceIp || device.hikModel !== model;
-    if (!changed && device.hikLastSeenAt !== undefined && now - device.hikLastSeenAt < 60_000) {
+    const lastHeartbeat = args.online ? device.hikLastSeenAt : Date.parse(device.updatedAt);
+    if (!reconnected && !changed && lastHeartbeat !== undefined && now - lastHeartbeat < 60_000) {
       return true;
     }
     const nowIso = new Date(now).toISOString();
     await ctx.db.patch(device._id, {
-      hikLastSeenAt: now,
+      // Offline durum sorgusu başarılı cihaz sinyali değildir.
+      ...(args.online ? { hikLastSeenAt: now } : {}),
       updatedAt: nowIso,
       hikOfflineHint: offlineHint,
       deviceIp,
