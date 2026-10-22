@@ -45,7 +45,7 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
   const refresh = useCallback(() => setRevision((r) => r + 1), []);
   const { filters, search, setSearch, expanded, setExpanded, change } =
     useStatusFilters();
-  const options = useStatusOptions({ convex, projectId, setError });
+  const options = useStatusOptions({ convex, projectId, setError, revision });
   const { counts, projectCounts } = useStatusCounts({
     convex, projectId, setError, filters, revision,
   });

@@ -25,7 +25,21 @@ const emptyOptions: Options = {
   templates: [],
 };
 
-export function useStatusOptions({ convex, projectId, setError }: StatusScope) {
+// Status UI reads only _id/name from devices; keeping the old array when those
+// match stops a refresh from re-running every per-device counts query.
+export function keepSameDevices<T extends { _id: string; name: string }>(
+  prev: T[],
+  next: T[],
+): T[] {
+  const same =
+    prev.length === next.length &&
+    prev.every((d, i) => d._id === next[i]?._id && d.name === next[i]?.name);
+  return same ? prev : next;
+}
+
+export function useStatusOptions({
+  convex, projectId, setError, revision,
+}: StatusScope & { revision: number }) {
   const [options, setOptions] = useState<Options>(emptyOptions);
   useEffect(() => {
     let alive = true;
@@ -49,7 +63,13 @@ export function useStatusOptions({ convex, projectId, setError }: StatusScope) {
         rules.push(...page.page.map((r) => ({ _id: r._id, name: r.name })));
         next = page.isDone ? null : page.continueCursor;
       } while (next && alive);
-      if (alive) setOptions({ departments, devices, templates, rules });
+      if (alive)
+        setOptions((prev) => ({
+          departments,
+          devices: keepSameDevices(prev.devices, devices),
+          templates,
+          rules,
+        }));
     }
     void loadOptions().catch((e) => {
       if (alive) setError(errorMessage(e));
@@ -57,7 +77,7 @@ export function useStatusOptions({ convex, projectId, setError }: StatusScope) {
     return () => {
       alive = false;
     };
-  }, [convex, projectId, setError]);
+  }, [convex, projectId, revision, setError]);
   return options;
 }
 

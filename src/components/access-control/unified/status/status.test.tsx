@@ -24,6 +24,7 @@ import {
   EmptyStatus,
   GrantRows,
 } from "./StatusViews";
+import { keepSameDevices } from "./useStatusData";
 const state = vi.hoisted(() => ({
   admin: true,
   params: "",
@@ -285,5 +286,31 @@ describe("yetki durumu SSR", () => {
     );
     expect(run).toContain("useQuery(api.deviceSyncRuns.get");
     expect(run).toContain("!completed.current");
+  });
+  it("Yenile filtre seçeneklerini de yeniden yükler", () => {
+    const page = readFileSync(
+      new URL("./StatusPage.tsx", import.meta.url),
+      "utf8",
+    ).replace(/\s/g, "");
+    expect(page).toContain(
+      "useStatusOptions({convex,projectId,setError,revision})",
+    );
+    const data = readFileSync(
+      new URL("./useStatusData.ts", import.meta.url),
+      "utf8",
+    ).replace(/\s/g, "");
+    expect(data).toContain("},[convex,projectId,revision,setError]);");
+  });
+  it("cihaz kimliği ve adı aynıysa eski diziyi korur, değişince yenisini alır", () => {
+    const prev = [
+      { _id: "d1", name: "Giriş" },
+      { _id: "d2", name: "Depo" },
+    ];
+    expect(keepSameDevices(prev, prev.map((d) => ({ ...d })))).toBe(prev);
+    const renamed = [{ _id: "d1", name: "Ana giriş" }, prev[1]];
+    expect(keepSameDevices(prev, renamed)).toBe(renamed);
+    const added = [...prev, { _id: "d3", name: "Otopark" }];
+    expect(keepSameDevices(prev, added)).toBe(added);
+    expect(keepSameDevices(prev, [prev[1], prev[0]])).not.toBe(prev);
   });
 });
