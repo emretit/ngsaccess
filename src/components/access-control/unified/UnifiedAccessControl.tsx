@@ -1,5 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import StatusPage from "./status/StatusPage";
 import TemplatesPage from "./templates/TemplatesPage";
 import { useState } from "react";
 import AccessRulesList from "./AccessRulesList";
@@ -10,7 +12,13 @@ import type { AccessRule } from "@/types/access-control";
 
 const ProjectAccessControl = () => {
   const [params, setParams] = useSearchParams();
-  const tab = params.get("tab") === "templates" ? "templates" : "rules";
+  const { isAdmin } = useActiveProject();
+  const tab =
+    params.get("tab") === "status" && isAdmin
+      ? "status"
+      : params.get("tab") === "templates"
+        ? "templates"
+        : "rules";
   const [saved, setSaved] = useState<RuleSaveResult | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AccessRule | null>(null);
@@ -40,7 +48,8 @@ const ProjectAccessControl = () => {
         onValueChange={(value) =>
           setParams((prev) => {
             const next = new URLSearchParams(prev);
-            if (value === "templates") next.set("tab", value);
+            if (value === "templates" || value === "status")
+              next.set("tab", value);
             else {
               next.delete("tab");
               next.delete("template");
@@ -49,10 +58,16 @@ const ProjectAccessControl = () => {
           })
         }
       >
-        <TabsList>
+        <TabsList className="h-auto flex flex-wrap w-fit max-w-full">
           <TabsTrigger value="rules">Kurallar</TabsTrigger>
           <TabsTrigger value="templates">Zaman Şablonları</TabsTrigger>
+          {isAdmin && <TabsTrigger value="status">Yetki Durumu</TabsTrigger>}
         </TabsList>
+        {isAdmin && (
+          <TabsContent value="status">
+            <StatusPage />
+          </TabsContent>
+        )}
         <TabsContent value="templates">
           <TemplatesPage />
         </TabsContent>

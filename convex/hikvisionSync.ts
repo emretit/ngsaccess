@@ -1,3 +1,4 @@
+import { grantStatusForOperation } from "./lib/grantStatus";
 import type { ScheduleTemplate } from "./lib/accessSchedule";
 import { mobileOperationId, mobileQueueAllowed } from "./lib/mobileAccess";
 import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } from "./lib/biometricGate";
@@ -477,6 +478,7 @@ export async function enqueueLocalBridgeOperationInTransaction(ctx: MutationCtx,
           claimedBy: undefined,
           lastError: undefined,
         });
+        if (["addPerson", "updatePerson", "deletePerson", "deleteCard"].includes(args.operation)) await grantStatusForOperation(ctx, { ...args, _id: existing._id }, "pending");
         await scheduleBridgeWakeForProject(ctx, device.projectId);
         return existing._id;
       }
@@ -492,6 +494,7 @@ export async function enqueueLocalBridgeOperationInTransaction(ctx: MutationCtx,
       nextRetryAt: now,
       createdAt: now,
     });
+    if (["addPerson", "updatePerson", "deletePerson", "deleteCard"].includes(args.operation)) await grantStatusForOperation(ctx, { ...args, _id: opId }, "pending");
     await scheduleBridgeWakeForProject(ctx, device.projectId);
     return opId;
 }
@@ -649,6 +652,10 @@ export const ackLocalBridgeOperation = internalMutation({
       return { ok: false, error: "operation not found" };
     }
     if (mobileOperationId(op.payload) !== undefined && op.status !== "processing") return { ok: false, error: "operation not processing" };
+    // A dedupe may have replaced the in-flight payload; let the bridge fetch it again.
+    if (op.status !== "processing") return { ok: true };
+    if (["addPerson", "updatePerson", "deletePerson", "deleteCard"].includes(op.operation)) await grantStatusForOperation(ctx, op,
+      args.ok ? (["deletePerson", "deleteCard"].includes(op.operation) ? "removed" : "effective") : "failed", args.message);
     if (args.ok) {
       await ctx.db.patch(args.opId, {
         status: "done",
@@ -845,6 +852,8 @@ export const listRetryCandidates = internalQuery({
 export const markOpDone = internalMutation({
   args: { id: v.id("hikPendingOperations") },
   handler: async (ctx, args) => {
+    const op = await ctx.db.get(args.id);
+    if (op && ["addPerson", "updatePerson", "addCard", "deletePerson"].includes(op.operation)) await grantStatusForOperation(ctx, op, op.operation === "deletePerson" ? "removed" : "effective");
     await ctx.db.patch(args.id, {
       status: "done",
       completedAt: Date.now(),
@@ -923,6 +932,7 @@ export const markOpRetried = internalMutation({
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id);
     if (!row) return;
+    if (["addPerson", "updatePerson", "addCard", "deletePerson"].includes(row.operation)) await grantStatusForOperation(ctx, row, "failed", args.lastError);
     await ctx.db.patch(args.id, {
       attemptCount: row.attemptCount + 1,
       lastError: args.lastError,

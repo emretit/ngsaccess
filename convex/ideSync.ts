@@ -1,3 +1,4 @@
+import { grantStatusForOperation } from "./lib/grantStatus";
 import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule, type ScheduleTemplate } from "./lib/accessSchedule";
 import { boundedScheduleRows, scheduleRuleDevices } from "./accessScheduleTemplates";
 import { mobileOperationId, mobileQueueAllowed, accessError } from "./lib/mobileAccess";
@@ -257,11 +258,12 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
           nextRetryAt: now,
           lastError: undefined,
         });
+        if (args.opType === "upsertUser" || args.opType === "deleteUser") await grantStatusForOperation(ctx, { ...args, _id: open._id }, "pending");
         return open._id;
       }
     }
 
-    return await ctx.db.insert("idePendingOperations", {
+    const opId = await ctx.db.insert("idePendingOperations", {
       projectId: args.projectId,
       deviceId: args.deviceId,
       runId: args.runId,
@@ -274,6 +276,8 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
       nextRetryAt: now,
       createdAt: now,
     });
+    if (args.opType === "upsertUser" || args.opType === "deleteUser") await grantStatusForOperation(ctx, { ...args, _id: opId }, "pending");
+    return opId;
 }
 
 /** Bridge'in çekeceği pending op'lar (nextRetryAt geçmiş). materialize edilmiş alanlarla. */
@@ -402,6 +406,7 @@ export const markAck = internalMutation({
     if (args.msxId != null && op.msxId != null && op.msxId !== args.msxId) return;
 
     if (args.result === "success") {
+      if (op.opType === "upsertUser" || op.opType === "deleteUser") await grantStatusForOperation(ctx, op, op.opType === "deleteUser" ? "removed" : "effective");
       await ctx.db.patch(args.opId, {
         status: "acked",
         ackedAt: Date.now(),
@@ -468,6 +473,7 @@ export const markAck = internalMutation({
         lastError: undefined,
       });
       if (op.opType === "deleteUser") {
+        await grantStatusForOperation(ctx, op, "removed");
         const device = await ctx.db.get(op.deviceId);
         const card = normalizeIdeCard(
           ((op.payload ?? {}) as Record<string, unknown>).ideUserId,
@@ -476,6 +482,7 @@ export const markAck = internalMutation({
       }
       return;
     }
+    if (op.opType === "upsertUser" || op.opType === "deleteUser") await grantStatusForOperation(ctx, op, "failed", args.message ?? args.result);
     // fail / timeout → retry veya terminal failed
     const maxAttempts = mobileOperationId(op.payload) !== undefined ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     if (op.attempts >= maxAttempts) {
@@ -514,6 +521,7 @@ export const requeueTimedOut = internalMutation({
         const maxAttempts = mobileOperationId(op.payload) !== undefined ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
         if (op.attempts >= maxAttempts) {
           await ctx.db.patch(op._id, { status: "failed", lastError: "ack timeout (cron)" });
+          if (op.opType === "upsertUser" || op.opType === "deleteUser") await grantStatusForOperation(ctx, op, "failed", "ack timeout (cron)");
         } else {
           await ctx.db.patch(op._id, {
             status: "pending",

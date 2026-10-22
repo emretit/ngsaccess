@@ -1,0 +1,89 @@
+import type { FunctionArgs, FunctionReturnType } from "convex/server";
+import { api } from "../../../../../convex/_generated/api";
+import type { Id } from "../../../../../convex/_generated/dataModel";
+
+export type GrantRow = FunctionReturnType<
+  typeof api.accessGrantStatus.listByProject
+>["page"][number];
+export type EmployeeDetail = FunctionReturnType<
+  typeof api.accessGrantStatus.byEmployee
+>;
+export type Counts = FunctionReturnType<typeof api.accessGrantStatus.counts>;
+export type Pair = { employeeId: Id<"employees">; deviceId: Id<"devices"> };
+export type Filters = {
+  departmentId?: Id<"departments">;
+  deviceId?: Id<"devices">;
+  ruleId?: Id<"accessRules">;
+  templateId?: Id<"accessScheduleTemplates">;
+  state?: GrantRow["state"];
+  search?: string;
+};
+export const labels = {
+  all: "Tümü",
+  effective: "Etkin",
+  pending: "Bekliyor",
+  failed: "Hata",
+  removed: "Kaldırıldı",
+  unknown: "Bilinmiyor",
+};
+export const countText = (value: number, capped: boolean) =>
+  capped && value >= 1000 ? "1000+" : String(value);
+export function queryArgs(
+  projectId: Id<"projects">,
+  filters: Filters,
+  cursor: string | null = null,
+): FunctionArgs<typeof api.accessGrantStatus.listByProject> {
+  return {
+    projectId,
+    ...filters,
+    search: filters.search?.trim() || undefined,
+    paginationOpts: { numItems: 50, cursor },
+  };
+}
+export const pairKey = (pair: Pair) => `${pair.employeeId}:${pair.deviceId}`;
+export function togglePair(
+  selected: Pair[],
+  pair: Pair,
+): { pairs: Pair[]; error?: string } {
+  if (selected.some((p) => pairKey(p) === pairKey(pair)))
+    return { pairs: selected.filter((p) => pairKey(p) !== pairKey(pair)) };
+  if (selected.length >= 100)
+    return { pairs: selected, error: "En çok 100 kişi×cihaz seçebilirsiniz." };
+  return { pairs: [...selected, pair] };
+}
+export const confirmationText = (count: number | string) =>
+  `${count} kişi×cihaz için tek gönderim başlatılacak.`;
+export function grantBadge(row: {
+  state: keyof typeof labels;
+  stale?: boolean;
+  lastError?: string;
+}) {
+  return {
+    label: row.stale ? labels.pending : labels[row.state],
+    stale: row.stale === true,
+    tone:
+      row.state === "failed"
+        ? ("danger" as const)
+        : row.stale || row.state === "pending"
+          ? ("warning" as const)
+          : row.state === "effective"
+            ? ("success" as const)
+            : ("neutral" as const),
+    hint: row.state === "failed" ? row.lastError : undefined,
+  };
+}
+
+/** Preserve identity so the initial empty debounce does not trigger a second query. */
+export function searchFilters(filters: Filters, search: string): Filters {
+  const trimmed = search.trim();
+  return (filters.search ?? "") === trimmed ? filters : { ...filters, search: trimmed };
+}
+export function failedConfirmationText(failed: number, capped: boolean): string {
+  const total = countText(failed, capped);
+  if (failed <= 100) return confirmationText(total);
+  const remaining = `${failed - 100}${capped && failed >= 1000 ? "+" : ""}`;
+  return `${total} hatalı kişi×cihaz var. İlk 100 hatalı kişi×cihaz için tek gönderim başlatılacak; kalan ${remaining} sonraki turda.`;
+}
+export function redistributionSuccessText(result: Pick<FunctionReturnType<typeof api.accessGrantStatus.redistribute>, "pairCount" | "remainingFailed" | "remainingCapped">): string {
+  return `${result.pairCount ?? "Tüm yetkili"} kişi×cihaz için gönderim başlatıldı. Kalan ${result.remainingFailed}${result.remainingCapped ? "+" : ""} hatalı kişi×cihaz sonraki turda.`;
+}

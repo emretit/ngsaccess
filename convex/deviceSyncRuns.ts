@@ -72,7 +72,9 @@ async function refreshRun(ctx: MutationCtx, runId: Id<"deviceSyncRuns">) {
 /** Auth remains inside the transaction; public callers cannot supply startedBy. */
 export const createRun = internalMutation({
   args: { projectId: v.optional(v.id("projects")), ruleId: v.optional(v.id("accessRules")) },
-  handler: async (ctx, args): Promise<Id<"deviceSyncRuns">> => {
+  handler: createRunInTransaction,
+});
+export async function createRunInTransaction(ctx: MutationCtx, args: { projectId?: Id<"projects">; ruleId?: Id<"accessRules"> }): Promise<Id<"deviceSyncRuns">> {
     const user = await requireAdmin(ctx);
     const rule = args.ruleId ? await ctx.db.get(args.ruleId) : null;
     if (args.ruleId && !rule) throw new ConvexError("Kural bulunamadı");
@@ -107,8 +109,7 @@ export const createRun = internalMutation({
     const status = await updateSummary(ctx, runId);
     if (status === "running") await ctx.scheduler.runAfter(refreshDelay(0), internal.deviceSyncRuns.refreshSummary, { runId, pollAttempt: 1 });
     return runId;
-  },
-});
+}
 
 export const startProjectResync = authedAction({
   args: { projectId: v.id("projects") },
@@ -142,10 +143,9 @@ async function readRuleDispatch(ctx: QueryCtx, args: {
 }): Promise<IdeRulePlan | null> {
   const rule = await ctx.db.get(args.ruleId);
   if (!rule || rule.projectId !== args.projectId || rule.isActive === false) return null;
-  const relations = await ctx.db.query("groupDevices")
-    .withIndex("by_project_group", q => q.eq("projectId", args.projectId).eq("groupId", args.ruleId)).take(MAX_DEVICES + 1);
-  if (relations.length > MAX_DEVICES) throw new ConvexError("Kural cihaz sınırı aşıldı (200)");
-  const deviceIds = [...new Set(relations.filter(r => args.deviceIds.includes(r.deviceId)).map(r => r.deviceId))];
+  const devices = await scheduleRuleDevices(ctx, rule);
+  if (devices.length > MAX_DEVICES) throw new ConvexError("Kural cihaz sınırı aşıldı (200)");
+  const deviceIds = devices.filter(device => args.deviceIds.includes(device._id)).map(device => device._id);
   if (!deviceIds.length) return null;
   const members = await ctx.db.query("groupMembers")
     .withIndex("by_project_group", q => q.eq("projectId", args.projectId).eq("groupId", args.ruleId)).take(MAX_MEMBERS + 1);
@@ -501,6 +501,7 @@ export const executeRuleDiffTarget = internalAction({
         ? await ctx.runQuery(internal.deviceSyncRuns.diffIdeContext, { deviceId: device._id, reconcileRoster: args.reconcileRoster && (currentRuleTarget || args.wasRuleTarget) })
         : { authorizedCards: [], orphanCards: [] };
       const deleteCards = new Set(ideContext.orphanCards);
+      const deleteEmployeesByCard = new Map<string, Id<"employees">>();
       for (const employeeId of new Set([...args.removed, ...args.syncMembers])) {
         checkTimeout();
         try {
@@ -520,7 +521,10 @@ export const executeRuleDiffTarget = internalAction({
             if (device.brand === "ide_smart") {
               const card = normalizeIdeCard(data.employee.cardNumber);
               if (!card) throw new ConvexError("Kart numarası IDE için geçersiz");
-              if (!ideContext.authorizedCards.includes(card)) deleteCards.add(data.employee.cardNumber);
+              if (!ideContext.authorizedCards.includes(card)) {
+                deleteCards.add(data.employee.cardNumber);
+                deleteEmployeesByCard.set(data.employee.cardNumber, employeeId);
+              }
             } else {
               worked = true;
               // Snapshot retains the former target after its membership has been removed.
@@ -540,7 +544,7 @@ export const executeRuleDiffTarget = internalAction({
         checkTimeout();
         worked = true;
         const result = await ctx.runAction(internal.actions.ideGatewayDevice.deleteIdeUserFromPanels, {
-          cardNumber, deviceIds: [device._id], projectId: run.projectId, runId: run._id,
+          employeeId: deleteEmployeesByCard.get(cardNumber), cardNumber, deviceIds: [device._id], projectId: run.projectId, runId: run._id,
         });
         if (!result.ok || result.queued !== 1) failures.push("IDE yetkisiz kişi silinemedi");
       }
@@ -673,10 +677,12 @@ export const enqueueTemplateTarget = internalMutation({
       if (!Number.isSafeInteger(card) || card < 1) throw new ConvexError("IDE kart numarası sayısal olmalı");
       const memberships = boundedScheduleRows(await ctx.db.query("groupMembers").withIndex("by_project_employee", q => q.eq("projectId", run.projectId).eq("employeeId", employeeId)).take(101), 100);
       const nos: number[] = [];
+      const ruleIds: Id<"accessRules">[] = [];
       for (const ruleId of new Set(memberships.map(m => m.groupId))) {
         const rule = await ctx.db.get(ruleId);
         if (!rule || rule.projectId !== run.projectId || rule.isActive === false) continue;
         if (!(await scheduleRuleDevices(ctx, rule)).some(d => d._id === device._id)) continue;
+        ruleIds.push(ruleId);
         nos.push(...[rule.idePermissionNo, ...(rule.ideExtraPermissionNos ?? [])].filter((no): no is number => no !== undefined));
       }
       if (new Set(nos).size > 16) {
@@ -684,8 +690,76 @@ export const enqueueTemplateTarget = internalMutation({
         continue;
       }
       await enqueueIdeOpInTransaction(ctx, { deviceId: device._id, projectId: run.projectId, runId: run._id, opType: "upsertUser",
-        payload: { mode: "create", userRecord: { id: card, status: 1, permissions: capPermissionNos(nos) } } });
+        payload: { employeeId, ruleIds, mode: "create", userRecord: { id: card, status: 1, permissions: capPermissionNos(nos) } } });
     }
     if (failures.length) await ctx.db.patch(target._id, { status: "failed", dispatchFinished: true, reason: failures.join("; ").slice(0, 2000), updatedAt: Date.now() });
+  },
+});
+
+async function assertNoActiveGrantRun(ctx: MutationCtx, projectId: Id<"projects">) {
+  const runs = await ctx.db.query("deviceSyncRuns").withIndex("by_project_started", q => q.eq("projectId", projectId).gte("startedAt", Date.now() - RUN_TIMEOUT_MS)).order("desc").take(1001);
+  if (runs.some(run => run.status === "running")) throw new ConvexError("Bu projede bir gönderim zaten çalışıyor");
+  if (runs.length > 1000) throw new ConvexError("Gönderim geçmişi okuma sınırı aşıldı; çalışan gönderim denetlenemedi");
+}
+
+/** Selected pairs share one run, one target per device and the existing watchdog. */
+export async function createGrantRun(ctx: MutationCtx, args: {
+  projectId: Id<"projects">; startedBy: Id<"users">;
+  pairs: { employeeId: Id<"employees">; deviceId: Id<"devices"> }[];
+}): Promise<Id<"deviceSyncRuns">> {
+  if (args.pairs.length === 0 || args.pairs.length > 100) throw new ConvexError("1–100 kişi×cihaz seçin");
+  await assertNoActiveGrantRun(ctx, args.projectId);
+  const byDevice = new Map<Id<"devices">, { device: Doc<"devices">; employeeIds: Set<Id<"employees">> }>();
+  for (const pair of args.pairs) {
+    const [employee, device] = await Promise.all([ctx.db.get(pair.employeeId), ctx.db.get(pair.deviceId)]);
+    if (!employee || employee.projectId !== args.projectId || !device || device.projectId !== args.projectId) throw new ConvexError("Kişi ve cihaz aynı projede olmalı");
+    const entry = byDevice.get(device._id) ?? { device, employeeIds: new Set<Id<"employees">>() };
+    entry.employeeIds.add(employee._id); byDevice.set(device._id, entry);
+  }
+  const now = Date.now();
+  const runId = await ctx.db.insert("deviceSyncRuns", { projectId: args.projectId, startedBy: args.startedBy, kind: "project_resync", status: "running", startedAt: now, counts: summarizeRun([], false).counts, dispatchFinished: true });
+  for (const { device, employeeIds } of byDevice.values()) {
+    const reason = skippedReason(device, now);
+    const targetId = await ctx.db.insert("deviceSyncRunTargets", { runId, deviceId: device._id, deviceName: device.name, brand: device.brand ?? "other", status: reason ? "skipped" : "queued", reason, updatedAt: now });
+    if (!reason) await ctx.scheduler.runAfter(0, internal.deviceSyncRuns.executeGrantTarget, { targetId, employeeIds: [...employeeIds] });
+  }
+  await ctx.scheduler.runAfter(RUN_TIMEOUT_MS, internal.deviceSyncRuns.expireRun, { runId });
+  if (await updateSummary(ctx, runId) === "running") await ctx.scheduler.runAfter(refreshDelay(0), internal.deviceSyncRuns.refreshSummary, { runId, pollAttempt: 1 });
+  return runId;
+}
+
+export const executeGrantTarget = internalAction({
+  args: { targetId: v.id("deviceSyncRunTargets"), employeeIds: v.array(v.id("employees")) },
+  handler: async (ctx, args): Promise<void> => {
+    const loaded = await ctx.runQuery(internal.deviceSyncRuns.loadTarget, { targetId: args.targetId });
+    if (!loaded || loaded.target.status !== "queued") return;
+    const { run, target, device } = loaded;
+    const failures: string[] = [];
+    try {
+      const skip = skippedReason(device, Date.now());
+      if (skip) { await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: target._id, skipped: skip }); return; }
+      for (const employeeId of args.employeeIds) {
+        if (Date.now() - run.startedAt >= RUN_TIMEOUT_MS) throw new ConvexError("Gönderim zaman sınırı aşıldı");
+        const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId });
+        if (!data || data.employee.projectId !== run.projectId) throw new ConvexError("Çalışan bulunamadı veya proje değişti");
+        const context = { employeeId, runId: run._id, targetDeviceIds: [device._id] };
+        if (data.deviceRules.some(dr => dr.device._id === device._id) && data.employee.isActive !== false) {
+          if (device.brand === "ide_smart") {
+            const result = await ctx.runAction(internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, context);
+            if (!result.ok || !result.queued) failures.push(result.error ?? "IDE kişisi gönderilemedi");
+          } else {
+            const result = await ctx.runAction(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { ...context, allowedProjectIds: [run.projectId] });
+            if (result.failed || !result.synced) failures.push(result.errors.join("; ") || "Hik kişisi gönderilemedi");
+          }
+        } else if (device.brand === "ide_smart") {
+          const result = await ctx.runAction(internal.actions.ideGatewayDevice.deleteIdeUserFromPanels, { employeeId, runId: run._id, projectId: run.projectId, deviceIds: [device._id], cardNumber: data.employee.cardNumber });
+          if (!result.ok || !result.queued) failures.push("IDE kişisi silinemedi");
+        } else {
+          const result = await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { ...context, allowedProjectIds: [run.projectId], snapshot: { cardNumber: data.employee.cardNumber, projectId: run.projectId, devices: [{ _id: device._id, name: device.name, projectId: device.projectId, brand: device.brand, hikDevIndex: device.hikDevIndex, hikTransport: device.hikTransport, hikDoorCount: device.hikDoorCount }] } });
+          if (result.failed || !result.removed) failures.push(result.errors.join("; ") || "Hik kişisi silinemedi");
+        }
+      }
+    } catch (error) { failures.push(error instanceof Error ? error.message : "Yeniden dağıtım başarısız"); }
+    await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: target._id, failure: failures.length ? failures.join("; ") : undefined, directSent: device.brand === "hikvision" && device.hikTransport !== "localBridge" });
   },
 });

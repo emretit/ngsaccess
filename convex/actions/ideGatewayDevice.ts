@@ -204,7 +204,7 @@ export const syncEmployeeToIdePanels = internalAction({
         projectId: panel.projectId,
         opType: "upsertUser",
         // create_data: id zaten varsa panel günceller (idempotent varsayımı — canlı doğrulanmalı).
-        payload: { mode: "create", userRecord: { id: cardNo, status, permissions } },
+        payload: { employeeId: args.employeeId, ruleIds: rules.map(dr => dr.rule._id), grantError: uniqueCount > 16 ? "IDE izin sınırı (16) aşıldı" : undefined, mode: "create", userRecord: { id: cardNo, status, permissions } },
       });
       opIds.push(userOpId);
       queued++;
@@ -243,7 +243,7 @@ export const deleteEmployeeFromIdePanels = internalAction({
         deviceId: dr.device._id,
         projectId: panel.projectId,
         opType: "deleteUser",
-        payload: { ideUserId: cardNo },
+        payload: { employeeId: args.employeeId, ideUserId: cardNo },
       });
       queued++;
     }
@@ -260,6 +260,7 @@ export const deleteEmployeeFromIdePanels = internalAction({
  */
 export const deleteIdeUserFromPanels = internalAction({
   args: {
+    employeeId: v.optional(v.id("employees")),
     cardNumber: v.string(),
     runId: v.optional(v.id("deviceSyncRuns")),
     deviceIds: v.array(v.id("devices")),
@@ -280,7 +281,7 @@ export const deleteIdeUserFromPanels = internalAction({
         runId: args.runId,
         projectId: panel.projectId ?? args.projectId,
         opType: "deleteUser",
-        payload: { ideUserId: cardNo },
+        payload: { employeeId: args.employeeId, ideUserId: cardNo },
       });
       queued++;
     }

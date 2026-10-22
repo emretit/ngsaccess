@@ -1,5 +1,6 @@
 "use node";
 
+import type { GrantResult } from "../lib/grantStatus";
 import type { FunctionReturnType } from "convex/server";
 import { buildDoorPlans } from "../lib/gateway/persons";
 import { internal } from "../_generated/api";
@@ -99,6 +100,7 @@ type SharedSync = {
   plans: Map<string, Promise<{ ok: boolean; error?: string }>>;
   numbers: Map<Id<"accessRules">, Promise<number>>;
   successes: Map<Id<"devices">, Id<"employees">[]>;
+  grantResults: GrantResult[];
 };
 
 async function removeScopedPerson(ctx: ActionCtx, device: HikDeviceRef, employeeId: Id<"employees">, cardNumber: string, runId?: Id<"deviceSyncRuns">) {
@@ -229,7 +231,7 @@ async function syncEmployeeDevices(
         const reason = !doorPlans.length
           ? "Kapsanan kapı yok"
           : "Windows köprüsü kapı başına çoklu planı henüz desteklemiyor";
-        return { ok: false, device: t.device, operation: deletion.ok ? "addPerson" as const : "deletePerson" as const,
+        return { ok: false, device: t.device, grantRemoved: deletion.ok, operation: deletion.ok ? "addPerson" as const : "deletePerson" as const,
           error: deletion.ok
             ? (!doorPlans.length ? `${reason}, kişi cihazdan kaldırıldı` : reason)
             : `${reason}; kişi kaldırılamadı: ${deletion.error ?? "Bilinmeyen hata"}` };
@@ -261,7 +263,7 @@ async function syncEmployeeDevices(
       }
       if (isLocalBridgeDevice(t.device)) {
         await enqueueLocalBridgeOp(ctx, t.device, "addPerson", {
-          employeeId: args.employeeId, employeeNo: employee.cardNumber,
+          ruleIds: t.rules.map(entry => entry.rule._id), employeeId: args.employeeId, employeeNo: employee.cardNumber,
           cardNumber: employee.cardNumber, name: `${employee.firstName} ${employee.lastName}`,
           planTemplateNo: doorPlans[0]?.planTemplateNos[0], doorCount: doorCountFor(t.device),
           doorRights: doorPlans.map(p => p.doorNo),
@@ -297,7 +299,7 @@ async function syncEmployeeDevices(
         );
       }
       if (args.runId && !cardResult.ok && !cardResult.alreadyExists) return { ok: false, device: t.device, operation: "addCard" as const, error: cardResult.error ?? "Kart gönderilemedi" };
-      return { ok: true as const, device: t.device };
+      return { ok: true as const, device: t.device, grantError: !cardResult.ok && !cardResult.alreadyExists ? cardResult.error ?? "Kart gönderilemedi" : undefined };
     }),
   );
 
@@ -341,6 +343,21 @@ async function syncEmployeeDevices(
       employeeId: args.employeeId,
     }),
   ]);
+  // HTTP tasks dedupe physical gateways, while grant attribution stays per device.
+  const resultByDeviceKey = new Map(results.map(result => [bridgeDedupeKey(result.device) ?? result.device._id, result]));
+  const rulesByDevice = new Map<Id<"devices">, Id<"accessRules">[]>();
+  const grantDevices = new Map(hikRules.map(({ device }) => [device._id, device]));
+  for (const { device, rule } of hikRules) rulesByDevice.set(device._id, [...rulesByDevice.get(device._id) ?? [], rule._id]);
+  const grantResults: GrantResult[] = [...grantDevices.values()].flatMap(device => {
+    const result = resultByDeviceKey.get(bridgeDedupeKey(device) ?? device._id);
+    if (!result || isLocalBridgeDevice(device) || !device.projectId || !isAllowed(device.projectId)) return [];
+    return [{ projectId: device.projectId, employeeId: args.employeeId, deviceId: device._id,
+      state: result.grantRemoved ? "removed" as const : result.ok && !result.grantError ? "effective" as const : "failed" as const,
+      ruleIds: rulesByDevice.get(device._id) ?? [],
+      lastRunId: args.runId, lastError: result.grantRemoved ? undefined : result.grantError ?? (result.ok ? undefined : result.error) }];
+  });
+  if (prepared) prepared.shared.grantResults.push(...grantResults);
+  else if (grantResults.length) await ctx.runMutation(internal.accessGrantStatus.recordGrantResults, { results: grantResults });
   return { synced, failed, errors };
 }
 
@@ -514,6 +531,11 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
         { employeeId: args.employeeId },
       ),
     ]);
+    const grantResults: GrantResult[] = [
+      ...skipped.filter(entry => !isLocalBridgeDevice(entry.device) && entry.device.projectId && isAllowed(entry.device.projectId)).flatMap(entry => entry.device.projectId ? [{ projectId: entry.device.projectId, employeeId: args.employeeId, deviceId: entry.device._id, state: "failed" as const, lastError: entry.reason, lastRunId: args.runId }] : []),
+      ...results.flatMap(result => !isLocalBridgeDevice(result.target.device) && result.target.device.projectId ? [{ projectId: result.target.device.projectId, employeeId: args.employeeId, deviceId: result.target.device._id, state: result.ok ? "removed" as const : "failed" as const, lastError: result.ok ? undefined : result.error, lastRunId: args.runId }] : []),
+    ];
+    if (grantResults.length) await ctx.runMutation(internal.accessGrantStatus.recordGrantResults, { results: grantResults });
     return { removed, failed, errors };
   },
 });
@@ -585,6 +607,7 @@ export const syncWeekPlanToDevicesInternal = internalAction({
       }
       return true;
     });
+    const selectedEmployees = employees.filter(employee => !args.targetEmployeeIds || args.targetEmployeeIds.includes(employee._id));
     const failureWrites: Promise<unknown>[] = [];
     for (const s of skippedDevices) {
       errors.push(`${s.device.name}: ${s.reason}`);
@@ -657,11 +680,11 @@ export const syncWeekPlanToDevicesInternal = internalAction({
 
     // Recompute every employee's complete rule union; never overwrite with only
     // the rule whose week plan happened to change.
-    const shared: SharedSync = { plans: new Map(), numbers: new Map(), successes: new Map() };
+    const shared: SharedSync = { plans: new Map(), numbers: new Map(), successes: new Map(), grantResults: [] };
     for (const result of planResults) {
       shared.plans.set(`${bridgeDedupeKey(result.device)}:${rule._id}`, Promise.resolve(result));
     }
-    const targets = employees.filter(emp => !args.targetEmployeeIds || args.targetEmployeeIds.includes(emp._id));
+    const targets = selectedEmployees;
     let employeesSynced = 0;
     // Bound HTTP concurrency and fetch complete employee rule unions in batches.
     for (let offset = 0; offset < targets.length; offset += 20) {
@@ -683,6 +706,11 @@ export const syncWeekPlanToDevicesInternal = internalAction({
       }),
     ));
 
+    // Large rules deliberately exceed the usual <=1 grant mutation/action budget.
+    // Device delivery must not be blocked by status volume: ceil(n / 500) bounded writes.
+    for (let offset = 0; offset < shared.grantResults.length; offset += 500) {
+      await ctx.runMutation(internal.accessGrantStatus.recordGrantResults, { results: shared.grantResults.slice(offset, offset + 500) });
+    }
     return { synced, failed, errors, employeesSynced };
   },
 });

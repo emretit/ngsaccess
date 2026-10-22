@@ -298,6 +298,7 @@ export const update = adminMutation({
     // Kart no değiştiyse ESKİ kartı IDE panellerinden sök (yoksa orphan kalır → eski
     // kart hâlâ kapı açar). Paneller groupMembers'tan çözülür (kart değişiminden bağımsız);
     // eski değer (emp.cardNumber) ile, yeni kartı yazacak sync'ten ÖNCE enqueue edilir.
+    // Eski kart temizliği yetki kaldırması değildir: employeeId taşımaz.
     if (cardChanged) await scheduleEmployeeCardChange(ctx, employeeId, emp.projectId, emp.cardNumber);
 
     if (!cardChanged && (activeChanged || groupMemberAdded)) {
@@ -332,7 +333,7 @@ async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"us
       await ctx.scheduler.runAfter(
         0,
         internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
-        { cardNumber: emp.cardNumber, deviceIds: ideDeviceIds, projectId: emp.projectId },
+        { employeeId: emp._id, cardNumber: emp.cardNumber, deviceIds: ideDeviceIds, projectId: emp.projectId },
       );
     }
 

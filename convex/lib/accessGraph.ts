@@ -79,6 +79,7 @@ export async function reconcileRemovedEmployeeIde(
         0,
         internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
         {
+          employeeId: args.employeeId,
           cardNumber: employee.cardNumber,
           deviceIds: orphans,
           projectId: args.projectId,

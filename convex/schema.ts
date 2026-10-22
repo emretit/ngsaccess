@@ -452,6 +452,19 @@ export default defineSchema({
     version: v.number(), pendingSyncJobId: v.optional(v.id("_scheduled_functions")),
     isArchived: v.optional(v.boolean()), createdAt: v.string(), updatedAt: v.string(),
   }).index("by_project", ["projectId"]).index("by_project_name", ["projectId", "name"]),
+  accessGrantStatus: defineTable({
+    projectId: v.id("projects"), employeeId: v.id("employees"), deviceId: v.id("devices"),
+    departmentId: v.optional(v.id("departments")),
+    state: v.union(v.literal("pending"), v.literal("effective"), v.literal("failed"), v.literal("removed")),
+    ruleIds: v.array(v.id("accessRules")), appliedAt: v.optional(v.number()),
+    lastError: v.optional(v.string()), lastRunId: v.optional(v.id("deviceSyncRuns")), updatedAt: v.number(),
+    lastOperationId: v.optional(v.string()), // Ignore late acknowledgements for superseded user operations.
+  }).index("by_employee_device", ["employeeId", "deviceId"])
+    .index("by_project_state", ["projectId", "state"])
+    .index("by_project_employee", ["projectId", "employeeId"])
+    .index("by_project_device", ["projectId", "deviceId"])
+    .index("by_project_department_state", ["projectId", "departmentId", "state"]),
+
   accessRules: defineTable({
     scheduleTemplateId: v.optional(v.id("accessScheduleTemplates")),
     ideExtraPermissionNos: v.optional(v.array(v.number())),

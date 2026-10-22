@@ -72,7 +72,7 @@ function memory() {
   const indexes: string[] = [];
   const query = (table: string) => {
     let rows = [...(tables[table] ?? [])];
-    const bounds = { eq: (field: string, value: unknown) => { rows = rows.filter(row => row[field] === value); return bounds; } };
+    const bounds = { eq: (field: string, value: unknown) => { rows = rows.filter(row => row[field] === value); return bounds; }, gte: (field: string, value: number) => { rows = rows.filter(row => Number(row[field]) >= value); return bounds; } };
     const chain = {
       withIndex: (name: string, callback: (q: typeof bounds) => unknown) => { indexes.push(name); callback(bounds); return chain; },
       take: async (limit: number) => rows.slice(0, limit),
