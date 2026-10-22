@@ -1,12 +1,13 @@
 {
   "date": "2026-10-22",
   "backend": {
-    "commit": "cc93131",
+    "commit": "eb677f9",
     "owner": "CEO",
-    "published": false,
-    "receiptEndpointPresentOnTarget": false,
-    "evidence": "visitor-acceptance-20261022.json",
-    "condition": "Explicit publication approval through CEO; verify additive fields and authenticated receipt query before live recovery acceptance."
+    "published": true,
+    "receiptEndpointPresentOnTarget": true,
+    "evidence": "post-deploy-20261022.json",
+    "condition": "Published by CEO; additive projectName + receipt query verified live 11:49 TR. Live OS-kill recovery acceptance (MOB-N05) still open.",
+    "publishedAt": "2026-10-22T11:42:00+03:00"
   },
   "signing": {
     "androidUploadEnvConfigured": false,
@@ -21,7 +22,7 @@
     "androidCompile": "passed_historical_revision",
     "iosCompile": "skipped_missing_pinned_Xcode",
     "uploadSigning": "skipped",
-    "currentMobileSourceCI": "not_run_uncommitted_sources",
+    "currentMobileSourceCI": "not_run_for_a6c5918_or_later",
     "condition": "Current reviewed revision on appropriate runner; skipped iOS job is not compilation evidence."
   },
   "remainingDeviceAcceptance": [
@@ -36,10 +37,19 @@
     "Protected symbol/dSYM retention and matching-artifact error recovery."
   ],
   "publicationsPerformed": {
-    "backend": false,
-    "web": false,
+    "backend": true,
+    "web": true,
     "store": false,
-    "push": false
+    "push": true,
+    "note": "eb677f9 live (Convex 11:42 TR, web 11:43 TR); mobile source a6c5918 pushed; no store upload"
   },
-  "notes": "This task produced profile/test APK and iOS simulator app. Neither closes store distribution acceptance."
+  "notes": "This task produced profile/test APK and iOS simulator app. Neither closes store distribution acceptance.",
+  "updated": "2026-10-22T16:00:00+03:00",
+  "sourceDrift": {
+    "checkedAt": "2026-10-22T16:00:00+03:00",
+    "fingerprintFiles": 73,
+    "changed": 0,
+    "mobileDiffSinceA6c5918": "none"
+  },
+  "plan": "../PLAN-20261022.md"
 }

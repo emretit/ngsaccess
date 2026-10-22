@@ -70,15 +70,16 @@
     },
     {
       "id": "MOB-N04",
-      "status": "implemented_backend_publication_pending",
+      "status": "verified_live",
       "result": "Profile and personal details show canonical mobile project when additive DTO is available; older live DTO uses localized fallback.",
       "evidence": [
-        "profile.json"
+        "profile.json",
+        "post-deploy-20261022.json"
       ]
     },
     {
       "id": "MOB-N05",
-      "status": "implemented_live_acceptance_pending",
+      "status": "implemented_backend_live_os_kill_acceptance_pending",
       "result": "Metadata-only durable request ID, authenticated receipt lookup and explicit same-ID replay survive modeled provider/client/store recreation; deployed-account OS process-kill acceptance still open.",
       "evidence": [
         "visitor.json",
@@ -204,5 +205,12 @@
       }
     ],
     "outcomes": "All6supervised tasks succeeded;4worker surfaces released,2retained by runtime because user took ownership; no reclaimable surface remains."
+  },
+  "postDeploy": {
+    "date": "2026-10-22T11:49:00+03:00",
+    "deployedRevision": "eb677f9",
+    "mobileSourceCommit": "a6c5918",
+    "evidence": "post-deploy-20261022.json",
+    "result": "passed"
   }
 }
