@@ -1,4 +1,4 @@
-import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Choice } from "./pdksRulesChoice";
@@ -20,12 +20,12 @@ export function PdksRulesPunchFields({
       <div className="grid gap-4 min-[761px]:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="pdks-effective-from">Geçerlilik tarihi</Label>
-          <Input
+          <DateInput
             id="pdks-effective-from"
-            type="date"
+            required
             min={tomorrowInTurkey()}
             value={values.effectiveFrom}
-            onChange={(event) => change({ effectiveFrom: event.target.value })}
+            onChange={(effectiveFrom) => change({ effectiveFrom })}
           />
           <p className="text-xs text-muted-foreground">
             Türkiye saatine göre en erken yarın.

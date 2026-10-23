@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { Input } from "@/components/ui/input";
+import { MonthPicker } from "@/components/ui/date-picker";
 
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { exportScopedExcel, exportScopedSgkPdf } from "./reports/exportReport";
@@ -147,11 +148,10 @@ function ReportDownloadSettings({ requestedReport }: { requestedReport?: string 
                 if (value === "sgk" || value === "overtime" || value === "attendance" || value === "department") setReportType(value);
               }}>{REPORT_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.label}</option>)}</select>
             </FormFieldWrapper>
-            <FormFieldWrapper htmlFor="report-year" label="Yıl">
+            {reportType === "overtime" && overtimePeriod === "year" ? <FormFieldWrapper htmlFor="report-year" label="Yıl">
               <select className={selectStyle} value={year} onChange={event => setYear(Number(event.target.value))}>{YEARS.map(value => <option key={value} value={value}>{value}</option>)}</select>
-            </FormFieldWrapper>
-            {(reportType !== "overtime" || overtimePeriod === "month") && <FormFieldWrapper htmlFor="report-month" label="Ay">
-              <select className={selectStyle} value={month} onChange={event => setMonth(Number(event.target.value))}>{MONTHS.map(value => <option key={value.value} value={value.value}>{value.label}</option>)}</select>
+            </FormFieldWrapper> : <FormFieldWrapper htmlFor="report-month" label="Ay">
+              <MonthPicker className="text-sm" date={new Date(year, month - 1, 1)} onSelect={date => { setYear(date.getFullYear()); setMonth(date.getMonth() + 1); }} />
             </FormFieldWrapper>}
             {reportType === "overtime" && <FormFieldWrapper htmlFor="report-period" label="Dönem">
               <select className={selectStyle} value={overtimePeriod} onChange={event => { if (event.target.value === "month" || event.target.value === "year") setOvertimePeriod(event.target.value); }}><option value="month">Aylık</option><option value="year">Yıllık</option></select>

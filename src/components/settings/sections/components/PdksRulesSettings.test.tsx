@@ -248,8 +248,8 @@ describe("PDKS kural ayarları", () => {
       "2026-11-02",
     );
     const html = render(<PdksRulesSettings />);
-    expect(html).toContain('min="2026-10-23"');
-    expect(html).toContain('value="2026-10-23"');
+    expect(html).toMatch(/<button[^>]*id="pdks-effective-from"/);
+    expect(html).toContain("23 Ekim 2026");
     expect(html).toContain("Şu an geçerli:");
     expect(html).toContain("Mevcut davranış");
   });

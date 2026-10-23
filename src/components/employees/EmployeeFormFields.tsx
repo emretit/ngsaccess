@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,9 +70,24 @@ export default function EmployeeFormFields({
     label: string,
     type = "text",
     hint?: string,
-  ) => (
+  ) => {
+    const describedBy =
+      [hint && `employee-${key}-hint`, errors[key] && `employee-${key}-error`]
+        .filter(Boolean)
+        .join(" ") || undefined;
+    return (
     <div>
       <Label htmlFor={`employee-${key}`}>{label}</Label>
+      {type === "date" ? (
+        <DateInput
+          className="max-sm:min-h-11"
+          id={`employee-${key}`}
+          value={formData[key] ?? ""}
+          onChange={(value) => update(key, value)}
+          aria-invalid={!!errors[key]}
+          aria-describedby={describedBy}
+        />
+      ) : (
       <Input
         className="max-sm:min-h-11"
         id={`employee-${key}`}
@@ -84,14 +100,11 @@ export default function EmployeeFormFields({
         value={formData[key] ?? ""}
         onChange={(e) => update(key, e.target.value)}
         aria-invalid={!!errors[key]}
-        aria-describedby={
-          [hint && `employee-${key}-hint`, errors[key] && `employee-${key}-error`]
-            .filter(Boolean)
-            .join(" ") || undefined
-        }
+        aria-describedby={describedBy}
         maxLength={key === "tcNo" ? 11 : undefined}
         inputMode={key === "tcNo" ? "numeric" : undefined}
       />
+      )}
       {hint && (
         <p id={`employee-${key}-hint`} className="mt-1 text-xs text-muted-foreground">
           {hint}
@@ -99,7 +112,8 @@ export default function EmployeeFormFields({
       )}
       <FieldError id={`employee-${key}-error`} message={errors[key]} />
     </div>
-  );
+    );
+  };
   const select = (
     key: "companyId" | "departmentId" | "positionId" | "accessRuleId",
     label: string,

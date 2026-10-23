@@ -53,9 +53,9 @@ it("D-1: pay fields and amounts are hidden without pay.view", () => {
 it("offers an optional date and access hint, hidden for visitors", () => {
   const html = render(false);
   expect(html).toContain("Erişim başlangıcı");
-  expect(html).toMatch(/<input[^>]*type="date"[^>]*name="accessStartsAt"/);
+  expect(html).toMatch(/<button[^>]*id="employee-accessStartsAt"/);
+  expect(html).not.toContain('type="date"');
   expect(html).toContain("Bu tarihten önce kart, QR ve mobil erişim reddedilir.");
-  expect(html).not.toMatch(/<input(?=[^>]*name="accessStartsAt")(?=[^>]*required)[^>]*>/);
   const visitor = renderToStaticMarkup(<EmployeeFormFields isVisitor formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} />);
-  expect(visitor).not.toContain('name="accessStartsAt"');
+  expect(visitor).not.toContain('id="employee-accessStartsAt"');
 });

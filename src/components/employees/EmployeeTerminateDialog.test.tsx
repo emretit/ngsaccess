@@ -29,7 +29,8 @@ beforeEach(() => { mocks.terminate.mockReset(); mocks.pending = false; mocks.sub
 it("renders the date/type/reason/code form and explains the effect", () => {
   const html = renderToStaticMarkup(<EmployeeTerminateDialog employee={employee} open onOpenChange={() => {}} />);
   expect(html).toContain("Son çalışma günü");
-  expect(html).toContain('type="date"');
+  expect(html).toMatch(/<button[^>]*id="[^"]*-date"/);
+  expect(html).not.toContain('type="date"');
   expect(html).toContain('maxLength="500"');
   expect(html).toContain('pattern="[0-9]{2}"');
   expect(html).toContain("Bu tarihten sonra kartı tüm cihazlardan silinir");

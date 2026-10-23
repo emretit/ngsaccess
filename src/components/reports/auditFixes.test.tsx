@@ -5,7 +5,6 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Reports from '@/pages/Reports';
 import { ReportPage } from './ReportPage';
 import { ReportScreen } from './ReportScreen';
-import { ReportDateInput, reportDateValue } from './ReportDateInput';
 import { REPORTS, reportColumns } from '@/lib/reports/registry';
 import { monthlySheet, dailyCell, dailySource } from '@/lib/reports/testFixtures';
 import { buildMonthlyStatusRows, flattenDailyRows, departmentLabel } from '@/lib/reports/rows';
@@ -57,12 +56,11 @@ describe('reports audit fixes', () => {
       expect(html).toContain(title); expect(html).toContain('Filtreleri temizle');
     }
   });
-  it('collapses mobile filters, uses numeric Turkish dates and displays a single range error', () => {
-    expect(reportDateValue('19.10.2026')).toBe('2026-10-19');
-    expect(renderToStaticMarkup(<ReportDateInput value="2026-10-19" onChange={() => {}} />)).toContain('value="19.10.2026"');
+  it('collapses mobile filters, uses date pickers and displays a single range error', () => {
     const html = renderToStaticMarkup(<MemoryRouter initialEntries={['/?preset=custom&from=2026-10-20&to=2026-10-01']}><ReportScreen definition={report('gec-kalanlar')} /></MemoryRouter>);
     expect(html).toContain('aria-controls="report-filters"'); expect(html).toContain('aria-expanded="false"'); expect(html).toContain('hidden sm:block');
     expect(html).toContain('Başlangıç tarihi bitiş tarihinden sonra olamaz.'); expect(html).not.toContain('Dönem seçimini düzeltin.');
+    expect(html).toMatch(/<button[^>]*id="report-from"/); expect(html).toContain('20 Ekim 2026'); expect(html).not.toContain('GG.AA.YYYY');
   });
   it('adds numeric minutes to Excel and scopes saved columns to project and user', () => {
     const row = flattenDailyRows([dailySource([dailyCell()])])[0];

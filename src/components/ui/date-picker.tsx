@@ -423,6 +423,8 @@ interface MonthPickerProps {
   className?: string;
   disabled?: boolean;
   id?: string;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
 }
 
 /** Gün ızgarası olmadan ay+yıl seçimi — DatePicker'ın ay/yıl başlığını tek başına sunar. */
@@ -433,6 +435,8 @@ export function MonthPicker({
   className,
   disabled,
   id,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
 }: MonthPickerProps) {
   const [open, setOpen] = React.useState(false);
   const [viewMonth, setViewMonth] = React.useState<Date>(date ?? new Date());
@@ -455,6 +459,8 @@ export function MonthPicker({
           type="button"
           variant="outline"
           disabled={disabled}
+          aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedBy}
           className={cn(TRIGGER_CLASS, !date && "text-muted-foreground", className)}
         >
           <span className="flex-1 truncate text-left">

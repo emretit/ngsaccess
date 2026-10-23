@@ -6,6 +6,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { notify } from "@/lib/notify";
@@ -53,7 +54,7 @@ export function AccountAccessDialog({ user, mode, onClose }: {
       <DialogHeader><DialogTitle>{mode === "expiry" ? "Erişim bitişi" : disabled ? "Kullanıcı çözülsün mü?" : "Kullanıcı dondurulsun mu?"}</DialogTitle>
         <DialogDescription>{userName(user)} · {mode === "expiry" ? "Tarih ve saat İstanbul saatine göredir." : disabled ? "Kullanıcı yeniden giriş yapabilir." : "Kullanıcının tüm oturumları kapanacak"}</DialogDescription>
       </DialogHeader>
-      {mode === "expiry" && <div className="space-y-2"><Label htmlFor="access-expiry">Tarih ve saat (İstanbul)</Label><Input id="access-expiry" type="datetime-local" value={value} disabled={pending} onChange={event => setValue(event.target.value)} /></div>}
+      {mode === "expiry" && <div className="space-y-2"><Label htmlFor="access-expiry">Tarih ve saat (İstanbul)</Label><div className="flex min-w-0 gap-2"><DateInput id="access-expiry" className="min-w-0 flex-1" required value={value.slice(0, 10)} disabled={pending} onChange={day => setValue(day ? `${day}T${value.slice(11, 16) || "00:00"}` : "")} /><Input type="time" className="w-28 shrink-0" aria-label="Erişim bitiş saati" value={value.slice(11, 16)} disabled={pending || !value} onChange={event => setValue(`${value.slice(0, 10)}T${event.target.value || "00:00"}`)} /></div></div>}
       <DialogFooter>
         <Button variant="outline" disabled={pending} onClick={onClose}>Vazgeç</Button>
         {mode === "expiry" && <Button variant="outline" disabled={pending || expiry === undefined} onClick={() => void save(true)}>Kaldır</Button>}
