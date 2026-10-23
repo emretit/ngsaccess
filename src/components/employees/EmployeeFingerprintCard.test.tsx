@@ -78,11 +78,16 @@ describe("parmak izi kartı", () => {
     mocks.fingerNos = [7];
     const html = render();
     expect(html).toContain('aria-label="Parmak izi 7 sistemden ve tüm cihazlardan sil"');
-    expect(html).toContain("Parmak izi 7 · 1/1 cihazda");
+    expect(html).toContain("Parmak izi 7 <span");
     expect(html).not.toContain("undefined");
     expect(html).toContain("sistemden ve tüm cihazlardan sil");
   });
-  it("eksik cihaz için yeniden gönderme düğmesi gösterir", () => { mocks.covered = false; expect(render()).toContain("Cihazlara yeniden gönder"); });
+  it("cihaz kapsamını göstermez; yalnız eksik cihaz varsa yeniden gönderme düğmesi çıkar", () => {
+    expect(render()).not.toContain("cihazlara yeniden gönder");
+    expect(render()).not.toContain("1/1 cihazda");
+    mocks.covered = false;
+    expect(render()).toContain('aria-label="Parmak izi 2 cihazlara yeniden gönder"');
+  });
   it.each(["role", "module"])("%s izni yoksa görünmez", condition => {
     if (condition === "role") mocks.admin = false; else mocks.enabled = false;
     expect(render()).toBe("");
@@ -91,10 +96,10 @@ describe("parmak izi kartı", () => {
     const html = render();
     expect(html).toContain("Cihaz özellikleri taranmadı; Cihazlar &gt; cihaz &gt; Özellikleri tara");
     expect(mocks.buttons.find(button => button.children === "Kaydı başlat")?.disabled).toBe(false);
-    expect(html).toContain("Parmak izi şifreli olarak sistemde saklanır");
-    expect(html).toContain("Puantajda kullanılmaz");
-    expect(html).toContain("parmak izi destekleyen erişim cihazları");
-    expect(html).toContain("Parmak izi 2 · 1/1 cihazda");
+    expect(html).toContain("Şifreli saklanır");
+    expect(html).toContain("puantajda kullanılmaz");
+    expect(html).toContain("Kayıtlı <span class=\"text-muted-foreground\">· 1/5</span>");
+    expect(html).toContain("Parmak izi 2 <span");
     expect(html).toContain("Herhangi bir parmak okutulabilir");
     expect(html).toContain('role="status"');
     expect(html.match(/<option/g)?.length).toBe(1);

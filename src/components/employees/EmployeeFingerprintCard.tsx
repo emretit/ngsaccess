@@ -4,6 +4,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -65,38 +66,43 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
     setStatus("Parmak izi cihazlara yeniden gönderiliyor.");
   }, { error: "Parmak izi gönderilemedi" });
 
-  return <section className="space-y-3 border-t pt-5" aria-label="Parmak izi">
+  const templates = data?.templates ?? [];
+  return <section className="space-y-2 border-t pt-4" aria-label="Parmak izi">
     <h3 className="text-base font-semibold">Parmak izi</h3>
-    <p className="text-sm text-muted-foreground">Parmak izi şifreli olarak sistemde saklanır ve kişinin erişimi olan Hikvision cihazlarına otomatik gönderilir. Puantajda kullanılmaz. Herhangi bir parmak okutulabilir; kişi başına en fazla {MAX_FINGERPRINTS_PER_EMPLOYEE} parmak izi.</p>
-    <div className="grid gap-3 sm:grid-cols-2">
-      <div className="space-y-1"><label htmlFor={deviceInputId} className="text-sm">Cihaz</label>
-        <select id={deviceInputId} className="max-sm:min-h-11 h-10 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2" value={device?._id ?? ""} disabled={pending} onChange={event => setDeviceId(event.target.value)}>
-          {!device && <option value="">Uygun cihaz yok</option>}
-          {data?.devices.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}
-        </select>
+    <p className="text-xs text-muted-foreground">Şifreli saklanır, kişinin erişimi olan Hikvision cihazlarına otomatik gönderilir; puantajda kullanılmaz. Herhangi bir parmak okutulabilir.</p>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-1.5">
+        <label htmlFor={deviceInputId} className="block text-sm">Cihaz</label>
+        <div className="flex gap-2">
+          <select id={deviceInputId} className="max-sm:min-h-11 h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2" value={device?._id ?? ""} disabled={pending} onChange={event => setDeviceId(event.target.value)}>
+            {!device && <option value="">Uygun cihaz yok</option>}
+            {data?.devices.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}
+          </select>
+          {pending
+            ? <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={!attempt || cancellation.pending} onClick={() => void cancellation.run()}>İptal</Button>
+            : <Button className="max-sm:min-h-11" type="button" aria-describedby={reasonId} disabled={!!reason} onClick={() => setConfirmOpen(true)}>Kaydı başlat</Button>}
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-sm">Kayıtlı <span className="text-muted-foreground">· {templates.length}/{MAX_FINGERPRINTS_PER_EMPLOYEE}</span></p>
+        {data && templates.length === 0
+          ? <p className="flex h-9 items-center rounded-md border border-dashed px-3 text-sm text-muted-foreground">Kayıtlı parmak izi yok.</p>
+          : templates.length > 0 && <ul className="space-y-1.5">{templates.map(row => {
+            const name = fingerprintLabel(row.fingerNo);
+            const missingOnDevice = data?.devices.some(item => !row.deviceIds.includes(item._id)) === true;
+            return <li key={row.fingerNo} className="flex min-h-9 items-center justify-between gap-2 rounded-md border pl-3 pr-1 text-sm">
+              <span>{name} <span className="text-xs text-muted-foreground">· {formatTrDateTime(new Date(row.enrolledAt))}</span></span>
+              <div className="flex items-center">
+                {missingOnDevice && <Button className="max-sm:min-h-11 h-7 w-7" size="icon" type="button" variant="ghost" title="Cihazlara yeniden gönder" aria-label={`${name} cihazlara yeniden gönder`} disabled={pending || !!reason || redistribution.pending} onClick={() => void redistribution.run(row.fingerNo)}><RefreshCw className="h-4 w-4" aria-hidden="true" /></Button>}
+                <Button className="max-sm:min-h-11 h-7 px-2" size="sm" type="button" variant="ghost" disabled={pending} aria-label={`${name} sistemden ve tüm cihazlardan sil`} onClick={() => setRemoveTarget(row.fingerNo)}>Sil</Button>
+              </div>
+            </li>;
+          })}</ul>}
       </div>
     </div>
-    {device && !device.capabilitiesScanned && <p className="text-sm text-muted-foreground">Cihaz özellikleri taranmadı; Cihazlar &gt; cihaz &gt; Özellikleri tara</p>}
-    <p id={reasonId} className="text-sm text-muted-foreground">{reason}</p>
-    <div className="flex flex-wrap gap-2">
-      <Button className="max-sm:min-h-11" type="button" aria-describedby={reasonId} disabled={!!reason || pending} onClick={() => setConfirmOpen(true)}>{pending ? "Cihaz yanıtı bekleniyor…" : "Kaydı başlat"}</Button>
-      {pending && <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={!attempt || cancellation.pending} onClick={() => void cancellation.run()}>İptal</Button>}
-    </div>
-    <p role="status" aria-live="polite" className="text-sm">{status}</p>
-    <p className="text-xs text-muted-foreground">Cihaz sayısı: parmak izi destekleyen erişim cihazları.</p>
-    <ul className="divide-y">{data?.templates.map(row => {
-      const name = fingerprintLabel(row.fingerNo);
-      const deviceNames = row.deviceIds.map(id => data.devices.find(item => item._id === id)?.name ?? data.enrollments.find(item => item.deviceId === id)?.deviceName ?? "Silinmiş cihaz");
-      const covered = data.devices.filter(item => row.deviceIds.includes(item._id)).length;
-      return <li key={row.fingerNo} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-        <div><span>{name} · {covered}/{data.devices.length} cihazda · {formatTrDateTime(new Date(row.enrolledAt))}</span><p className="text-muted-foreground">{deviceNames.join(", ") || "Cihazlara gönderim bekleniyor"}</p></div>
-        <div className="flex flex-wrap gap-2">
-          {covered < data.devices.length && <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={pending || !!reason || redistribution.pending} onClick={() => void redistribution.run(row.fingerNo)}>Cihazlara yeniden gönder</Button>}
-          <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={pending} aria-label={`${name} sistemden ve tüm cihazlardan sil`} onClick={() => setRemoveTarget(row.fingerNo)}>Sil</Button>
-        </div>
-      </li>;
-    })}</ul>
-    {data?.templates.length === 0 && <p className="text-sm text-muted-foreground">Bu kişi için kayıtlı parmak izi yok.</p>}
+    {device && !device.capabilitiesScanned && <p className="text-xs text-muted-foreground">Cihaz özellikleri taranmadı; Cihazlar &gt; cihaz &gt; Özellikleri tara</p>}
+    <p id={reasonId} className="text-xs text-muted-foreground empty:hidden">{reason}</p>
+    <p role="status" aria-live="polite" className="text-xs">{status}</p>
     <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}><DialogContent>
       <DialogHeader><DialogTitle>Parmak izi kaydını başlat</DialogTitle><DialogDescription>Cihazda parmağınızı okutun; yaklaşık 30 saniye beklenir. {device?.name}{fingerNo !== null && ` · ${fingerprintLabel(fingerNo)}`}</DialogDescription></DialogHeader>
       <DialogFooter><Button className="max-sm:min-h-11" type="button" variant="outline" onClick={() => setConfirmOpen(false)}>Vazgeç</Button><Button className="max-sm:min-h-11" type="button" disabled={pending || !!reason} onClick={() => void run()}>Kaydı başlat</Button></DialogFooter>
