@@ -3,6 +3,7 @@ import { trDayRangeISO } from "./trDate";
 export const AUDIT_TARGET_LABELS: Record<string, string> = {
   hikPendingOperations: "Hikvision senkron uyarısı",
   shiftAssignments: "Vardiya atamaları",
+  departmentShiftAssignments: "Departman vardiya ataması",
   pdksRuleVersions: "PDKS kuralları",
   users: "Kullanıcılar",
   projectPrivacySettings: "Proje gizlilik ayarları",

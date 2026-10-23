@@ -1,3 +1,5 @@
+import { PdksPlanSummary } from "./PdksPlanSummary";
+import { segmentTimeRange } from "../lib/presentation";
 import { eachDayOfInterval, format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { STATUS_META, IN_PROGRESS_META, statusMetaFor } from "../statusMeta";
@@ -105,6 +107,10 @@ export function PDKSHeatmapView({
                       onClick={() => onCellClick?.(row.id, date)}
                     >
                       {meta.code} · {duration}
+                      <PdksPlanSummary day={cell} />
+                      {cell?.segments && cell.segments.length > 1 && <span className="block text-[10px]">
+                        {segmentTimeRange(cell.segments)}
+                      </span>}
                     </button>
                   );
                 })}

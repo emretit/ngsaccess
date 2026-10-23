@@ -30,10 +30,11 @@ export function pdksWorkDay(
   employeeId: Id<"employees">,
   resolve: PdksShiftResolver,
   direction?: string,
+  resolveLast: PdksShiftResolver = resolve,
 ): string {
   const date = trDateKey(accessTime);
   const previousDate = addWorkDate(date, -1);
-  const previous = resolve(employeeId, previousDate);
+  const previous = resolveLast(employeeId, previousDate);
   const flex = flexibleSchedule(previous);
   if (flex) return direction === "exit" && validFlexibleExit(flex, relativeMinute(previousDate, accessTime)) ? previousDate : date;
   if (!previous || !isOvernightShift(previous)) return date;
@@ -57,6 +58,7 @@ export function groupPdksWorkDays<
   resolve: PdksShiftResolver,
   manualEntryFor?: (employeeId: Id<"employees">, date: string) => string | undefined,
   eligibleEntry?: (reading: T) => boolean,
+  resolveLast: PdksShiftResolver = resolve,
 ): Map<string, T[]> {
   const result = new Map<string, T[]>();
   // Entries open their calendar day. A previous open session can start a night
@@ -70,12 +72,13 @@ export function groupPdksWorkDays<
     const date = trDateKey(reading.accessTime);
     const previousDate = addWorkDate(date, -1);
     const currentFlex = flexibleSchedule(resolve(employeeId, date));
-    const previousFlex = flexibleSchedule(resolve(employeeId, previousDate));
+    const previousFlex = flexibleSchedule(resolveLast(employeeId, previousDate));
     let key = pdksWorkDay(
       reading.accessTime,
       employeeId,
       resolve,
       reading.direction,
+      resolveLast,
     );
     if ((currentFlex || previousFlex) && (!("accessStatus" in reading) || reading.accessStatus === "izin_verildi")) {
       // Preserve the fixed night rule when only the current schedule is flexible.
@@ -201,6 +204,7 @@ export function buildPdksWorkDateResolver(
     eligibleEntry?: (reading: Doc<"cardReadings">) => boolean;
   },
   policyFor?: (reading: WorkDateReading, date: string) => PdksDayPolicy,
+  resolveLast: PdksShiftResolver = resolve,
 ) {
   const byId = new Map(
     employees.map((employee) => [String(employee._id), employee]),
@@ -220,7 +224,7 @@ export function buildPdksWorkDateResolver(
     const previousPolicy = policyFor(reading, previous);
     const previousDirection = effectiveDirection(reading, previousPolicy);
     const date = employee && matchesPdksCheckpoint(reading, previousPolicy) &&
-      pdksWorkDay(reading.accessTime, employee._id, resolve, previousDirection) === previous ? previous : day;
+      pdksWorkDay(reading.accessTime, employee._id, resolve, previousDirection, resolveLast) === previous ? previous : day;
     const direction = effectiveDirection(reading, policyFor(reading, date));
     return direction === reading.direction ? reading : { ...reading, direction };
   };
@@ -239,7 +243,7 @@ export function buildPdksWorkDateResolver(
       byEmployee.set(String(employee._id), bucket);
     }
     for (const { employee, readings } of byEmployee.values()) {
-      for (const [date, grouped] of groupPdksWorkDays(readings, employee._id, resolve, options?.manualEntryFor, options?.eligibleEntry)) {
+      for (const [date, grouped] of groupPdksWorkDays(readings, employee._id, resolve, options?.manualEntryFor, options?.eligibleEntry, resolveLast)) {
         for (const reading of grouped) workDates.set(String(reading._id), date);
       }
     }
@@ -258,6 +262,7 @@ export function buildPdksWorkDateResolver(
           employee._id,
           resolve,
           reading.direction,
+          resolveLast,
         )
       : day;
   };

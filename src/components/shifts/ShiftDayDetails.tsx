@@ -1,3 +1,4 @@
+import { planSummary } from "./lib/planForm";
 import { usePermissions } from "@/hooks/usePermissions";
 import { shortDate, shiftTimeLabel } from "./lib/planning";
 import {
@@ -14,6 +15,7 @@ import {
   DAYS,
   dayLabel,
   type Assignment,
+  type DepartmentAssignment,
   type DayData,
   type Employee,
 } from "./lib/planning";
@@ -24,6 +26,7 @@ export function ShiftDayDetails({
   onClose,
   onEdit,
   onAssign,
+  onEditDepartment,
   canAssign,
 }: {
   employee: Employee;
@@ -32,6 +35,7 @@ export function ShiftDayDetails({
   onClose: () => void;
   onEdit: (assignment: Assignment) => void;
   onAssign: () => void;
+  onEditDepartment?: (assignment: DepartmentAssignment) => void;
   canAssign: boolean;
 }) {
   const { can } = usePermissions();
@@ -53,8 +57,24 @@ export function ShiftDayDetails({
           </DialogDescription>
         </DialogHeader>
         <ShiftDayBadges data={data} />
+        {data.resolved?.cell.source === "department" && <section className="space-y-2 rounded border border-dashed p-3">
+          <p className="font-medium">Departmandan: {data.resolved.departmentName ?? "Departman"}</p>
+          {data.resolved.shifts.map(shift => <p key={shift._id} className="text-sm">{shift.name} · {shiftTimeLabel(shift)}</p>)}
+          {can("schedule.manage") && data.resolved.departmentAssignment && onEditDepartment && <Button variant="outline" onClick={() => { if (data.resolved?.departmentAssignment) onEditDepartment(data.resolved.departmentAssignment); }}>Departman atamasını düzenle</Button>}
+        </section>}
+        {data.resolved?.cell.source === "default" && <section className="space-y-2 text-muted-foreground"><p>Varsayılan vardiya</p>{data.resolved.shifts.map(shift => <p key={shift._id}>{shift.name} · {shiftTimeLabel(shift)}</p>)}</section>}
+        {data.resolved?.cell.kind === "rest" && <p className="rounded bg-subtle p-3 text-sm">Boş gün (döngü)</p>}
+        {data.resolved?.cell.kind === "rest" && data.resolved.assignment && can("schedule.manage") && <Button variant="outline" onClick={() => { if (data.resolved?.assignment) onEdit(data.resolved.assignment); }}>Tüm seriyi düzenle</Button>}
+        {data.inheritedContinuations?.map(({ shift, source, departmentName, departmentAssignment }) => (
+          <section key={`previous-${shift._id}`} className="border-t py-3 space-y-2">
+            <p className="font-medium">{shift.name}</p>
+            <p className="text-sm tabular-nums">Önceki günden · 00:00–{shift.endTime}</p>
+            <p className="text-xs text-muted-foreground">{source === "department" ? `Departmandan: ${departmentName ?? "Departman"}` : source === "default" ? "Varsayılan vardiya" : "Önceki günün planı"}</p>
+            {can("schedule.manage") && departmentAssignment && onEditDepartment && <Button variant="outline" onClick={() => onEditDepartment(departmentAssignment)}>Departman atamasını düzenle</Button>}
+          </section>
+        ))}
         {data.records.map(({ assignment, shift, continuation }) => (
-          <div key={assignment._id} className="border-t py-3 space-y-2">
+          <div key={`${assignment._id}-${shift._id}`} className="border-t py-3 space-y-2">
             <p className="font-medium">{shift.name}</p>
             <p className="text-sm tabular-nums">
               {continuation
@@ -65,7 +85,7 @@ export function ShiftDayDetails({
               Seri: {shortDate(assignment.startDate)} – {shortDate(assignment.endDate)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {assignment.weekPattern?.length
+              {assignment.plan && assignment.plan.kind !== "weekly" ? planSummary(assignment.plan) : assignment.weekPattern?.length
                 ? DAYS.filter(([code]) =>
                     assignment.weekPattern?.includes(code),
                   )
@@ -80,7 +100,7 @@ export function ShiftDayDetails({
         ))}
         {!canAssign && <p id="day-assign-help" className="text-sm text-muted-foreground">Önce vardiya tanımlayın veya bir tanımı etkinleştirin.</p>}
         {can("schedule.manage") && <DialogFooter className="flex-row justify-end"><Button aria-describedby={!canAssign ? "day-assign-help" : undefined} disabled={!canAssign} onClick={onAssign}>
-          Bu tarihe vardiya ata
+          {data.resolved?.cell.source === "department" ? "Bu kişi için değiştir" : "Bu tarihe vardiya ata"}
         </Button></DialogFooter>}
       </DialogContent>
     </Dialog>

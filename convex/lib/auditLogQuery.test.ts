@@ -73,6 +73,7 @@ describe("denetim sorgusu", () => {
       "biometricDestructionDeviceCheck",
       "biometricDestructionRun",
       "cardReadings",
+      "departmentShiftAssignments",
       "deviceEvents",
       "employeeConsents",
       "employees",

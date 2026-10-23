@@ -1,3 +1,4 @@
+import { scopedPdksPlan } from "./pdksMultiShift";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { loadPdksPolicies } from "./pdksRules";
@@ -94,7 +95,7 @@ export async function getMonthlyPayrollSheet(
   if (earlyPayrollRecords && earlyPayrollRecords.length > 10000) throw new Error("Manuel kayıt sınırı aşıldı; proje veya tarih aralığını daraltın");
   const payrollEmployeeIds = new Set(employees.map(employee => employee._id));
   const payrollBoundaryManual = new Map((earlyPayrollRecords ?? []).filter(record => payrollEmployeeIds.has(record.employeeId) && record.manualEntry && (!args.projectId || record.projectId === args.projectId)).map(record => [`${record.employeeId}__${record.date}`, record]));
-  const payrollBoundaryWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: readings, manualEntryFor: (id, date) => payrollBoundaryManual.get(`${id}__${date}`)?.entryTime, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date));
+  const payrollBoundaryWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: readings, manualEntryFor: (id, date) => payrollBoundaryManual.get(`${id}__${date}`)?.entryTime, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolveLast(id, date), args.projectId));
   const policies = await loadPdksPolicies(ctx, employees.map(e => e.projectId), payrollHasFlexible ? addWorkDate(overtimeRange.startDate, -1) : overtimeRange.startDate, overtimeRange.endDate);
   readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, payrollBoundaryWorkDate(r)));
 
@@ -140,14 +141,14 @@ export async function getMonthlyPayrollSheet(
 
   const payrollEmployeesById = new Map(employees.map(e => [String(e._id), e]));
   const payrollEmployeeReadings = buildPdksEmployeeReadingMap({ employees, readings });
-  const payrollWorkDate = [...payrollShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime }) : payrollBoundaryWorkDate;
+  const payrollWorkDate = [...payrollShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime }, undefined, (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId)) : payrollBoundaryWorkDate;
   const payrollAvailableDates = pdksAvailableDatesByProject(readings, payrollWorkDate);
   const payrollManualDates = pdksManualDatesByEmployee(manualByEmpDate.values());
   const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
   for (const [empId, employeeReadings] of payrollEmployeeReadings) {
     const employee = payrollEmployeesById.get(empId);
     if (!employee) continue;
-    const byDay = groupPdksWorkDays(employeeReadings, employee._id, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime);
+    const byDay = groupPdksWorkDays(employeeReadings, employee._id, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime, undefined, (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId));
     for (const [date, dayReadings] of byDay) empDayReadings.set(`${empId}__${date}`, dayReadings);
   }
 
@@ -188,6 +189,7 @@ export async function getMonthlyPayrollSheet(
           holidayMap,
           workingDays,
           dayShift: scopedPdksShift(payrollShiftResolver.resolve(emp._id, d), args.projectId),
+          dayPlan: scopedPdksPlan(payrollShiftResolver.resolvePlan(emp._id, d), args.projectId),
           workSettings,
           overtimeRates,
           empHourlyRate,

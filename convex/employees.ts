@@ -1,3 +1,4 @@
+import { syncPlanRefs } from "./lib/shiftAssign";
 import { writeAudit } from "./lib/audit";
 import { toUtcISO, trDateKey, trDayRangeISO } from "./lib/trDate";
 import { getProjectIdsWithPermission, hasPermission, requirePermission } from "./lib/permissions";
@@ -392,7 +393,10 @@ async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"us
 
     for (const table of employeeDependentTables) {
       const records = await ctx.db.query(table).withIndex("by_employee", q => q.eq("employeeId", emp._id)).collect();
-      for (const record of records) await ctx.db.delete(record._id);
+      for (const record of records) {
+        if ("shiftId" in record) await syncPlanRefs(ctx, { assignmentId: record._id }, record.projectId);
+        await ctx.db.delete(record._id);
+      }
     }
 
     // KVKK cascade: biyometrik veri sil, rıza iptal, cardReadings PII anonimleştir

@@ -53,6 +53,9 @@ function recurringWindows(
 export function computePdksDay(params: {
   policy?: PdksDayPolicy;
   hasLeave?: boolean;
+  dayKind?: "rest" | "work";
+  /** Split plans attribute a manual exit against the last piece, independently of the first entry. */
+  manualExitNextDay?: boolean;
   date: string;
   readings: readonly Doc<"cardReadings">[];
   manual?: Doc<"pdksRecords">;
@@ -89,6 +92,11 @@ export function computePdksDay(params: {
   const directedEntry = readings.find(r => r.direction === "entry")?.accessTime;
   const directedFallback = directedEntry ? `${String(Math.floor(isoTimeToTRMinutes(directedEntry) / 60)).padStart(2, "0")}:${String(isoTimeToTRMinutes(directedEntry) % 60).padStart(2, "0")}` : undefined;
   const evidenceManualTimes = manualPdksTimes(date, manual ? { ...manual, entryTime: manual.entryTime ?? directedFallback } : undefined, shift);
+  if (params.manualExitNextDay && manual?.exitTime) {
+    const exitISO = `${addWorkDate(date, 1)}T${manual.exitTime}:00.000+03:00`;
+    manualTimes.exitISO = exitISO;
+    evidenceManualTimes.exitISO = exitISO;
+  }
   const flexEntry = validManualEntry ?? readings.find(r => r.direction === "entry")?.accessTime;
   const validManualExit = evidenceManualTimes.exitISO && (!flex || validFlexibleExit(flex, relativeMinute(date, evidenceManualTimes.exitISO), flexEntry ? relativeMinute(date, flexEntry) : undefined)) ? evidenceManualTimes.exitISO : undefined;
   let evidence = flex
@@ -195,7 +203,15 @@ export function computePdksDay(params: {
   };
   const wholeMinutes = eachPunch ? Math.floor : Math.round;
   const holidayFor = (holiday: Doc<"holidays"> | null | undefined) => fixedRules?.holidayWorkRequired ? undefined : holiday;
-  const classification = classifyDay(date, params.workingDays, holidayFor(params.holiday));
+  // A cycle shift owns its whole work day, including the next calendar day after midnight.
+  // dayKind therefore stays anchored to the shift-start date even in splitAtMidnight mode.
+  const classify = (day: string, holiday: Doc<"holidays"> | null | undefined) => {
+    const effectiveHoliday = holidayFor(holiday);
+    return effectiveHoliday || params.dayKind === undefined
+      ? classifyDay(day, params.workingDays, effectiveHoliday)
+      : params.dayKind === "rest" ? "weekend" as const : "workday" as const;
+  };
+  const classification = classify(date, params.holiday);
   const requiredNetMinutes = flex ? params.hasLeave || classification === "weekend" || classification === "holiday" ? 0 : classification === "halfDayHoliday" ? flex.requiredNetMinutes / 2 : flex.requiredNetMinutes : undefined;
   const shiftStart = parseHHMM(shift?.startTime ?? workSettings.workStartTime);
   const shiftEnd =
@@ -235,8 +251,7 @@ export function computePdksDay(params: {
     const window = { start, end };
     const calendarDate = addWorkDate(date, Math.floor(start / 1440));
     const cls = rates.nightShiftDayMode === "splitAtMidnight"
-      ? classifyDay(calendarDate, params.workingDays,
-          holidayFor(calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate)))
+      ? classify(calendarDate, calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate))
       : classification;
     const premium = cls === "weekend" || cls === "holiday";
     const isNight = nightWindows.some((night) => overlap(window, night) > 0);

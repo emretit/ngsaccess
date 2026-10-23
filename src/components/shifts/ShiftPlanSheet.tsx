@@ -1,3 +1,4 @@
+import { DepartmentAssignments } from "./DepartmentAssignments";
 import { useSearchParams } from "react-router-dom";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -33,6 +34,7 @@ export function ShiftPlanSheet({ onCreateShift }: { onCreateShift: () => void })
         : <QuerySectionBoundary resetKey={projectId} title="Vardiya verileri yüklenemedi">
           <ShiftCalendarView key={projectId} projectId={projectId} projectName={activeProject?.name ?? "Seçili proje"}
             openDefinitions={(hasDefinitions) => { setOpen(false); if (!hasDefinitions) onCreateShift(); }} />
+          <DepartmentAssignments projectId={projectId} />
         </QuerySectionBoundary>}
       </div>
     </SheetContent>

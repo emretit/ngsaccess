@@ -46,6 +46,8 @@ export const projectDeletionBlockingTables = [
   { table: "leaves", index: "by_project", label: "izin" },
   { table: "shifts", index: "by_project", label: "vardiya" },
   { table: "shiftAssignments", index: "by_project", label: "vardiya ataması" },
+  { table: "departmentShiftAssignments", index: "by_project_end", label: "departman vardiya ataması" },
+  { table: "shiftPlanRefs", index: "by_project", label: "vardiya planı referansı" },
   { table: "companies", index: "by_project", label: "firma" },
   { table: "departments", index: "by_project", label: "departman" },
   { table: "positions", index: "by_project", label: "pozisyon" },
@@ -103,7 +105,9 @@ export async function projectDeletionCounts(ctx: Pick<QueryCtx, "db">, projectId
         ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
         : entry.index === "by_project_device"
           ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
-          : await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101);
+          : entry.index === "by_project_end"
+            ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
+            : await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101);
     return [entry.table, rows.length] as const;
   }));
   return Object.fromEntries(counts);

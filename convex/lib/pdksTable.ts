@@ -21,7 +21,8 @@ import {
   resolveDayStatus,
 } from "./pdksCalc";
 import { calculatePeriodOvertime, overtimePeriodRange } from "./overtimeCalc";
-import { computePdksDay } from "./pdksDay";
+import { computePdksPlannedDay, plannedDayFields, splitReadingsByShift, type PdksSegment } from "./pdksMultiShift";
+import type { DayPlan } from "./shiftResolver";
 import { pdksLeaveMatchesProject } from "./pdksAvailability";
 import { addWorkDate, groupPdksWorkDays } from "./pdksWorkDay";
 
@@ -106,6 +107,8 @@ export function classifyPdksDay(params: {
 
 /** Rapor ekranları için gün ayrıntısı: plan (vardiya) ve gerçekleşen yan yana. */
 export type PdksDayDetail = {
+  segments?: PdksSegment[];
+  planKind?: "rest";
   dayType: "workday" | "weekend" | "holiday" | "halfDayHoliday";
   shiftName: string | null;
   plannedStart: string;
@@ -122,6 +125,8 @@ export type PdksDayDetail = {
 };
 
 export type PdksTableDayCell = FlexibleMinutes & {
+  segments?: PdksSegment[];
+  planKind?: "rest";
   durationMeasured?: boolean;
   punchQuality?: import("./pdksEvidence").PunchQuality;
   date: string;
@@ -260,6 +265,8 @@ export function computePdksTableRow(params: {
   workingDays: string[];
   workSettings: EffectiveWorkSettings;
   overtimeRates: EffectiveOvertimeRates;
+  resolvePlan?: (employeeId: Id<"employees">, dateISO: string) => DayPlan;
+  resolveLast?: (employeeId: Id<"employees">, dateISO: string) => Doc<"shifts"> | null;
   resolveShift: (
     employeeId: Id<"employees">,
     dateISO: string,
@@ -268,8 +275,12 @@ export function computePdksTableRow(params: {
 }): PdksTableRow {
   const { employee, empKey, workSettings, overtimeRates } = params;
   const empId = employee?._id;
+  const resolveLast = params.resolveLast ?? ((id: Id<"employees">, date: string) => {
+    const plan = params.resolvePlan?.(id, date);
+    return plan ? plan.kind === "shifts" ? plan.shifts[plan.shifts.length - 1] ?? null : null : params.resolveShift(id, date);
+  });
   const byDate = empId
-    ? groupPdksWorkDays(params.empReadings, empId, params.resolveShift, (id, date) => params.manualPdksByEmpDate.get(`${id}__${date}`)?.entryTime)
+    ? groupPdksWorkDays(params.empReadings, empId, params.resolveShift, (id, date) => params.manualPdksByEmpDate.get(`${id}__${date}`)?.entryTime, undefined, resolveLast)
     : new Map<string, Doc<"cardReadings">[]>();
   const hourlyRate = resolveHourlyRate({
     hourlyRate: employee?.hourlyRate,
@@ -288,14 +299,18 @@ export function computePdksTableRow(params: {
     const leave = params.allLeaves.find(
       (l) => l.employeeId === empId && pdksLeaveMatchesProject(l, employee?.projectId) && date >= l.startDate && date <= l.endDate,
     );
-    const settings = settingsForShift(shift, workSettings);
-    const day = computePdksDay({
+    const dayPlan = empId ? params.resolvePlan?.(empId, date) : undefined;
+    // Arrival waits on the first piece; exit time and early-exit tolerance belong to the last.
+    const lastShift = dayPlan?.kind === "shifts" ? dayPlan.shifts[dayPlan.shifts.length - 1] ?? shift : shift;
+    const settings = settingsForShift(lastShift, workSettings);
+    const day = computePdksPlannedDay({
       policy: params.policyFor?.(date),
       hasLeave: !!leave,
       date,
       readings,
       manual,
       shift,
+      dayPlan,
       workSettings,
       overtimeRates,
       hourlyRate,
@@ -311,7 +326,7 @@ export function computePdksTableRow(params: {
       earlyExitTolerance: settings.earlyExitToleranceMinutes,
       hasAssignedShift:
         params.firstRecordDate !== undefined ? shift !== null : undefined,
-      lateTolerance: settings.maxLateMinutes,
+      lateTolerance: shift?.lateToleranceMinutes ?? workSettings.maxLateMinutes,
       now: params.now,
       today: params.today,
       dataAvailable: employee !== null && (params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!manual)),
@@ -331,7 +346,8 @@ export function computePdksTableRow(params: {
     const cell: PdksTableDayCell = {
       date,
       ...flexibleMinuteFields(day),
-      ...(day.scheduleType === "flexible" || params.policyFor?.(date).calculationMode === "eachPunch" || params.policyFor?.(date).punchMode === "requirements" || params.policyFor && hasDirectionalPdksCheckpoints(params.policyFor(date)) ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
+      ...plannedDayFields(day),
+      ...(day.segments || day.scheduleType === "flexible" || params.policyFor?.(date).calculationMode === "eachPunch" || params.policyFor?.(date).punchMode === "requirements" || params.policyFor && hasDirectionalPdksCheckpoints(params.policyFor(date)) ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
       firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
       lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
       totalMinutes: day.totalMinutes,
@@ -347,9 +363,10 @@ export function computePdksTableRow(params: {
           ? "—"
           : code,
       detail: {
+        ...plannedDayFields(day),
         dayType: day.classification,
-        shiftName: shift?.name ?? null,
-        plannedStart: day.scheduleType === "flexible" ? "Esnek" : settings.workStartTime,
+        shiftName: dayPlan?.kind === "shifts" && dayPlan.shifts.length > 1 ? dayPlan.shifts.map(s => s.name).join(" + ") : shift?.name ?? null,
+        plannedStart: day.scheduleType === "flexible" ? "Esnek" : shift?.startTime ?? settings.workStartTime,
         plannedEnd: day.scheduleType === "flexible" ? "Esnek" : settings.workEndTime,
         isEarlyExit: day.isEarlyExit,
         earlyExitMinutes: day.earlyExitMinutes,
@@ -370,13 +387,17 @@ export function computePdksTableRow(params: {
         breakViolation:
           day.scheduleType === "flexible" || manual?.entryTime && manual.exitTime
             ? false
-            : computeBreakViolation({
-                punchTimes: readings
-                  .filter((r) => r.accessStatus === "izin_verildi")
-                  .map((r) => r.accessTime),
-                breakStart: shift?.breakStart,
-                breakEnd: shift?.breakEnd,
-              }),
+            : dayPlan?.kind === "shifts" && dayPlan.shifts.length > 1
+              ? splitReadingsByShift(date, readings, dayPlan.shifts, params.policyFor?.(date)).some((bucket, index) => computeBreakViolation({
+                  punchTimes: bucket.filter(reading => reading.accessStatus === "izin_verildi").map(reading => reading.accessTime),
+                  breakStart: dayPlan.shifts[index]?.breakStart,
+                  breakEnd: dayPlan.shifts[index]?.breakEnd,
+                }))
+              : computeBreakViolation({
+                  punchTimes: readings.filter(reading => reading.accessStatus === "izin_verildi").map(reading => reading.accessTime),
+                  breakStart: shift?.breakStart,
+                  breakEnd: shift?.breakEnd,
+                }),
       },
     };
     return { day, cell, manual, leave, readings };

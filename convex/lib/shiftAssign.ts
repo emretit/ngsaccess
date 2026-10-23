@@ -1,3 +1,6 @@
+import { ConvexError } from "convex/values";
+import type { QueryCtx, MutationCtx } from "../_generated/server";
+import { planShiftIds, validateShiftPlan, validatePlanStructure, type PlanRow, type ShiftPlan } from "./shiftPlan";
 import type { Doc, Id } from "../_generated/dataModel";
 import { shiftTimeLabel, scheduleIntervals, validateRange, type ScheduleRange } from "./shiftUx";
 
@@ -23,7 +26,7 @@ export interface ExistingShiftAssignment extends ScheduleRange {
   shift: ShiftClock;
 }
 export type AssignmentConflict = Omit<ExistingShiftAssignment, "shift"> & ShiftClock;
-function intervalsOverlap(a: [number, number][], b: [number, number][]): boolean {
+export function intervalsOverlap(a: [number, number][], b: [number, number][]): boolean {
   let i = 0;
   let j = 0;
   while (i < a.length && j < b.length) {
@@ -54,15 +57,16 @@ export function evaluateShiftAssignment(input: {
   holidays: Pick<Doc<"holidays">, "_id" | "date" | "name" | "isHalfDay">[];
   forceConfirm?: boolean;
   calendarConfirmed?: boolean;
+  shifts?: ReadonlyMap<string, ShiftClock>;
 }): AssignmentDecision {
   validateAssignRange(input.range);
-  const intervals = scheduleIntervals(input.range, input.shift);
+  const intervals = scheduleIntervals(input.range, input.shift, input.shifts);
   const base: AssignmentDecision = {
     status: "will_assign", reason: "Atanacak", occurrenceCount: intervals.length,
     conflict: null, leave: null, holiday: null,
   };
   if (input.shift.isActive === false) return { ...base, status: "skipped", reason: "Pasif vardiya atanamaz" };
-  if (!intervals.length) return { ...base, status: "skipped", reason: "Seçilen aralıkta tekrar desenine uyan gün yok" };
+  if (!intervals.length && (!input.range.plan || input.range.plan.kind === "weekly")) return { ...base, status: "skipped", reason: "Seçilen aralıkta tekrar desenine uyan gün yok" };
 
   const touched = new Set<string>();
   for (const [start, end] of intervals) {
@@ -83,7 +87,7 @@ export function evaluateShiftAssignment(input: {
       startDate: existing.startDate > shiftDateOffset(input.range.startDate, -1) ? existing.startDate : shiftDateOffset(input.range.startDate, -1),
       endDate: existing.endDate < shiftDateOffset(input.range.endDate, 1) ? existing.endDate : shiftDateOffset(input.range.endDate, 1),
     };
-    const other = scheduleIntervals(range, existing.shift);
+    const other = scheduleIntervals(range, existing.shift, input.shifts);
     if (intervalsOverlap(intervals, other)) {
       const { shift, ...assignment } = existing;
       base.conflict = { ...assignment, ...shift };
@@ -97,11 +101,38 @@ export function evaluateShiftAssignment(input: {
 }
 
 /** Exact visible-day intersection, including the previous day's night tail. */
-export function assignmentIntersectsRange(range: ScheduleRange, shift: ShiftClock, start: string, end: string): boolean {
+export function assignmentIntersectsRange(range: ScheduleRange, shift: ShiftClock, start: string, end: string, shifts?: ReadonlyMap<string, ShiftClock>): boolean {
   const first = range.startDate > shiftDateOffset(start, -1) ? range.startDate : shiftDateOffset(start, -1);
   const last = range.endDate < end ? range.endDate : end;
   const visibleStart = Date.parse(start) / 60000;
   const visibleEnd = Date.parse(shiftDateOffset(end, 1)) / 60000;
-  return scheduleIntervals({ ...range, startDate: first, endDate: last }, shift)
+  return scheduleIntervals({ ...range, startDate: first, endDate: last }, shift, shifts)
     .some(([startMinute, endMinute]) => startMinute < visibleEnd && endMinute > visibleStart);
+}
+
+
+/** A single transaction owns the assignment and every secondary reference. */
+export async function syncPlanRefs(ctx: MutationCtx, owner: { assignmentId: Id<"shiftAssignments"> } | { departmentAssignmentId: Id<"departmentShiftAssignments"> }, projectId: Id<"projects"> | undefined, plan?: ShiftPlan): Promise<void> {
+  const existing = "assignmentId" in owner
+    ? await ctx.db.query("shiftPlanRefs").withIndex("by_assignment", q => q.eq("assignmentId", owner.assignmentId)).take(2913)
+    : await ctx.db.query("shiftPlanRefs").withIndex("by_department_assignment", q => q.eq("departmentAssignmentId", owner.departmentAssignmentId)).take(2913);
+  if (existing.length > 2912) throw new ConvexError("Plan referans sınırı aşıldı");
+  for (const ref of existing) await ctx.db.delete(ref._id);
+  if (!plan) return;
+  if (!projectId) throw new ConvexError("Plan için proje zorunludur");
+  for (const shiftId of planShiftIds(plan)) await ctx.db.insert("shiftPlanRefs", { ...owner, projectId, shiftId });
+}
+export async function loadPlanShifts(ctx: QueryCtx | MutationCtx, row: Pick<PlanRow, "shiftId" | "plan">): Promise<Map<string, Doc<"shifts">>> {
+  if (row.plan) validatePlanStructure(row.plan);
+  const ids = [...new Set([row.shiftId, ...planShiftIds(row.plan)])];
+  const shifts = (await Promise.all(ids.map(id => ctx.db.get(id)))).filter((shift): shift is NonNullable<typeof shift> => shift !== null);
+  return new Map(shifts.map(shift => [String(shift._id), shift]));
+}
+export async function normalizeAssignmentPlan(ctx: QueryCtx | MutationCtx, row: PlanRow & { projectId?: Id<"projects"> }) {
+  const shifts = await loadPlanShifts(ctx, row);
+  // Legacy inactive assignments keep their existing preview/skip behavior.
+  const normalized = row.plan ? validateShiftPlan(row, shifts) : { shiftId: row.shiftId, plan: undefined };
+  const shift = shifts.get(normalized.shiftId);
+  if (!shift) throw new ConvexError("Vardiya bulunamadı");
+  return { ...normalized, shift, shifts };
 }

@@ -1,3 +1,4 @@
+import { scopedPdksPlan, usesPlanDayRules } from "./lib/pdksMultiShift";
 import { usesShiftDayRules } from "./lib/pdksFixedRules";
 import { flexibleReportProjects } from "./lib/reportScope";
 import { trDateKey } from "./lib/trDate";
@@ -120,10 +121,11 @@ export const summary = employeeAuthedQuery({
     const policies = await loadPdksPolicies(ctx, [projectId], addWorkDate(args.startDate, -1), args.endDate);
     const policyFor = (date: string) => policies(projectId, date);
     const dates = buildPeriodDateKeys(args.startDate, args.endDate);
+    const planDates = buildPeriodDateKeys(addWorkDate(args.startDate, -1), addWorkDate(args.endDate, 1));
     const versioned = hasVersionedPdksPolicy(policies, projectId, addWorkDate(args.startDate, -1), args.endDate);
     const flexibleDefinitions = !versioned && projectId ? await flexibleReportProjects(ctx, [projectId], args.startDate, args.endDate, new Map([[projectId, [employee]]]), usesShiftDayRules) : new Set<Id<"projects">>();
     const earlyShifts = flexibleDefinitions.size ? await buildBoundedShiftResolver(ctx, [employee]) : undefined;
-    const flexible = earlyShifts !== undefined && [...earlyShifts.shifts.values()].some(usesShiftDayRules) && hasPdksShiftDayRules([employee], earlyShifts.resolve, args.startDate, args.endDate);
+    const flexible = earlyShifts !== undefined && (planDates.some(date => usesPlanDayRules(earlyShifts.resolvePlan(employee._id, date))) || [...earlyShifts.shifts.values()].some(usesShiftDayRules) && hasPdksShiftDayRules([employee], earlyShifts.resolve, args.startDate, args.endDate));
     const range = versioned || flexible ? attendanceDateRange(addWorkDate(args.startDate, -1), addWorkDate(args.endDate, 1)) : { startISO, endISO };
     const rows = await ctx.db.query("cardReadings").withIndex("by_employee_accessTime", q =>
       q.eq("employeeId", employee._id).gte("accessTime", range.startISO ?? startISO).lt("accessTime", range.endISO ?? endISO))
@@ -138,7 +140,12 @@ export const summary = employeeAuthedQuery({
       const shift = shifts.resolve(id, date);
       return shift?.projectId === projectId || shift?.scheduleType === "flexible" && !shift.projectId ? shift : null;
     };
-    const hasFlexible = [...shifts.shifts.values()].some(usesShiftDayRules);
+    const hasFlexible = [...shifts.shifts.values()].some(usesShiftDayRules) || planDates.some(date => usesPlanDayRules(shifts.resolvePlan(employee._id, date)));
+    const resolvePlan = (id: Id<"employees">, date: string) => scopedPdksPlan(shifts.resolvePlan(id, date), projectId);
+    const resolveLast = (id: Id<"employees">, date: string) => {
+      const plan = resolvePlan(id, date);
+      return plan.kind === "shifts" ? plan.shifts[plan.shifts.length - 1] ?? null : null;
+    };
     const [manual, leaves, projectHolidays, globalHolidays, workSettings, general] = await Promise.all([
       ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", hasFlexible ? addWorkDate(args.startDate, -1) : args.startDate).lte("date", hasFlexible ? addWorkDate(args.endDate, 1) : args.endDate)).take(1001),
       ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", args.endDate)).take(1001),
@@ -152,7 +159,7 @@ export const summary = employeeAuthedQuery({
     const workDate = buildPdksWorkDateResolver([employee], resolveShift, hasFlexible ? {
       readings: rows.page, manualEntryFor: (id, date) => manualByDate.get(`${id}__${date}`)?.entryTime,
       eligibleEntry: reading => filterPdksReadings([reading], projectId, r => policyFor(trDateKey(r.accessTime))).length > 0,
-    } : undefined, (_reading, date) => policyFor(date));
+    } : undefined, (_reading, date) => policyFor(date), resolveLast);
     const included = filterPdksReadings(rows.page, projectId, reading => policyFor(workDate(reading)));
     const row = computePdksTableRow({
       policyFor, employee, empKey: employee._id, empReadings: included, departmentName: "", periodDateKeys: dates,
@@ -161,12 +168,12 @@ export const summary = employeeAuthedQuery({
       allLeaves: leaves.filter(leave => leave.status === "approved" && (!leave.projectId || leave.projectId === projectId)),
       holidayMap: new Map([...globalHolidays, ...projectHolidays].map(holiday => [holiday.date, holiday])),
       workingDays: general?.workingDays?.length ? general.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"],
-      workSettings, overtimeRates: DEFAULT_OVERTIME_RATES, resolveShift, manualEditedBy: null,
+      workSettings, overtimeRates: DEFAULT_OVERTIME_RATES, resolveShift, resolvePlan, resolveLast, manualEditedBy: null,
     });
     const presentDates = new Set(row.days.filter(day => day.status === "present" || day.status === "late").map(day => day.date));
     const summary = summarizeMovements(calendarReadings, args.startDate, args.endDate, projectId, new Date().toISOString(), policyFor, { workDate, presentDates });
     if (hasFlexible) summary.totals.presentDays = summary.days.filter(day =>
-      policyFor(day.date).punchMode === "requirements" || usesShiftDayRules(resolveShift(employee._id, day.date))
+      policyFor(day.date).punchMode === "requirements" || usesPlanDayRules(resolvePlan(employee._id, day.date)) || usesShiftDayRules(resolveShift(employee._id, day.date))
         ? presentDates.has(day.date) : day.entryCount > 0).length;
     return summary;
   },

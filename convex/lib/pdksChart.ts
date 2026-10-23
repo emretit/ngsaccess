@@ -1,3 +1,5 @@
+import { shiftForInstant } from "./pdksMultiShift";
+import type { DayPlan } from "./shiftResolver";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
 import { trDateKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -68,6 +70,7 @@ export function computePdksChartData(params: {
   endDate: string;
   chartSettings: EffectiveWorkSettings;
   employeeDepartmentByKey: ReadonlyMap<string, string>;
+  resolvePlan?: (employeeId: Id<"employees">, dateISO: string) => DayPlan;
   resolveShift: (
     employeeId: Id<"employees">,
     dateISO: string,
@@ -137,7 +140,8 @@ export function computePdksChartData(params: {
       if (!rec.firstEntry) {
         rec.firstEntry = r.accessTime;
         const arrivalMin = isoTimeToTRMinutes(r.accessTime);
-        const shift = r.employeeId ? resolveShift(r.employeeId, dateKey) : null;
+        const plan = r.employeeId ? params.resolvePlan?.(r.employeeId, dateKey) : undefined;
+        const shift = plan?.kind === "shifts" ? shiftForInstant(dateKey, r.accessTime, plan, r.direction) : r.employeeId ? resolveShift(r.employeeId, dateKey) : null;
         const lateThresholdMin = shift
           ? thresholdsForShift(shift, chartSettings).lateThresholdMin
           : fallbackLateThresholdMin;

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import EmployeeFormFields from "./EmployeeFormFields";
+import EmployeeFormFields, { DepartmentShiftWarning } from "./EmployeeFormFields";
 import type { EmployeeFormData } from "./hooks/useEmployeeFormData";
 const formData: EmployeeFormData = { firstName: "", lastName: "", email: "", tcNo: "", cardNumber: "", payrollCode: "", companyId: null, departmentId: null, positionId: null, accessRuleId: null, shift: null, shiftId: null, photoUrl: null, notes: "", isActive: true, hourlyRate: null, monthlySalary: null };
 function render(autoFocusFirstName: boolean) { return renderToStaticMarkup(<EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} autoFocusFirstName={autoFocusFirstName} />); }
@@ -58,4 +58,24 @@ it("offers an optional date and access hint, hidden for visitors", () => {
   expect(html).toContain("Bu tarihten önce kart, QR ve mobil erişim reddedilir.");
   const visitor = renderToStaticMarkup(<EmployeeFormFields isVisitor formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} />);
   expect(visitor).not.toContain('id="employee-accessStartsAt"');
+});
+
+it("departman planı uyarısı yalnız mevcut çalışanın departmanı gerçekten değişince gösterilir", () => {
+  const original = "department-a" as NonNullable<EmployeeFormData["departmentId"]>;
+  const changed = "department-b" as NonNullable<EmployeeFormData["departmentId"]>;
+  const renderWarning = (isEditing: boolean, departmentId: EmployeeFormData["departmentId"]) => renderToStaticMarkup(<DepartmentShiftWarning isEditing={isEditing} originalDepartmentId={original} departmentId={departmentId} />);
+  expect(renderWarning(true, changed)).toContain("Departman vardiya planı geçmiş günlere de uygulanır; kapanmış dönem için kişiye vardiya atayın.");
+  expect(renderWarning(true, null)).toContain('role="status"');
+  expect(renderWarning(true, original)).toBe("");
+  expect(renderWarning(false, changed)).toBe("");
+});
+
+it("taslaktan değişmiş departmanla yeniden açılışta özgün çalışan departmanına göre uyarır", () => {
+  const original = "department-a" as NonNullable<EmployeeFormData["departmentId"]>;
+  const changed = "department-b" as NonNullable<EmployeeFormData["departmentId"]>;
+  const props = { isEditing: true, originalDepartmentId: original, formData: { ...formData, departmentId: changed }, setFormData: () => {}, companies: [], departments: [], accessRules: [], positions: [], memberships: [] };
+  const renderDraft = () => renderToStaticMarkup(<MemoryRouter><EmployeeFormFields {...props} /></MemoryRouter>);
+  expect(renderDraft()).toContain("Departman vardiya planı geçmiş günlere de uygulanır");
+  expect(renderDraft()).toContain("Departman vardiya planı geçmiş günlere de uygulanır");
+  expect(renderToStaticMarkup(<MemoryRouter><EmployeeFormFields {...props} formData={{ ...props.formData, departmentId: original }} /></MemoryRouter>)).not.toContain("Departman vardiya planı geçmiş günlere de uygulanır");
 });

@@ -14,7 +14,7 @@ export async function findManualPdksRecord(ctx: MutationCtx, employeeId: Id<"emp
 /** Tek kişilik elle yazım doğrulaması: atanmış gece vardiyası çıkışın girişten önce olmasına izin verir. */
 export async function validateManualPdksForEmployee(ctx: MutationCtx, employee: Doc<"employees">, input: ManualPdksInput): Promise<ValidManualPdks> {
   const resolver = await buildShiftResolver(ctx, [employee]);
-  const shift = resolver.resolve(employee._id, input.date);
+  const shift = resolver.resolveLast(employee._id, input.date);
   return validateManualPdksInput(input, shift?.projectId === employee.projectId ? shift : null);
 }
 

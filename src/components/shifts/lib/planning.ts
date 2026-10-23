@@ -17,6 +17,9 @@ export type Shift = FunctionReturnType<typeof api.shifts.list>[number];
 export type Assignment = FunctionReturnType<
   typeof api.shifts.listAssignments
 >[number];
+export type DepartmentAssignment = FunctionReturnType<typeof api.shiftPlans.listDepartmentAssignments>[number];
+export type PlanCell = FunctionReturnType<typeof api.shiftPlans.planCells>[number];
+export type Department = FunctionReturnType<typeof api.departments.list>[number];
 export type Preview = FunctionReturnType<typeof api.shifts.previewBulkAssign>;
 export type Apply = FunctionReturnType<typeof api.shifts.bulkAssignShift>;
 export type Period = "week" | "month" | "day";
@@ -179,7 +182,11 @@ export function cellData(
     ),
   };
 }
-export type DayData = ReturnType<typeof cellData>;
+export type DayData = ReturnType<typeof cellData> & {
+  /** Server-resolved night tails without a personal assignment row. */
+  inheritedContinuations?: { shift: Shift; source: PlanCell["source"]; departmentName?: string; departmentAssignment?: DepartmentAssignment }[];
+  resolved?: { cell: PlanCell; shifts: Shift[]; departmentName?: string; departmentAssignment?: DepartmentAssignment; assignment?: Assignment };
+};
 
 export { shiftTimeLabel } from "../../../../convex/lib/shiftUx";
 export function shortDate(day: string) {
@@ -200,4 +207,11 @@ export function calendarDayLabel(day: string) {
   const date = new Date(`${day}T12:00:00Z`);
   const weekday = DAYS[(date.getUTCDay() + 6) % 7]?.[1] ?? "";
   return `${weekday} ${date.getUTCDate()}`;
+}
+
+/** Visible shift chips include the previous calendar day's night tails from every source. */
+export function dayDisplayRecords(data: DayData) {
+  const personal = data.records.map(record => ({ ...record, key: `${record.assignment._id}-${record.shift._id}-${record.continuation}` }));
+  const inherited = (data.inheritedContinuations ?? []).map(({ shift }) => ({ key: `previous-${shift._id}`, shift, continuation: true }));
+  return data.resolved ? [...inherited, ...personal.filter(record => record.continuation), ...data.resolved.shifts.map(shift => ({ key: shift._id, shift, continuation: false }))] : [...inherited, ...personal];
 }

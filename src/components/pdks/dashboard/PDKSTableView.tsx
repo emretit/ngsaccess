@@ -1,3 +1,5 @@
+import { PdksPlanSummary } from "./PdksPlanSummary";
+import { singleRowDay } from "../lib/presentation";
 import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -149,6 +151,7 @@ export function PDKSTableView({
                   >
                     {r.name}
                   </button>
+                  <PdksPlanSummary day={singleRowDay(r)} />
                 </td>
                 <td className="break-words px-2">{r.department || "—"}</td>
                 <td className="px-2 tabular-nums">

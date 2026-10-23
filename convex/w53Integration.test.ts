@@ -228,11 +228,13 @@ it("legacy manuel kayıtlar sınırlı okunur; esnekte yalnız gerekli indeksli 
     return { tables, gets };
   });
   expect(await counts()).toEqual({ tables: {
+    // Paket B adds two project-scoped metadata probes; employee/data read counts stay unchanged.
+    shiftPlanRefs: 1, departmentShiftAssignments: 1,
     pdksRuleVersions: 2, shifts: 2, employees: 1, shiftAssignments: 1, pdksRecords: 1,
     cardReadings: 2, workSettings: 1, overtimeRates: 1, holidays: 2, generalSettings: 1, leaves: 1,
   }, gets: 1 });
   await f.t.run(ctx => ctx.db.patch(f.shiftId, { scheduleType: "fixed", flexible: undefined }));
-  expect(await counts()).toEqual({ tables: { pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 1 }, gets: 0 });
+  expect(await counts()).toEqual({ tables: { shiftPlanRefs: 1, departmentShiftAssignments: 1, pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 1 }, gets: 0 });
 });
 
 it.each(["ham", "manuel"] as const)("dashboard D+1 ham çıkışı D'nin %s giriş politikasını taşır; bugünkü devamı artırmaz", async kind => {
@@ -361,7 +363,7 @@ it("D3: 500 kişilik legacy manuel taramayı global esnek keşif yeniden kullan�
     return { tables, gets, readings: result.readings, rows: [...result.ruleRows] };
   });
   const before = await counts();
-  expect(before).toEqual({ tables: { pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 500 }, gets: 0, readings: [], rows: [] });
+  expect(before).toEqual({ tables: { shiftPlanRefs: 1, departmentShiftAssignments: 1, pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 500 }, gets: 0, readings: [], rows: [] });
   const globalId = await f.t.run(ctx => ctx.db.insert("shifts", { name: "Atanmamış global", startTime: "05:00", endTime: "22:00", scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE, createdAt: "", updatedAt: "" }));
   const after = await counts();
   expect(after).toEqual({ ...before, tables: { ...before.tables, employees: 1, shiftAssignments: 1 } });

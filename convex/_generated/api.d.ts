@@ -215,6 +215,7 @@ import type * as seedHikvisionLanDevice from "../seedHikvisionLanDevice.js";
 import type * as seedTestCardAccess from "../seedTestCardAccess.js";
 import type * as settings from "../settings.js";
 import type * as sgkExport from "../sgkExport.js";
+import type * as shiftPlans from "../shiftPlans.js";
 import type * as shifts from "../shifts.js";
 import type * as userPreferences from "../userPreferences.js";
 import type * as userProjects from "../userProjects.js";
@@ -437,6 +438,7 @@ declare const fullApi: ApiFromModules<{
   seedTestCardAccess: typeof seedTestCardAccess;
   settings: typeof settings;
   sgkExport: typeof sgkExport;
+  shiftPlans: typeof shiftPlans;
   shifts: typeof shifts;
   userPreferences: typeof userPreferences;
   userProjects: typeof userProjects;

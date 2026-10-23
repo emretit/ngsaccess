@@ -7,6 +7,42 @@ export type PdksRow = FunctionReturnType<
   typeof api.cardReadings.getPdksTableData
 >[number];
 export type PdksCell = PdksRow["days"][number];
+export type PdksPlanDay = Pick<PdksCell, "segments" | "planKind" | "status">;
+export type PdksSegment = NonNullable<PdksCell["segments"]>[number];
+export const CYCLE_REST_LABEL = "Boş gün (döngü)";
+
+/** Presentation only: the server supplies the day plan and attendance decisions. */
+export function planDayLabel(day?: Pick<PdksPlanDay, "segments" | "planKind">): string {
+  if (day?.planKind === "rest") return CYCLE_REST_LABEL;
+  return day?.segments && day.segments.length > 1
+    ? day.segments.map(segment => segment.shiftName).join(" + ") : "";
+}
+export function singleRowDay(row: Pick<PdksRow, "days">): PdksCell | undefined {
+  return row.days?.length === 1 ? row.days[0] : undefined;
+}
+export function displaySegmentTime(iso: string | null): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("tr-TR", {
+    timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(date);
+}
+export function segmentTimeRange(segments: readonly PdksSegment[]): string {
+  const first = segments.find(segment => segment.firstISO)?.firstISO ?? null;
+  const last = [...segments].reverse().find(segment => segment.lastISO)?.lastISO ?? null;
+  return `${displaySegmentTime(first)}–${displaySegmentTime(last)}`;
+}
+export const SEGMENT_DECISION_LABELS: Record<PdksSegment["decision"], string> = {
+  present: "Geldi", absent: "Gelmedi", incomplete: "İncelenecek",
+};
+export function segmentDecisionLabel(segment: PdksSegment, status: PdksPlanDay["status"]): string {
+  if (segment.decision === "absent") {
+    if (status === "future") return "Bekleniyor";
+    if (status === "leave" || status === "holiday" || status === "weekend") return "—";
+  }
+  return SEGMENT_DECISION_LABELS[segment.decision];
+}
 export type SortKey =
   | "name"
   | "department"
@@ -81,7 +117,7 @@ export function cellLabel(name: string, date: string, cell?: PdksCell): string {
     cell?.durationMeasured === false ? "Süre hesaplanamadı" : status === "future" || status === "noData" || status === "notEmployed"
       ? "Süre yok"
       : `${Math.floor((cell?.totalMinutes ?? 0) / 60)} saat ${(cell?.totalMinutes ?? 0) % 60} dakika`;
-  return `${name}, ${readableDate(date)}, ${statusMetaFor(cell ?? { status }).label}, ${duration}${reviewHint(cell) ? `, ${reviewHint(cell)}` : ""}`;
+  return `${name}, ${readableDate(date)}, ${statusMetaFor(cell ?? { status }).label}, ${duration}${reviewHint(cell) ? `, ${reviewHint(cell)}` : ""}${planDayLabel(cell) ? `, ${planDayLabel(cell)}` : ""}${cell?.segments && cell.segments.length > 1 ? `, ${cell.segments.length} vardiya, ${segmentTimeRange(cell.segments)}` : ""}`;
 }
 export function periodTotals(days: readonly PdksCell[]) {
   return days.reduce(

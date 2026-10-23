@@ -1,7 +1,9 @@
+import { shiftForInstant, usesPlanDayRules, splitReadingsByShift } from "./lib/pdksMultiShift";
+import { buildPeriodDateKeys } from "./lib/pdksCalc";
 import { hasFixedShiftRules, usesShiftDayRules } from "./lib/pdksFixedRules";
 import { loadRuleReportDays } from "./lib/reportAttendance";
 import { resolveAttendanceEvidence } from "./lib/pdksEvidence";
-import { buildPdksWorkDateResolver, groupPdksWorkDays } from "./lib/pdksWorkDay";
+import { addWorkDate, buildPdksWorkDateResolver, groupPdksWorkDays } from "./lib/pdksWorkDay";
 import type { PdksTableRow } from "./lib/pdksTable";
 import { filterPdksReadings } from "./lib/pdksSource";
 import { summarizeDailyReadings } from "./lib/dashboardActivity";
@@ -234,7 +236,6 @@ async function loadPdksDataset(
   if (filters.companyId) employees = employees.filter((e) => e.companyId === filters.companyId);
   if (filters.departmentId) employees = employees.filter((e) => e.departmentId === filters.departmentId);
   if (filters.positionId) employees = employees.filter((e) => e.positionId === filters.positionId);
-  if (filters.shiftId) employees = employees.filter((e) => e.shiftId === filters.shiftId);
 
   const [leaves, deptDocs, shiftResolver] = await Promise.all([
     ctx.db
@@ -244,6 +245,14 @@ async function loadPdksDataset(
     ctx.db.query("departments").collect(),
     buildShiftResolver(ctx, employees),
   ]);
+  if (filters.shiftId) {
+    // Shift filters match resolved shifts during the period, including overrides of employee defaults.
+    const dates = buildPeriodDateKeys(trDateKey(rangeStartISO), trDateKey(rangeEndISO));
+    employees = employees.filter(employee => dates.some(date => {
+      const plan = shiftResolver.resolvePlan(employee._id, date);
+      return plan.kind === "shifts" && plan.shifts.some(shift => shift._id === filters.shiftId);
+    }));
+  }
   const deptNameById = new Map<string, string>(
     deptDocs.map((d) => [String(d._id), d.name])
   );
@@ -256,16 +265,14 @@ async function loadPdksDataset(
     ? await getEffectiveWorkSettings(ctx, settingsProjectId)
     : DEFAULT_WORK_SETTINGS;
 
-  const hasFlexible = [...shiftResolver.shifts.values()].some(usesShiftDayRules);
-  // Reuse attribution built from the complete raw history, including entries before today's range.
-  const workDate = hasFlexible ? ruleReport.workDate : buildPdksWorkDateResolver(employees, shiftResolver.resolve);
+  const workDate = dashboardWorkDateResolver(employees, shiftResolver, ruleReport.workDate);
   const filtered = filterPdksReadings(readings, filters.projectId, r => ruleReport.policies(r.projectId, workDate(r)));
   const legacy = filtered.filter(r => !ruleReport.managesReading(r));
   const versioned: Doc<"cardReadings">[] = [];
   for (const employee of employees) {
-    for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve, ruleReport.manualEntryFor)) {
+    for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve, ruleReport.manualEntryFor, undefined, shiftResolver.resolveLast)) {
       const policy = ruleReport.policies(employee.projectId, date);
-      if (policy.punchMode !== "requirements" && !usesShiftDayRules(shiftResolver.resolve(employee._id, date))) continue;
+      if (policy.punchMode !== "requirements" && !usesPlanDayRules(shiftResolver.resolvePlan(employee._id, date)) && !usesShiftDayRules(shiftResolver.resolve(employee._id, date))) continue;
       const cell = ruleReport.ruleRows.get(employee._id)?.days.find(day => day.date === date);
       if (cell?.status !== "present" && cell?.status !== "late") continue;
       const evidence = resolveAttendanceEvidence(list, undefined, policy);
@@ -276,7 +283,25 @@ async function loadPdksDataset(
   return { employees, readings: [...legacy, ...versioned], activityReadings: filtered, leaves, deptNameById, shiftResolver, workSettings, ruleRows: ruleReport.ruleRows };
 }
 
-function computePdksCoreInMemory(
+/** Keep the legacy boundary resolver for ordinary person-days, even with versioned policies. */
+export function dashboardWorkDateResolver(
+  employees: readonly Doc<"employees">[],
+  shifts: ShiftResolver,
+  reportWorkDate: (reading: Doc<"cardReadings">) => string,
+) {
+  const legacyWorkDate = buildPdksWorkDateResolver(employees, shifts.resolve, undefined, undefined, shifts.resolveLast);
+  const hasShiftRules = [...shifts.shifts.values()].some(usesShiftDayRules);
+  const byId = new Map(employees.map(employee => [employee._id, employee]));
+  const byCard = new Map(employees.map(employee => [employee.cardNumber, employee]));
+  return (reading: Doc<"cardReadings">) => {
+    const employee = reading.employeeId ? byId.get(reading.employeeId) : byCard.get(reading.cardNo);
+    const date = trDateKey(reading.accessTime);
+    const planned = employee && [date, addWorkDate(date, -1)].some(day => usesPlanDayRules(shifts.resolvePlan(employee._id, day)));
+    return hasShiftRules || planned ? reportWorkDate(reading) : legacyWorkDate(reading);
+  };
+}
+
+export function computePdksCoreInMemory(
   employees: Doc<"employees">[],
   readings: Doc<"cardReadings">[],
   leaves: Doc<"leaves">[],
@@ -284,6 +309,7 @@ function computePdksCoreInMemory(
   deptNameById: Map<string, string>,
   shiftResolver: ShiftResolver,
   workSettings: EffectiveWorkSettings,
+  ruleRows: ReadonlyMap<Id<"employees">, Pick<PdksTableRow, "days">> = new Map(),
 ): { core: PdksStatsCore; lateByDept: Map<string, number> } {
   const allowedEmpIds = new Set(employees.map((e) => String(e._id)));
   const startDate = trDateKey(range.start);
@@ -310,7 +336,7 @@ function computePdksCoreInMemory(
       presentSet.add(key);
       const arrivalMin = isoTimeToTRMinutes(r.accessTime);
       const dateISO = trDateKey(r.accessTime);
-      const shift = shiftResolver.resolve(r.employeeId as Id<"employees">, dateISO);
+      const shift = shiftForInstant(dateISO, r.accessTime, shiftResolver.resolvePlan(r.employeeId as Id<"employees">, dateISO), r.direction);
       const { lateThresholdMin } = thresholdsForShift(shift, workSettings);
       if (arrivalMin > lateThresholdMin) lateSet.add(key);
     }
@@ -319,12 +345,20 @@ function computePdksCoreInMemory(
   }
 
   const defaultWorkingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
+  const managedDates = new Map<string, Set<string>>();
   let totalOvertimeMinutes = 0;
-  for (const [empId, list] of empDayReadings.entries()) {
+  for (const [employeeId, row] of ruleRows) {
+    if (!allowedEmpIds.has(employeeId)) continue;
+    const days = row.days.filter(day => day.date >= startDate && day.date <= endDate && usesPlanDayRules(shiftResolver.resolvePlan(employeeId, day.date)));
+    managedDates.set(employeeId, new Set(days.map(day => day.date)));
+    totalOvertimeMinutes += days.reduce((sum, day) => sum + day.overtimeMinutes, 0);
+  }
+  for (const [empId, allReadings] of empDayReadings.entries()) {
+    const list = allReadings.filter(reading => !managedDates.get(empId)?.has(trDateKey(reading.accessTime)));
     list.sort((a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime());
     const first = list[0];
     const last = list[list.length - 1];
-    if (first === last) continue;
+    if (!first || !last || first === last) continue;
     const diff = new Date(last.accessTime).getTime() - new Date(first.accessTime).getTime();
     const netMin = Math.floor(diff / 60000);
     const dateISO = trDateKey(first.accessTime);
@@ -359,6 +393,9 @@ function computePdksCoreInMemory(
 
   const totalEmployees = employees.length;
   const presentToday = presentSet.size;
+  // The production caller uses a single day; a multi-day attendance rate must count each day separately.
+  const expectedEmployees = employees.filter(employee => shiftResolver.resolvePlan(employee._id, startDate).kind !== "rest");
+  const expectedPresent = expectedEmployees.filter(employee => presentSet.has(employee._id)).length;
 
   return {
     core: {
@@ -368,7 +405,7 @@ function computePdksCoreInMemory(
       overtimeHours: Math.round((totalOvertimeMinutes / 60) * 10) / 10,
       insideBuilding: presentSet.size,
       leaveToday,
-      devamOrani: totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 0,
+      devamOrani: expectedEmployees.length > 0 ? Math.round((expectedPresent / expectedEmployees.length) * 100) : 0,
     },
     lateByDept,
   };
@@ -476,7 +513,7 @@ export const getRepeatLateOffenders = authedQuery({
       const emp = empById.get(empKey);
       if (!emp) continue;
       if (ruleRows.get(emp._id)?.days.some(day => day.date === dateKey)) continue;
-      const shift = shiftResolver.resolve(emp._id, dateKey);
+      const shift = shiftForInstant(dateKey, accessTime, shiftResolver.resolvePlan(emp._id, dateKey), "entry");
       const { lateThresholdMin } = thresholdsForShift(shift, workSettings);
       const arrivalMin = isoTimeToTRMinutes(accessTime);
       if (arrivalMin > lateThresholdMin) {
@@ -546,25 +583,19 @@ export const getBreakViolations = authedQuery({
       );
       if (totalMin < 450) continue;
 
-      const shift = shiftResolver.resolve(emp._id, today);
-      if (!shift?.breakStart || !shift?.breakEnd) continue;
-      const [bsh, bsm] = shift.breakStart.split(":").map(Number);
-      const [beh, bem] = shift.breakEnd.split(":").map(Number);
-      const bsMin = bsh * 60 + bsm;
-      const beMin = beh * 60 + bem;
-
-      const hadBreakReading = list.some((r) => {
-        const m = isoTimeToTRMinutes(r.accessTime);
-        return m >= bsMin && m <= beMin;
-      });
-      if (!hadBreakReading) {
-        violations.push({
-          employeeId: emp._id,
-          firstName: emp.firstName,
-          lastName: emp.lastName,
-          totalMinutes: totalMin,
+      const plan = shiftResolver.resolvePlan(emp._id, today);
+      const shifts = plan.kind === "shifts" ? plan.shifts : [];
+      const buckets = splitReadingsByShift(today, list, shifts);
+      const missingBreak = shifts.some((shift, index) => {
+        if (!shift.breakStart || !shift.breakEnd) return false;
+        const [bsh, bsm] = shift.breakStart.split(":").map(Number);
+        const [beh, bem] = shift.breakEnd.split(":").map(Number);
+        return !(buckets[index] ?? []).some(reading => {
+          const minute = isoTimeToTRMinutes(reading.accessTime);
+          return minute >= bsh * 60 + bsm && minute <= beh * 60 + bem;
         });
-      }
+      });
+      if (missingBreak) violations.push({ employeeId: emp._id, firstName: emp.firstName, lastName: emp.lastName, totalMinutes: totalMin });
     }
     return violations.sort((a, b) => b.totalMinutes - a.totalMinutes);
   },
@@ -631,15 +662,15 @@ export const getActivitySummary = authedQuery({
     const daily = summarizeDailyReadings(readings.filter(r => r.direction === "entry" || r.direction === "exit" || (!r.employeeId || !dataset.ruleRows.has(r.employeeId))));
     const { core } = computePdksCoreInMemory(
       dataset.employees, readings.filter((reading) => reading.direction !== "exit"), dataset.leaves,
-      { start: startISO, end: endISO }, dataset.deptNameById, dataset.shiftResolver, dataset.workSettings,
+      { start: startISO, end: endISO }, dataset.deptNameById, dataset.shiftResolver, dataset.workSettings, dataset.ruleRows,
     );
     const ruleCells = [...dataset.ruleRows].filter(([id]) => employeeIds.has(id)).flatMap(([id, row]) => row.days.map(day => ({ id, day })));
     const governedIds = new Set(ruleCells.map(cell => cell.id));
     const legacyPresent = new Set(readings.filter(r => r.employeeId && !governedIds.has(r.employeeId)).map(r => r.employeeId));
-    const presentRules = new Set(readings.filter(r => r.employeeId && governedIds.has(r.employeeId) && r.direction === "entry" && !hasFixedShiftRules(dataset.shiftResolver.resolve(r.employeeId, today))).map(r => r.employeeId));
+    const presentRules = new Set(readings.filter(r => r.employeeId && governedIds.has(r.employeeId) && r.direction === "entry" && !usesPlanDayRules(dataset.shiftResolver.resolvePlan(r.employeeId, today)) && !hasFixedShiftRules(dataset.shiftResolver.resolve(r.employeeId, today))).map(r => r.employeeId));
     if (governedIds.size) {
       for (const { id, day } of ruleCells) {
-        if ((day.status === "present" || day.status === "late") && usesShiftDayRules(dataset.shiftResolver.resolve(id, day.date))) presentRules.add(id);
+        if ((day.status === "present" || day.status === "late") && (usesPlanDayRules(dataset.shiftResolver.resolvePlan(id, day.date)) || usesShiftDayRules(dataset.shiftResolver.resolve(id, day.date)))) presentRules.add(id);
       }
       core.presentToday = legacyPresent.size + presentRules.size;
       const firstEntries = new Map<Id<"employees">, Doc<"cardReadings">>();
@@ -647,7 +678,11 @@ export const getActivitySummary = authedQuery({
         if (!reading.employeeId || reading.direction === "exit" || (governedIds.has(reading.employeeId) && reading.direction !== "entry") || firstEntries.has(reading.employeeId)) continue;
         firstEntries.set(reading.employeeId, reading);
       }
-      core.lateArrivals = new Set([...firstEntries].filter(([id, reading]) => isoTimeToTRMinutes(reading.accessTime) > thresholdsForShift(dataset.shiftResolver.resolve(id, today), dataset.workSettings).lateThresholdMin).map(([id]) => id)).size;
+      const lateIds = new Set([...firstEntries].filter(([id, reading]) => !usesPlanDayRules(dataset.shiftResolver.resolvePlan(id, today)) && isoTimeToTRMinutes(reading.accessTime) > thresholdsForShift(shiftForInstant(today, reading.accessTime, dataset.shiftResolver.resolvePlan(id, today), "entry"), dataset.workSettings).lateThresholdMin).map(([id]) => id));
+      for (const { id, day } of ruleCells) {
+        if (usesPlanDayRules(dataset.shiftResolver.resolvePlan(id, day.date)) && day.isLate) lateIds.add(id);
+      }
+      core.lateArrivals = lateIds.size;
     }
     const settingsProjectId = args.projectId ?? dataset.employees[0]?.projectId;
     const settings = settingsProjectId

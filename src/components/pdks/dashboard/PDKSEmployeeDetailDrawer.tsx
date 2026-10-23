@@ -1,3 +1,6 @@
+import { PdksDaySegments } from "./PdksDaySegments";
+import { PdksPlanSummary } from "./PdksPlanSummary";
+import { planDayLabel } from "../lib/presentation";
 import { usePermissions } from "@/hooks/usePermissions";
 import { restorePdksFocus } from "../lib/focus";
 import { Component, useState, type ReactNode } from "react";
@@ -136,6 +139,7 @@ function Detail({
               {detail.employee.department}
             </span>
           </div>
+          <PdksPlanSummary day={day} />
           {reviewHint(day) && <p className="text-sm text-muted-foreground">{reviewHint(day)}</p>}
           <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
             {[
@@ -152,6 +156,7 @@ function Detail({
               </div>
             ))}
           </dl>
+          <PdksDaySegments day={day} />
           <div className="space-y-1 text-xs text-muted-foreground">
             {day.leaveType && <p>İzin türü: {leaveLabel(day.leaveType)}</p>}
             <p>Gün kodu: {day.payrollCode || "—"}</p>
@@ -165,7 +170,7 @@ function Detail({
             {detail.employee.position && (
               <p>Pozisyon: {detail.employee.position}</p>
             )}
-            {detail.employee.shift && <p>Vardiya: {detail.employee.shift}</p>}
+            {!planDayLabel(day) && detail.employee.shift && <p>Vardiya: {detail.employee.shift}</p>}
           </div>
           {day.manualNote && (
             <div className="border-y py-3 text-sm">

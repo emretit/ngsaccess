@@ -184,6 +184,7 @@ export default function EmployeeForm({
               isVisitor={employee?.isVisitor}
               autoFocusFirstName={autoFocusFirstName}
               isEditing={!!employee}
+              originalDepartmentId={employee?.departmentId ?? null}
               memberships={memberships}
               formData={formData}
               setFormData={setFormData}

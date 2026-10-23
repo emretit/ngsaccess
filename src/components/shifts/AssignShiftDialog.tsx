@@ -1,5 +1,6 @@
-import { WeekdaySelection } from "./WeekdaySelection";
-import { ShiftSelect } from "./ShiftSelect";
+import { AssignmentPatternEditor } from "./AssignmentPatternEditor";
+import { DepartmentTargetPicker, DepartmentPreviewPanel } from "./DepartmentTargetPicker";
+import { assignmentFields, bulkAssignmentRequest, departmentAssignmentRequest, focusAssignmentError, planFormError } from "./lib/planForm";
 import { shiftMessage, shortDate, shiftTimeLabel } from "./lib/planning";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -16,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
-import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
+import { PlanQueryBoundary } from "./PlanQueryBoundary";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { errorMessage } from "@/lib/notify";
@@ -54,6 +55,8 @@ export function AssignShiftDialog({
   initial,
 }: AssignShiftDialogProps) {
   const [values, setValues] = useState<BulkAssignmentFormValues>(() => ({
+    target: "people",
+    departmentId: "",
     employeeIds: initial?.employeeIds ?? [],
     // Pasif vardiya seçeneklerde yok; önceden seçilmiş gelirse görünmeyen değer gönderilmesin.
     shiftId: shifts.some(s => s._id === initial?.shiftId && s.isActive !== false) ? initial?.shiftId ?? "" : "",
@@ -74,6 +77,9 @@ export function AssignShiftDialog({
   const [result, setResult] = useState<Apply | null>(null);
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
+  const planErrorRef = useRef<HTMLParagraphElement>(null);
+  const [departmentSaved, setDepartmentSaved] = useState(false);
+  const assignDepartment = useMutation(api.shiftPlans.assignDepartment);
   const apply = useMutation(api.shifts.bulkAssignShift);
   const close = () => {
     if (!lock.current) guard.requestClose(() => onOpenChange(false));
@@ -92,11 +98,11 @@ export function AssignShiftDialog({
       for (const issue of parsed.error.issues)
         next[String(issue.path[0])] = issue.message;
       setErrors(next);
-      requestAnimationFrame(() =>
-        document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(),
-      );
+      focusAssignmentError(planErrorRef, Boolean(next.plan || next.shiftId));
       return;
     }
+    const planError = planFormError(parsed.data, shifts);
+    if (planError) { setErrors({ plan: planError }); focusAssignmentError(planErrorRef, true); return; }
     setErrors({});
     setPreviewValues(parsed.data);
   };
@@ -106,19 +112,13 @@ export function AssignShiftDialog({
     setPending(true);
     setServerError("");
     try {
-      const response = await apply({
-        resultMode: "detailed",
-        projectId,
-        employeeIds: previewValues.employeeIds as Id<"employees">[],
-        shiftId: previewValues.shiftId as Id<"shifts">,
-        startDate: previewValues.startDate,
-        endDate: previewValues.endDate,
-        weekPattern: previewValues.specificDays
-          ? previewValues.weekPattern
-          : undefined,
-        forceConfirm,
-        calendarConfirmed,
-      });
+      if (previewValues.target === "department") {
+        await assignDepartment(departmentAssignmentRequest(previewValues, projectId, forceConfirm));
+        setDepartmentSaved(true);
+        setBaseline(JSON.stringify(values));
+        return;
+      }
+      const response = await apply(bulkAssignmentRequest(previewValues, projectId, forceConfirm, calendarConfirmed));
       setResult(response);
       setBaseline(JSON.stringify(values));
     } catch (error) {
@@ -140,8 +140,7 @@ export function AssignShiftDialog({
           <DialogHeader>
             <DialogTitle>Vardiya ata</DialogTitle>
             <DialogDescription>
-              Bir veya birden fazla çalışan seçin. Mevcut atamalar korunur; bu
-              işlem ek atama oluşturur.
+              Kişi veya departman seçin, deseni belirleyin ve önizlemeyi onaylayın.
             </DialogDescription>
           </DialogHeader>
           {serverError && (
@@ -149,7 +148,7 @@ export function AssignShiftDialog({
               {shiftMessage(serverError)}
             </p>
           )}
-          {result ? (
+          {departmentSaved ? <section role="status" className="space-y-3"><p>Departman ataması oluşturuldu.</p><Button onClick={() => onOpenChange(false)}>Kapat</Button></section> : result ? (
             <section role="status" className="space-y-3">
               <h3 className="font-semibold">
                 {result.insertedCount ? "Atama sonucu" : "Atama yapılamadı"}
@@ -192,6 +191,12 @@ export function AssignShiftDialog({
           ) : (
             <>
               <fieldset disabled={pending} className="space-y-4 min-w-0">
+                <h3 className="text-sm font-semibold">1. Kime</h3>
+                <div role="group" aria-label="Atama hedefi" className="flex gap-1">
+                  <Button type="button" variant={values.target !== "department" ? "default" : "outline"} aria-pressed={values.target !== "department"} onClick={() => change({ ...values, target: "people" })}>Kişiler</Button>
+                  <Button type="button" variant={values.target === "department" ? "default" : "outline"} aria-pressed={values.target === "department"} onClick={() => change({ ...values, target: "department" })}>Departman</Button>
+                </div>
+                {values.target === "department" ? <DepartmentTargetPicker projectId={projectId} value={values.departmentId ?? ""} previewValues={bulkAssignmentFormSchema.safeParse(values).success && !planFormError(values, shifts) ? values : undefined} onChange={departmentId => change({ ...values, departmentId })} error={errors.departmentId} /> : <>
                 <FormFieldWrapper
                   htmlFor="assignment-people"
                   label="Çalışanlar"
@@ -244,16 +249,7 @@ export function AssignShiftDialog({
                       </label>
                     ))}
                 </div>
-                <FormFieldWrapper
-                  htmlFor="assignment-shift"
-                  label="Vardiya"
-                  error={errors.shiftId}
-                >
-                  <ShiftSelect id="assignment-shift" label="Vardiya" value={values.shiftId}
-                    invalid={!!errors.shiftId} describedBy={errors.shiftId ? "assignment-shift-error" : undefined}
-                    onChange={(shiftId) => change({ ...values, shiftId })} placeholder="Vardiya seçin"
-                    options={shifts.filter(s => s.isActive !== false).map(s => ({ value: s._id, label: `${s.name} · ${shiftTimeLabel(s)}` }))} />
-                </FormFieldWrapper>
+                </>}
                 <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
                   {(["startDate", "endDate"] as const).map((key) => (
                     <FormFieldWrapper
@@ -270,38 +266,22 @@ export function AssignShiftDialog({
                     </FormFieldWrapper>
                   ))}
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox" className="size-6 shrink-0 accent-primary"
-                    checked={values.specificDays}
-                    onChange={(e) =>
-                      change({ ...values, specificDays: e.target.checked })
-                    }
-                  />
-                  Belirli günler
-                </label>
-                {values.specificDays ? (
-                  <WeekdaySelection id="assignment-days" value={values.weekPattern} error={errors.weekPattern}
-                    onChange={(weekPattern) => change({ ...values, weekPattern })} />
-                ) : (
-                  <p className="text-sm">Her gün uygulanır.</p>
-                )}
+                <AssignmentPatternEditor values={values} shifts={shifts} onChange={change} errors={errors} errorRef={planErrorRef} />
                 <p className="text-xs text-muted-foreground">
                   {shortDate(values.startDate)}–{shortDate(values.endDate)} dahil aralık ·{" "}
-                  {values.employeeIds.length} kişi. Gece vardiyaları ertesi güne
+                  {values.target === "department" ? "Departman ve alt departmanlar" : `${values.employeeIds.length} kişi`}. Gece vardiyaları ertesi güne
                   devam edebilir.
                 </p>
               </fieldset>
               {previewValues && (
-                <QuerySectionBoundary
+                <PlanQueryBoundary
                   resetKey={JSON.stringify([
                     previewValues,
                     forceConfirm,
                     calendarConfirmed,
                   ])}
-                  title="Atama önizlemesi yüklenemedi"
                 >
-                  <PreviewPanel
+                  {previewValues.target === "department" ? <DepartmentPreviewPanel values={previewValues} projectId={projectId} forceConfirm={forceConfirm} setForceConfirm={setForceConfirm} pending={pending} onSave={() => void save()} /> : <PreviewPanel
                     values={previewValues}
                     projectId={projectId}
                     forceConfirm={forceConfirm}
@@ -310,8 +290,8 @@ export function AssignShiftDialog({
                     setCalendarConfirmed={setCalendarConfirmed}
                     pending={pending}
                     onSave={() => void save()}
-                  />
-                </QuerySectionBoundary>
+                  />}
+                </PlanQueryBoundary>
               )}
               <div className="sticky bottom-0 bg-surface flex flex-wrap justify-end gap-2 border-t py-3">
                 <Button variant="outline" disabled={pending} onClick={close}>
@@ -351,10 +331,7 @@ export function PreviewPanel({
   const preview = useQuery(api.shifts.previewBulkAssign, {
     projectId,
     employeeIds: values.employeeIds as Id<"employees">[],
-    shiftId: values.shiftId as Id<"shifts">,
-    startDate: values.startDate,
-    endDate: values.endDate,
-    weekPattern: values.specificDays ? values.weekPattern : undefined,
+    ...assignmentFields(values),
     forceConfirm,
     calendarConfirmed,
   });
@@ -362,7 +339,7 @@ export function PreviewPanel({
     return <SectionSkeleton label="Atama önizlemesi hesaplanıyor" />;
   return (
     <section ref={(node) => { if (node && !node.dataset.shown) { node.dataset.shown = "1"; node.querySelector("[data-apply]")?.scrollIntoView?.({ block: "center" }); } }} className="space-y-3 border-t pt-3">
-      <h3 className="font-medium">Önizleme</h3>
+      <h3 className="font-medium">3. Önizleme</h3>
       <p role="status" className="text-sm">
         {previewSummary(preview.summary)}
       </p>

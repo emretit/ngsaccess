@@ -10,7 +10,8 @@ import {
   type EffectiveOvertimeRates,
 } from "./pdksHelpers";
 import { settingsForShift } from "./shiftResolver";
-import { computePdksDay } from "./pdksDay";
+import { computePdksPlannedDay, plannedDayFields } from "./pdksMultiShift";
+import type { DayPlan } from "./shiftResolver";
 
 export function computePayrollCell(params: {
   policyFor?: PdksPolicyResolver;
@@ -24,18 +25,20 @@ export function computePayrollCell(params: {
   holidayMap?: ReadonlyMap<string, Doc<"holidays">>;
   workingDays: string[];
   dayShift: Doc<"shifts"> | null;
+  dayPlan?: DayPlan;
   workSettings: EffectiveWorkSettings;
   overtimeRates: EffectiveOvertimeRates;
   empHourlyRate: number | null;
 }) {
   const { date, dayShift, workSettings } = params;
-  const day = computePdksDay({
+  const day = computePdksPlannedDay({
     hasLeave: params.hasLeave,
       policy: params.policyFor?.(date),
     date,
     readings: params.dayReadings,
     manual: params.manual,
     shift: dayShift,
+    dayPlan: params.dayPlan,
     workSettings,
     overtimeRates: params.overtimeRates,
     hourlyRate: params.empHourlyRate,
@@ -43,7 +46,8 @@ export function computePayrollCell(params: {
     holiday: params.holiday,
     holidayMap: params.holidayMap,
   });
-  const settings = settingsForShift(dayShift, workSettings);
+  const lastShift = params.dayPlan?.kind === "shifts" ? params.dayPlan.shifts[params.dayPlan.shifts.length - 1] ?? dayShift : dayShift;
+  const settings = settingsForShift(lastShift, workSettings);
   const status = classifyPdksDay({
     date,
     dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manual),
@@ -53,7 +57,7 @@ export function computePayrollCell(params: {
     earlyExitTolerance: settings.earlyExitToleranceMinutes,
     hasAssignedShift:
       params.firstRecordDate !== undefined ? dayShift !== null : undefined,
-    lateTolerance: settings.maxLateMinutes,
+    lateTolerance: dayShift?.lateToleranceMinutes ?? workSettings.maxLateMinutes,
     classification: day.classification,
     pendingUntil: day.pendingUntil,
     durationMeasured: day.durationMeasured,
@@ -70,7 +74,8 @@ export function computePayrollCell(params: {
   return {
     date,
     ...flexibleMinuteFields(day),
-    ...(day.scheduleType === "flexible" || params.policyFor?.(date).calculationMode === "eachPunch" || params.policyFor?.(date).punchMode === "requirements" || params.policyFor && hasDirectionalPdksCheckpoints(params.policyFor(date)) ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
+    ...plannedDayFields(day),
+    ...(day.segments || day.scheduleType === "flexible" || params.policyFor?.(date).calculationMode === "eachPunch" || params.policyFor?.(date).punchMode === "requirements" || params.policyFor && hasDirectionalPdksCheckpoints(params.policyFor(date)) ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
     overtimeSegments: day.overtimeSegments,
     status,
     payrollCode:

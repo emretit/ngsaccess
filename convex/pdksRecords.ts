@@ -74,7 +74,7 @@ export const bulkUpsertManual = authedMutation({
           }
         }
 
-        const shift = resolver.resolve(employee._id, row.date);
+        const shift = resolver.resolveLast(employee._id, row.date);
         const input = validateManualPdksInput({ ...row, note: batchNote }, shift?.projectId === employee.projectId ? shift : null);
 
         const existing = await findManualPdksRecord(ctx, row.employeeId, row.date);
@@ -149,7 +149,7 @@ export const previewManualShifts = authedQuery({
     const resolver = await buildShiftResolver(ctx, employees);
     return args.rows.flatMap(row => {
       if (!employeeIds.has(row.employeeId)) return [];
-      const shift = resolver.resolve(row.employeeId, row.date);
+      const shift = resolver.resolveLast(row.employeeId, row.date);
       return shift?.projectId === args.projectId && isOvernightShift(shift)
         ? [{ key: `${row.employeeId}__${row.date}`, startTime: shift.startTime, endTime: shift.endTime }] : [];
     });

@@ -3,7 +3,7 @@ import { assertDepartmentAncestors } from "./lib/departmentTree";
 import { assertPeopleProject } from "./lib/peopleScope";
 import { resolveProjectScope } from "./lib/projectScope";
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
@@ -95,6 +95,8 @@ export const remove = authedMutation({
     if (dept.projectId ? !isProjectAllowed(allowedProjectIds, dept.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu departmana erişim yetkiniz yok");
     }
+    const assignment = await ctx.db.query("departmentShiftAssignments").withIndex("by_department_end", q => q.eq("departmentId", args.departmentId)).take(1);
+    if (assignment.length) throw new ConvexError("Departman silinemez: vardiya ataması var. Önce departman vardiya atamalarını kaldırın.");
     const employees = await ctx.db.query("employees").withIndex("by_department", q => q.eq("departmentId", args.departmentId)).take(1);
     const children = await ctx.db.query("departments").withIndex("by_parent", q => q.eq("parentId", args.departmentId)).take(1);
     if (employees.length || children.length) throw new Error("Departman silinemez: bağlı çalışan veya alt departman var. Önce bağlı kayıtları taşıyın.");

@@ -16,7 +16,7 @@ vi.mock("./lib/auth", async importOriginal => {
   return { ...original, getProjectIdsForUser: async (ctx: TestContext) => ctx.user.role === "super_admin" ? [ctx.projectId, ctx.otherProjectId] : ctx.memberships };
 });
 vi.mock("./lib/shiftResolver", () => ({
-  buildShiftResolver: async () => ({ resolve: () => ({ projectId: "project-1", startTime: "22:00", endTime: "06:00" }) }),
+  buildShiftResolver: async () => ({ resolve: () => ({ projectId: "project-1", startTime: "22:00", endTime: "06:00" }), resolveLast: () => ({ projectId: "project-1", startTime: "22:00", endTime: "06:00" }) }),
 }));
 
 type Row = Record<string, unknown> & { _id: string; _creationTime: number; table: string };

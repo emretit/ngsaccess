@@ -1,3 +1,4 @@
+import { shiftPlanValidator, shiftPlanFields } from "./lib/shiftPlan";
 import { doorStatusPlanValidator, verifyPlanValidator, holidayPlanValidator } from "./lib/doorStatusPlan";
 import { inviteRoleValidator, permissionValidator, projectRoleValidator } from "./lib/roleCatalog";
 import { defineSchema, defineTable } from "convex/server";
@@ -1033,6 +1034,7 @@ export default defineSchema({
 
   shiftAssignments: defineTable({
     employeeId: v.id("employees"),
+    plan: v.optional(shiftPlanValidator),
     shiftId: v.id("shifts"),
     projectId: v.optional(v.id("projects")),
     startDate: v.string(),
@@ -1047,6 +1049,26 @@ export default defineSchema({
     .index("by_dates", ["startDate", "endDate"])
     .index("by_project_end", ["projectId", "endDate"])
     .index("by_employee_end", ["employeeId", "endDate"]),
+
+  departmentShiftAssignments: defineTable({
+    departmentId: v.id("departments"),
+    ...shiftPlanFields,
+    projectId: v.id("projects"),
+  })
+    .index("by_department_end", ["departmentId", "endDate"])
+    .index("by_project_end", ["projectId", "endDate"])
+    .index("by_shift", ["shiftId"]),
+
+  shiftPlanRefs: defineTable({
+    projectId: v.id("projects"),
+    shiftId: v.id("shifts"),
+    assignmentId: v.optional(v.id("shiftAssignments")),
+    departmentAssignmentId: v.optional(v.id("departmentShiftAssignments")),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_shift", ["shiftId"])
+    .index("by_assignment", ["assignmentId"])
+    .index("by_department_assignment", ["departmentAssignmentId"]),
 
   // ═══════ 8 · AYARLAR (GENEL / MAIL / BİLDİRİM) ════════════════════════
   generalSettings: defineTable({

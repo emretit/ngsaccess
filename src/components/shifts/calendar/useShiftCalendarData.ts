@@ -1,7 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { visibleRange, type Employee, type Period } from "../lib/planning";
+import { offsetDay, visibleRange, type Employee, type Period } from "../lib/planning";
 
 // Keep definitions outside the plan boundary and range queries inside it.
 export function useShiftCalendarDefinitions(projectId: Id<"projects">) {
@@ -10,9 +10,9 @@ export function useShiftCalendarDefinitions(projectId: Id<"projects">) {
   return { employees, shifts };
 }
 
-export function useShiftCalendarData({ projectId, employees, day, effectivePeriod, search, shiftFilter, page }: {
+export function useShiftCalendarData({ projectId, employees, day, effectivePeriod, search, page }: {
   projectId: Id<"projects">; employees: Employee[]; day: string; effectivePeriod: Period;
-  search: string; shiftFilter: string; page: number;
+  search: string; page: number;
 }) {
   const range = visibleRange(day, effectivePeriod);
   const filtered = employees.filter((e) =>
@@ -25,11 +25,16 @@ export function useShiftCalendarData({ projectId, employees, day, effectivePerio
   const visible = filtered.slice(currentPage * 50, (currentPage + 1) * 50);
   const assignments = useQuery(api.shifts.listAssignments, {
     projectId,
+    includePlans: true,
     rangeStart: range.rangeStart,
     rangeEnd: range.rangeEnd,
     employeeIds: visible.map((e) => e._id),
-    ...(shiftFilter === "all" ? {} : { shiftId: shiftFilter as Id<"shifts"> }),
   });
+  const cells = useQuery(api.shiftPlans.planCells, {
+    projectId, employeeIds: visible.map(employee => employee._id), rangeStart: offsetDay(range.rangeStart, -1), rangeEnd: range.rangeEnd,
+  });
+  const departmentAssignments = useQuery(api.shiftPlans.listDepartmentAssignments, { projectId });
+  const departments = useQuery(api.departments.list, { projectId });
   const leaves = useQuery(api.leaves.listForRange, {
     projectId,
     startDate: range.rangeStart,
@@ -39,5 +44,5 @@ export function useShiftCalendarData({ projectId, employees, day, effectivePerio
     startDate: range.rangeStart,
     endDate: range.rangeEnd,
   });
-  return { range, filtered, pageCount, currentPage, visible, assignments, leaves, holidays };
+  return { range, filtered, pageCount, currentPage, visible, assignments, leaves, holidays, cells, departmentAssignments, departments };
 }

@@ -1,4 +1,4 @@
-import { shiftTimeLabel } from "./lib/planning";
+import { dayDisplayRecords, shiftTimeLabel } from "./lib/planning";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { dayLabel, type DayData } from "./lib/planning";
 import { LEAVE_TYPE_LABEL_TR } from "./lib/calendarOverlays";
@@ -39,25 +39,34 @@ export function ShiftCalendarCell({
   canAssign?: boolean;
   compact?: boolean;
 }) {
-  const limit = compact ? 1 : 2;
+  const limit = data.resolved ? 2 : compact ? 1 : 2;
+  const records = dayDisplayRecords(data);
+  const rest = data.resolved?.cell.kind === "rest";
+  const source = data.resolved?.cell.source;
+  const sourceLabel = source === "department" ? `Departmandan: ${data.resolved?.departmentName ?? "Departman"}` : source === "default" ? "Varsayılan vardiya" : "";
+  const title = [sourceLabel, rest ? "Boş" : records.map(({ shift }) => `${shift.name} · ${shiftTimeLabel(shift)}`).join(", ")].filter(Boolean).join(" · ");
+  const ariaLabel = [employeeName, dayLabel(date), rest ? "Boş" : records.length ? `${records.length} atama: ${records.map(({ shift }) => shift.name).join(", ")}` : "atama yok",
+    sourceLabel, rest || records.length ? "ayrıntıları aç" : canAssign ? "vardiya ata" : "günü aç"].filter(Boolean).join(", ");
   return (
-    <div className={`group relative rounded text-left text-xs break-words hover:bg-subtle ${compact ? "min-h-10 p-0.5" : "min-h-[68px] p-2"}`}>
+    <div title={title || undefined} data-source={source} data-kind={data.resolved?.cell.kind} style={rest ? { backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, hsl(var(--border)) 4px, hsl(var(--border)) 5px)" } : undefined} className={`group relative rounded text-left text-xs break-words hover:bg-subtle ${source === "department" ? "border border-dashed" : ""} ${rest ? "bg-subtle text-muted-foreground" : ""} ${compact ? "min-h-10 p-0.5" : "min-h-[68px] p-2"}`}>
       {onOpen && (
         <button
           type="button"
           onClick={onOpen}
-          title={compact && data.records.length ? data.records.map(({ shift }) => `${shift.name} · ${shiftTimeLabel(shift)}`).join(", ") : undefined}
-          aria-label={`${employeeName}, ${dayLabel(date)}, ${data.records.length ? `${data.records.length} atama: ${data.records.map(({ shift }) => shift.name).join(", ")}, ayrıntıları aç` : `atama yok, ${canAssign ? "vardiya ata" : "günü aç"}`}`}
+          title={title || undefined}
+          aria-label={ariaLabel}
           className="absolute inset-0 z-10 w-full rounded focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
         >
-          {!data.records.length && canAssign && <span aria-hidden="true" className="text-xl text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">+</span>}
+          {!records.length && !rest && canAssign && <span aria-hidden="true" className="text-xl text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">+</span>}
         </button>
       )}
       <div className="pointer-events-none space-y-1">
-        {data.records.slice(0, limit).map(({ assignment, shift, continuation }) => {
+        {rest && <span className="block font-medium">Boş</span>}
+        {records.slice(0, limit).map(({ key, shift, continuation }) => {
           const bar = shiftColorClasses(shift.color)?.bar;
           return (
-            <span key={assignment._id} className={`block ${bar ? `${bar} pl-1.5` : ""}`} title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
+            <span key={key} className={`relative block ${bar ? source === "default" ? "pl-1.5" : `${bar} pl-1.5` : ""}`} title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
+              {bar && source === "default" && <span aria-hidden="true" className={`absolute inset-y-0 left-0 opacity-50 ${bar}`} />}
               {!compact && <span className="block font-medium">{shift.name}</span>}
               <span className={`text-muted-foreground tabular-nums ${compact ? "block text-[10px] leading-tight tracking-tight" : ""}`}>
                 {cellTimeLabel(shift, continuation, compact)}
@@ -65,9 +74,9 @@ export function ShiftCalendarCell({
             </span>
           );
         })}
-        {data.records.length > limit && (
+        {records.length > limit && (
           <span className={compact ? "text-[10px]" : "block underline"}>
-            {`+${data.records.length - limit}${compact ? "" : " atama · tümünü gör"}`}
+            {`+${records.length - limit}${compact ? "" : " atama · tümünü gör"}`}
           </span>
         )}
         <ShiftDayBadges data={data} compact={compact} />

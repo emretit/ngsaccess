@@ -1,3 +1,7 @@
+import { planShiftIds } from "../../../convex/lib/shiftPlan";
+import { AssignmentPatternEditor } from "./AssignmentPatternEditor";
+import { assignmentFields, focusAssignmentError, planFormError } from "./lib/planForm";
+import type { DepartmentAssignment } from "./lib/planning";
 import { WeekdaySelection } from "./WeekdaySelection";
 import { ShiftSelect } from "./ShiftSelect";
 import { shiftMessage, shortDate, shiftTimeLabel } from "./lib/planning";
@@ -5,7 +9,6 @@ import { shiftError } from "./lib/shiftError";
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +30,7 @@ import { DateInput } from "@/components/ui/date-picker";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  assignment: Assignment | null;
+  assignment: Assignment | DepartmentAssignment | null;
   shifts: Shift[];
   shiftName: string;
   employeeName: string;
@@ -48,9 +51,12 @@ function EditForm({
   shifts,
   shiftName,
   employeeName,
-}: Props & { assignment: Assignment }) {
+}: Props & { assignment: Assignment | DepartmentAssignment }) {
   const [values, setValues] = useState<BulkAssignmentFormValues>({
-    employeeIds: [assignment.employeeId],
+    target: "employeeId" in assignment ? "people" : "department",
+    departmentId: "departmentId" in assignment ? assignment.departmentId : undefined,
+    employeeIds: "employeeId" in assignment ? [assignment.employeeId] : [],
+    plan: assignment.plan,
     shiftId: assignment.shiftId,
     startDate: assignment.startDate,
     endDate: assignment.endDate,
@@ -68,6 +74,11 @@ function EditForm({
   const [confirm, setConfirm] = useState<"save" | "delete" | null>(null);
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
+  const planErrorRef = useRef<HTMLParagraphElement>(null);
+  const selectedShiftIds = values.plan ? planShiftIds(values.plan) : [values.shiftId];
+  const hasInactiveShift = shifts.some(shift => shift.isActive === false && selectedShiftIds.includes(shift._id));
+  const updateDepartment = useMutation(api.shiftPlans.updateDepartmentAssignment);
+  const removeDepartment = useMutation(api.shiftPlans.removeDepartmentAssignment);
   const update = useMutation(api.shifts.updateAssignment);
   const remove = useMutation(api.shifts.removeAssignment);
   const close = () => {
@@ -80,17 +91,18 @@ function EditForm({
     setServerError(undefined);
   };
   const prepare = () => {
+    if (hasInactiveShift) return;
     const parsed = bulkAssignmentFormSchema.safeParse(values);
     if (!parsed.success) {
       const next: Record<string, string> = {};
       for (const issue of parsed.error.issues)
         next[String(issue.path[0])] = issue.message;
       setErrors(next);
-      requestAnimationFrame(() =>
-        document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(),
-      );
+      focusAssignmentError(planErrorRef, Boolean(next.plan || ((assignment.plan || "departmentId" in assignment) && next.shiftId)));
       return;
     }
+    const planError = planFormError(parsed.data, shifts);
+    if (planError) { setErrors({ plan: planError }); focusAssignmentError(planErrorRef, true); return; }
     setErrors({});
     setConfirm("save");
   };
@@ -100,17 +112,13 @@ function EditForm({
     setPending(true);
     setServerError(undefined);
     try {
-      if (confirm === "delete") await remove({ assignmentId: assignment._id });
-      else
-        await update({
-          assignmentId: assignment._id,
-          shiftId: values.shiftId as Id<"shifts">,
-          startDate: values.startDate,
-          endDate: values.endDate,
-          weekPattern: values.specificDays ? values.weekPattern : [],
-          forceConfirm,
-          calendarConfirmed,
-        });
+      if ("departmentId" in assignment) {
+        if (confirm === "delete") await removeDepartment({ departmentAssignmentId: assignment._id });
+        else await updateDepartment({ departmentAssignmentId: assignment._id, ...assignmentFields(values, Boolean(assignment.plan)), weekPattern: values.plan && values.plan.kind !== "weekly" ? [] : values.specificDays ? values.weekPattern : [], forceConfirm });
+      } else {
+        if (confirm === "delete") await remove({ assignmentId: assignment._id });
+        else await update({ assignmentId: assignment._id, ...assignmentFields(values, Boolean(assignment.plan)), weekPattern: values.plan && values.plan.kind !== "weekly" ? [] : values.specificDays ? values.weekPattern : [], forceConfirm, calendarConfirmed });
+      }
       notify.success(
         confirm === "delete"
           ? "Atama serisi silindi"
@@ -149,16 +157,18 @@ function EditForm({
             </p>
           )}
           <fieldset disabled={pending} className="space-y-4">
-            <FormFieldWrapper
+            {!assignment.plan && !("departmentId" in assignment) && errors.plan && <p ref={planErrorRef} tabIndex={-1} role="alert" className="text-sm text-danger">{errors.plan}</p>}
+            {(assignment.plan || "departmentId" in assignment) ? <AssignmentPatternEditor values={values} shifts={shifts} onChange={change} errors={errors} errorRef={planErrorRef} /> : <FormFieldWrapper
               htmlFor="edit-shift"
               label="Vardiya"
               error={errors.shiftId}
             >
               <ShiftSelect id="edit-shift" label="Vardiya" value={values.shiftId}
-                invalid={!!errors.shiftId} describedBy={errors.shiftId ? "edit-shift-error" : undefined}
+                invalid={!!errors.shiftId} describedBy={[errors.shiftId ? "edit-shift-error" : "", hasInactiveShift ? "edit-inactive-shift" : ""].filter(Boolean).join(" ") || undefined}
                 onChange={(shiftId) => change({ ...values, shiftId })}
                 options={shifts.filter(s => s.isActive !== false || s._id === assignment.shiftId).map(s => ({ value: s._id, label: `${s.name} · ${shiftTimeLabel(s)}` }))} />
-            </FormFieldWrapper>
+            </FormFieldWrapper>}
+            {hasInactiveShift && <p id="edit-inactive-shift" role="status" className="text-xs text-muted-foreground">Bu vardiya pasif; kaydetmek için aktif bir vardiya seçin.</p>}
             <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
               {(["startDate", "endDate"] as const).map((key) => (
                 <FormFieldWrapper
@@ -175,7 +185,7 @@ function EditForm({
                 </FormFieldWrapper>
               ))}
             </div>
-            <label className="flex gap-2 text-sm">
+            {!(assignment.plan || "departmentId" in assignment) && <><label className="flex gap-2 text-sm">
               <input
                 type="checkbox" className="size-6 shrink-0 accent-primary"
                 checked={values.specificDays}
@@ -190,7 +200,7 @@ function EditForm({
                     onChange={(weekPattern) => change({ ...values, weekPattern })} />
             ) : (
               <p className="text-sm">Her gün</p>
-            )}
+            )}</>}
             <p className="text-xs text-muted-foreground">
               {shortDate(values.startDate)}–{shortDate(values.endDate)} dahil tüm seri. Mevcut diğer
               atamalar korunur.
@@ -228,7 +238,7 @@ function EditForm({
             <Button variant="outline" disabled={pending} onClick={close}>
               Vazgeç
             </Button>
-            <Button disabled={pending} onClick={prepare}>
+            <Button disabled={pending || hasInactiveShift} onClick={prepare}>
               Kaydet
             </Button>
           </div>

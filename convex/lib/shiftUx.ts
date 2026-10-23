@@ -1,3 +1,6 @@
+import { ConvexError } from "convex/values";
+import { slotForDate, type ShiftPlan } from "./shiftPlan";
+import type { Id } from "../_generated/dataModel";
 import { validateFixedRules, type FixedShiftRules } from "./pdksFixedRules";
 import { flexibleExitEnd, flexibleSchedule, validateFlexible, type ShiftSchedule } from "./pdksFlexible";
 import { trDateKey } from "./trDate";
@@ -42,11 +45,26 @@ export function validateShift(shift: ShiftSchedule & FixedShiftRules & { breakSt
     if (value !== undefined && (!Number.isInteger(value) || value < 0 || value > 240)) throw new Error("Tolerans 0–240 arasında tam sayı olmalıdır");
   }
 }
-export interface ScheduleRange { startDate: string; endDate: string; weekPattern?: string[] }
+export interface ScheduleRange { startDate: string; endDate: string; weekPattern?: string[]; plan?: ShiftPlan; shiftId?: Id<"shifts"> }
 export function appliesOn(range: ScheduleRange, day: string): boolean {
   return day >= range.startDate && day <= range.endDate && (!range.weekPattern?.length || range.weekPattern.includes(CODES[new Date(`${day}T12:00:00Z`).getUTCDay()]));
 }
-export function scheduleIntervals(range: ScheduleRange, shift: ShiftSchedule): [number, number][] {
+export function scheduleIntervals(range: ScheduleRange, shift: ShiftSchedule, shifts?: ReadonlyMap<string, ShiftSchedule>): [number, number][] {
+  if (range.plan) {
+    const result: [number, number][] = [];
+    const primary = range.shiftId ?? (range.plan.kind === "weekly" ? range.plan.shiftIds[0] : range.plan.slots.flat()[0]);
+    if (!primary) return result;
+    for (let value = Date.parse(range.startDate); value <= Date.parse(range.endDate); value += DAY) {
+      const date = new Date(value).toISOString().slice(0, 10);
+      const ids = slotForDate({ ...range, shiftId: primary }, date);
+      for (const id of ids ?? []) {
+        const selected = shifts?.get(id) ?? (id === primary ? shift : undefined);
+        if (!selected) throw new ConvexError("Planın vardiya bilgisi bulunamadı");
+        result.push(...scheduleIntervals({ startDate: date, endDate: date }, selected));
+      }
+    }
+    return result.sort((a, b) => a[0] - b[0]);
+  }
   const flex = flexibleSchedule(shift);
   const startMinute = minute(flex?.checkInStart ?? shift.startTime);
   let endMinute = flex ? Math.min(flexibleExitEnd(flex), minute(flex.checkInEnd) + flex.maxSpanMinutes) : minute(shift.endTime);

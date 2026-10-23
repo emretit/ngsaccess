@@ -1,10 +1,11 @@
+import { shiftExportRows } from "@/lib/shiftExport";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ClearAssignmentsDialog } from '../ClearAssignmentsDialog';
-import { shiftExportRows } from '@/lib/shiftExport';
+
 import { csvExport, downloadExport, exportFilenamePart, xlsxExport } from '@/lib/spreadsheetExport';
 import { notify } from '@/lib/notify';
 import { ShiftSelect } from "../ShiftSelect";
-import { assignmentInitial, shiftTimeLabel } from "../lib/planning";
+import { assignmentInitial, offsetDay, shiftTimeLabel } from "../lib/planning";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -22,12 +23,13 @@ import { AssignmentEditDialog } from "../AssignmentEditDialog";
 import {
   istanbulToday,
   type Assignment,
+  type DepartmentAssignment,
   type Employee,
   type Period,
   type Shift,
 } from "../lib/planning";
 import { useShiftCalendarData } from "./useShiftCalendarData";
-import { calendarDayResolver, groupAssignments } from "./shiftCalendarModel";
+import { resolvedCalendarDay, groupAssignments } from "./shiftCalendarModel";
 import { openCalendarDay } from "./calendarActions";
 import { CalendarHeader } from "./CalendarHeader";
 import { CalendarNavigation } from "./CalendarNavigation";
@@ -78,14 +80,14 @@ export function ShiftCalendarPlan({
     employee: Employee;
     date: string;
   } | null>(null);
-  const [edit, setEdit] = useState<Assignment | null>(null);
-  const { range, filtered, pageCount, currentPage, visible, assignments, leaves, holidays } =
-    useShiftCalendarData({ projectId, employees, day, effectivePeriod, search, shiftFilter, page });
+  const [edit, setEdit] = useState<Assignment | DepartmentAssignment | null>(null);
+  const { range, filtered, pageCount, currentPage, visible, assignments, leaves, holidays, cells, departmentAssignments, departments } =
+    useShiftCalendarData({ projectId, employees, day, effectivePeriod, search, page });
   const exportPlan = async (format: 'xlsx' | 'csv') => {
     if (!can("reports.view") || !assignments || exporting) return;
     setExporting(true);
     try {
-      const rows = shiftExportRows(visible, range.days, assignments, shifts);
+      const rows = shiftExportRows(visible, range.days, assignments, shifts, getData);
       const blob = format === 'xlsx' ? await xlsxExport(rows, 'Vardiyalar') : new Blob([csvExport(rows)], { type: 'text/csv;charset=utf-8' });
       downloadExport(blob, `vardiyalar-${exportFilenamePart(projectName)}-${range.rangeStart}_${range.rangeEnd}.${format}`);
     } catch (error: unknown) { notify.error('Vardiyalar aktarılamadı', error); }
@@ -93,9 +95,16 @@ export function ShiftCalendarPlan({
   };
   const active = shifts.filter((s) => s.isActive !== false);
   const loading =
-    assignments === undefined || leaves === undefined || holidays === undefined;
+    assignments === undefined || leaves === undefined || holidays === undefined || cells === undefined || departmentAssignments === undefined || departments === undefined;
   const assignmentsByEmployee = useMemo(() => groupAssignments(assignments ?? []), [assignments]);
-  const getData = calendarDayResolver(assignmentsByEmployee, shifts, leaves ?? [], holidays ?? []);
+  const cellMap = useMemo(() => new Map((cells ?? []).map(cell => [`${cell.employeeId}|${cell.date}`, cell])), [cells]);
+  const getData = (employee: Employee, date: string) => {
+    const cell = cellMap.get(`${employee._id}|${date}`);
+    const previous = cellMap.get(`${employee._id}|${offsetDay(date, -1)}`);
+    const showPrevious = shiftFilter === "all" || previous?.shiftIds.includes(shiftFilter as Id<"shifts">);
+    const shown = shiftFilter === "all" || cell?.shiftIds.includes(shiftFilter as Id<"shifts">);
+    return resolvedCalendarDay(employee, date, shown ? cell : undefined, (shown || showPrevious) ? assignmentsByEmployee.get(employee._id) ?? [] : [], shifts, departmentAssignments ?? [], departments ?? [], leaves ?? [], holidays ?? [], showPrevious ? previous : undefined);
+  };
   const clearSelection = () => setSelected(new Set());
   const changeDay = (next: string) => {
     if (!next) return;
@@ -191,7 +200,7 @@ export function ShiftCalendarPlan({
         />
       ) : (
         <>
-          {assignments.length === 0 && (
+          {!(cells ?? []).some(cell => cell.kind !== "none") && assignments.length === 0 && (
             <p className="text-sm text-muted-foreground">
               Bu dönemde atama yok.
             </p>
@@ -235,6 +244,7 @@ export function ShiftCalendarPlan({
           data={getData(detail.employee, detail.date)}
           onClose={() => setDetail(null)}
           canAssign={canManage && active.length > 0}
+          onEditDepartment={(assignment) => { setDetail(null); setEdit(assignment); }}
           onEdit={(assignment) => {
             setDetail(null);
             setEdit(assignment);
@@ -259,8 +269,8 @@ export function ShiftCalendarPlan({
         shiftName={
           shifts.find((s) => s._id === edit?.shiftId)?.name ?? "Vardiya"
         }
-        employeeName={employees
-          .filter((e) => e._id === edit?.employeeId)
+        employeeName={edit && "departmentId" in edit ? departments?.find(department => department._id === edit.departmentId)?.name ?? "Departman" : employees
+          .filter((e) => edit && "employeeId" in edit && e._id === edit.employeeId)
           .map((e) => `${e.firstName} ${e.lastName}`)
           .join("")}
       />

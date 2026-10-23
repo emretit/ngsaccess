@@ -1,3 +1,4 @@
+import { scopedPdksPlan } from "./lib/pdksMultiShift";
 import { usesShiftDayRules } from "./lib/pdksFixedRules";
 import { requirePermission } from "./lib/permissions";
 import { processCardReadingCore } from "./lib/processCardReadingCore";
@@ -585,7 +586,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
       .withIndex("by_employee_date", q => q.eq("employeeId", args.employeeId).gte("date", addWorkDate(overtimeRange.startDate, -1)).lte("date", addWorkDate(overtimeRange.endDate, 1))).take(1001) : undefined;
     if (earlyDetailRecords && earlyDetailRecords.length > 1000) throw new Error("Manuel kayıt sınırı aşıldı; tarih aralığını daraltın");
     const detailBoundaryManual = new Map((earlyDetailRecords ?? []).filter(record => record.manualEntry && (!args.projectId || record.projectId === args.projectId)).map(record => [record.date, record]));
-    const detailBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: sourceReadings, manualEntryFor: (id, date) => id === employee._id ? detailBoundaryManual.get(date)?.entryTime : undefined, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date));
+    const detailBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: sourceReadings, manualEntryFor: (id, date) => id === employee._id ? detailBoundaryManual.get(date)?.entryTime : undefined, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolveLast(id, date), args.projectId));
     const policies = await loadPdksPolicies(ctx, availabilityEmployees.map(e => e.projectId), detailHasFlexible ? addWorkDate(overtimeRange.startDate, -1) : overtimeRange.startDate, overtimeRange.endDate);
     readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, detailBoundaryWorkDate(r)));
 
@@ -636,9 +637,9 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const periodDateKeys = buildPeriodDateKeys(args.startDate, args.endDate);
 
-    const readingsByDate = groupPdksWorkDays(readings, employee._id, (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId), (_id, date) => manualByDate.get(date)?.entryTime);
+    const readingsByDate = groupPdksWorkDays(readings, employee._id, (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId), (_id, date) => manualByDate.get(date)?.entryTime, undefined, (id, date) => scopedPdksShift(detailShiftResolver.resolveLast(id, date), args.projectId));
 
-    const detailWorkDate = buildPdksWorkDateResolver(availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate)), (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => id === employee._id ? manualByDate.get(date)?.entryTime : undefined });
+    const detailWorkDate = buildPdksWorkDateResolver(availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate)), (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => id === employee._id ? manualByDate.get(date)?.entryTime : undefined }, undefined, (id, date) => scopedPdksShift(detailShiftResolver.resolveLast(id, date), args.projectId));
     const detailPeriodDates = new Set(periodDateKeys);
     const excludedUnknownReadings = countExcludedUnknownPdksReadings(
       sourceReadings.filter(r => detailPeriodDates.has(detailWorkDate(r))),
@@ -659,6 +660,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
         holiday: holidayMap.get(dk),
         holidayMap,
         dayShift: scopedPdksShift(detailShiftResolver.resolve(employee._id, dk), args.projectId),
+        dayPlan: scopedPdksPlan(detailShiftResolver.resolvePlan(employee._id, dk), args.projectId),
         workSettings,
         overtimeRates,
         workingDays,

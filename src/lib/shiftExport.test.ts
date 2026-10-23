@@ -20,3 +20,15 @@ describe('shift export grid', () => {
     expect(rows[1]?.slice(2)).toEqual(['Gündüz · 22:00–06:00 (+1 gün) (devam)', '—']);
   });
 });
+
+it('exports resolved multi-shift and rest cells with unchanged Turkish headers', () => {
+  const evening = { ...fixed, _id: 'evening', name: 'Akşam', startTime: '18:00', endTime: '22:00' } as Shift;
+  const rows = shiftExportRows([employee], ['2026-10-19', '2026-10-20'], [], [], (_employee, date) => ({
+    records: [], conflict: false, leave: null, holiday: null,
+    resolved: { cell: { employeeId: employee._id, date, kind: date === '2026-10-19' ? 'shifts' : 'rest', source: 'department', shiftIds: date === '2026-10-19' ? [fixed._id, evening._id] : [] }, shifts: date === '2026-10-19' ? [fixed, evening] : [] },
+  }));
+  expect(rows).toEqual([
+    ['Çalışan', 'Sicil', '19.10 Pzt', '20.10 Sal'],
+    ['=Ayşe Test', '+123', 'Gündüz · 09:00–17:00; Akşam · 18:00–22:00', 'Boş'],
+  ]);
+});

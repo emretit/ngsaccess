@@ -11,7 +11,8 @@ import {
 import { settingsForShift } from "./shiftResolver";
 import { formatIstanbulTime, formatHoursLabel } from "./pdksCalc";
 import { calculatePeriodOvertime, type OvertimeDay } from "./overtimeCalc";
-import { computePdksDay } from "./pdksDay";
+import { computePdksPlannedDay, plannedDayFields } from "./pdksMultiShift";
+import type { DayPlan } from "./shiftResolver";
 
 export function computeAttendanceDetailDay(params: {
   policyFor?: PdksPolicyResolver;
@@ -24,6 +25,7 @@ export function computeAttendanceDetailDay(params: {
   holiday: Doc<"holidays"> | null | undefined;
   holidayMap?: ReadonlyMap<string, Doc<"holidays">>;
   dayShift: Doc<"shifts"> | null;
+  dayPlan?: DayPlan;
   workSettings: EffectiveWorkSettings;
   workingDays: string[];
   overtimeRates?: EffectiveOvertimeRates;
@@ -32,20 +34,22 @@ export function computeAttendanceDetailDay(params: {
   const leave = params.leaves.find(
     (l) => date >= l.startDate && date <= l.endDate,
   );
-  const day = computePdksDay({
+  const day = computePdksPlannedDay({
     hasLeave: !!leave,
       policy: params.policyFor?.(date),
     date,
     readings: params.dayReadings,
     manual: params.manualDay,
     shift: dayShift,
+    dayPlan: params.dayPlan,
     workSettings,
     overtimeRates: params.overtimeRates,
     workingDays: params.workingDays,
     holiday: params.holiday,
     holidayMap: params.holidayMap,
   });
-  const settings = settingsForShift(dayShift, workSettings);
+  const lastShift = params.dayPlan?.kind === "shifts" ? params.dayPlan.shifts[params.dayPlan.shifts.length - 1] ?? dayShift : dayShift;
+  const settings = settingsForShift(lastShift, workSettings);
   const status = classifyPdksDay({
     date,
     dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manualDay),
@@ -55,7 +59,7 @@ export function computeAttendanceDetailDay(params: {
     earlyExitTolerance: settings.earlyExitToleranceMinutes,
     hasAssignedShift:
       params.firstRecordDate !== undefined ? dayShift !== null : undefined,
-    lateTolerance: settings.maxLateMinutes,
+    lateTolerance: dayShift?.lateToleranceMinutes ?? workSettings.maxLateMinutes,
     classification: day.classification,
     pendingUntil: day.pendingUntil,
     durationMeasured: day.durationMeasured,
@@ -72,6 +76,7 @@ export function computeAttendanceDetailDay(params: {
   return {
     date,
     ...flexibleMinuteFields(day),
+    ...plannedDayFields(day),
     durationMeasured: day.durationMeasured,
     punchQuality: day.punchQuality,
     overtimeSegments: day.overtimeSegments,

@@ -10,7 +10,7 @@ export function openCalendarDay(
   onAssign: (initial: AssignmentInitial) => void,
   onDetail: (detail: { employee: Employee; date: string }) => void,
 ) {
-  if (canAssign && data.records.length === 0) {
+  if (canAssign && data.records.length === 0 && !data.inheritedContinuations?.length && (!data.resolved || data.resolved.cell.kind === "none")) {
     onAssign({ employeeIds: [employee._id], startDate: date, endDate: date });
   } else onDetail({ employee, date });
 }

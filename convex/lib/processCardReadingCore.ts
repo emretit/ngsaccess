@@ -1,3 +1,4 @@
+import { shiftForInstant } from "./pdksMultiShift";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
@@ -428,7 +429,7 @@ async function processGenericCardReading(
 
   // 6. Geç kalma bildirimi (hasAccess + geç giriş)
   if (hasAccess) {
-    await notifyLateReading(ctx, employee, accessTime);
+    await notifyLateReading(ctx, employee, accessTime, cardDirection);
   }
 
   return { granted: hasAccess };
@@ -462,10 +463,13 @@ async function decideReadingAccess(
   return { hasAccess, activeRuleIds };
 }
 
-async function notifyLateReading(ctx: MutationCtx, employee: Doc<"employees">, accessTime: string) {
+async function notifyLateReading(ctx: MutationCtx, employee: Doc<"employees">, accessTime: string, direction?: string) {
   const settings = await getEffectiveWorkSettings(ctx, employee.projectId);
-  const dayShiftResolver = await buildShiftResolver(ctx, [employee]);
-  const dayShift = dayShiftResolver.resolve(employee._id, trDateKey(accessTime));
+  const date = trDateKey(accessTime);
+  const dayShiftResolver = await buildShiftResolver(ctx, [employee], { start: date, end: date });
+  const plan = dayShiftResolver.resolvePlan(employee._id, date);
+  if (plan.kind === "rest") return;
+  const dayShift = shiftForInstant(date, accessTime, plan, direction);
   const { lateThresholdMin } = thresholdsForShift(dayShift, settings);
   const isLate = isoTimeToTRMinutes(accessTime) > lateThresholdMin;
   if (isLate && employee.projectId) {

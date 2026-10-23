@@ -9,7 +9,8 @@
  */
 import { isRuleOpenAt } from "./ruleSchedule";
 import { trDateKey, trDayRangeISO } from "./trDate";
-import { assignmentAppliesOnDate } from "./shiftResolver";
+import { createShiftResolver, readDepartmentPlans } from "./shiftResolver";
+import { planShiftIds } from "./shiftPlan";
 import { addWorkDate } from "./pdksWorkDay";
 import { clockMinute, flexibleExitEnd, flexibleSchedule } from "./pdksFlexible";
 import type { MutationCtx } from "../_generated/server";
@@ -49,15 +50,16 @@ async function directionShift(ctx: MutationCtx, employeeId: Id<"employees">, dat
     .take(DIRECTION_ASSIGNMENT_LIMIT + 1);
   // An incomplete assignment set cannot safely infer yesterday's night shift.
   if (assignments.length > DIRECTION_ASSIGNMENT_LIMIT) return null;
-  const applicable = assignments.filter(assignment => assignmentAppliesOnDate(assignment, date)
-    && (!assignment.projectId || assignment.projectId === employee.projectId))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  for (const assignment of applicable) {
-    const shift = await ctx.db.get(assignment.shiftId);
-    if (shift && (!shift.projectId || shift.projectId === employee.projectId)) return shift;
-  }
-  const shift = employee.shiftId ? await ctx.db.get(employee.shiftId) : null;
-  return shift && (!shift.projectId || shift.projectId === employee.projectId) ? shift : null;
+  const departmentData = await readDepartmentPlans(ctx, employee.projectId && employee.departmentId ? [employee.projectId] : [], { start: date, end: date });
+  const applicable = assignments.filter(assignment => !assignment.projectId || assignment.projectId === employee.projectId);
+  const ids = [...new Set([
+    ...(employee.shiftId ? [employee.shiftId] : []),
+    ...[...applicable, ...departmentData.assignments].flatMap(row => [row.shiftId, ...planShiftIds(row.plan)]),
+  ])];
+  const shifts = (await Promise.all(ids.map(id => ctx.db.get(id))))
+    .filter((shift): shift is NonNullable<typeof shift> => shift !== null)
+    .filter(shift => !shift.projectId || shift.projectId === employee.projectId);
+  return createShiftResolver([employee], shifts, [applicable], departmentData.departments, departmentData.assignments).resolveLast(employeeId, date);
 }
 
 // Cihazın yön ayarına ve toggle state'ine göre okumanın yönünü çözer.

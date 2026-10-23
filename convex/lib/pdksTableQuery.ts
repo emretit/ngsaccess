@@ -1,3 +1,4 @@
+import { scopedPdksPlan } from "./pdksMultiShift";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { loadPdksPolicies } from "./pdksRules";
@@ -110,9 +111,6 @@ export async function getPdksTableData(
   if (args.positionId) {
     employees = employees.filter((e) => e.positionId === args.positionId);
   }
-  if (args.shiftId) {
-    employees = employees.filter((e) => e.shiftId === args.shiftId);
-  }
   if (args.person && args.person.trim()) {
     const term = args.person.trim().toLocaleLowerCase("tr-TR");
     employees = employees.filter((e) =>
@@ -121,6 +119,14 @@ export async function getPdksTableData(
   }
 
   const tableBoundaryShiftResolver = await buildShiftResolver(ctx, availabilityEmployees);
+  if (args.shiftId) {
+    // Shift filters match resolved shifts during the period, including overrides of employee defaults.
+    const filterDates = buildPeriodDateKeys(startDate, endDate);
+    employees = employees.filter(employee => filterDates.some(date => {
+      const plan = scopedPdksPlan(tableBoundaryShiftResolver.resolvePlan(employee._id, date), args.projectId);
+      return plan.kind === "shifts" && plan.shifts.some(shift => shift._id === args.shiftId);
+    }));
+  }
   const tableHasFlexible = [...tableBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") && hasFlexiblePdksShift(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
   if (tableHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, ctx.user.role === "super_admin" && !args.projectId ? undefined : allowedProjectIds), ...readings];
   const sourceReadings = readings;
@@ -128,7 +134,7 @@ export async function getPdksTableData(
     .withIndex("by_employee_date", q => q.eq("employeeId", emp._id).gte("date", addWorkDate(overtimeRange.startDate, -1)).lte("date", addWorkDate(overtimeRange.endDate, 1))).take(1001))) : undefined;
   if (earlyTableRecords?.some(records => records.length > 1000)) throw new Error("Manuel kayıt sınırı aşıldı; tarih aralığını daraltın");
   const tableBoundaryManual = new Map((earlyTableRecords ?? []).flat().filter(record => record.manualEntry && (!args.projectId || record.projectId === args.projectId)).map(record => [`${record.employeeId}__${record.date}`, record]));
-  const tableBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: sourceReadings, manualEntryFor: (id, date) => tableBoundaryManual.get(`${id}__${date}`)?.entryTime, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date));
+  const tableBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: sourceReadings, manualEntryFor: (id, date) => tableBoundaryManual.get(`${id}__${date}`)?.entryTime, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolveLast(id, date), args.projectId));
   const policies = await loadPdksPolicies(ctx, availabilityEmployees.map(e => e.projectId), tableHasFlexible ? addWorkDate(overtimeRange.startDate, -1) : overtimeRange.startDate, overtimeRange.endDate);
   readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, tableBoundaryWorkDate(r)));
 
@@ -190,7 +196,7 @@ export async function getPdksTableData(
   const tableDepartments = await Promise.all([...new Set(employees.flatMap(e => e.departmentId ? [e.departmentId] : []))].map(id => ctx.db.get(id)));
   const tableDeptById = new Map(tableDepartments.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [String(d._id), d]));
 
-  const tableWorkDate = [...tableBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualPdksByEmpDate.get(`${id}__${date}`)?.entryTime }) : tableBoundaryWorkDate;
+  const tableWorkDate = [...tableBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualPdksByEmpDate.get(`${id}__${date}`)?.entryTime }, undefined, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolveLast(id, date), args.projectId)) : tableBoundaryWorkDate;
   const tablePeriodDates = new Set(periodDateKeys);
   const sourceReadingsByEmployee = buildPdksEmployeeReadingMap({
     employees,
@@ -238,6 +244,8 @@ export async function getPdksTableData(
         workingDays,
         workSettings,
         overtimeRates,
+        resolvePlan: (id, date) => scopedPdksPlan(shiftResolver.resolvePlan(id, date), args.projectId),
+        resolveLast: (id, date) => scopedPdksShift(shiftResolver.resolveLast(id, date), args.projectId),
         resolveShift: (employeeId, dateISO) => {
           const shift = shiftResolver.resolve(employeeId, dateISO);
           return scopedPdksShift(shift, args.projectId);

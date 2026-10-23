@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { ShiftPlanSheet, useShiftPlanOpen } from "./ShiftPlanSheet";
 const state = vi.hoisted(() => ({ projectId: "project" as string | null, loading: false, params: new URLSearchParams(), openDefinitions: (_hasDefinitions: boolean) => {}, sheetOpen: false, onOpenChange: (_open: boolean) => {} }));
 vi.mock("react-router-dom", () => ({ useSearchParams: () => [state.params, (update: (previous: URLSearchParams) => URLSearchParams) => { state.params = update(state.params); }] }));
+vi.mock("./DepartmentAssignments", () => ({ DepartmentAssignments: () => <div>Departman atamaları</div> }));
 vi.mock("./ShiftCalendarView", () => ({ ShiftCalendarView: ({ openDefinitions }: { openDefinitions: (hasDefinitions: boolean) => void }) => { state.openDefinitions = openDefinitions; return <div>Takvim</div>; } }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: state.projectId, activeProject: { name: "Proje" }, loading: state.loading }) }));
 vi.mock("@/components/ui/sheet", () => {

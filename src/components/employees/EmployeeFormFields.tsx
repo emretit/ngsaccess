@@ -27,7 +27,13 @@ interface Props {
   autoFocusFirstName?: boolean;
   /** Kayıtlı kişiyi düzenlerken yardım metinleri yeni kayda göre değişir. */
   isEditing?: boolean;
+  originalDepartmentId?: EmployeeFormData["departmentId"];
   memberships?: { _id: string; name: string; isActive?: boolean }[];
+}
+export function DepartmentShiftWarning({ isEditing, originalDepartmentId, departmentId }: {
+  isEditing: boolean; originalDepartmentId: EmployeeFormData["departmentId"]; departmentId: EmployeeFormData["departmentId"];
+}) {
+  return isEditing && originalDepartmentId !== departmentId ? <p role="status" className="text-xs text-muted-foreground">Departman vardiya planı geçmiş günlere de uygulanır; kapanmış dönem için kişiye vardiya atayın.</p> : null;
 }
 export default function EmployeeFormFields({
   formData,
@@ -42,6 +48,7 @@ export default function EmployeeFormFields({
   photo,
   autoFocusFirstName = false,
   isEditing = false,
+  originalDepartmentId = null,
   memberships,
 }: Props) {
   const [otherOpen, setOtherOpen] = useState(false);
@@ -185,6 +192,7 @@ export default function EmployeeFormFields({
             {select("departmentId", "Departman", departments)}
             {select("positionId", "Pozisyon", positions)}
           </div>
+          <DepartmentShiftWarning isEditing={isEditing} originalDepartmentId={originalDepartmentId} departmentId={formData.departmentId} />
           <Label htmlFor="employee-isActive" className="flex min-h-11 items-center gap-2 text-sm">
             <Checkbox
               id="employee-isActive"

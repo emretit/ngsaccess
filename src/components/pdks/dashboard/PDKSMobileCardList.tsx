@@ -1,3 +1,5 @@
+import { PdksPlanSummary } from "./PdksPlanSummary";
+import { singleRowDay } from "../lib/presentation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RowActions } from "@/components/shared/RowActions";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -45,6 +47,7 @@ export function PDKSMobileCardList({
               <p className="text-xs text-muted-foreground">
                 {r.department || "—"}
               </p>
+              <PdksPlanSummary day={singleRowDay(r)} />
               <div className="mt-2">
                 <PdksRowStatus record={r} />
               </div>

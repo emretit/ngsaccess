@@ -101,7 +101,18 @@ it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK ayn�
         }
         // yetki meta okuması (docs/roles/PLAN.md), DTO'yu etkilemez
         const permissionMetadata = (read: unknown[]) => read[0] === "projectRolePermissions" || (read[0] === "userProjects" && read.some(call => Array.isArray(call) && call[0] === "withIndex" && call[1] === "by_user") && read.some(call => Array.isArray(call) && call[0] === "take" && call[1] === 1000));
-        const normalizedReads = reads.filter(read => !discovery.includes(read) && !permissionMetadata(read)).map(read => JSON.stringify(stable(read))).sort();
+        // Coordinator-approved Paket B existence probes; DTOs and legacy data reads remain strict.
+        const planDiscovery = reads.filter(read => read[0] === "shiftPlanRefs" || read[0] === "departmentShiftAssignments");
+        for (const read of planDiscovery) {
+          if (read[0] === "shiftPlanRefs") {
+            expect(read).toEqual(["shiftPlanRefs", ["withIndex", "by_project"], ["eq", "projectId", ids.projectId], ["export"], ["first"]]);
+          } else {
+            const lowerBound: unknown = Array.isArray(read[3]) ? read[3][2] : undefined;
+            expect(typeof lowerBound).toBe("string");
+            expect(read).toEqual(["departmentShiftAssignments", ["withIndex", "by_project_end"], ["eq", "projectId", ids.projectId], ["gte", "endDate", lowerBound], ["export"], ["first"]]);
+          }
+        }
+        const normalizedReads = reads.filter(read => !discovery.includes(read) && !planDiscovery.includes(read) && !permissionMetadata(read)).map(read => JSON.stringify(stable(read))).sort();
         const actual = { reads: normalizedReads, result: stable(result) };
         if (otherFlexible) expect(actual, `${name}: başka projedeki esnek atama sabit DTO/DB izini değiştirmez`).toEqual(baseline.get(name));
         else {

@@ -182,3 +182,22 @@ describe("pdksChart – computePdksChartData", () => {
     expect(result.lateDistribution).toEqual([]);
   });
 });
+
+it("plan-aware chart keeps zero/one shift results structurally identical", () => {
+  for (const dayShift of [null, shift()]) {
+    const input = chartParams({ readings: [reading(`${MONDAY}T08:00:00Z`, EMP_A, "1")], resolveShift: () => dayShift });
+    expect(computePdksChartData({ ...input, resolvePlan: () => dayShift
+      ? { kind: "shifts", source: "default", calendar: "project", shifts: [dayShift] }
+      : { kind: "none", source: "project" } })).toStrictEqual(computePdksChartData(input));
+  }
+});
+
+it("multi-shift chart compares an afternoon arrival with the afternoon threshold", () => {
+  const morning = shift({ startTime: "08:00", endTime: "12:00" });
+  const afternoon = shift({ _id: "afternoon" as Id<"shifts">, startTime: "14:00", endTime: "18:00", lateToleranceMinutes: 0 });
+  const result = computePdksChartData(chartParams({
+    readings: [reading(`${MONDAY}T11:10:00Z`, EMP_A, "1")], resolveShift: () => morning,
+    resolvePlan: () => ({ kind: "shifts", source: "employee", calendar: "project", shifts: [morning, afternoon] }),
+  }));
+  expect(result.lateMinutesSamples).toEqual([10]);
+});

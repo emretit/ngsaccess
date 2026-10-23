@@ -64,7 +64,7 @@ export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects
     workDate = buildPdksWorkDateResolver(employees, shifts.resolve, flexible ? {
       readings, manualEntryFor: (id, date) => manualByDate.get(`${id}__${date}`)?.entryTime,
       eligibleEntry: reading => filterPdksReadings([reading], undefined, r => policies(r.projectId, trDateKey(r.accessTime))).length > 0,
-    } : undefined, (reading, date) => policies(reading.projectId, date));
+    } : undefined, (reading, date) => policies(reading.projectId, date), shifts.resolveLast);
   }
   const dateFor = workDate;
   return filterPdksReadings(readings, undefined, r => policies(r.projectId, dateFor(r)));
@@ -104,6 +104,17 @@ export async function flexibleReportProjects(
   const dayBefore = addWorkDate(startDate, -1);
   const assignmentsByShift = new Map<Id<"shifts">, Doc<"shiftAssignments">[]>();
   for (const projectId of projectIds) {
+    // Existence probes only: a hit selects the bounded resolver, which verifies dates and ownership.
+    // Refs avoid scanning an arbitrarily large legacy assignment history just to discover plans.
+    // Expired refs may select this path indefinitely: only a performance cost; the bounded resolver keeps results correct.
+    const [planRef, department] = await Promise.all([
+      ctx.db.query("shiftPlanRefs").withIndex("by_project", q => q.eq("projectId", projectId)).first(),
+      ctx.db.query("departmentShiftAssignments").withIndex("by_project_end", q => q.eq("projectId", projectId).gte("endDate", dayBefore)).first(),
+    ]);
+    if (planRef || department) {
+      projects.add(projectId);
+      continue;
+    }
     const relevant = candidates.filter(shift => !shift.projectId || shift.projectId === projectId);
     if (!relevant.length) continue;
     let employees = employeesByProject.get(projectId);
