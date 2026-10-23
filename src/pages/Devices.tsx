@@ -10,6 +10,8 @@ import { QRCodeDialog } from '@/components/devices/QRCodeDialog';
 import { AssignLocationForm } from '@/components/devices/AssignLocationForm';
 import { DeviceDetailsPanel } from '@/components/devices/DeviceDetailsPanel';
 import { ClaimDeviceDialog } from '@/components/devices/ClaimDeviceDialog';
+import { VirtualReaderDialog, type VirtualReaderDialogState } from '@/components/devices/VirtualReaderDialog';
+import { isVirtualReader } from '../../convex/lib/virtualReader';
 import { useProjectFilteredDevices } from '@/hooks/useProjectFilteredDevices';
 import { useZonesAndDoors } from '@/hooks/useZonesAndDoors';
 import { useQRCodeDialog } from '@/components/devices/useQRCodeDialog';
@@ -59,6 +61,7 @@ const Devices = () => {
     projectId
   });
   const [claimOpen, setClaimOpen] = useState(false);
+  const [virtualReader, setVirtualReader] = useState<VirtualReaderDialogState | null>(null);
 
   const consumeDeviceRequest = useDeviceDeepLink(requestedDeviceId, devices, isLoading, devicePanel.open,
     device => setDevicePanel({ open: true, device, projectId }),
@@ -75,6 +78,11 @@ const Devices = () => {
 
   // QR Dialog
   const { selectedQR, handleQRClick, handleDownloadQR, closeQRDialog } = useQRCodeDialog();
+  // Sanal okuyucunun kimlik QR'ı yok; aynı menü satırı okuyucu ekranı bağlantısını açar.
+  const handleDeviceQRClick = (device: Device) => {
+    if (!isVirtualReader(device)) return handleQRClick(device);
+    if (device.apiToken) setVirtualReader({ mode: "link", name: device.name, readerToken: device.apiToken });
+  };
 
   // Location form
   const { showLocationForm, openLocationForm, closeLocationForm, handleAssignLocation } = useLocationForm();
@@ -163,7 +171,8 @@ const Devices = () => {
           onEditDevice={handleEditDevice}
           onAddNew={handleNewDevice}
           onAddFromCloud={handleClaimFromCloud}
-          onQRClick={handleQRClick}
+          onAddVirtualReader={() => setVirtualReader({ mode: "create" })}
+          onQRClick={handleDeviceQRClick}
           onReleaseDevice={canManage ? handleReleaseDevice : undefined}
           canManage={canManage}
         />}
@@ -174,6 +183,12 @@ const Devices = () => {
         open={claimOpen}
         onClose={() => setClaimOpen(false)}
         onSuccess={handleClaimSuccess}
+      />
+
+      <VirtualReaderDialog
+        state={virtualReader}
+        projectId={projectId}
+        onClose={() => setVirtualReader(null)}
       />
 
       {/* QR Code Dialog */}

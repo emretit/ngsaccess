@@ -1,6 +1,7 @@
 import { isDeviceHost } from "../../../../convex/lib/deviceUx";
 import { z } from "zod";
 import { MANUAL_MODEL_ID } from "../../../../convex/lib/hikModels";
+import { VIRTUAL_READER_TYPE } from "../../../../convex/lib/virtualReader";
 
 export const DEVICE_BRANDS = ["hikvision", "other", "ide_smart"] as const;
 export type DeviceBrand = (typeof DEVICE_BRANDS)[number];
@@ -30,7 +31,8 @@ const doorCountField = z.preprocess(
  * tipi değişmez). Diğer tüm zorunluluklar (seri no, ehome, UUID/IP) admin'in de
  * ihtiyacı olduğundan superRefine aynen korunur.
  */
-const deviceTypeSchema = z.enum(["Kontrol Paneli", "Kart Okuyucu", "Parmak İzi Okuyucu", "Yüz Tanıma", "QR Kod Okuyucu", "RFID Okuyucu", "Erişim Terminali", "Erişim Paneli", "Turnike", "Kapı Kontrolörü", "Diğer"]);
+// Sanal okuyucu formdan seçilmez; düzenlemede kayıtlı tip korunsun diye geçerli sayılır.
+const deviceTypeSchema = z.enum(["Kontrol Paneli", "Kart Okuyucu", "Parmak İzi Okuyucu", "Yüz Tanıma", "QR Kod Okuyucu", "RFID Okuyucu", "Erişim Terminali", "Erişim Paneli", "Turnike", "Kapı Kontrolörü", "Diğer", VIRTUAL_READER_TYPE]);
 
 export function makeFormSchema(adminMode: boolean, isEdit = false) {
   return z.object({

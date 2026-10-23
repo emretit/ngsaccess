@@ -8,26 +8,26 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { notify } from "@/lib/notify";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 interface AddReaderDialogProps { open: boolean; onOpenChange: (open: boolean) => void; doorId: Id<"doors">; doorName: string; defaultDirection?: "entry" | "exit" | "both"; }
 
 export function AddReaderDialog({ open, onOpenChange, doorId, doorName, defaultDirection = "exit" }: AddReaderDialogProps) {
-  const initialName = `${doorName}${defaultDirection === "exit" ? " Çıkış" : defaultDirection === "entry" ? " Giriş" : ""}`;
-  const [direction, setDirection] = useState<"entry" | "exit" | "both">(defaultDirection);
+  // Yön etiketi ada eklenmez; kullanıcı isterse adına kendisi yazar.
+  const initialName = doorName;
   const [name, setName] = useState(initialName);
   const [error, setError] = useState<string>();
   const nameInput = useRef<HTMLInputElement>(null);
-  const guard = useUnsavedChangesGuard(open && (name !== initialName || direction !== defaultDirection));
+  const guard = useUnsavedChangesGuard(open && name !== initialName);
   const create = useMutation(api.readers.create);
   const { run, pending } = useAsyncAction(async () => {
-    await create({ name: name.trim(), doorId, direction });
+    // Yön sorulmaz: kapıdaki boş okuyucu yuvası (LocationTree hesaplar) sessizce kullanılır.
+    await create({ name: name.trim(), doorId, direction: defaultDirection });
     notify.success("Okuyucu eklendi");
     setName("");
     onOpenChange(false);
   }, { error: "Okuyucu eklenemedi" });
-  const close = () => { if (!pending) guard.requestClose(() => { setName(initialName); setDirection(defaultDirection); setError(undefined); onOpenChange(false); }); };
+  const close = () => { if (!pending) guard.requestClose(() => { setName(initialName); setError(undefined); onOpenChange(false); }); };
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!name.trim()) { setError("Okuyucu adı gereklidir."); nameInput.current?.focus(); return; }
@@ -43,7 +43,6 @@ export function AddReaderDialog({ open, onOpenChange, doorId, doorName, defaultD
           {error && <p role="alert" className="text-sm text-destructive">Kaydedilemedi. {error}</p>}
           <fieldset disabled={pending} className="space-y-4">
             <FormFieldWrapper htmlFor="add-reader-name" label="Okuyucu adı" error={error}><Input ref={nameInput} id="add-reader-name" value={name} onChange={e => { setName(e.target.value); setError(undefined); }} /></FormFieldWrapper>
-            <FormFieldWrapper htmlFor="add-reader-direction" label="Yön">{control => <Select disabled={pending} value={direction} onValueChange={value => { if (value === "entry" || value === "exit" || value === "both") setDirection(value); }}><SelectTrigger {...control}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="entry">Giriş</SelectItem><SelectItem value="exit">Çıkış</SelectItem><SelectItem value="both">Giriş/Çıkış</SelectItem></SelectContent></Select>}</FormFieldWrapper>
           </fieldset>
           <DialogFooter className="border-t border-line pt-4"><Button type="button" variant="outline" disabled={pending} onClick={close}>İptal</Button><Button type="submit" disabled={pending}>{pending ? "Ekleniyor…" : "Ekle"}</Button></DialogFooter>
         </form>

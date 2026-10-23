@@ -6,13 +6,13 @@ describe("güvenli giriş dönüşü", () => {
   it.each([null, "https://evil.test", "//evil.test", "/\\evil.test", "/%2Fevil.test", "/%5cevil.test", "/login?next=/login", "/auth", "/%6cogin", "/foo/../login", "/%zz", "/\nevil.test"])("güvensiz veya döngülü hedefi reddeder: %s", (target) => expect(safeReturnPath(target)).toBe("/home"));
   it("her rota tek ve eksik başlıklar tanımlı", () => {
     expect(new Set(routeMeta.map(item => item.href)).size).toBe(routeMeta.length);
-    for (const href of ["/home", "/audit-log", "/engineering-department", "/virtual-readers"]) expect(routeMeta.find(item => item.href === href)?.name).toBeTruthy();
+    for (const href of ["/home", "/audit-log", "/engineering-department"]) expect(routeMeta.find(item => item.href === href)?.name).toBeTruthy();
   });
 });
 
 describe("Sanal okuyucular menüsü", () => {
-  it("keeps the destination visible with its upcoming badge", () => {
-    expect(visibleRoutes("admin").find(route => route.href === "/virtual-readers"))
-      .toMatchObject({ name: "Sanal Okuyucular", badge: "Yakında" });
+  it("ayrı menü öğesi yok; Cihazlar → Cihaz ekle içinde", () => {
+    expect(visibleRoutes("admin").find(route => route.href === "/virtual-readers")).toBeUndefined();
+    expect(visibleRoutes("admin").some(route => route.href === "/devices")).toBe(true);
   });
 });

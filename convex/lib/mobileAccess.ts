@@ -5,6 +5,7 @@ import type { QueryCtx } from "../_generated/server";
 import { accessScheduleError } from "./accessRuleUx";
 import { employmentEnded } from "./employment";
 import { trDateKey } from "./trDate";
+import { isVirtualReader } from "./virtualReader";
 
 const GRAPH_LIMIT = 500;
 export type MobileTransport = "ide_mqtt" | "hik_local_bridge" | "hik_gateway" | "unsupported";
@@ -172,6 +173,8 @@ export async function resolveMobileTarget(ctx: QueryCtx, employee: Doc<"employee
 export async function genericReaderTokenAllowed(ctx: QueryCtx, employee: Doc<"employees">, device: Doc<"devices">, now: number): Promise<boolean> {
   if (!employee.projectId || employee.projectId !== device.projectId || device.isActive === false || !employeeWithinAccessEpoch(employee, now)) return false;
   if (device.brand === "ide_smart" || device.brand === "hikvision") return false;
+  // Sanal okuyucu kapı açmaz, yalnız giriş/çıkış kaydeder: projenin aktif her çalışanı okutabilir.
+  if (isVirtualReader(device)) return true;
   const targets = await listMobileTargets(ctx, employee, now);
   // Generic protocol carries no actuator: ambiguous multi-door authorization fails closed.
   const own = targets.filter(target => target.deviceId === device._id);

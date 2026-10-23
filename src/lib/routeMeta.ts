@@ -1,13 +1,12 @@
 import { permissionCapabilities } from "./capabilities";
 import { ROLE_DEFAULTS, legacyRoleToProjectRole, type Permission } from "../../convex/lib/roleCatalog";
-import { Activity, BarChart3, BellRing, CalendarClock, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, ScanLine, User, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, BellRing, CalendarClock, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, User, type LucideIcon } from "lucide-react";
 
 export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; permission?: Permission; settings?: boolean; superAdminOnly?: boolean; menu?: boolean; badge?: "Yakında"; group?: "main" | "attendance" | "management" }
 export const routeMeta: RouteMeta[] = [
   { href: "/home", group: "main", name: "Ana Sayfa", icon: Home },
   { href: "/employees", group: "main", name: "Kişiler", icon: Users, permission: "employees.view" },
   { href: "/devices", group: "main", name: "Cihazlar", icon: Cpu },
-  { href: "/virtual-readers", group: "main", name: "Sanal Okuyucular", icon: ScanLine, badge: "Yakında" },
   { href: "/access-control", group: "main", name: "Geçiş Kontrol", icon: Shield },
   { href: "/visitors", group: "main", name: "Ziyaretçiler", icon: DoorOpen },
   { href: "/live-monitoring", group: "main", name: "Canlı İzleme", icon: Activity },

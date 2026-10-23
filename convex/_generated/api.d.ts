@@ -191,6 +191,7 @@ import type * as lib_syncStatusScope from "../lib/syncStatusScope.js";
 import type * as lib_trDate from "../lib/trDate.js";
 import type * as lib_turkishHolidays from "../lib/turkishHolidays.js";
 import type * as lib_visitorPresence from "../lib/visitorPresence.js";
+import type * as lib_virtualReader from "../lib/virtualReader.js";
 import type * as lib_visitorStatus from "../lib/visitorStatus.js";
 import type * as maintenance from "../maintenance.js";
 import type * as migrations from "../migrations.js";
@@ -218,6 +219,7 @@ import type * as shifts from "../shifts.js";
 import type * as userPreferences from "../userPreferences.js";
 import type * as userProjects from "../userProjects.js";
 import type * as users from "../users.js";
+import type * as virtualReaders from "../virtualReaders.js";
 import type * as visitors from "../visitors.js";
 import type * as zones from "../zones.js";
 
@@ -411,6 +413,7 @@ declare const fullApi: ApiFromModules<{
   "lib/trDate": typeof lib_trDate;
   "lib/turkishHolidays": typeof lib_turkishHolidays;
   "lib/visitorPresence": typeof lib_visitorPresence;
+  "lib/virtualReader": typeof lib_virtualReader;
   "lib/visitorStatus": typeof lib_visitorStatus;
   maintenance: typeof maintenance;
   migrations: typeof migrations;
@@ -438,6 +441,7 @@ declare const fullApi: ApiFromModules<{
   userPreferences: typeof userPreferences;
   userProjects: typeof userProjects;
   users: typeof users;
+  virtualReaders: typeof virtualReaders;
   visitors: typeof visitors;
   zones: typeof zones;
 }>;

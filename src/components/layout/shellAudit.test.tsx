@@ -65,10 +65,10 @@ describe("Kabuk denetimi", () => {
     expect(html).not.toContain('aria-label="Proje ara"');
     state.projects.pop();
   });
-  it("renders the upcoming destination with a neutral badge in navigation", () => {
+  it("does not list virtual readers as a separate destination", () => {
     const html = render(<AppSidebarNav />);
-    expect(html).toContain('href="/virtual-readers"');
-    expect(html).toMatch(/class="[^"]*bg-subtle[^"]*text-muted-foreground[^"]*">Yakında/);
+    expect(html).toContain('href="/devices"');
+    expect(html).not.toContain('href="/virtual-readers"');
   });
 });
 

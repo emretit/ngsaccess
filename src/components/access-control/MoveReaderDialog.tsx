@@ -17,7 +17,7 @@ import {
 import { notify } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
-import { initialReaderMoveSelection, readerMoveConflict, type ReaderDirection } from "./readerMove";
+import { autoMoveDirection, type ReaderDirection } from "./readerMove";
 
 interface TargetDoor {
   id: Id<"doors">;
@@ -53,32 +53,30 @@ export function MoveReaderDialog({
     [currentDoorId, targetDoors],
   );
   const [targetDoorId, setTargetDoorId] = useState<Id<"doors"> | "">("");
-  const [direction, setDirection] = useState<ReaderDirection>(currentDirection);
 
   const selectedTarget = availableTargets.find(door => door.id === targetDoorId);
-  const conflict = readerMoveConflict(direction, selectedTarget?.directions ?? []);
+  const direction = autoMoveDirection(currentDirection, selectedTarget?.directions ?? []);
+  const conflict = selectedTarget !== undefined && direction === null;
 
   const moveReader = useMutation(api.readers.move);
   const { run: move, pending: isSubmitting } = useAsyncAction(async () => {
-    if (conflict) throw new Error("Hedefte bu yön dolu. Başka yön veya kapı seçin.");
     if (!targetDoorId || !selectedTarget) throw new Error("Hedef kapı seçin");
+    if (!direction) throw new Error("Hedef kapıda boş okuyucu yeri yok. Başka kapı seçin.");
     await moveReader({ readerId, targetDoorId, direction });
     notify.success("Okuyucu taşındı");
   });
 
   useEffect(() => {
     if (!open) return;
-    const initial = initialReaderMoveSelection(currentDirection);
-    setTargetDoorId(initial.targetDoorId);
-    setDirection(initial.direction);
-  }, [open, readerId, currentDirection]);
+    setTargetDoorId("");
+  }, [open, readerId]);
 
   const handleTargetChange = (value: string) => {
     const selected = availableTargets.find((door) => door.id === value);
     setTargetDoorId(selected?.id ?? "");
   };
 
-  const guard = useUnsavedChangesGuard(open && (targetDoorId !== "" || direction !== currentDirection));
+  const guard = useUnsavedChangesGuard(open && targetDoorId !== "");
   const close = () => { if (!isSubmitting) guard.requestClose(() => onOpenChange(false)); };
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -102,7 +100,7 @@ export function MoveReaderDialog({
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{readerName}</div>
           </div>
 
-          {conflict && <p role="alert" className="text-sm text-destructive">Taşıma yapılamaz. Hedef kapıda bu yön dolu.</p>}
+          {conflict && <p role="alert" className="text-sm text-destructive">Taşıma yapılamaz. Hedef kapıda boş okuyucu yeri yok.</p>}
           <FormFieldWrapper htmlFor="targetDoor" label="Hedef kapı">
             {control => <Select disabled={isSubmitting} value={targetDoorId} onValueChange={handleTargetChange}>
               <SelectTrigger {...control}>
@@ -121,19 +119,6 @@ export function MoveReaderDialog({
             <p className="text-xs text-muted-foreground">Bu panelde taşınabilecek boş kapı yok.</p>
           )}
 
-          <FormFieldWrapper htmlFor="readerDirection" label="Yeni yön" error={conflict ? "Hedef kapıda bu yön dolu. Yönü veya hedef kapıyı kendiniz değiştirin." : undefined}>
-            {control => <Select disabled={isSubmitting} value={direction} onValueChange={(value) => setDirection(value as ReaderDirection)}>
-              <SelectTrigger {...control}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="entry">Giriş</SelectItem>
-                <SelectItem value="exit">Çıkış</SelectItem>
-                <SelectItem value="both">Giriş/Çıkış</SelectItem>
-              </SelectContent>
-            </Select>}
-          </FormFieldWrapper>
-          <p className="text-sm text-muted-foreground">Yön: {currentDirection === "entry" ? "Giriş" : currentDirection === "exit" ? "Çıkış" : "Giriş/Çıkış"} → {direction === "entry" ? "Giriş" : direction === "exit" ? "Çıkış" : "Giriş/Çıkış"}</p>
           <DialogFooter>
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={close}>
               İptal

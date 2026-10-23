@@ -344,7 +344,6 @@ export function LocationTree({
               readerId={dialog.reader.readerId}
               doorId={dialog.door._id}
               readerName={dialog.reader.readerName}
-              readerDirection={dialog.reader.readerDirection}
               requireSensor={dialog.door.requireSensor}
               isIdeDoor={deviceOf(dialog.door)?.brand === "ide_smart"}
             />

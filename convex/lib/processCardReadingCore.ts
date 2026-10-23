@@ -5,7 +5,8 @@ import { employeeWithinAccessEpoch, genericReaderTokenAllowed } from "./mobileAc
 import { inferAccessStatus, inferDenialReason } from "./hikEventCodes";
 import { ideResultGranted } from "./cardReaderParse";
 import { canEmployeeAccessDevice } from "./accessDecision";
-import { ideTimeToISO, resolveDirection, resolveActiveMatchingRuleIds } from "./cardReadingProcess";
+import { ideTimeToISO, resolveDirection, resolveActiveMatchingRuleIds, type AccessDirection } from "./cardReadingProcess";
+import { isVirtualReader, READER_TOKEN_PATTERN, type ReaderScanDenial } from "./virtualReader";
 import { getEffectiveWorkSettings, isoTimeToTRMinutes } from "./pdksHelpers";
 import { buildShiftResolver, thresholdsForShift } from "./shiftResolver";
 import { trDateKey } from "./trDate";
@@ -86,7 +87,7 @@ export async function processCardReadingCore(
   const device = await resolveReadingDevice(ctx, args);
 
   // Reader credentials must never be misinterpreted as native IDE/Hik card identifiers.
-  const isReaderUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.cardNo);
+  const isReaderUuid = READER_TOKEN_PATTERN.test(args.cardNo);
   if (isReaderUuid && (!args.authedDeviceId || device?.brand === "ide_smart" || device?.brand === "hikvision")) return { granted: false };
 
   // Panels decide access themselves; generic readers continue to server rules.
@@ -94,8 +95,7 @@ export async function processCardReadingCore(
   if (device?.brand === "ide_smart") return persistIdeReading(ctx, args, device, state);
 
   // Reader-purpose UUIDs can only be consumed by authenticated generic readers.
-  const isToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.cardNo);
-  if (isToken) return consumeReaderToken(ctx, args, device);
+  if (isReaderUuid) return consumeReaderToken(ctx, args, device);
 
   return processGenericCardReading(ctx, args, device, state);
 }
@@ -278,32 +278,48 @@ async function consumeReaderToken(
   args: ProcessCardReadingArgs,
   device: Doc<"devices"> | null,
 ): Promise<{ granted: boolean }> {
+  return { granted: (await consumeReaderTokenDetailed(ctx, args.cardNo, device)).granted };
+}
+
+export type ReaderTokenOutcome =
+  | { granted: true; employeeName: string; direction: AccessDirection; accessTime: string }
+  | { granted: false; reason: ReaderScanDenial };
+
+/** Tek kullanımlık mobil QR'ı genel okuyucu adına tüketir; ret hiçbir kayıt yazmaz. */
+export async function consumeReaderTokenDetailed(
+  ctx: MutationCtx,
+  token: string,
+  device: Doc<"devices"> | null,
+): Promise<ReaderTokenOutcome> {
+  const deny = (reason: ReaderScanDenial): ReaderTokenOutcome => ({ granted: false, reason });
   const tokenRow = await ctx.db.query("checkInTokens")
-    .withIndex("by_token", q => q.eq("token", args.cardNo)).first();
+    .withIndex("by_token", q => q.eq("token", token)).first();
   const now = Date.now();
-  if (!device || !tokenRow || tokenRow.purpose !== "reader" || tokenRow.usedAt ||
-      !Number.isFinite(Date.parse(tokenRow.expiresAt)) || Date.parse(tokenRow.expiresAt) <= now) return { granted: false };
+  if (!device || !tokenRow || tokenRow.purpose !== "reader") return deny("TOKEN_INVALID");
+  if (tokenRow.usedAt) return deny("TOKEN_USED");
+  if (!Number.isFinite(Date.parse(tokenRow.expiresAt)) || Date.parse(tokenRow.expiresAt) <= now) return deny("TOKEN_EXPIRED");
   const session = tokenRow.sessionId ? await ctx.db.get(tokenRow.sessionId) : null;
   if (!session || session.employeeId !== tokenRow.employeeId ||
       !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= now ||
-      (session.passwordVersion ?? 0) !== tokenRow.authVersion) return { granted: false };
+      (session.passwordVersion ?? 0) !== tokenRow.authVersion) return deny("SESSION_INVALID");
   const tokenEmployee = await ctx.db.get(tokenRow.employeeId);
-  if (!tokenEmployee || tokenRow.projectId !== tokenEmployee.projectId || tokenRow.projectId !== device.projectId) return { granted: false };
+  if (!tokenEmployee || tokenRow.projectId !== tokenEmployee.projectId || tokenRow.projectId !== device.projectId) return deny("NOT_ALLOWED");
   const auth = await ctx.db.query("employeeAuth")
     .withIndex("by_employee", q => q.eq("employeeId", tokenEmployee._id)).first();
-  if (!auth?.passwordHash || tokenRow.authVersion !== (auth.passwordVersion ?? 0) ||
-      !(await genericReaderTokenAllowed(ctx, tokenEmployee, device, now))) return { granted: false };
+  if (!auth?.passwordHash || tokenRow.authVersion !== (auth.passwordVersion ?? 0)) return deny("SESSION_INVALID");
+  if (!(await genericReaderTokenAllowed(ctx, tokenEmployee, device, now))) return deny("NOT_ALLOWED");
   const consumedAt = new Date(now).toISOString();
   const employeeName = `${tokenEmployee.firstName} ${tokenEmployee.lastName}`;
   await ctx.db.patch(tokenRow._id, { usedAt: consumedAt, employeeName, locationRecorded: false });
   const direction = await resolveDirection(ctx, { device, employeeId: tokenEmployee._id, nowISO: consumedAt });
+  const protocol = isVirtualReader(device) ? "virtual_reader" : "generic_reader";
   await ctx.db.insert("cardReadings", {
     projectId: device.projectId, deviceId: device._id, employeeId: tokenEmployee._id,
     cardNo: tokenEmployee.cardNumber, employeeName, accessTime: consumedAt,
-    accessStatus: "izin_verildi", direction, rawData: JSON.stringify({ source: "qr", protocol: "generic_reader" }),
+    accessStatus: "izin_verildi", direction, rawData: JSON.stringify({ source: "qr", protocol }),
     createdAt: consumedAt, updatedAt: consumedAt,
   });
-  return { granted: true };
+  return { granted: true, employeeName, direction, accessTime: consumedAt };
 }
 
 async function processGenericCardReading(

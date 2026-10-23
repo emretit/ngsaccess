@@ -4,6 +4,11 @@ export function readerMoveConflict(direction: ReaderDirection, occupied: readonl
   return occupied.some(existing => existing === direction || existing === 'both' || direction === 'both');
 }
 
-export function initialReaderMoveSelection(direction: ReaderDirection): { targetDoorId: ''; direction: ReaderDirection } {
-  return { targetDoorId: '', direction };
+/**
+ * Yön kullanıcıya sorulmaz (PDKS nokta tipi belirler); yalnız Hik okuyucu yuvasını (giriş/çıkış) seçer.
+ * Mevcut yuva hedefte boşsa korunur, değilse ilk boş tek yönlü yuvaya geçilir; yer yoksa null.
+ */
+export function autoMoveDirection(current: ReaderDirection, occupied: readonly ReaderDirection[]): ReaderDirection | null {
+  const candidates: ReaderDirection[] = [current, 'entry', 'exit'];
+  return candidates.find(direction => !readerMoveConflict(direction, occupied)) ?? null;
 }

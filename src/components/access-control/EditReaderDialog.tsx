@@ -5,20 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { notify } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
-
-type ReaderDirection = "entry" | "exit" | "both";
 
 interface EditReaderDialogProps {
   open: boolean;
@@ -27,7 +18,6 @@ interface EditReaderDialogProps {
   readerId?: Id<"readers"> | null;
   doorId: Id<"doors">;
   readerName: string;
-  readerDirection: ReaderDirection;
   // IDE Smart kapısı için mevcut sensör ayarı. undefined → panel default (true) varsayılır.
   requireSensor?: boolean;
   // IDE Smart paneline bağlı kapı mı (sensör toggle yalnızca o zaman gösterilir).
@@ -40,12 +30,10 @@ export function EditReaderDialog({
   readerId,
   doorId,
   readerName,
-  readerDirection,
   requireSensor: initialRequireSensor,
   isIdeDoor = false,
 }: EditReaderDialogProps) {
   const [name, setName] = useState(readerName);
-  const [direction, setDirection] = useState<ReaderDirection>(readerDirection);
   const [requireSensor, setRequireSensor] = useState(initialRequireSensor ?? true);
   const [nameError, setNameError] = useState<string>();
   const [partialSave, setPartialSave] = useState(false);
@@ -56,18 +44,17 @@ export function EditReaderDialog({
     setPartialSave(false);
     if (!name.trim()) throw new Error("Okuyucu adı gereklidir.");
     if (readerId) {
-      await updateReader({ readerId, name: name.trim(), direction });
+      await updateReader({ readerId, name: name.trim() });
       if (isIdeDoor) {
         try { await updateDoor({ doorId, requireSensor }); }
         catch (error: unknown) { setPartialSave(true); throw error; }
       }
     } else {
-      await updateDoor({ doorId, readerName: name.trim(), readerDirection: direction,
-        ...(isIdeDoor ? { requireSensor } : {}) });
+      await updateDoor({ doorId, readerName: name.trim(), ...(isIdeDoor ? { requireSensor } : {}) });
     }
     notify.success("Okuyucu güncellendi");
   }, { error: "Okuyucu ayarları kaydedilemedi" });
-  const guard = useUnsavedChangesGuard(open && (name !== readerName || direction !== readerDirection || (isIdeDoor && requireSensor !== (initialRequireSensor ?? true))));
+  const guard = useUnsavedChangesGuard(open && (name !== readerName || (isIdeDoor && requireSensor !== (initialRequireSensor ?? true))));
   const close = () => { if (!isSubmitting) guard.requestClose(() => onOpenChange(false)); };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,20 +72,10 @@ export function EditReaderDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} noValidate>
           {nameError && <p role="alert" className="text-sm text-destructive">Kaydedilemedi. {nameError}</p>}
-          {partialSave && <p role="alert" className="text-sm text-destructive">Okuyucu adı ve yönü kaydedildi; kapı sensörü kaydedilemedi. Sensör ayarını yeniden deneyin.</p>}
+          {partialSave && <p role="alert" className="text-sm text-destructive">Okuyucu adı kaydedildi; kapı sensörü kaydedilemedi. Sensör ayarını yeniden deneyin.</p>}
           <fieldset disabled={isSubmitting} className="grid gap-4 py-4">
             <FormFieldWrapper htmlFor="readerName" label="Okuyucu adı *" error={nameError}>
               <Input id="readerName" value={name} onChange={e => setName(e.target.value)} placeholder="Okuyucu adı" required />
-            </FormFieldWrapper>
-            <FormFieldWrapper htmlFor="readerDirection" label="Yön">
-              {control => <Select disabled={isSubmitting} value={direction} onValueChange={value => setDirection(value as ReaderDirection)}>
-                <SelectTrigger {...control}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="entry">Giriş</SelectItem>
-                  <SelectItem value="exit">Çıkış</SelectItem>
-                  <SelectItem value="both">Giriş/Çıkış</SelectItem>
-                </SelectContent>
-              </Select>}
             </FormFieldWrapper>
             {isIdeDoor && <FormFieldWrapper htmlFor="requireSensor" label="Kapı sensörü (bu kapıya ait)"
               hint="Kapıda fiziksel sensör varsa açın. Kapalıysa açılış sensör yanıtı beklenmeden tamamlanır.">

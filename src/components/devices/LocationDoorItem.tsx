@@ -24,8 +24,6 @@ export type DoorAction =
   | { type: "fetchReaderCfg"; door: DoorNode; reader: ReaderRow }
   | { type: "deleteReader"; door: DoorNode; reader: ReaderRow };
 
-const DIRECTION_LABEL = { entry: "Giriş", exit: "Çıkış", both: "Giriş/Çıkış" } as const;
-
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 
@@ -140,7 +138,7 @@ export function LocationDoorItem({
                   <div className={cn("group flex min-w-0 items-center gap-1.5 rounded-sm pl-2 hover:bg-muted", TREE_ROW_HEIGHT)} title={details.join(" · ")}>
                     <span aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", reader.online ? "status-success-bg" : "bg-muted-foreground/40")} />
                     <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                      <span className="text-foreground">{label}</span> · {DIRECTION_LABEL[reader.readerDirection]}
+                      <span className="text-foreground">{label}</span>
                       <span className="block text-[10px]">{reader.online ? "Çevrimiçi" : "Çevrimdışı"}</span>
                     </span>
                     {reader.hikCardReaderAntiSneakEnabled === true && (

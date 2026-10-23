@@ -24,6 +24,8 @@ interface DevicesContentProps {
   onAddNew: () => void;
   /** Buluttan (havuzdan) cihaz ekleme akışı. */
   onAddFromCloud: () => void;
+  /** Sanal okuyucu (tablet kamerasıyla QR) ekleme akışı. */
+  onAddVirtualReader?: () => void;
   onQRClick?: (device: Device) => void;
   onReleaseDevice?: (device: Device) => Promise<void> | void;
   /** Yönetimsel aksiyonlar (cihaz ekle menüsü) yalnız admin'e gösterilir. */
@@ -42,6 +44,7 @@ export function DevicesContent({
   onEditDevice,
   onAddNew,
   onAddFromCloud,
+  onAddVirtualReader,
   onQRClick,
   onReleaseDevice,
   canManage = true,
@@ -74,7 +77,7 @@ export function DevicesContent({
     <div className="min-w-0 space-y-5">
       <PageHeader title="Cihazlar">
         {canManage && (
-          <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} />
+          <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} onAddVirtualReader={onAddVirtualReader} />
         )}
       </PageHeader>
       <div className="flex min-w-0 flex-col gap-4 min-[1100px]:flex-row min-[1100px]:gap-5">

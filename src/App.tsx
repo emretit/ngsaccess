@@ -14,7 +14,7 @@ const Register = lazy(() => import('@/pages/Register'));
 const VerifyEmail = lazy(() => import('@/pages/VerifyEmail'));
 const Employees = lazy(() => import('@/pages/Employees'));
 const Devices = lazy(() => import('@/pages/Devices'));
-const VirtualReaders = lazy(() => import('@/pages/VirtualReaders'));
+const VirtualReaderKiosk = lazy(() => import('@/pages/VirtualReaderKiosk'));
 const AccessControl = lazy(() => import('@/pages/AccessControl'));
 const Visitors = lazy(() => import('@/pages/Visitors'));
 const LiveMonitoring = lazy(() => import('@/pages/LiveMonitoring'));
@@ -61,6 +61,9 @@ function AppContent() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/check-in" element={<CheckIn />} />
+        <Route path="/reader" element={<VirtualReaderKiosk />} />
+        {/* Sanal okuyucular artık Cihazlar → Cihaz ekle menüsünde. */}
+        <Route path="/virtual-readers" element={<Navigate to="/devices" replace />} />
         <Route path="/demo-request" element={<Navigate to="/register" replace />} />
         <Route path="/user-setup" element={<UserSetup />} />
         <Route path="/admin-setup" element={<AdminSetup />} />
@@ -70,7 +73,6 @@ function AppContent() {
           <Route path="/system-admin" element={<SystemAdmin />} />
           <Route path="/employees" element={<Employees />} />
           <Route path="/devices" element={<Devices />} />
-          <Route path="/virtual-readers" element={<VirtualReaders />} />
           <Route path="/access-control" element={<AccessControl />} />
           <Route path="/visitors" element={<Visitors />} />
           <Route path="/live-monitoring" element={<LiveMonitoring />} />

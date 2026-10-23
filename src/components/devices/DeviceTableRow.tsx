@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Device } from "@/types/device";
 import { deviceLastSignal } from "@/lib/deviceStatus";
-import { Edit2, Trash2, MapPin, QrCode, Undo2 } from "lucide-react";
+import { Edit2, Trash2, MapPin, QrCode, Undo2, ScanLine } from "lucide-react";
+import { isVirtualReader } from "../../../convex/lib/virtualReader";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -73,7 +74,8 @@ export function DeviceTableRow({
   // Çevrimdışı cihazda kopma anı; durumla aynı sinyalden (ISUP anlık durumu dahil) okunur.
   const offlineSince =
     device.connectionStatus === "offline" ? deviceLastSignal(device) : undefined;
-  const brandModel = [deviceBrandLabel(device.brand), device.hikModel?.trim()]
+  const virtualReader = isVirtualReader(device);
+  const brandModel = virtualReader ? "Sanal okuyucu" : [deviceBrandLabel(device.brand), device.hikModel?.trim()]
     .filter(Boolean)
     .join(" · ");
   const serial =
@@ -172,7 +174,13 @@ export function DeviceTableRow({
             <Edit2 className="mr-2 h-4 w-4" />
             Ayrıntıyı görüntüle
           </DropdownMenuItem>
-          {onQRClick && (
+          {onQRClick && virtualReader && canManage && (
+            <DropdownMenuItem disabled={!device.apiToken} onSelect={() => onQRClick(device)}>
+              <ScanLine className="mr-2 h-4 w-4" />
+              Okuyucu ekranı bağlantısı
+            </DropdownMenuItem>
+          )}
+          {onQRClick && !virtualReader && (
             <DropdownMenuItem
               disabled={
                 !(device.deviceSerial?.trim() || device.ideUuid?.trim())
