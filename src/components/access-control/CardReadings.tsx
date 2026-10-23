@@ -11,12 +11,14 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { Button } from "@/components/ui/button";
+import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 import { useFilteredReadings } from "@/components/live-monitoring/useFilteredReadings";
 import { useLiveReadings } from "@/components/live-monitoring/useLiveReadings";
 import { ReadingDetailPanel } from "@/components/live-monitoring/ReadingDetailPanel";
 import { matches, readFilters, writeFilters, type Filters, type Reading } from "@/components/live-monitoring/lib/readings";
 
 const OLDEST_DAY = "2000-01-01";
+const PAGE_SIZES = [25, 50, 100] as const;
 const previousDay = (day: string) => new Date(Date.parse(`${day}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 type OpenReading = (r: Reading, trigger: HTMLElement) => void;
 type Range = { startDate?: string; endDate?: string };
@@ -36,15 +38,33 @@ function ReadingList({ projectId, filters, range, liveRows, freshIds, onOpen }: 
     projectId, deviceId: device?._id, doorId: door?._id, employeeId: employee?._id,
     source: filters.source === "all" ? undefined : filters.source, result: filters.result === "all" ? undefined : filters.result, ...range,
   } : undefined);
-  if (badDate) return <p id="reading-date-error" role="alert" className="text-xs text-danger">Bitiş tarihi başlangıçtan önce olamaz.</p>;
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
+  const [page, setPage] = useState(1);
   const term = filters.search.trim().toLocaleLowerCase("tr-TR");
+  const [pagedTerm, setPagedTerm] = useState(term);
+  if (pagedTerm !== term) { setPagedTerm(term); setPage(1); }
   const liveIds = new Set(liveRows.map(r => r._id));
   const readings = [...liveRows, ...history.rows.filter(r => !liveIds.has(r._id) && (!term || `${r.employeeName ?? ""} ${r.cardNo}`.toLocaleLowerCase("tr-TR").includes(term)))];
-  if (!readings.length && history.loading) return <SectionSkeleton rows={6} label="Erişim okumaları yükleniyor" />;
-  return <div className="min-w-0 space-y-3">
-    <CardReadingsTable readings={readings} freshIds={freshIds} onOpen={onOpen} emptyMessage={history.isDone ? "Seçili kapsamda okuma yok." : "Yüklenen kayıtlarda eşleşme yok. Daha eski kayıtlarda olabilir."} />
-    {history.isDone ? readings.length > 0 && <p className="text-xs text-muted-foreground">Tüm kayıtlar yüklendi.</p> : <Button variant="outline" disabled={history.loading} onClick={history.loadMore}>{history.loading ? "Yükleniyor…" : "Daha eski kayıtları yükle"}</Button>}
-  </div>;
+  const loadedPages = Math.max(1, Math.ceil(readings.length / pageSize));
+  // İstenen sayfa yüklenenleri aşınca eski kayıtlar sayfa dolana ya da kayıt bitene kadar çekilir.
+  const waiting = !badDate && page > loadedPages && !history.isDone;
+  const { loading: historyLoading, loadMore } = history;
+  useEffect(() => { if (waiting && !historyLoading) loadMore(); }, [waiting, historyLoading, loadMore]);
+  if (badDate) return <p id="reading-date-error" role="alert" className="text-xs text-danger">Bitiş tarihi başlangıçtan önce olamaz.</p>;
+  if (!readings.length) {
+    if (history.loading) return <SectionSkeleton rows={6} label="Erişim okumaları yükleniyor" />;
+    return <div className="min-w-0 space-y-3">
+      <CardReadingsTable readings={readings} onOpen={onOpen} emptyMessage={history.isDone ? "Seçili kapsamda okuma yok." : "Yüklenen kayıtlarda eşleşme yok. Daha eski kayıtlarda olabilir."} />
+      {!history.isDone && <Button variant="outline" onClick={history.loadMore}>Daha eski kayıtlarda ara</Button>}
+    </div>;
+  }
+  const currentPage = Math.min(page, loadedPages);
+  return <CardReadingsTable readings={readings.slice((currentPage - 1) * pageSize, currentPage * pageSize)} freshIds={freshIds} onOpen={onOpen} footer={<PaginationBar
+    summary={`${readings.length}${history.isDone ? "" : "+"} okuma · ${pageRange(readings.length, currentPage, pageSize)} gösteriliyor`}
+    page={currentPage} pageCount={history.isDone ? loadedPages : undefined}
+    onPrevious={() => setPage(currentPage - 1)} onNext={() => setPage(currentPage + 1)}
+    nextDisabled={history.isDone ? currentPage >= loadedPages : waiting} nextLabel={waiting ? "Yükleniyor…" : "Sonraki"}
+    pageSize={pageSize} pageSizes={PAGE_SIZES} onPageSizeChange={size => { setPageSize(size); setPage(1); }} pageSizeLabel="Sayfadaki okuma sayısı" />} />;
 }
 function Readings({ projectId, filters, onOpen }: { projectId: Id<"projects">; filters: Filters; onOpen: OpenReading }) {
   const dated = Boolean(filters.start || filters.end);
