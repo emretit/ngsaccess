@@ -5,7 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
-import { trTodayKey } from "./lib/trDate";
+import { trDayRangeISO, trTodayKey } from "./lib/trDate";
 import { addWorkDate } from "./lib/pdksWorkDay";
 
 const choice = v.union(v.literal("absent"), v.literal("review"));
@@ -75,6 +75,52 @@ export const listCheckpointTargets = authedQuery({
         return { doorId: door._id, deviceId: door.deviceId ?? null, name: door.name, selectable: reason === null, reason };
       }),
     };
+  },
+});
+/** PDKS Ayarları uyarısı: yürürlükteki/gelecek kuralda seçili okuyucu artık okumalarla eşleşmiyorsa.
+ * Okumalar bugünden önceki 7 günden okunur; bugünün okutmaları sorguyu her kart okutmada yeniden çalıştırmasın. */
+export const getCheckpointWarnings = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    await resolveProjectScope(ctx, projectId);
+    await requirePermission(ctx, ctx.user, projectId, "schedule.manage");
+    const today = trTodayKey();
+    const [current, future] = await Promise.all([
+      ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).lte("effectiveFrom", today)).order("desc").take(1),
+      ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).gt("effectiveFrom", today)).take(65),
+    ]);
+    if (future.length > 64) throw new Error("64'ten fazla gelecek PDKS sürümü var");
+    // Each version's snapshot is checked on its own: a valid future target must not hide a broken current one.
+    const targets = (await Promise.all([...current, ...future].filter(version => version.checkpointMode === "selected").map(async version =>
+      (await selections(ctx, version._id)).map(target => ({ target, effectiveFrom: version.effectiveFrom }))))).flat()
+      .filter(({ target }) => target.targetType === "reader" && target.readerId);
+    const warnings = new Map<string, string>();
+    const hikDevices = new Map<Id<"devices">, Doc<"devices">>();
+    for (const { target, effectiveFrom } of targets) {
+      if (!target.readerId) continue;
+      const [reader, device] = await Promise.all([ctx.db.get(target.readerId), ctx.db.get(target.deviceId)]);
+      const deviceName = device && device.projectId === projectId ? device.name : "Cihaz";
+      if (!reader || reader.projectId !== projectId || reader.deviceId !== target.deviceId || reader.doorId !== target.doorId) {
+        warnings.set(`moved:${target.readerId}:${effectiveFrom}`, `${deviceName}: ${effectiveFrom} tarihli kuralda seçili bir okuyucu silinmiş ya da başka kapıya taşınmış; okumalar bu okuyucu seçimiyle eşleşmiyor. Kuralı yeniden yayınlayın.`);
+      } else if (target.ioId === undefined && device?.brand !== "ide_smart") {
+        if (reader.hikReaderNo === undefined) warnings.set(`number:${reader._id}`, `${deviceName} – ${reader.name}: okuyucunun numarası yok. Cihazlar sayfasında kapı numarasını girin; o zamana kadar okumalar bu okuyucu seçimiyle eşleşmiyor.`);
+        else if (device) hikDevices.set(device._id, device);
+      }
+    }
+    const { startISO } = trDayRangeISO(addWorkDate(today, -7), today);
+    const todayStartISO = trDayRangeISO(today, today).startISO;
+    await Promise.all([...hikDevices.values()].map(async device => {
+      const [recent, readers] = await Promise.all([
+        ctx.db.query("cardReadings").withIndex("by_device_access_time", q => q.eq("deviceId", device._id).gte("accessTime", startISO).lt("accessTime", todayStartISO)).order("desc").take(500),
+        ctx.db.query("readers").withIndex("by_device", q => q.eq("deviceId", device._id)).take(201),
+      ]);
+      if (readers.length > 200) return; // Eksik okuyucu listesiyle yanlış "tanımsız numara" uyarısı vermeyelim.
+      const known = new Set(readers.filter(reader => reader.projectId === projectId).map(reader => reader.hikReaderNo));
+      const unknown = [...new Set(recent.filter(reading => reading.projectId === projectId && reading.hikCardReaderNo !== undefined && !known.has(reading.hikCardReaderNo))
+        .map(reading => reading.hikCardReaderNo))].sort((a, b) => (a ?? 0) - (b ?? 0));
+      if (unknown.length) warnings.set(`unknown:${device._id}`, `${device.name}: bugün hariç son 7 günde ${unknown.join(", ")} numaralı okuyucudan okuma geldi ama bu numarada tanımlı okuyucu yok. Cihazlar sayfasında kapı numarasını kontrol edin; bu okumalar seçili okuyucularla eşleşmiyor.`);
+    }));
+    return [...warnings].map(([key, message]) => ({ key, message }));
   },
 });
 export const publishRuleVersion = authedMutation({

@@ -611,6 +611,7 @@ export default defineSchema({
     .index("by_employee", ["employeeId"])
     .index("by_access_time", ["accessTime"])
     .index("by_project_access_time", ["projectId", "accessTime"])
+    .index("by_device_access_time", ["deviceId", "accessTime"])
     .index("by_project_status_time", ["projectId", "accessStatus", "accessTime"])
     .index("by_status_time", ["accessStatus", "accessTime"])
     .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"])

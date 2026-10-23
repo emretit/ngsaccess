@@ -7,6 +7,7 @@ import { PdksRulesSettings } from "@/components/settings/sections/components/Pdk
 import { HolidayCalendarManager } from "@/components/settings/sections/components/HolidayCalendarManager";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { WorkingDaysSettings } from "./WorkingDaysSettings";
+import { CheckpointWarnings } from "./CheckpointWarnings";
 
 /** PDKS Kayıtları › Ayarlar: çalışma günleri, mesai politikası, devam kuralları ve tatil takvimi. */
 export function PdksSettingsPanel({ projectId }: { projectId: Id<"projects"> }) {
@@ -15,7 +16,7 @@ export function PdksSettingsPanel({ projectId }: { projectId: Id<"projects"> }) 
     <p className="text-sm text-muted-foreground">Çalışma saatleri, molalar ve vardiya atamaları <Link to="/shifts" className="underline">Vardiyalar</Link> sayfasında yönetilir. Tatil işlemleri mesai formundan ayrı kaydedilir.</p>
     <SettingsFormState.Provider value={reportForm}>
       <QuerySectionBoundary resetKey={projectId} title="PDKS ayarları yüklenemedi." description="Kayıtlar sekmesine geçebilir veya tekrar deneyebilirsiniz.">
-        <WorkingDaysSettings projectId={projectId} /><OvertimeSettingsForm /><PdksRulesSettings /><HolidayCalendarManager />
+        <WorkingDaysSettings projectId={projectId} /><OvertimeSettingsForm /><CheckpointWarnings projectId={projectId} /><PdksRulesSettings /><HolidayCalendarManager />
       </QuerySectionBoundary>
     </SettingsFormState.Provider>
     {dialog}
