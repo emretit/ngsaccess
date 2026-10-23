@@ -13,6 +13,8 @@ import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog
 import { Button } from "@/components/ui/button";
 import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 import { useFilteredReadings } from "@/components/live-monitoring/useFilteredReadings";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { readingSearchTerm } from "../../../convex/lib/readingSearch";
 import { useLiveReadings } from "@/components/live-monitoring/useLiveReadings";
 import { ReadingDetailPanel } from "@/components/live-monitoring/ReadingDetailPanel";
 import { matches, readFilters, writeFilters, type Filters, type Reading } from "@/components/live-monitoring/lib/readings";
@@ -24,7 +26,7 @@ type OpenReading = (r: Reading, trigger: HTMLElement) => void;
 type Range = { startDate?: string; endDate?: string };
 
 /** Canlı satırların altına sunucu filtreli eski kayıtları ekler; tekrar eden okumalar bir kez gösterilir. */
-function ReadingList({ projectId, filters, range, liveRows, freshIds, onOpen }: { projectId: Id<"projects">; filters: Filters; range: Range; liveRows: Reading[]; freshIds: ReadonlySet<string>; onOpen: OpenReading }) {
+function ReadingList({ projectId, filters, search, range, liveRows, freshIds, onOpen }: { projectId: Id<"projects">; filters: Filters; search?: string; range: Range; liveRows: Reading[]; freshIds: ReadonlySet<string>; onOpen: OpenReading }) {
   // URL kimlikleri sorgu argümanına girmeden seçili projenin seçenekleriyle doğrulanır.
   const devices = useQuery(api.devices.list, { projectId });
   const doors = useQuery(api.doors.list, { projectId });
@@ -36,15 +38,12 @@ function ReadingList({ projectId, filters, range, liveRows, freshIds, onOpen }: 
   const badDate = Boolean(filters.start && filters.end && filters.start > filters.end);
   const history = useFilteredReadings(ready && !badDate ? {
     projectId, deviceId: device?._id, doorId: door?._id, employeeId: employee?._id,
-    source: filters.source === "all" ? undefined : filters.source, result: filters.result === "all" ? undefined : filters.result, ...range,
+    source: filters.source === "all" ? undefined : filters.source, result: filters.result === "all" ? undefined : filters.result, search, ...range,
   } : undefined);
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
   const [page, setPage] = useState(1);
-  const term = filters.search.trim().toLocaleLowerCase("tr-TR");
-  const [pagedTerm, setPagedTerm] = useState(term);
-  if (pagedTerm !== term) { setPagedTerm(term); setPage(1); }
   const liveIds = new Set(liveRows.map(r => r._id));
-  const readings = [...liveRows, ...history.rows.filter(r => !liveIds.has(r._id) && (!term || `${r.employeeName ?? ""} ${r.cardNo}`.toLocaleLowerCase("tr-TR").includes(term)))];
+  const readings = [...liveRows, ...history.rows.filter(r => !liveIds.has(r._id))];
   const loadedPages = Math.max(1, Math.ceil(readings.length / pageSize));
   // İstenen sayfa yüklenenleri aşınca eski kayıtlar sayfa dolana ya da kayıt bitene kadar çekilir.
   const waiting = !badDate && page > loadedPages && !history.isDone;
@@ -69,6 +68,8 @@ function ReadingList({ projectId, filters, range, liveRows, freshIds, onOpen }: 
 function Readings({ projectId, filters, onOpen }: { projectId: Id<"projects">; filters: Filters; onOpen: OpenReading }) {
   const dated = Boolean(filters.start || filters.end);
   const feed = useLiveReadings(projectId, !dated, filters.source);
+  // Arama sunucuda yapılır; her tuşta sorgu açılmasın diye kısa gecikmeyle uygulanır.
+  const search = readingSearchTerm(useDebouncedValue(filters.search));
   const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
   const previousIds = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -83,8 +84,8 @@ function Readings({ projectId, filters, onOpen }: { projectId: Id<"projects">; f
   if (!dated && feed.loading) return <SectionSkeleton rows={6} label="Erişim okumaları yükleniyor" />;
   // Bugün canlı akışta tamsa eski kayıtlar dünde biter; sorgu bugünkü yeni okumalarla yeniden çalışmaz.
   const range: Range = dated ? { startDate: filters.start || undefined, endDate: filters.end || undefined } : feed.truncated ? {} : { startDate: OLDEST_DAY, endDate: previousDay(feed.day) };
-  const liveRows = dated ? [] : feed.rows.filter(r => matches(r, filters));
-  return <ReadingList key={`${filters.device}:${filters.employee}:${filters.door}:${filters.result}:${range.startDate}:${range.endDate}`} projectId={projectId} filters={filters} range={range} liveRows={liveRows} freshIds={freshIds} onOpen={onOpen} />;
+  const liveRows = dated ? [] : feed.rows.filter(r => matches(r, { ...filters, search: search ?? "" }));
+  return <ReadingList key={`${filters.device}:${filters.employee}:${filters.door}:${filters.result}:${search}:${range.startDate}:${range.endDate}`} projectId={projectId} filters={filters} search={search} range={range} liveRows={liveRows} freshIds={freshIds} onOpen={onOpen} />;
 }
 function ProjectReadings({ projectId }: { projectId: Id<"projects"> }) {
   const [params, setParams] = useSearchParams();

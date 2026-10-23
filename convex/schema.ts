@@ -616,7 +616,8 @@ export default defineSchema({
     .index("by_project_device_status_time", ["projectId", "deviceId", "accessStatus", "accessTime"])
     .index("by_project_device_employee_time", ["projectId", "deviceId", "employeeId", "accessTime"])
     .index("by_employee_status_time", ["employeeId", "accessStatus", "accessTime"])
-    .index("by_project_employee_time", ["projectId", "employeeId", "accessTime"]),
+    .index("by_project_employee_time", ["projectId", "employeeId", "accessTime"])
+    .index("by_project_card_time", ["projectId", "cardNo", "accessTime"]),
 
   // Hikvision access dışı olaylar: alarm, exception, operation, status.
   // PDKS hesaplarını şişirmemek için cardReadings'ten ayrı tutulur.

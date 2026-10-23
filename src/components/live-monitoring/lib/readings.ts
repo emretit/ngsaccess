@@ -1,4 +1,5 @@
 import { formatTrDateTime } from "@/lib/date";
+import { matchesReadingSearch, readingSearchTerm } from "../../../../convex/lib/readingSearch";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../../convex/_generated/api";
 export type Reading = FunctionReturnType<typeof api.cardReadings.listLiveSince>["rows"][number];
@@ -12,9 +13,9 @@ export function mergeRows<T extends { _id: string; _creationTime: number }>(befo
   return [...new Map([...before, ...incoming].map(r => [r._id, r])).values()].sort((a, b) => b._creationTime - a._creationTime || b._id.localeCompare(a._id)).slice(0, limit);
 }
 export function matches(r: Reading, f: Filters) {
-  const term = f.search.trim().toLocaleLowerCase("tr-TR");
+  const term = readingSearchTerm(f.search);
   const result = r.accessStatus === "izin_verildi" ? "granted" : r.accessStatus === "reddedildi" ? "denied" : "unknown";
-  return (!f.device || r.deviceId === f.device) && (!f.employee || r.employeeId === f.employee) && (!f.door || r.door?._id === f.door) && (f.result === "all" || f.result === result) && (!term || `${personLabel(r)} ${r.cardNo}`.toLocaleLowerCase("tr-TR").includes(term));
+  return (!f.device || r.deviceId === f.device) && (!f.employee || r.employeeId === f.employee) && (!f.door || r.door?._id === f.door) && (f.result === "all" || f.result === result) && (!term || matchesReadingSearch(r, term));
 }
 export function readFilters(params: URLSearchParams, project: string): Filters {
   if (params.get("liveProject") && params.get("liveProject") !== project) return { ...emptyFilters };

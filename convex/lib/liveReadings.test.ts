@@ -234,6 +234,33 @@ describe("public handlers through real auth wrappers", () => {
     expect(await invoke(listFiltered, f.ctx, { ...args, paginationOpts: { numItems: 1, cursor: first.continueCursor } })).toMatchObject({ page: [], isDone: true });
     expect(f.indexes).toContain("by_device_io_time");
   });
+  it("server search merges exact card and person-name matches in access-time order across pages", async () => {
+    const f = context([
+      reading({ _id: "card" as Id<"cardReadings">, cardNo: "777", accessTime: "2026-10-17T09:00:00.000Z" }),
+      reading({ _id: "person" as Id<"cardReadings">, cardNo: "555", employeeId, accessTime: "2026-10-17T08:00:00.000Z" }),
+      reading({ _id: "other" as Id<"cardReadings">, cardNo: "7777", accessTime: "2026-10-17T10:00:00.000Z" }),
+      reading({ _id: "foreign" as Id<"cardReadings">, projectId: "foreign" as Id<"projects">, cardNo: "777", accessTime: "2026-10-17T11:00:00.000Z" }),
+    ]);
+    const byCard = await invoke<{ page: { _id: string }[]; continueCursor: string }>(listFiltered, f.ctx, { projectId, search: " 777 ", paginationOpts: { numItems: 10, cursor: null } });
+    expect(byCard.page.map(r => r._id)).toEqual(["card"]);
+    expect(f.indexes).toContain("by_project_card_time");
+    const first = await invoke<{ page: { _id: string }[]; continueCursor: string; isDone: boolean }>(listFiltered, f.ctx, { projectId, search: "ada", paginationOpts: { numItems: 1, cursor: null } });
+    expect(first.page.map(r => r._id)).toEqual(["person"]);
+    expect(f.indexes).toContain("by_project_employee_time");
+    expect(await invoke(listFiltered, f.ctx, { projectId, search: "ada", paginationOpts: { numItems: 1, cursor: first.continueCursor } })).toMatchObject({ page: [], isDone: true });
+  });
+  it("server search keeps device, result and date filters and returns empty when nothing can match", async () => {
+    const f = context([
+      reading({ _id: "granted" as Id<"cardReadings">, cardNo: "777", deviceId, accessStatus: "izin_verildi" }),
+      reading({ _id: "denied" as Id<"cardReadings">, cardNo: "777", deviceId, accessStatus: "reddedildi" }),
+      reading({ _id: "old" as Id<"cardReadings">, cardNo: "777", deviceId, accessStatus: "reddedildi", accessTime: "2026-09-01T08:00:00.000Z" }),
+      reading({ _id: "elsewhere" as Id<"cardReadings">, cardNo: "777", accessStatus: "reddedildi" }),
+    ]);
+    const paginationOpts = { numItems: 10, cursor: null };
+    const page = await invoke<{ page: { _id: string }[] }>(listFiltered, f.ctx, { projectId, search: "777", deviceId, result: "denied", startDate: "2026-10-17", endDate: "2026-10-17", paginationOpts });
+    expect(page.page.map(r => r._id)).toEqual(["denied"]);
+    expect(await invoke(listFiltered, f.ctx, { projectId, search: "Ada Yok", paginationOpts })).toMatchObject({ page: [], isDone: true, scannedCount: 0 });
+  });
   it("employee and unknown-result index paths stay scoped", async () => {
     const f = context([reading({ employeeId }), reading({ _id: "denied" as Id<"cardReadings">, employeeId, accessStatus: "reddedildi" })]);
     const paginationOpts = { numItems: 200, cursor: null };

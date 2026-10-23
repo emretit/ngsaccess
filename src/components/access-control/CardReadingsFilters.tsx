@@ -32,7 +32,7 @@ function Options({ projectId, filters, change }: { projectId: Id<"projects">; fi
   </>;
 }
 export function CardReadingsFilters({ projectId, filters, change }: { projectId: Id<"projects">; filters: Filters; change: (next: Partial<Filters>) => void }) {
-  return <FilterBar search={filters.search} onSearchChange={search => change({ search })} searchLabel="Kişi veya kart ara" placeholder="Kişi/kart ara" hasFilters={Object.entries(filters).some(([key, value]) => value !== emptyFilters[key as keyof Filters])} onClear={() => change(emptyFilters)}>
+  return <FilterBar search={filters.search} onSearchChange={search => change({ search })} searchLabel="Kişi adı veya kart no ara" placeholder="Ad, soyad ya da tam kart no" hasFilters={Object.entries(filters).some(([key, value]) => value !== emptyFilters[key as keyof Filters])} onClear={() => change(emptyFilters)}>
     <QuerySectionBoundary className="contents" resetKey={projectId} description="Filtre seçenekleri yüklenemedi. Arama korunuyor."><Options projectId={projectId} filters={filters} change={change} /></QuerySectionBoundary>
   </FilterBar>;
 }

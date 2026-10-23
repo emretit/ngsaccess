@@ -4,7 +4,7 @@ import { getPdksTableData as getPdksTableDataQuery } from "./lib/pdksTableQuery"
 import { getMonthlyPayrollSheet as getMonthlyPayrollSheetQuery } from "./lib/pdksPayrollQuery";
 import { loadPdksPolicies } from "./lib/pdksRules";
 import { employedDuring, employedOn } from "./lib/employment";
-import { stream } from "convex-helpers/server/stream";
+import { mergedStream, stream } from "convex-helpers/server/stream";
 import schema from "./schema";
 import { canSeePayInProject } from "./lib/payVisibility";
 import { classifyReadingSource, countExcludedUnknownPdksReadings, filterPdksReadings } from "./lib/pdksSource";
@@ -13,6 +13,7 @@ import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
 import { cardReadingDateBounds, scopedCardReadingQuery } from "./lib/cardReadingList";
 import { assignmentPrecondition, ASSIGN_CARD_ERRORS, liveReadingSource, liveReadingWindow, matchesReadingResult } from "./lib/liveReadings";
+import { matchesPersonSearch, readingSearchTerm } from "./lib/readingSearch";
 import { getEmployeeTargetDevices } from "./lib/peopleHikSnapshot";
 import { writeAudit } from "./lib/audit";
 import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./lib/alarmNotify";
@@ -141,11 +142,14 @@ export const listFiltered = authedQuery({
     result: v.optional(v.union(v.literal("granted"), v.literal("denied"), v.literal("unknown"))),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
+    /** Kişi adı/soyadı (sözcük başı) ya da tam kart numarası. */
+    search: v.optional(v.string()),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
     const bounds = cardReadingDateBounds(args.startDate, args.endDate);
+    const search = readingSearchTerm(args.search);
     const door = args.doorId ? await ctx.db.get(args.doorId) : null;
     if (args.doorId && (!door || door.projectId !== args.projectId || !door.deviceId || door.ioId === undefined)) {
       throw new ConvexError("Bu kapı seçili projede bir IDE okuyucusuyla eşleşmiyor");
@@ -167,7 +171,27 @@ export const listFiltered = authedQuery({
     }
     const status = args.result === "granted" ? "izin_verildi" : args.result === "denied" ? "reddedildi" : undefined;
     const query = stream(ctx.db, schema).query("cardReadings");
-    const indexed = (() => {
+    const searched = search ? await (async () => {
+      // Arama: tam kart numarası + adı/soyadı uyan kişilerin okumaları, zamana göre tek akışta birleşir.
+      const people = (await Promise.all([
+        ctx.db.query("employees").withSearchIndex("search_first_name", q => q.search("firstName", search).eq("projectId", args.projectId)).take(50),
+        ctx.db.query("employees").withSearchIndex("search_last_name", q => q.search("lastName", search).eq("projectId", args.projectId)).take(50),
+      ])).flat().filter(person => matchesPersonSearch(person, search) && (args.employeeId === undefined || person._id === args.employeeId));
+      const personIds = [...new Set(people.map(person => person._id))].slice(0, 20);
+      const streams = [
+        ...(/^[A-Za-z0-9_-]{1,32}$/.test(search) ? [query.withIndex("by_project_card_time", q => {
+          const prefix = q.eq("projectId", args.projectId).eq("cardNo", search);
+          return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+        }).order("desc")] : []),
+        ...personIds.map(id => stream(ctx.db, schema).query("cardReadings").withIndex("by_project_employee_time", q => {
+          const prefix = q.eq("projectId", args.projectId).eq("employeeId", id);
+          return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+        }).order("desc")),
+      ];
+      return streams.length ? mergedStream(streams, ["accessTime"]) : null;
+    })() : undefined;
+    if (searched === null) return { page: [], isDone: true, continueCursor: "", scannedCount: 0, matchedCount: 0, scanLimitReached: false, filterScope: "boundedScan" as const };
+    const indexed = searched ?? (() => {
       if (door && deviceId && door.ioId !== undefined) return query.withIndex("by_device_io_time", q => {
         const prefix = q.eq("deviceId", deviceId).eq("ideIoId", door.ioId);
         return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
@@ -196,13 +220,15 @@ export const listFiltered = authedQuery({
         const prefix = q.eq("projectId", args.projectId);
         return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
       });
-    })();
+    })().order("desc");
     let scannedCount = 0;
     // filterWith runs JS classification inside the stream, before pagination. Its
     // cursor advances over rejected rows too; no native paginate loop is needed.
-    const page = await indexed.order("desc").filterWith(async row => {
+    const page = await indexed.filterWith(async row => {
       scannedCount += 1;
       return row.projectId === args.projectId
+        && (deviceId === undefined || row.deviceId === deviceId)
+        && (door?.ioId === undefined || row.ideIoId === door.ioId)
         && (args.employeeId === undefined || row.employeeId === args.employeeId)
         && matchesReadingResult(row.accessStatus, args.result)
         && (args.source === undefined || liveReadingSource(row) === args.source);
