@@ -6,6 +6,6 @@ describe("permission capabilities", () => {
   });
   it("project management and platform management are independent", () => {
     expect(permissionCapabilities(p => p === "admin.manage", "admin")).toMatchObject({ inviteUsers: true, manageUsers: false });
-    expect(permissionCapabilities(() => true, "super_admin").settingsTabs).toHaveLength(9);
+    expect(permissionCapabilities(() => true, "super_admin").settingsTabs).toHaveLength(8);
   });
 });

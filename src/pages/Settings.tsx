@@ -1,9 +1,9 @@
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { UNSAFE_NavigationContext, useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { SettingsSidebar, SETTINGS_SECTIONS } from "@/components/settings/SettingsSidebar";
-import { SettingsFormState, type FormState } from "@/components/settings/SettingsFormState";
+import { SettingsFormState } from "@/components/settings/SettingsFormState";
+import { useSettingsFormsGuard } from "@/components/settings/useSettingsFormsGuard";
 import { GeneralSettings } from "@/components/settings/sections/GeneralSettings";
-import { WorkAndPayrollSettings } from "@/components/settings/sections/WorkAndPayrollSettings";
 import { ReportsSettings } from "@/components/settings/sections/ReportsSettings";
 import { NotificationSettings } from "@/components/settings/sections/NotificationSettings";
 import { MailSettings } from "@/components/settings/sections/MailSettings";
@@ -14,15 +14,12 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
-import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { usePermissions } from "@/hooks/usePermissions";
 import { RolesSettings } from "@/components/settings/sections/RolesSettings";
 import { permissionCapabilities, type SettingsTab } from "@/lib/capabilities";
 import { AccessDenied } from "@/components/shared/AccessDenied";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
-import { useProjectChangeGuard } from "@/contexts/ActiveProjectContext";
-
-import { installNavigationGuard } from "@/lib/navigationGuard";
+import { PDKS_SETTINGS_PATH } from "@/components/pdks/settings/route";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -33,33 +30,19 @@ export default function Settings() {
   const section = SETTINGS_SECTIONS.find(item => item.key === requestedTab) ?? SETTINGS_SECTIONS.find(item => permissions.settingsTabs.includes(item.key)) ?? SETTINGS_SECTIONS[0];
   const activeTab = section.key;
   const scope = useActiveProjectScope();
-  const [forms, setForms] = useState<Record<string, FormState>>({});
-  const reportForm = useCallback((id: string, state: FormState | null) => setForms(previous => {
-    if (state && previous[id]?.dirty === state.dirty && previous[id]?.pending === state.pending) return previous;
-    const next = { ...previous };
-    if (state) next[id] = state; else delete next[id];
-    return next;
-  }), []);
-  const dirty = Object.values(forms).some(form => form.dirty);
-  const pending = Object.values(forms).some(form => form.pending);
-  const guard = useUnsavedChangesGuard(dirty || pending);
-  useProjectChangeGuard(dirty || pending, pending ? () => undefined : guard.requestClose);
-  const { navigator } = useContext(UNSAFE_NavigationContext);
-  const { requestClose } = guard;
-  useEffect(() => {
-    if (!dirty && !pending) return;
-    return installNavigationGuard(navigator, proceed => { if (!pending) requestClose(proceed); }, window, pending);
-  }, [dirty, pending, navigator, requestClose]);
+  const { reportForm, pending, dialog } = useSettingsFormsGuard();
   const heading = useRef<HTMLHeadingElement>(null);
   const previousTab = useRef(activeTab);
   useEffect(() => {
     if (previousTab.current !== activeTab) { heading.current?.focus(); previousTab.current = activeTab; }
   }, [activeTab]);
   useEffect(() => {
+    // Mesai ve tatil bölümü PDKS Kayıtları › Ayarlar sekmesine taşındı; eski bağlantılar oraya gider.
+    if (requestedTab === "work-payroll") { navigate(PDKS_SETTINGS_PATH, { replace: true }); return; }
     if (requestedTab !== null && !SETTINGS_SECTIONS.some(item => item.key === requestedTab)) {
       const next = new URLSearchParams(searchParams); next.delete("tab"); setSearchParams(next, { replace: true });
     }
-  }, [requestedTab, searchParams, setSearchParams]);
+  }, [requestedTab, searchParams, setSearchParams, navigate]);
   const handleTabChange = (tab: SettingsTab) => {
     if (pending || tab === activeTab) return;
     const next = new URLSearchParams(searchParams);
@@ -73,7 +56,6 @@ export default function Settings() {
       case "roles": return <RolesSettings />;
       case "general": return <GeneralSettings />;
       case "users": return <div className="min-w-0 max-w-full overflow-x-auto"><AdminUsersPanel projectScoped /></div>;
-      case "work-payroll": return <WorkAndPayrollSettings />;
       case "reports": return <ReportsSettings requestedReport={searchParams.get("report")} />;
       case "integrations": return <IntegrationsSettings />;
       case "privacy": return <PrivacySettings />;
@@ -97,6 +79,6 @@ export default function Settings() {
           </QuerySectionBoundary></SettingsFormState.Provider>}
       </div>
     </div>
-    {guard.dialog}
+    {dialog}
   </div>;
 }

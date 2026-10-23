@@ -14,6 +14,7 @@ export const AUDIT_TARGET_LABELS: Record<string, string> = {
   biometricDestructionDevice: "Biyometrik cihaz imhası",
   pdksRecords: "PDKS kaydı",
   holidays: "Tatil",
+  generalSettings: "Genel ayarlar",
   overtimeRates: "Mesai oranı",
   employees: "Çalışan",
   employeeConsents: "Çalışan izni / Ziyaretçi onayı",

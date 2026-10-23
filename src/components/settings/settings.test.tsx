@@ -94,7 +94,7 @@ describe("settings presentation contracts", () => {
     mocks.role = "super_admin";
     const admin = render();
     expect(admin).toContain("E-posta gönderimi");
-    expect(admin.indexOf("Mesai ve tatil")).toBeLessThan(admin.indexOf("Raporlar"));
+    expect(admin).not.toContain("Mesai ve tatil");
   });
   it("hides pristine save controls and blocks invalid/pending submissions", () => {
     expect(renderToStaticMarkup(<SettingsSaveBar dirty={false} label="Genel ayarları kaydet" onCancel={() => undefined} />)).toBe("");

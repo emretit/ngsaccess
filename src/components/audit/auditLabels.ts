@@ -87,6 +87,7 @@ const tableLabels: Record<string, Record<string, string>> = {
   userProjects: { role: "Proje rolü" },
   projectRolePermissions: { permissions: "Rol yetkileri", default: "Varsayılan yetkiler" },
   holidays: { name: "Tatil adı", type: "Tatil türü", isHalfDay: "Yarım gün" },
+  generalSettings: { workingDays: "Çalışma günleri" },
   employees: {
     cardNo: "Kart numarası",
     department: "Bölüm",

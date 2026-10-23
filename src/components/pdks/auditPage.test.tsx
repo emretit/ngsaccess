@@ -6,7 +6,7 @@ import PDKSRecords from "@/pages/PDKSRecords";
 import type { FilterValues } from "./dashboard/PDKSFilterBar";
 const state = vi.hoisted(() => ({ admin: false, reportType: "daily" as FilterValues["reportType"] }));
 vi.mock("convex/react", () => ({ useQuery: () => ({ leaves: 0, corrections: 0, capped: false }), useMutation: () => vi.fn() }));
-vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
+vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn(), Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a> }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "p", activeProject: { name: "Merkez" }, canManage: state.admin, loading: false }) }));
 vi.mock("@/hooks/usePdksFilterParams", () => ({ usePdksFilterParams: () => ({ filters: { reportType: state.reportType, statusFilter: "all", person: "", dateRange: {} }, setFilters: vi.fn() }) }));
 vi.mock("@/hooks/usePdksFilterOptions", () => ({ usePdksFilterOptions: () => ({ departments: [], companies: [], positions: [], shifts: [] }) }));
@@ -45,5 +45,11 @@ describe("PDKS sayfa davranışları", () => {
     expect(html).toContain("İçe aktar");
     expect(html).toContain("Puantaj tablosu");
     expect(html).not.toMatch(/disabled=""[^>]*aria-pressed="false"[^>]*>Analiz/);
+  });
+  it("Ayarlar düğmesi yalnız vardiya yöneticisine görünür ve ayrı ayar sayfasına gider", () => {
+    state.reportType = "daily"; state.admin = false;
+    expect(renderToStaticMarkup(<PDKSRecords />)).not.toContain('href="/pdks-records/settings"');
+    state.admin = true;
+    expect(renderToStaticMarkup(<PDKSRecords />)).toMatch(/href="\/pdks-records\/settings"[^>]*>.*Ayarlar/);
   });
 });

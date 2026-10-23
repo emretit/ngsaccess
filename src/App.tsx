@@ -19,6 +19,7 @@ const AccessControl = lazy(() => import('@/pages/AccessControl'));
 const Visitors = lazy(() => import('@/pages/Visitors'));
 const LiveMonitoring = lazy(() => import('@/pages/LiveMonitoring'));
 const PDKSRecords = lazy(() => import('@/pages/PDKSRecords'));
+const PdksSettings = lazy(() => import('@/pages/PdksSettings'));
 const Shifts = lazy(() => import('@/pages/Shifts'));
 const Leaves = lazy(() => import('@/pages/Leaves'));
 const CheckIn = lazy(() => import('@/pages/CheckIn'));
@@ -74,6 +75,7 @@ function AppContent() {
           <Route path="/visitors" element={<Visitors />} />
           <Route path="/live-monitoring" element={<LiveMonitoring />} />
           <Route path="/pdks-records" element={<PDKSRecords />} />
+          <Route path="/pdks-records/settings" element={<PdksSettings />} />
           <Route path="/shifts" element={<Shifts />} />
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/settings" element={<Settings />} />

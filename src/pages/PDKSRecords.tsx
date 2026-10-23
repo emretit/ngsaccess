@@ -1,4 +1,8 @@
+import { Link } from "react-router-dom";
+import { Settings } from "lucide-react";
 import { CorrectionRequestsEntry } from "@/components/pdks/CorrectionRequestsPanel";
+import { PDKS_SETTINGS_FROM_RECORDS, PDKS_SETTINGS_PATH } from "@/components/pdks/settings/route";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { usePdksFilterParams } from "@/hooks/usePdksFilterParams";
 import { PDKSDateNavigator } from "@/components/pdks/dashboard/PDKSDateNavigator";
@@ -44,6 +48,7 @@ function PDKSContent({
   setFilters: (v: FilterValues) => void;
 }) {
   const view = usePdksRecordsView(filters, setFilters);
+  const canSettings = usePermissions().can("schedule.manage");
   const {
     projectId, activeProject, canManage, setImport, setWarningsOpen, setAi,
     exportRows, dateRangeLabel, selectedDate, filterSummary, selectedIds,
@@ -73,6 +78,14 @@ function PDKSContent({
           </DropdownMenu>
         }
       >
+        {canSettings && (
+          <Button variant="outline" asChild>
+            <Link to={PDKS_SETTINGS_PATH} state={PDKS_SETTINGS_FROM_RECORDS}>
+              <Settings className="h-4 w-4" aria-hidden="true" />
+              Ayarlar
+            </Link>
+          </Button>
+        )}
         <PDKSEnhancedExportPanel
           records={exportRows}
           dateRange={dateRangeLabel}

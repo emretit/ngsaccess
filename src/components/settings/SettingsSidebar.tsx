@@ -7,7 +7,6 @@ export const SETTINGS_SECTIONS: { key: SettingsTab; label: string; scope: string
   { key: "general", label: "Genel", scope: "Seçili projenin şirket bilgileri ve varsayılanları." },
   { key: "users", label: "Kullanıcılar ve davetler", scope: "Yetkiniz kapsamındaki kullanıcılar. Davette hedef proje ayrıca seçilir." },
   { key: "roles", label: "Roller", scope: "Seçili projenin rol yetkileri." },
-  { key: "work-payroll", label: "Mesai ve tatil", scope: "Seçili projenin mesai politikası ve tatil takvimi." },
   { key: "reports", label: "Raporlar", scope: "Proje kapsamına göre indirme ve kişisel e-posta hatırlatması." },
   { key: "integrations", label: "Entegrasyonlar", scope: "Seçili projenin köprü anahtarları ve entegrasyon bilgileri." },
   { key: "privacy", label: "Gizlilik ve KVKK", scope: "Seçili projenin biyometri, saklama süresi ve asistan gizlilik ayarları." },

@@ -3,6 +3,7 @@ import { writeAudit } from "./lib/audit";
 import { validateSettingsNumbers } from "./lib/settingsUx";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
+import { normalizeWorkingDays, storedWorkingDays } from "./lib/workingDays";
 
 import { v } from "convex/values";
 import { authedQuery, authedMutation, optionalAuthQuery } from "./lib/customFunctions";
@@ -148,6 +149,37 @@ export const getWork = authedQuery({
       .query("workSettings")
       .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .first();
+  },
+});
+
+// === Çalışma günleri (PDKS Ayarları; hafta sonu tanımı) ===
+export const getWorkingDays = authedQuery({
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsWithPermission(ctx, ctx.user, "schedule.manage");
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) return null;
+    const row = await ctx.db.query("generalSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first();
+    return storedWorkingDays(row?.workingDays);
+  },
+});
+
+export const saveWorkingDays = authedMutation({
+  args: { projectId: v.id("projects"), workingDays: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    await requirePermission(ctx, ctx.user, args.projectId, "schedule.manage");
+    const workingDays = normalizeWorkingDays(args.workingDays);
+    const now = new Date().toISOString();
+    const existing = await ctx.db.query("generalSettings").withIndex("by_project", q => q.eq("projectId", args.projectId)).first();
+    const targetId = existing?._id ?? await ctx.db.insert("generalSettings", {
+      companyName: "NGS Access", projectId: args.projectId, workingDays, createdAt: now, updatedAt: now,
+    });
+    if (existing) await ctx.db.patch(existing._id, { workingDays, updatedAt: now });
+    await writeAudit(ctx, {
+      user: ctx.user, projectId: args.projectId, action: existing ? "update" : "create",
+      targetTable: "generalSettings", targetId,
+      oldValue: { workingDays: existing?.workingDays }, newValue: { workingDays },
+    });
   },
 });
 

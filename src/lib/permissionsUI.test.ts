@@ -9,7 +9,6 @@ describe("proje yetkilerinden arayüz görünürlüğü", () => {
     const tabs = permissionCapabilities(can, role).settingsTabs;
     expect(tabs.includes("roles")).toBe(role === "admin");
     expect(tabs.includes("users")).toBe(role === "admin");
-    expect(tabs.includes("work-payroll")).toBe(role === "admin" || role === "hr");
     expect(tabs.includes("integrations")).toBe(role === "admin" || role === "technician");
     expect(tabs.includes("reports")).toBe(role !== "technician");
     expect(tabs.includes("mail")).toBe(false);
