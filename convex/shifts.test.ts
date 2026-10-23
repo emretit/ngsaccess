@@ -98,3 +98,49 @@ describe('shift definition colors', () => {
     await expect(f.caller.mutation(api.shifts.update, { shiftId, startTime: '06:00' })).rejects.toThrow(/yeni tanım/);
   });
 });
+
+describe('fixed shift advanced rules API', () => {
+  const rules = {
+    validWindow: { checkInStart: '08:00', checkInEnd: '10:00', checkOutStart: '16:00', checkOutEnd: '18:00', checkOutEndDayOffset: 0 as const },
+    absentAfterLateMinutes: 30, minWorkMinutes: 360, missingCheckInLateMinutes: 20, holidayWorkRequired: true,
+  };
+  it('creates all rules, preserves omitted values for old clients and explicitly clears each rule', async () => {
+    const f = await fixture();
+    const shiftId = await f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: 'Kurallı', startTime: '09:00', endTime: '17:00', ...rules });
+    expect(await f.t.run(ctx => ctx.db.get(shiftId))).toMatchObject(rules);
+    await f.caller.mutation(api.shifts.update, { shiftId, name: 'Eski web' });
+    expect(await f.t.run(ctx => ctx.db.get(shiftId))).toMatchObject(rules);
+    await f.caller.mutation(api.shifts.update, { shiftId, minWorkMinutes: 0, holidayWorkRequired: false });
+    expect(await f.t.run(ctx => ctx.db.get(shiftId))).toMatchObject({ minWorkMinutes: 0, holidayWorkRequired: false });
+    await f.caller.mutation(api.shifts.update, { shiftId, validWindow: null, absentAfterLateMinutes: null, minWorkMinutes: null, missingCheckInLateMinutes: null, holidayWorkRequired: null });
+    const cleared = await f.t.run(ctx => ctx.db.get(shiftId));
+    for (const key of Object.keys(rules)) expect(cleared).not.toHaveProperty(key);
+  });
+  it('revalidates the retained window when updating shift times and refuses invalid values', async () => {
+    const f = await fixture();
+    await f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, ...rules });
+    await expect(f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, startTime: '11:00' })).rejects.toThrow('Giriş penceresi');
+    await expect(f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, minWorkMinutes: 1441 })).rejects.toThrow('0–1440');
+    await expect(f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: 'Hatalı', startTime: '09:00', endTime: '17:00', validWindow: { ...rules.validWindow, checkOutEnd: '25:00' } })).rejects.toThrow('HH:MM');
+    expect(await f.t.run(ctx => ctx.db.get(f.shiftId))).toMatchObject({ startTime: '09:00', ...rules });
+  });
+  it('rejects advanced rules in both flexible create and update mutations', async () => {
+    const f = await fixture();
+    const flexible = { requiredNetMinutes: 480, checkInStart: '05:00', checkInEnd: '22:00', checkOutStart: '05:00', checkOutEnd: '14:00', checkOutEndDayOffset: 1 as const, maxSpanMinutes: 960, breakMode: 'duration' as const, breakMinutes: 60 };
+    const args = { projectId: f.projectId, name: 'Esnek', startTime: '05:00', endTime: '22:00', scheduleType: 'flexible' as const, flexible };
+    const shiftId = await f.caller.mutation(api.shifts.create, args);
+    for (const patch of [{ validWindow: rules.validWindow }, { absentAfterLateMinutes: 0 }, { minWorkMinutes: 0 }, { missingCheckInLateMinutes: 0 }, { holidayWorkRequired: false }]) {
+      await expect(f.caller.mutation(api.shifts.create, { ...args, ...patch })).rejects.toThrow('esnek vardiyada kullanılamaz');
+      await expect(f.caller.mutation(api.shifts.update, { shiftId, ...patch })).rejects.toThrow('esnek vardiyada kullanılamaz');
+    }
+  });
+});
+
+
+it('allows cosmetic changes to malformed historic shift definitions but validates calculation changes', async () => {
+  const f = await fixture();
+  await f.t.run(ctx => ctx.db.patch(f.shiftId, { minWorkMinutes: -1 }));
+  await f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, name: 'Yeni ad', color: 'teal', isActive: false });
+  expect(await f.t.run(ctx => ctx.db.get(f.shiftId))).toMatchObject({ name: 'Yeni ad', color: 'teal', isActive: false, minWorkMinutes: -1 });
+  await expect(f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, startTime: '08:00' })).rejects.toThrow();
+});

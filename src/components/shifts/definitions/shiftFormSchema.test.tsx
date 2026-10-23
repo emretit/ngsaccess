@@ -60,3 +60,26 @@ it("accepts allowed colors, rejects unknown ones and encodes no color as null", 
   expect(shiftPayloadSchema.parse(fixed).color).toBeNull();
   expect(shiftPayloadSchema.safeParse({ ...fixed, color: "red" }).success).toBe(false);
 });
+
+it("advanced rules hydrate in a closed section and blank fields clear through null", () => {
+  const rules = { validWindow: { checkInStart: "07:00", checkInEnd: "09:00", checkOutStart: "16:00", checkOutEnd: "18:00", checkOutEndDayOffset: 0 as const }, absentAfterLateMinutes: 30, minWorkMinutes: 360, missingCheckInLateMinutes: 15, holidayWorkRequired: true };
+  expect(shiftPayloadSchema.parse({ ...fixed, ...rules })).toMatchObject(rules);
+  expect(shiftPayloadSchema.parse(fixed)).toMatchObject({ validWindow: null, absentAfterLateMinutes: null, minWorkMinutes: null, missingCheckInLateMinutes: null, holidayWorkRequired: null });
+  const html = render({ ...fixed, ...rules, _id: "shift" as Id<"shifts"> });
+  expect(html).toContain("Gelişmiş");
+  expect(html).not.toContain("<details open");
+  expect(html).toContain('value="360"');
+  expect(html).toContain('value="07:00"');
+  const flexible = { ...fixed, ...rules, scheduleType: "flexible" as const, flexible: DEFAULT_FLEXIBLE };
+  const payload = shiftPayloadSchema.parse(flexible);
+  expect(payload.validWindow).toBeUndefined();
+  expect(payload.minWorkMinutes).toBeUndefined();
+  expect(render({ ...flexible, _id: "shift" as Id<"shifts"> })).not.toContain("Gelişmiş");
+});
+
+it("advanced rules validate limits, windows and zero without coercing blanks to zero", () => {
+  expect(shiftPayloadSchema.parse({ ...fixed, minWorkMinutes: 0 }).minWorkMinutes).toBe(0);
+  expect(shiftPayloadSchema.parse({ ...fixed, minWorkMinutes: 1440 }).minWorkMinutes).toBe(1440);
+  expect(shiftPayloadSchema.safeParse({ ...fixed, minWorkMinutes: 1441 }).success).toBe(false);
+  expect(shiftPayloadSchema.safeParse({ ...fixed, validWindow: { checkInStart: "09:00", checkInEnd: "10:00", checkOutStart: "16:00", checkOutEnd: "18:00", checkOutEndDayOffset: 0 } }).success).toBe(false);
+});

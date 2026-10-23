@@ -1,10 +1,11 @@
+import { usesShiftDayRules, validFixedPunch, type FixedShiftRules } from "./pdksFixedRules";
 import { flexibleSchedule, relativeMinute, validFlexibleEntry, validFlexibleExit, type ShiftSchedule } from "./pdksFlexible";
 import type { Doc, Id } from "../_generated/dataModel";
 import { isoTimeToTRMinutes, parseHHMM } from "./pdksHelpers";
 import { effectiveDirection, matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
 import { trDateKey, trDayRangeISO } from "./trDate";
 
-export type PdksShift = ShiftSchedule;
+export type PdksShift = ShiftSchedule & FixedShiftRules;
 export type PdksShiftResolver = (
   employeeId: Id<"employees">,
   date: string,
@@ -43,6 +44,7 @@ export function pdksWorkDay(
     : parseHHMM(previous.startTime);
   const minute = isoTimeToTRMinutes(accessTime);
   if (direction === "entry" && current && minute >= nextStart) return date;
+  if (previous.validWindow && direction !== "entry" && validFixedPunch(previous.validWindow, previousDate, accessTime, "exit")) return previousDate;
   const cutoff = end + Math.max(0, nextStart - end) / 2;
   return minute <= cutoff ? previousDate : date;
 }
@@ -146,6 +148,16 @@ export function hasFlexiblePdksShift(
   return employees.some(employee => dates.some(date => flexibleSchedule(resolve(employee._id, date))));
 }
 
+/** Same assignment and night-tail scope as flexible discovery, for all managed schedules. */
+export function hasPdksShiftDayRules(
+  employees: readonly Doc<"employees">[], resolve: PdksShiftResolver, startDate: string, endDate: string,
+) {
+  for (let date = addWorkDate(startDate, -1), last = addWorkDate(endDate, 1); date <= last; date = addWorkDate(date, 1)) {
+    if (employees.some(employee => usesShiftDayRules(resolve(employee._id, date)))) return true;
+  }
+  return false;
+}
+
 /** Include the following calendar day; consumers retain only requested work days. */
 export function pdksWorkDayRange(startDate: string, endDate: string) {
   return trDayRangeISO(startDate, addWorkDate(endDate, 1));
@@ -157,13 +169,14 @@ export function manualPdksTimes(
   shift: PdksShift | null,
 ) {
   const flex = flexibleSchedule(shift);
+  const entryTime = manual?.entryTime ?? (shift?.scheduleType !== "flexible" && (shift?.validWindow || shift?.missingCheckInLateMinutes !== undefined) ? shift?.startTime : undefined);
   const nextDay = flex
     ? flex.checkOutEndDayOffset === 1 && !!manual?.entryTime && !!manual.exitTime && manual.exitTime <= manual.entryTime
     : isOvernightShift(shift) &&
-    !!manual?.entryTime &&
-    !!manual.exitTime &&
-    (manual.exitTime < manual.entryTime ||
-      (manual.exitTime === manual.entryTime && shift?.startTime === shift?.endTime));
+    !!entryTime &&
+    !!manual?.exitTime &&
+    (manual.exitTime < entryTime ||
+      (manual.exitTime === entryTime && shift?.startTime === shift?.endTime));
   return {
     entryISO: manual?.entryTime
       ? `${date}T${manual.entryTime}:00.000+03:00`

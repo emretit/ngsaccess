@@ -61,3 +61,10 @@ it("overtime hint is attached to its checkbox and schedule type uses pressed but
   expect(find(tree, props => props.children === "Sabit")?.["aria-pressed"]).toBe(true);
   expect(find(tree, props => props.children === "Esnek")?.["aria-pressed"]).toBe(false);
 });
+
+it("preserves hydrated advanced rules when saving an existing fixed definition", async () => {
+  const rules = { validWindow: { checkInStart: "08:00", checkInEnd: "10:00", checkOutStart: "17:00", checkOutEnd: "19:00", checkOutEndDayOffset: 0 as const }, absentAfterLateMinutes: 30, minWorkMinutes: 360, missingCheckInLateMinutes: 15, holidayWorkRequired: true };
+  const f = setup({ ...shift, ...rules });
+  await find(f.render(), (_, type) => type === "form")?.onSubmit?.({ preventDefault: vi.fn() });
+  expect(f.onUpdate).toHaveBeenCalledWith(shift._id, expect.objectContaining(rules));
+});

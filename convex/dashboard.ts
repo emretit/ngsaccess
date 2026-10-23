@@ -1,3 +1,4 @@
+import { hasFixedShiftRules, usesShiftDayRules } from "./lib/pdksFixedRules";
 import { loadRuleReportDays } from "./lib/reportAttendance";
 import { resolveAttendanceEvidence } from "./lib/pdksEvidence";
 import { buildPdksWorkDateResolver, groupPdksWorkDays } from "./lib/pdksWorkDay";
@@ -255,7 +256,7 @@ async function loadPdksDataset(
     ? await getEffectiveWorkSettings(ctx, settingsProjectId)
     : DEFAULT_WORK_SETTINGS;
 
-  const hasFlexible = [...shiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible");
+  const hasFlexible = [...shiftResolver.shifts.values()].some(usesShiftDayRules);
   // Reuse attribution built from the complete raw history, including entries before today's range.
   const workDate = hasFlexible ? ruleReport.workDate : buildPdksWorkDateResolver(employees, shiftResolver.resolve);
   const filtered = filterPdksReadings(readings, filters.projectId, r => ruleReport.policies(r.projectId, workDate(r)));
@@ -264,7 +265,7 @@ async function loadPdksDataset(
   for (const employee of employees) {
     for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve, ruleReport.manualEntryFor)) {
       const policy = ruleReport.policies(employee.projectId, date);
-      if (policy.punchMode !== "requirements" && shiftResolver.resolve(employee._id, date)?.scheduleType !== "flexible") continue;
+      if (policy.punchMode !== "requirements" && !usesShiftDayRules(shiftResolver.resolve(employee._id, date))) continue;
       const cell = ruleReport.ruleRows.get(employee._id)?.days.find(day => day.date === date);
       if (cell?.status !== "present" && cell?.status !== "late") continue;
       const evidence = resolveAttendanceEvidence(list, undefined, policy);
@@ -635,10 +636,10 @@ export const getActivitySummary = authedQuery({
     const ruleCells = [...dataset.ruleRows].filter(([id]) => employeeIds.has(id)).flatMap(([id, row]) => row.days.map(day => ({ id, day })));
     const governedIds = new Set(ruleCells.map(cell => cell.id));
     const legacyPresent = new Set(readings.filter(r => r.employeeId && !governedIds.has(r.employeeId)).map(r => r.employeeId));
-    const presentRules = new Set(readings.filter(r => r.employeeId && governedIds.has(r.employeeId) && r.direction === "entry").map(r => r.employeeId));
+    const presentRules = new Set(readings.filter(r => r.employeeId && governedIds.has(r.employeeId) && r.direction === "entry" && !hasFixedShiftRules(dataset.shiftResolver.resolve(r.employeeId, today))).map(r => r.employeeId));
     if (governedIds.size) {
       for (const { id, day } of ruleCells) {
-        if ((day.status === "present" || day.status === "late") && dataset.shiftResolver.resolve(id, day.date)?.scheduleType === "flexible") presentRules.add(id);
+        if ((day.status === "present" || day.status === "late") && usesShiftDayRules(dataset.shiftResolver.resolve(id, day.date))) presentRules.add(id);
       }
       core.presentToday = legacyPresent.size + presentRules.size;
       const firstEntries = new Map<Id<"employees">, Doc<"cardReadings">>();

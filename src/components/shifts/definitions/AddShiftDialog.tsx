@@ -1,3 +1,4 @@
+import type { FixedShiftRules } from "../../../../convex/lib/pdksFixedRules";
 import { shortDate } from "../lib/planning";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
@@ -13,6 +14,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -24,7 +26,7 @@ import { SHIFT_COLOR_KEYS } from "../../../../convex/lib/shiftColors";
 import { SHIFT_COLORS } from "../lib/shiftColors";
 import { cn } from "@/lib/utils";
 export type { ShiftFormPayload } from "./shiftFormSchema";
-export type EditingShift = Pick<Doc<"shifts">, "_id" | "name" | "color" | "startTime" | "endTime" | "scheduleType" | "flexible" | "breakStart" | "breakEnd" | "lateToleranceMinutes" | "earlyExitToleranceMinutes" | "overtimeStartToleranceMinutes"> & { overtimeEnabled: boolean; isActive: boolean };
+export type EditingShift = Pick<Doc<"shifts">, "_id" | "name" | "color" | "startTime" | "endTime" | "scheduleType" | "flexible" | "breakStart" | "breakEnd" | "lateToleranceMinutes" | "earlyExitToleranceMinutes" | "overtimeStartToleranceMinutes"> & { overtimeEnabled: boolean; isActive: boolean } & { [K in keyof FixedShiftRules]?: FixedShiftRules[K] | null };
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,6 +49,11 @@ export function AddShiftDialog({
   const [values, setValues] = useState<ShiftFormValues>(() => ({
     scheduleType: editingShift?.scheduleType ?? "fixed",
     flexible: editingShift?.flexible ?? { ...DEFAULT_FLEXIBLE },
+    validWindow: editingShift?.validWindow ?? undefined,
+    absentAfterLateMinutes: editingShift?.absentAfterLateMinutes ?? undefined,
+    minWorkMinutes: editingShift?.minWorkMinutes ?? undefined,
+    missingCheckInLateMinutes: editingShift?.missingCheckInLateMinutes ?? undefined,
+    holidayWorkRequired: editingShift?.holidayWorkRequired ?? undefined,
     name: editingShift?.name ?? "",
     color: editingShift?.color,
     startTime: editingShift?.startTime ?? "",
@@ -308,6 +315,7 @@ export function AddShiftDialog({
                   {duration.net} dk
                 </p>
               )}
+              <FixedRuleFields values={values} errors={errors} onChange={setValues} />
               </>}
               <label className="flex gap-2 items-start text-sm">
                 <input
@@ -457,4 +465,58 @@ function FlexibleFields({ value, error, onChange }: {
 
 function withoutCosmetic(values: ShiftFormValues) {
   return JSON.stringify({ ...values, name: undefined, color: undefined, isActive: undefined });
+}
+
+function FixedRuleFields({ values, errors, onChange }: {
+  values: ShiftFormValues;
+  errors: Record<string, string>;
+  onChange: (values: ShiftFormValues) => void;
+}) {
+  const window = values.validWindow;
+  const numberFields = [
+    ["absentAfterLateMinutes", "Devamsızlık için geç kalma eşiği (dk)", "Tolerans düşüldükten sonra geç kalma bu süreyi aşarsa devamsız sayılır."],
+    ["minWorkMinutes", "En az net çalışma (dk)", "Mola sonrası çalışma bu sürenin altındaysa devamsız sayılır."],
+    ["missingCheckInLateMinutes", "Giriş yoksa geç kalma (dk)", "Çıkış varsa bu kadar dakika geç sayılır; eksik giriş kuralının önüne geçer."],
+  ] as const;
+  return <details open={errors.validWindow || numberFields.some(([key]) => errors[key]) ? true : undefined}>
+    <summary className="cursor-pointer text-sm font-medium">Gelişmiş</summary>
+    <div className="space-y-3 pt-3">
+      <p className="text-xs text-muted-foreground">Boş bırakılan alan için ek kural uygulanmaz.</p>
+      <label className="flex gap-2 items-center text-sm">
+        <Switch aria-label="Geçerli giriş/çıkış penceresi" checked={!!window}
+          onCheckedChange={checked => onChange({ ...values, validWindow: checked ? {
+            checkInStart: values.startTime, checkInEnd: values.startTime,
+            checkOutStart: values.endTime, checkOutEnd: values.endTime,
+            checkOutEndDayOffset: values.endTime < values.startTime ? 1 : 0,
+          } : undefined })} />
+        Geçerli giriş/çıkış penceresi
+      </label>
+      <p className="text-xs text-muted-foreground">Pencere dışındaki okutmalar detayda kalır; gün incelenecek olarak işaretlenir.</p>
+      {window && <div className="grid grid-cols-2 gap-3">
+        {([
+          ["checkInStart", "En erken giriş"], ["checkInEnd", "En geç giriş"],
+          ["checkOutStart", "En erken çıkış"], ["checkOutEnd", "En geç çıkış"],
+        ] as const).map(([key, label]) => <FormFieldWrapper key={key} htmlFor={`fixed-${key}`} label={label} error={errors.validWindow}>
+          <Input id={`fixed-${key}`} type="time" value={window[key]}
+            onChange={event => onChange({ ...values, validWindow: { ...window, [key]: event.target.value } })} />
+        </FormFieldWrapper>)}
+        <FormFieldWrapper htmlFor="fixed-exit-day" label="En geç çıkış günü" hint="Gece vardiyasında ertesi günü seçin.">
+          <select id="fixed-exit-day" className="w-full rounded-md border bg-background p-2" value={window.checkOutEndDayOffset}
+            onChange={event => onChange({ ...values, validWindow: { ...window, checkOutEndDayOffset: event.target.value === "1" ? 1 : 0 } })}>
+            <option value="0">Aynı gün</option><option value="1">Ertesi gün (+1)</option>
+          </select>
+        </FormFieldWrapper>
+      </div>}
+      {numberFields.map(([key, label, hint]) => <FormFieldWrapper key={key} htmlFor={`shift-${key}`} label={label} hint={hint} error={errors[key]}>
+        <Input id={`shift-${key}`} type="number" min={0} max={1440} step={1} value={values[key] ?? ""}
+          onChange={event => onChange({ ...values, [key]: event.target.value === "" ? undefined : Number(event.target.value) })} />
+      </FormFieldWrapper>)}
+      <label className="flex gap-2 items-center text-sm">
+        <Switch aria-label="Resmi tatilde çalışma zorunlu" checked={values.holidayWorkRequired ?? false}
+          onCheckedChange={checked => onChange({ ...values, holidayWorkRequired: checked ? true : undefined })} />
+        Resmi tatilde çalışma zorunlu
+      </label>
+      <p className="text-xs text-muted-foreground">Resmi tatil normal iş günü sayılır; tatil mesaisi uygulanmaz. Hafta sonu ayarı korunur.</p>
+    </div>
+  </details>;
 }

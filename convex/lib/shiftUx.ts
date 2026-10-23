@@ -1,3 +1,4 @@
+import { validateFixedRules, type FixedShiftRules } from "./pdksFixedRules";
 import { flexibleExitEnd, flexibleSchedule, validateFlexible, type ShiftSchedule } from "./pdksFlexible";
 import { trDateKey } from "./trDate";
 const DAY = 86400000;
@@ -17,7 +18,8 @@ export function minute(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
 }
-export function validateShift(shift: ShiftSchedule & { breakStart?: string; breakEnd?: string; lateToleranceMinutes?: number; earlyExitToleranceMinutes?: number; overtimeStartToleranceMinutes?: number}) {
+export function validateShift(shift: ShiftSchedule & FixedShiftRules & { breakStart?: string; breakEnd?: string; lateToleranceMinutes?: number; earlyExitToleranceMinutes?: number; overtimeStartToleranceMinutes?: number}) {
+  validateFixedRules(shift);
   if (shift.scheduleType === "flexible") {
     validateFlexible(shift.flexible);
     for (const value of [shift.lateToleranceMinutes, shift.earlyExitToleranceMinutes, shift.overtimeStartToleranceMinutes]) {

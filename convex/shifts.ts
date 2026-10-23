@@ -386,6 +386,15 @@ export const list = authedQuery({
 });
 
 const scheduleArgs = {
+  validWindow: v.optional(v.union(v.null(), v.object({
+    checkInStart: v.string(), checkInEnd: v.string(),
+    checkOutStart: v.string(), checkOutEnd: v.string(),
+    checkOutEndDayOffset: v.union(v.literal(0), v.literal(1)),
+  }))),
+  absentAfterLateMinutes: v.optional(v.union(v.null(), v.number())),
+  minWorkMinutes: v.optional(v.union(v.null(), v.number())),
+  missingCheckInLateMinutes: v.optional(v.union(v.null(), v.number())),
+  holidayWorkRequired: v.optional(v.union(v.null(), v.boolean())),
   scheduleType: v.optional(v.union(v.literal("fixed"), v.literal("flexible"))),
   flexible: v.optional(v.object({
     requiredNetMinutes: v.number(), checkInStart: v.string(), checkInEnd: v.string(),
@@ -462,10 +471,10 @@ export const update = authedMutation({
     const patch = toPatch(updates);
     // Ad, renk ve aktiflik hesabı değiştirmez; esnek tanımda da yerinde güncellenir.
     const cosmeticOnly = Object.keys(patch).every((key) => key === "name" || key === "color" || key === "isActive");
+    if (!cosmeticOnly) validateShift({ ...shift, ...patch });
     if ((shift.scheduleType === "flexible" || patch.scheduleType === "flexible") && !cosmeticOnly) {
       throw new Error("Esnek vardiya değişikliği için yeni tanım oluşturun ve gelecek tarihli atama yapın; geçmiş hesaplar değiştirilmez");
     }
-    validateShift({ ...shift, ...patch });
     await ctx.db.patch(shiftId, { ...patch, updatedAt: new Date().toISOString() });
   },
 });

@@ -1,3 +1,4 @@
+import { usesShiftDayRules } from "./lib/pdksFixedRules";
 import { requirePermission } from "./lib/permissions";
 import { processCardReadingCore } from "./lib/processCardReadingCore";
 import { getPdksTableData as getPdksTableDataQuery } from "./lib/pdksTableQuery";
@@ -55,7 +56,7 @@ import {
   computeAttendanceDetailDay,
   summarizeAttendanceDays,
 } from "./lib/pdksDetail";
-import { addWorkDate, buildPdksWorkDateResolver, groupPdksWorkDays, hasFlexiblePdksShift, pdksWorkDayRange } from "./lib/pdksWorkDay";
+import { addWorkDate, buildPdksWorkDateResolver, groupPdksWorkDays, hasPdksShiftDayRules, pdksWorkDayRange } from "./lib/pdksWorkDay";
 import { pdksLeaveMatchesProject, readPdksAvailableDateKeys, pdksFirstRecordDate } from "./lib/pdksAvailability";
 
 export type CardReadingListPage = PaginationResult<Awaited<ReturnType<typeof enrichReadingsForList>>[number]>;
@@ -577,7 +578,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
       .withIndex("by_project", q => q.eq("projectId", employee.projectId)).collect();
 
     const detailBoundaryShiftResolver = await buildShiftResolver(ctx, availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate)));
-    const detailHasFlexible = [...detailBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") && hasFlexiblePdksShift([employee], (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
+    const detailHasFlexible = [...detailBoundaryShiftResolver.shifts.values()].some(usesShiftDayRules) && hasPdksShiftDayRules([employee], (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
     if (detailHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, allowedProjectIds, employee), ...readings];
     const sourceReadings = readings;
     const earlyDetailRecords = detailHasFlexible ? await ctx.db.query("pdksRecords")

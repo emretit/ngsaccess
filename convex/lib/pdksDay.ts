@@ -1,3 +1,4 @@
+import { fixedPunchEvidence } from "./pdksFixedRules";
 import { flexibleSchedule, flexibleBreak, flexibleReadings, flexiblePendingUntil, relativeMinute, validFlexibleEntry, validFlexibleExit } from "./pdksFlexible";
 import { resolveAttendanceEvidence } from "./pdksEvidence";
 import { hasDirectionalPdksCheckpoints, LEGACY_PDKS_POLICY, type PdksDayPolicy } from "./pdksRules";
@@ -73,7 +74,7 @@ export function computePdksDay(params: {
     .sort((a, b) => a.accessTime.localeCompare(b.accessTime));
   const provisionalManual = manualPdksTimes(date, manual, shift);
   const validManualEntry = provisionalManual.entryISO && (!flex || validFlexibleEntry(flex, relativeMinute(date, provisionalManual.entryISO))) ? provisionalManual.entryISO : undefined;
-  const readings = flex ? flexibleReadings(flex, date, candidateReadings, validManualEntry) : candidateReadings;
+  let readings = flex ? flexibleReadings(flex, date, candidateReadings, validManualEntry) : candidateReadings;
   const rawEntry = readings[0]?.accessTime;
   const fallbackEntry = rawEntry
     ? `${String(Math.floor(isoTimeToTRMinutes(rawEntry) / 60)).padStart(2, "0")}:${String(isoTimeToTRMinutes(rawEntry) % 60).padStart(2, "0")}`
@@ -94,6 +95,16 @@ export function computePdksDay(params: {
     ? resolveAttendanceEvidence(readings, { entryISO: validManualEntry, exitISO: validManualExit }, params.policy ?? LEGACY_PDKS_POLICY, { scheduleType: "flexible" })
     : eachPunch || (params.policy ?? LEGACY_PDKS_POLICY).punchMode === "requirements" || hasDirectionalPdksCheckpoints(params.policy ?? LEGACY_PDKS_POLICY)
     ? resolveAttendanceEvidence(readings, { entryISO: manual?.entryTime ? evidenceManualTimes.entryISO : undefined, exitISO: evidenceManualTimes.exitISO }, params.policy ?? LEGACY_PDKS_POLICY) : null;
+  const fixedRules = shift?.scheduleType !== "flexible" ? shift : null;
+  const resolvedFixedEvidence = fixedRules && (fixedRules.validWindow || fixedRules.missingCheckInLateMinutes !== undefined)
+    ? fixedPunchEvidence({ rules: fixedRules, date, readings: candidateReadings,
+      manual: { entryISO: manual?.entryTime ? evidenceManualTimes.entryISO : undefined, exitISO: evidenceManualTimes.exitISO },
+      policy: params.policy ?? LEGACY_PDKS_POLICY }) : undefined;
+  const fixedEvidence = fixedRules?.validWindow || resolvedFixedEvidence?.missingEntryLate ? resolvedFixedEvidence : undefined;
+  if (fixedEvidence) {
+    readings = fixedEvidence.readings;
+    evidence = fixedEvidence.evidence;
+  }
   if (flex && !eachPunch && evidence?.durationMeasured) {
     const entryMinute = evidence.firstISO ? relativeMinute(date, evidence.firstISO) : undefined;
     const validFirst = entryMinute !== undefined && validFlexibleEntry(flex, entryMinute);
@@ -129,7 +140,7 @@ export function computePdksDay(params: {
     ? Math.floor((new Date(lastISO).getTime() - origin) / 60000)
     : undefined;
   const minPunchInterval = params.policy?.minPunchIntervalMinutes ?? 1;
-  const pairResult = eachPunch ? pairPdksPunches(flexibleConflict ? [] : pdksPairReadings(readings, {
+  const pairResult = eachPunch ? pairPdksPunches(flexibleConflict ? [] : pdksPairReadings(readings, fixedEvidence?.manual ?? {
     entryISO: flex ? validManualEntry : manual?.entryTime ? evidenceManualTimes.entryISO : undefined,
     exitISO: flex ? validManualExit : evidenceManualTimes.exitISO,
   }, minPunchInterval), minPunchInterval) : undefined;
@@ -183,7 +194,8 @@ export function computePdksDay(params: {
     return rawTotalMinutes > 0 ? (raw * totalMinutes) / rawTotalMinutes : 0;
   };
   const wholeMinutes = eachPunch ? Math.floor : Math.round;
-  const classification = classifyDay(date, params.workingDays, params.holiday);
+  const holidayFor = (holiday: Doc<"holidays"> | null | undefined) => fixedRules?.holidayWorkRequired ? undefined : holiday;
+  const classification = classifyDay(date, params.workingDays, holidayFor(params.holiday));
   const requiredNetMinutes = flex ? params.hasLeave || classification === "weekend" || classification === "holiday" ? 0 : classification === "halfDayHoliday" ? flex.requiredNetMinutes / 2 : flex.requiredNetMinutes : undefined;
   const shiftStart = parseHHMM(shift?.startTime ?? workSettings.workStartTime);
   const shiftEnd =
@@ -224,7 +236,7 @@ export function computePdksDay(params: {
     const calendarDate = addWorkDate(date, Math.floor(start / 1440));
     const cls = rates.nightShiftDayMode === "splitAtMidnight"
       ? classifyDay(calendarDate, params.workingDays,
-          calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate))
+          holidayFor(calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate)))
       : classification;
     const premium = cls === "weekend" || cls === "holiday";
     const isNight = nightWindows.some((night) => overlap(window, night) > 0);
@@ -283,6 +295,7 @@ export function computePdksDay(params: {
   const earlyTolerance =
     shift?.earlyExitToleranceMinutes ?? workSettings.earlyExitToleranceMinutes;
   const lateMinutes =
+    fixedEvidence?.missingEntryLate ? fixedRules?.missingCheckInLateMinutes ?? 0 :
     flex || entry === undefined ? 0 : Math.max(0, entry - shiftStart - lateTolerance);
   const earlyExitMinutes =
     flex || exit === undefined ? 0 : Math.max(0, shiftEnd - earlyTolerance - exit);
@@ -291,6 +304,12 @@ export function computePdksDay(params: {
   );
   const multiplier =
     overtimeMinutes > 0 ? weightedOvertimeMinutes / overtimeMinutes : 0;
+  const absentByFixedRule = !!fixedRules && classification === "workday" && !params.hasLeave && (
+    (fixedRules.absentAfterLateMinutes !== undefined && lateMinutes > fixedRules.absentAfterLateMinutes) ||
+    (fixedRules.minWorkMinutes !== undefined && (evidence?.durationMeasured ?? (!!firstISO && !!lastISO)) && totalMinutes < fixedRules.minWorkMinutes)
+  );
+  const attendanceDecision = fixedEvidence?.outsideWindow ? "incomplete" as const
+    : absentByFixedRule && evidence ? "absent" as const : evidence?.decision;
   return {
     date,
     ...(flex ? {
@@ -319,8 +338,8 @@ export function computePdksDay(params: {
     earlyExitMinutes,
     exitNextDay: exit !== undefined && exit >= 1440,
     isOvernightShift: isOvernightShift(shift),
-    hasAttendance: evidence ? evidence.attendanceCredit : !!firstISO || !!lastISO,
-    attendanceDecision: evidence?.decision,
+    hasAttendance: absentByFixedRule || fixedEvidence?.outsideWindow ? false : evidence ? evidence.attendanceCredit : !!firstISO || !!lastISO,
+    attendanceDecision,
     durationMeasured: evidence?.durationMeasured ?? (!!firstISO && !!lastISO),
     punchQuality: evidence?.punchQuality ?? (firstISO && lastISO ? "ok" as const : firstISO ? "missingExit" as const : lastISO ? "missingEntry" as const : "noPunch" as const),
     overtimePayTRY:
