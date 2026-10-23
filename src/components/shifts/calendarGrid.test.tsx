@@ -63,13 +63,14 @@ describe("Vardiya takvimi sade sunum", () => {
     expect(html).toContain("min-h-11");
     expect(html).toContain("atama yok, vardiya ata");
   });
-  it.each(["fixed", "flexible"] as const)("ayda %s vardiya yalnız tek satır saat veya Esnek gösterir", (scheduleType) => {
+  it.each(["fixed", "flexible"] as const)("ayda %s vardiya yalnız saat aralığı veya Esnek gösterir (dar sütunda tire sonrası kırılır)", (scheduleType) => {
     const shift = { _id: "shift", name: "Gündüz", scheduleType, startTime: "08:30", endTime: "18:00" } as Shift;
     const assignment = { _id: "assignment", employeeId: employee._id, shiftId: shift._id, startDate: "2026-10-19", endDate: "2026-10-19" } as Assignment;
     const data = { ...empty, records: [{ shift, assignment, continuation: false }] };
     const html = renderToStaticMarkup(<ShiftCalendarCell data={data} date="2026-10-19" employeeName="İpek Yıldız" compact />);
     expect(html).toContain("min-h-10");
-    expect(html).toContain("whitespace-nowrap");
+    expect(html).not.toContain("whitespace-nowrap");
+    expect(html).toContain("text-[10px] leading-tight");
     expect(html).toContain(scheduleType === "flexible" ? ">Esnek<" : ">08:30–18:00<");
     expect(html).toContain('title="Gündüz · ');
     expect(html).not.toContain(">Gündüz<");
