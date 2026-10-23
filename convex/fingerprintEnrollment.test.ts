@@ -53,6 +53,13 @@ describe("cihazda parmak izi metadata ve izinler", () => {
     await expect(f.caller.mutation(api.fingerprintEnrollment.beginEnrollment, { ...f.target, fingerNo })).rejects.toThrow();
     expect(await f.t.run(ctx => ctx.db.query("deviceFingerprintEnrollments").collect())).toHaveLength(0);
   });
+  it("kişi başına 5 parmak izi: 6+ slot ve dolu kişide yeni kayıt reddedilir, mevcut slot yeniden kaydedilir", async () => {
+    const f = await fixture();
+    await expect(f.caller.mutation(api.fingerprintEnrollment.beginEnrollment, { ...f.target, fingerNo: 6 })).rejects.toThrow("en fazla 5");
+    await f.t.run(async ctx => { for (const fingerPrintID of [1, 2, 3, 4, 7]) await ctx.db.insert("employeeFingerprints", { employeeId: f.employeeId, projectId: f.projectId, fingerPrintID, encData: "e", iv: "i", keyVersion: "v1", addedAt: 1 }); });
+    await expect(f.caller.mutation(api.fingerprintEnrollment.beginEnrollment, { ...f.target, fingerNo: 5 })).rejects.toThrow("en fazla 5");
+    await expect(f.caller.mutation(api.fingerprintEnrollment.beginEnrollment, { ...f.target, fingerNo: 2 })).resolves.toBeTypeOf("string");
+  });
   it("oturumsuz ve project_user sorgu, başlatma ve iptal çağrıları reddedilir", async () => {
     const f = await fixture("project_user");
     await expect(f.t.query(api.fingerprintEnrollment.listForEmployee, { employeeId: f.employeeId })).rejects.toThrow("Giriş");

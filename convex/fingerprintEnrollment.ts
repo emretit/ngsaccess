@@ -9,6 +9,7 @@ import { canAccessEmployeeProject, getProjectIdsForUser, requireEmployeeAccess }
 import { internal } from "./_generated/api";
 import { writeAudit } from "./lib/audit";
 import { assertBiometricAllowed } from "./lib/biometricGate";
+import { FINGERPRINT_LIMIT_MESSAGE, MAX_FINGERPRINTS_PER_EMPLOYEE } from "./lib/fingerprintSlots";
 
 const targetArgs = { employeeId: v.id("employees"), deviceId: v.id("devices"), fingerNo: v.number() };
 
@@ -133,6 +134,11 @@ export const beginEnrollment = authedMutation({
     const permittedEmployee = await requireEmployeeAccess(ctx, args.employeeId);
     await requirePermission(ctx, ctx.user, permittedEmployee.projectId, "biometrics.manage");
     const { employee } = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
+    // Silme/yeniden gönderme eski 6-10 slotlarını da kabul eder; yeni kayıt yalnız 1-5'e ve toplam 5 şablona izinli.
+    const templates = await ctx.db.query("employeeFingerprints").withIndex("by_employee", q => q.eq("employeeId", args.employeeId)).take(11);
+    if (args.fingerNo > MAX_FINGERPRINTS_PER_EMPLOYEE || templates.filter(row => row.fingerPrintID !== args.fingerNo).length >= MAX_FINGERPRINTS_PER_EMPLOYEE) {
+      throw new ConvexError(FINGERPRINT_LIMIT_MESSAGE);
+    }
     const pending = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_device_pendingUntil", q => q.eq("deviceId", args.deviceId).gt("pendingUntil", Date.now())).first();
     if (pending) throw new ConvexError("Bu cihazda başka bir parmak izi işlemi sürüyor; bitmesini bekleyin.");
     const existing = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee_device_finger", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId).eq("fingerNo", args.fingerNo)).unique();

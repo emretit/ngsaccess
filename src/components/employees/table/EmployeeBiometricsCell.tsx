@@ -2,7 +2,6 @@ import type { LucideIcon } from "lucide-react";
 import { Check, Fingerprint, ScanFace } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { fingerName } from "../lib/fingerNames";
 
 export interface EmployeeBiometrics {
   face: boolean;
@@ -57,7 +56,6 @@ export function EmployeeBiometricsCell({ biometrics }: { biometrics?: EmployeeBi
           icon={Fingerprint}
           active={fingerNos.length > 0}
           title={fingerNos.length > 0 ? `${fingerNos.length} parmak izi kayıtlı` : "Parmak izi kaydı yok"}
-          detail={fingerNos.length > 0 ? fingerNos.map(fingerName).join(", ") : undefined}
         />
       </div>
     </TooltipProvider>
