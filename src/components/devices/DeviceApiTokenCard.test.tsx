@@ -23,7 +23,7 @@ describe("cihaz bağlantı anahtarı", () => {
     expect(html).not.toContain("secret");
     expect(html).not.toContain("suffix");
     expect(html).toContain("19.10.2026 03:00");
-    expect(html).toContain("Teknik ayrıntı");
+    expect(html).not.toContain("Teknik ayrıntı");
   });
   it("yenileme reddedilirse onay sözleşmesi için hatayı yeniden fırlatır", async () => {
     const failure = new Error("Bağlantı kesildi");

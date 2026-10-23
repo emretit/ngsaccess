@@ -65,7 +65,7 @@ it.each([
       expect(html).not.toContain("komut kuyruğa alınır");
     const open = html
       .match(/<button[^>]*>[\s\S]*?<\/button>/g)
-      ?.find((button) => button.endsWith("Aç</button>"));
+      ?.find((button) => button.includes("Kapıyı aç"));
     expect(open).toBeDefined();
     expect(open).not.toContain('disabled=""');
   },
@@ -83,7 +83,7 @@ it("project_user yalnız kapı açma komutunu görür", () => {
   const html = renderToStaticMarkup(
     <DeviceCommandCenter deviceId={mocks.device._id} />,
   );
-  expect(html).toContain("Aç</button>");
+  expect(html).toContain("Kapıyı aç");
   for (const label of [
     "Özellikleri tara",
     "Çalışma durumu",
@@ -97,14 +97,14 @@ it("project_user yalnız kapı açma komutunu görür", () => {
     expect(html).not.toContain(label);
   mocks.admin = true;
 });
-it("sınırlandırılmış sayaçları 100+ ve liste sınırını bir uyarıyla gösterir", () => {
+it("komut kuyruğunu göstermez, liste sınırını bir uyarıyla gösterir", () => {
   mocks.capped = true;
   mocks.limited = true;
   const html = renderToStaticMarkup(
     <DeviceCommandCenter deviceId={mocks.device._id} />,
   );
-  expect(html.match(/100\+/g)).toHaveLength(3);
-  expect(html).toContain("grid-cols-3");
+  expect(html).not.toContain("Komut kuyruğu");
+  expect(html).not.toContain("100+");
   expect(html).toContain(
     "Bu cihazda gösterilenden fazla kapı/okuyucu var; liste kısaltıldı.",
   );
@@ -117,7 +117,7 @@ it("cihaz yöneticisi kapı açma yetkisi kaldırıldığında açma düğmesini
   mocks.doors = false;
   mocks.device = { _id: "d" as Id<"devices">, name: "Panel", brand: "hikvision", hikTransport: "gateway", hikDevIndex: "index" };
   const html = renderToStaticMarkup(<DeviceCommandCenter deviceId={mocks.device._id} />);
-  expect(html).not.toContain("Aç</button>");
+  expect(html).not.toContain("Kapıyı aç");
   expect(html).toContain("Yeniden başlat");
   mocks.doors = true;
 });

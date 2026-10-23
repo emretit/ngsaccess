@@ -6,9 +6,6 @@ export const deviceLabels = {
   backfillEvents: "Olayları tara",
   captureCard: "Kart okut",
   triggerSync: "Panel senkronu",
-  pending: "Bekliyor",
-  processing: "İşleniyor",
-  failed: "Başarısız",
   zone: "Bölge seçin",
   newZone: "+ Yeni bölge oluştur",
   optionalIp: "IP adresi (isteğe bağlı)",
@@ -18,10 +15,3 @@ export const deviceLabels = {
   offlineConfirmation: "Cihaz çevrimdışı; komut başarısız olabilir.",
   longRunning: "İşlem arka planda sürüyor, paneli kapatabilirsiniz.",
 } as const;
-export function deviceEventLabel(label: string): string {
-  const match =
-    /^(?:Cihaz istisnası|Cihaz durum olayı|Bilinmeyen olay|Cihaz olayı)\s*\((?:kod )?(\d+)\)$/.exec(
-      label,
-    );
-  return match ? `Cihaz olayı (kod ${match[1]})` : label;
-}

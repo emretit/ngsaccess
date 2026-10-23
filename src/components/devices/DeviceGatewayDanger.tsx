@@ -14,9 +14,9 @@ export function DeviceGatewayDanger({ device, onPendingChange }: {
     api.actions.hikGatewayDevice.removeDeviceFromGateway,
   );
   return (
-    <section className="border-t border-destructive/30 pt-4">
-      <h3 className="mb-2 font-medium text-destructive">Tehlikeli bölge</h3>
-      <Button type="button" variant="destructive" onClick={() => setOpen(true)}>
+    <section className="py-3">
+      <h4 className="mb-2 text-sm font-semibold text-destructive">Tehlikeli bölge</h4>
+      <Button type="button" variant="destructive" size="sm" onClick={() => setOpen(true)}>
         Gateway bağlantısını kaldır
       </Button>
       <ConfirmDestructive

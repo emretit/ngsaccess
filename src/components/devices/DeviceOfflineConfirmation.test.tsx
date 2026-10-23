@@ -11,8 +11,6 @@ vi.mock("@/hooks/useProjectAccess", () => ({ useProjectAccess: () => ({ canManag
 vi.mock("./useDeviceCommands", () => ({ useDeviceCommands: () => ({ pendingAction: { title: "Onay", description: "İşlem etkisi", destructive: mocks.destructive }, pending: false, setPendingAction: vi.fn(), runConfirmed: vi.fn(), longRunning: false }) }));
 vi.mock("./DeviceActionsSection", () => ({ DeviceActionsSection: () => null }));
 vi.mock("./DeviceConnectionSection", () => ({ DeviceConnectionSection: () => null }));
-vi.mock("./DeviceQueueSection", () => ({ DeviceQueueSection: () => null }));
-vi.mock("./DeviceDoorsSection", () => ({ DeviceDoorsSection: () => null }));
 vi.mock("@/components/shared/ConfirmDestructive", () => ({ ConfirmDestructive: ({ open, effects }: { open: boolean; effects: string[] }) => open ? <div data-confirm>{effects.join(" ")}</div> : null }));
 vi.mock("@/components/ui/alert-dialog", () => {
   const Part = ({ children }: { children?: ReactNode }) => <div>{children}</div>;

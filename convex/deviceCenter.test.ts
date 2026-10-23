@@ -227,70 +227,38 @@ describe("drawer commands authorization and server audit", () => {
 });
 
 describe("getOverview bounded data", () => {
-  it.each(["hikvision", "ide_smart"] as const)("counts only %s queues, caps at 100 and projects events", async brand => {
+  it("returns only connection, door and reader data without queues or private event payloads", async () => {
     const f = await fixture();
-    const deviceId = brand === "hikvision" ? f.hikId : f.ideId;
     await f.t.run(async ctx => {
-      for (const status of ["pending", "processing", "failed", "done"] as const) {
-        for (let i = 0; i < 102; i++) await ctx.db.insert("hikPendingOperations", { deviceId, status, operation: "openDoor", payload: {}, attemptCount: 0, createdAt: Date.now() });
-      }
-      for (const status of ["pending", "sent", "failed", "acked"] as const) {
-        for (let i = 0; i < 102; i++) await ctx.db.insert("idePendingOperations", { deviceId, status, opType: "openDoor", payload: {}, attempts: 0, idempotencyKey: `${status}-${i}`, createdAt: Date.now() });
-      }
-      await ctx.db.insert("deviceEvents", { deviceId, label: "Test", source: "system", category: "operation", severity: "info", eventTime: now.toISOString(), createdAt: now.toISOString(), updatedAt: now.toISOString(), cardNo: "123", rawData: "private blob" });
+      await ctx.db.insert("hikPendingOperations", { deviceId: f.hikId, status: "pending", operation: "openDoor", payload: {}, attemptCount: 0, createdAt: Date.now() });
+      await ctx.db.insert("deviceEvents", { deviceId: f.hikId, label: "Test", source: "system", category: "operation", severity: "info", eventTime: now.toISOString(), createdAt: now.toISOString(), updatedAt: now.toISOString(), cardNo: "123", rawData: "private blob" });
     });
-    const overview = await f.caller.query(api.deviceCenter.getOverview, { deviceId });
+    const overview = await f.caller.query(api.deviceCenter.getOverview, { deviceId: f.hikId });
     expect(overview).not.toBeNull();
     if (!overview) throw new Error("overview missing");
-    const active = brand === "hikvision" ? overview.queues.hikvision : overview.queues.ideSmart;
-    const inactive = brand === "hikvision" ? overview.queues.ideSmart : overview.queues.hikvision;
-    for (const status of Object.values(active)) expect(status).toEqual({ count: 100, capped: true });
-    for (const status of Object.values(inactive)) expect(status).toEqual({ count: 0, capped: false });
-    expect(overview.queues.hikvision).not.toHaveProperty("done");
-    expect(overview.queues.ideSmart).not.toHaveProperty("acked");
-    expect(Object.keys(overview.recentEvents[0]).sort()).toEqual(["_id", "label", "eventTime", "cardNo", "category", "severity"].sort());
-    expect(overview).not.toHaveProperty("online");
+    expect(Object.keys(overview).sort()).toEqual(["device", "doors", "limits", "readers"]);
     expect(overview.device).not.toHaveProperty("hikWorkStatus");
     expect(JSON.stringify(overview)).not.toContain("private blob");
   });
-  it.each(["hikvision", "ide_smart"] as const)("reads only three bounded %s statuses and never terminal or other-brand queues", async brand => {
+  it.each(["hikvision", "ide_smart"] as const)("never reads queue, event or card reading tables for %s", async brand => {
     const f = await fixture();
-    const calls: { table: string; method: string; args: unknown[] }[] = [];
-    function trace(target: object, table: string): object {
-      return new Proxy(target, {
-        get(obj, key) {
-          const value: unknown = Reflect.get(obj, key);
-          if (typeof value !== "function") return value;
-          return (...args: unknown[]) => {
-            calls.push({ table, method: String(key), args: [...args] });
-            if (key === "withIndex" && typeof args[1] === "function") {
-              const callback = args[1];
-              args[1] = (q: object) => Reflect.apply(callback, undefined, [trace(q, table)]);
-            }
-            const result: unknown = Reflect.apply(value, obj, args);
-            return result !== null && typeof result === "object" && ["withIndex", "eq", "order"].includes(String(key)) ? trace(result, table) : result;
-          };
-        },
-      });
-    }
+    const tables: string[] = [];
     await f.caller.run(async ctx => {
       const db = new Proxy(ctx.db, {
         get(target, key) {
           if (key !== "query") return Reflect.get(target, key);
           return (table: string) => {
-            const result: object = Reflect.apply(target.query, target, [table]);
-            return trace(result, table);
+            tables.push(table);
+            return Reflect.apply(target.query, target, [table]);
           };
         },
       });
       const query = getOverview as unknown as { _handler: (ctx: QueryCtx, args: { deviceId: typeof f.hikId }) => Promise<unknown> };
       await query._handler({ ...ctx, db }, { deviceId: brand === "hikvision" ? f.hikId : f.ideId });
     });
-    const queueReads = calls.filter(call => call.table.endsWith("PendingOperations"));
-    expect(new Set(queueReads.map(call => call.table))).toEqual(new Set([brand === "hikvision" ? "hikPendingOperations" : "idePendingOperations"]));
-    expect(queueReads.filter(call => call.method === "take").map(call => call.args)).toEqual([[101], [101], [101]]);
-    expect(queueReads.filter(call => call.method === "eq" && call.args[0] === "status").map(call => call.args[1]).sort()).toEqual(brand === "hikvision" ? ["failed", "pending", "processing"] : ["failed", "pending", "sent"]);
-    expect(queueReads.some(call => call.method === "collect")).toBe(false);
+    expect(tables).toEqual(expect.arrayContaining(["doors", "readers"]));
+    for (const table of ["hikPendingOperations", "idePendingOperations", "deviceEvents", "cardReadings"])
+      expect(tables).not.toContain(table);
   });
   it("caps 257 doors and 1025 readers without breaking overview", async () => {
     const f = await fixture();
@@ -302,13 +270,6 @@ describe("getOverview bounded data", () => {
     expect(overview?.doors).toHaveLength(256);
     expect(overview?.readers).toHaveLength(1024);
     expect(overview?.limits).toEqual({ doorsCapped: true, readersCapped: true });
-  });
-  it("does not cap exactly 100 rows", async () => {
-    const f = await fixture();
-    await f.t.run(async ctx => {
-      for (let i = 0; i < 100; i++) await ctx.db.insert("hikPendingOperations", { deviceId: f.hikId, status: "pending", operation: "openDoor", payload: {}, attemptCount: 0, createdAt: Date.now() });
-    });
-    expect((await f.caller.query(api.deviceCenter.getOverview, { deviceId: f.hikId }))?.queues.hikvision.pending).toEqual({ count: 100, capped: false });
   });
 });
 

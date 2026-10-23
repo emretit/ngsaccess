@@ -23,8 +23,3 @@ export function commandResultMessage(result: { ok: boolean; queued?: boolean; er
   if (!result.ok) return errorMessage(result.error ?? "İşlem başarısız");
   return result.queued ? "Sıraya alındı — cihaz onayı henüz alınmadı" : "İşlem sonucu alındı";
 }
-
-export function capabilityLabel(probe: { ok: boolean; supported: boolean | null }): string {
-  if (!probe.ok) return "Doğrulanamadı";
-  return probe.supported === true ? "Destekli" : probe.supported === false ? "Desteklenmiyor" : "Belirsiz";
-}

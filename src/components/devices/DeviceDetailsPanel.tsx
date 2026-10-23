@@ -222,7 +222,7 @@ export function DeviceDetailsPanel({
                 {operationsVisited && <TabsContent
                   value="overview"
                   forceMount
-                  className="min-h-0 flex-1 overflow-y-auto px-5 py-4 data-[state=inactive]:hidden"
+                  className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-1 data-[state=inactive]:hidden"
                 >
                   <QuerySectionBoundary resetKey={selectedDevice._id}>
                     <DeviceCommandCenter
@@ -230,8 +230,7 @@ export function DeviceDetailsPanel({
                       onPendingChange={setCommandPending}
                     />
                   </QuerySectionBoundary>
-                  {canManage && <section aria-label="Yönetim" className="mt-4 space-y-4">
-                    <h3 className="text-sm font-medium">Yönetim</h3>
+                  {canManage && <section aria-label="Yönetim" className="divide-y divide-line border-t border-line">
                     <DeviceApiTokenCard
                       key={selectedDevice._id} deviceId={selectedDevice._id}
                       deviceName={selectedDevice.name} currentToken={selectedDevice.apiToken}

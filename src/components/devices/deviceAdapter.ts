@@ -1,6 +1,5 @@
 import { formatTrDateTime } from "@/lib/date";
 import type { ServerDevice } from "@/types/device";
-import type { BadgeProps } from "@/components/ui/badge";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../convex/_generated/api";
 export type DeviceOverview = NonNullable<
@@ -19,8 +18,6 @@ export type ConfirmedAction = {
   destructive?: boolean;
   run: () => Promise<OperationResult>;
 };
-
-type BadgeVariant = NonNullable<BadgeProps["variant"]>;
 
 type BrandAdapter = {
   label: string;
@@ -57,37 +54,6 @@ export function formatDirection(value: string | undefined): string {
   }
 }
 
-export function eventVariant(category: string, severity: string): BadgeVariant {
-  if (severity === "critical") return "destructive";
-  if (
-    severity === "warning" ||
-    category === "alarm" ||
-    category === "exception"
-  ) {
-    return "warning";
-  }
-  if (category === "operation") return "info";
-  if (category === "status" || category === "unknown") return "outline";
-  return "secondary";
-}
-
-export function eventCategoryLabel(category: string): string {
-  switch (category) {
-    case "access":
-      return "Geçiş";
-    case "alarm":
-      return "Alarm";
-    case "exception":
-      return "İstisna";
-    case "operation":
-      return "Operasyon";
-    case "status":
-      return "Durum";
-    default:
-      return "Bilinmiyor";
-  }
-}
-
 export function getAdapter(
   device: ServerDevice,
   hasIdeDoor: boolean,
@@ -111,7 +77,6 @@ export function getAdapter(
         triggerSync: false,
       },
       unsupportedReasons: [
-        "Panel senkronu yalnız IDE Smart panellerde kullanılabilir.",
         canGatewayCommand
           ? ""
           : "Gateway işlemleri için cihazın gateway kaydı gerekir.",
@@ -136,7 +101,6 @@ export function getAdapter(
         triggerSync: Boolean(device.ideUuid),
       },
       unsupportedReasons: [
-        "IDE Smart bağlantısında özellik taraması, çalışma durumu, eşitlik kontrolü, olay tarama, kart okutma ve yeniden başlatma desteklenmiyor.",
         device.ideUuid ? "" : "IDE Smart komutları için Panel UUID gerekir.",
         hasIdeDoor
           ? ""

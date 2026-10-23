@@ -22,17 +22,19 @@ export function DeviceConnectionSection({
       : overview.device.lastSeen,
   );
   return (
-    <section className="min-w-0 py-5 ">
+    <section className="min-w-0 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold">Bağlantı</h3>
             <Badge variant="outline">{adapter.label}</Badge>
             <Badge variant="secondary">{adapter.transport}</Badge>
           </div>
-          <p className="break-all text-sm text-muted-foreground">
-            {overview.device.deviceIp ?? "IP adresi belirtilmedi"}
-          </p>
+          {overview.device.deviceIp && (
+            <p className="break-all text-sm text-muted-foreground">
+              {overview.device.deviceIp}
+            </p>
+          )}
         </div>
         <StatusBadge
           tone={
@@ -51,7 +53,7 @@ export function DeviceConnectionSection({
         </StatusBadge>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 ">
+      <div className="mt-2 grid grid-cols-2 gap-x-3">
         <Metric
           label="Son sinyal"
           value={lastSignal === "—" ? "Henüz sinyal alınmadı" : lastSignal}

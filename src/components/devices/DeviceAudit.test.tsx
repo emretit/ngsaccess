@@ -170,7 +170,7 @@ describe("cihaz audit görünümü", () => {
     } as unknown as MouseEvent<HTMLTableCellElement>);
     expect(select).toHaveBeenCalledOnce();
   });
-  it("çevrimdışı panelde Aç etkin kalır, kuyruğu açıklar ve okuyucu ayarındaki boş planı gizler", () => {
+  it("çevrimdışı panelde kapı açma etkin kalır, kuyruğu açıklar ve okuyucu ayarı sınırını gösterir", () => {
     mocks.query.mockReturnValue({
       device,
       doors: [{ _id: "door", name: "Kapı", hikDoorNo: 2 }],
@@ -198,19 +198,17 @@ describe("cihaz audit görünümü", () => {
       <DeviceCommandCenter deviceId={device._id} />,
     );
     expect(html).toContain(
-      'role="status" class="py-3 text-sm text-warning">Cihaz çevrimdışı — komut kuyruğa alınır</p>',
+      'role="status" class="py-2 text-sm text-warning">Cihaz çevrimdışı — komut kuyruğa alınır</p>',
     );
     const openButton = html
       .match(/<button[^>]*>[\s\S]*?<\/button>/g)
-      ?.find((button) => button.endsWith("Aç</button>"));
+      ?.find((button) => button.includes("Kapıyı aç"));
     expect(openButton).toBeDefined();
     expect(openButton).not.toContain('disabled=""');
     expect(html).toContain("Okuyucu ayarını oku");
     expect(html).toContain(
-      "Bu bağlantı yöntemi okuyucu ayarını okumayı desteklemiyor.",
+      "Yerel köprü bağlantısında okuyucu ayarları",
     );
-    expect(html).toContain("Hik kapı kanalı #2");
-    expect(html).toContain("Hik okuyucu kanalı #3");
     expect(html).not.toContain("Plan -");
     expect(html).not.toContain("(TR)");
   });

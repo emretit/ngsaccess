@@ -11,7 +11,7 @@ export function Metric({
   compact?: boolean;
 }) {
   return (
-    <div className="min-w-0 py-2">
+    <div className="min-w-0 py-1">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div
         className={
@@ -32,7 +32,9 @@ export function ActionButton({
   icon,
   children,
   onClick,
+  className,
 }: {
+  className?: string;
   busy: boolean;
   disabled: boolean;
   icon: ReactNode;
@@ -44,6 +46,7 @@ export function ActionButton({
       type="button"
       variant="outline"
       size="sm"
+      className={className}
       aria-describedby={disabled ? "device-command-reasons" : undefined}
       disabled={disabled}
       onClick={onClick}

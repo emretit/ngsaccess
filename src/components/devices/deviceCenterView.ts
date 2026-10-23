@@ -8,5 +8,4 @@ export type DeviceCenterView = ReturnType<typeof useDeviceCommands> & {
   connected: boolean;
   offlineMessage: string;
   canManage: boolean;
-  queueRows: { label: string; value: number; capped: boolean }[];
 };
