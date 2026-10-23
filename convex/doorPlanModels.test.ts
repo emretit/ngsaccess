@@ -103,4 +103,8 @@ describe("door plan phase 2 models", () => {
       ),
     ).toThrow("16");
   });
+  it("rejects impossible holiday dates with a readable error", () => {
+    for (const date of ["2026-13-45", "2026-02-30", "26-01-01"])
+      expect(() => holidayRanges([date])).toThrow("Geçersiz tatil tarihi");
+  });
 });

@@ -4,6 +4,8 @@ import {
   type PlanResult,
   type PlanKey,
 } from "../doorPlanResult";
+/** Toplu plan işleminde bir seferde en fazla kapı sayısı. */
+export const MAX_BULK_DOORS = 50;
 export type BulkResult = {
   doorId: Id<"doors">;
   saved: boolean;
@@ -20,8 +22,8 @@ export async function applyBulkPlans(
   previous: BulkResult[] = [],
 ): Promise<BulkResult[]> {
   const ids = [...new Set(doorIds)];
-  if (!ids.length || ids.length > 50)
-    throw new Error("Bir seferde 1–50 kapı seçin");
+  if (!ids.length || ids.length > MAX_BULK_DOORS)
+    throw new Error(`Bir seferde 1–${MAX_BULK_DOORS} kapı seçin`);
   const results: BulkResult[] = [];
   for (const doorId of ids) {
     const old = previous.find((row) => row.doorId === doorId);

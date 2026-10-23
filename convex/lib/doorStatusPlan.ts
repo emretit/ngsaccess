@@ -7,6 +7,7 @@ import {
   type WeekSchedule,
 } from "./accessSchedule";
 import type { DoorStatusSegment, VerifySegment } from "./gateway/plans";
+import { snapshotProbeSupported } from "./capabilitySnapshot";
 
 export const DOOR_STATUS_DAYS = [
   "Monday",
@@ -258,9 +259,13 @@ export function holidayRanges(
 ): { beginDate: string; endDate: string }[] {
   const ranges: { beginDate: string; endDate: string }[] = [];
   for (const date of [...new Set(dates)].sort()) {
+    // Date.parse NaN döndürür ("2026-13-45"); toISOString o durumda RangeError atardı.
+    const time = /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? Date.parse(`${date}T00:00:00Z`)
+      : Number.NaN;
     if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
-      new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date
+      Number.isNaN(time) ||
+      new Date(time).toISOString().slice(0, 10) !== date
     )
       throw new ConvexError("Geçersiz tatil tarihi");
     const previous = ranges[ranges.length - 1];
@@ -277,30 +282,7 @@ export function holidayRanges(
     );
   return ranges;
 }
+/** Bilinmeyen (null) yetenek, herhangi bir PUT'tan önce sunucuda ayrıca kontrol edilir. */
 export function holidaySupportFromSnapshot(raw?: string): boolean | null {
-  if (!raw) return null;
-  try {
-    const snapshot: unknown = JSON.parse(raw);
-    if (
-      !snapshot ||
-      typeof snapshot !== "object" ||
-      !("probes" in snapshot) ||
-      !Array.isArray(snapshot.probes)
-    )
-      return null;
-    for (const probe of snapshot.probes) {
-      if (
-        probe &&
-        typeof probe === "object" &&
-        "key" in probe &&
-        probe.key === "doorStatusHoliday" &&
-        "supported" in probe &&
-        typeof probe.supported === "boolean"
-      )
-        return probe.supported;
-    }
-  } catch {
-    /* Unknown capability is checked on the server before any PUT. */
-  }
-  return null;
+  return snapshotProbeSupported(raw, "doorStatusHoliday");
 }

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/table";
 import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import { DoorPlanDialog, type DoorPlanTarget } from "./DoorPlanDialog";
+import { MAX_BULK_DOORS } from "./bulk";
+import { formatTrDateTime } from "@/lib/date";
 import {
   DOOR_STATUS_DAYS,
   type DoorStatusInterval,
@@ -91,10 +93,10 @@ export function DoorPlansTab() {
     <>
       <div className="flex items-center gap-3 mb-3">
         <span className="text-sm">
-          {checked.length} kapı seçildi (en fazla 50)
+          {checked.length} kapı seçildi (en fazla {MAX_BULK_DOORS})
         </span>
         <Button
-          disabled={!checked.length || checked.length > 50}
+          disabled={!checked.length || checked.length > MAX_BULK_DOORS}
           onClick={() => setCopyProject(projectId)}
         >
           Planı kopyala
@@ -108,13 +110,14 @@ export function DoorPlansTab() {
                 type="checkbox"
                 aria-label="Tüm kapıları seç"
                 checked={
-                  checked.length === targets.length && targets.length > 0
+                  checked.length > 0 &&
+                  checked.length === Math.min(targets.length, MAX_BULK_DOORS)
                 }
                 onChange={(event) =>
                   setSelection({
                     projectId,
                     ids: event.target.checked
-                      ? targets.slice(0, 50).map((door) => door.doorId)
+                      ? targets.slice(0, MAX_BULK_DOORS).map((door) => door.doorId)
                       : [],
                   })
                 }
@@ -145,7 +148,7 @@ export function DoorPlansTab() {
                   aria-label={`${door.doorName} seç`}
                   checked={checked.includes(door.doorId)}
                   disabled={
-                    !checked.includes(door.doorId) && checked.length >= 50
+                    !checked.includes(door.doorId) && checked.length >= MAX_BULK_DOORS
                   }
                   onChange={(event) =>
                     setSelection({
@@ -202,7 +205,7 @@ export function DoorPlansTab() {
                   : door.plansPending
                     ? "Kaydedildi, gönderilmedi"
                     : door.hikPlanAppliedAt
-                      ? `Gönderildi ${new Date(door.hikPlanAppliedAt).toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" })}`
+                      ? `Gönderildi ${formatTrDateTime(new Date(door.hikPlanAppliedAt))}`
                       : "Gönderilmedi"}
               </TableCell>
             </TableRow>

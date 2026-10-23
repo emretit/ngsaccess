@@ -1,4 +1,5 @@
 import { requirePermission } from "./lib/permissions";
+import { snapshotProbeSupported } from "./lib/capabilitySnapshot";
 import { scheduleFingerprintPurge } from "./lib/employeeCardChange";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
@@ -23,15 +24,7 @@ export function validateFingerNo(fingerNo: number) {
 }
 
 export function fingerprintCapability(raw?: string): boolean | null {
-  if (!raw) return null;
-  try {
-    const value: unknown = JSON.parse(raw);
-    if (!value || typeof value !== "object" || !("probes" in value) || !Array.isArray(value.probes)) return null;
-    for (const probe of value.probes as unknown[]) {
-      if (probe && typeof probe === "object" && "key" in probe && probe.key === "captureFingerprint" && "supported" in probe && typeof probe.supported === "boolean") return probe.supported;
-    }
-  } catch { /* Missing or invalid scans are unknown, never an implicit rejection. */ }
-  return null;
+  return snapshotProbeSupported(raw, "captureFingerprint");
 }
 
 /** Same project and active rule; both device and door assignments grant scope. */

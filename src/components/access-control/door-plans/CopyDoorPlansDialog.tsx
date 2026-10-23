@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { TemplatePicker } from "../unified/templates/TemplatePicker";
 import type { DoorPlanTarget } from "./DoorPlanDialog";
 import { normalizeVerifyPlan } from "../../../../convex/lib/doorStatusPlan";
-import { applyBulkPlans, bulkFailed, type BulkResult } from "./bulk";
+import { applyBulkPlans, bulkFailed, MAX_BULK_DOORS, type BulkResult } from "./bulk";
 export function CopyDoorPlansDialog({
   targets,
   selectedIds,
@@ -195,7 +195,7 @@ export function CopyDoorPlansDialog({
           </Button>
           {!results.length ? (
             <Button
-              disabled={pending || holidayBlocked || selectedIds.length > 50}
+              disabled={pending || holidayBlocked || selectedIds.length > MAX_BULK_DOORS}
               onClick={() => void run()}
             >
               {pending ? "Gönderiliyor…" : "Kaydet ve gönder"}
