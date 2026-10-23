@@ -6,7 +6,11 @@ import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { DoorStatusPlan } from "./lib/doorStatusPlan";
 const wire = vi.hoisted(() => ({ send: vi.fn() }));
-vi.mock("./lib/gateway/core", () => ({ gatewayApiCallChecked: wire.send }));
+vi.mock("./lib/gateway/core", () => ({ gatewayApiCallChecked: wire.send,
+  gatewayApiCall: vi.fn(async () => ({ status: 200, raw: "{}", data: {
+    isSupportDoorStatusPlan: true, isSupportDoorStatusWeekPlanCfg: true, isSupportDoorStatusPlanTemplate: true,
+  } })),
+}));
 const modules = import.meta.glob("./**/*.ts");
 const legacy: DoorStatusPlan = {
   enabled: true,
@@ -163,7 +167,7 @@ describe("kapı durum planı gateway zinciri", () => {
             {
               DoorStatusPlanTemplate: {
                 enable: true,
-                templateNo: 102,
+                templateName: "NGS 102",
                 weekPlanNo: 2,
                 holidayGroupNo: "",
               },

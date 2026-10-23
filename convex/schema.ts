@@ -1,4 +1,4 @@
-import { doorStatusPlanValidator } from "./lib/doorStatusPlan";
+import { doorStatusPlanValidator, verifyPlanValidator, holidayPlanValidator } from "./lib/doorStatusPlan";
 import { inviteRoleValidator, permissionValidator, projectRoleValidator } from "./lib/roleCatalog";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -306,14 +306,21 @@ export default defineSchema({
     // Kapı durum planı (DoorStatusPlan) — mesai saatinde kapıyı otomatik açık/kapalı tutar.
     hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
     // Doğrulama planı (VerifyWeekPlan) — saate göre doğrulama modunu değiştirir.
-    hikVerifyPlan: v.optional(
-      v.object({
-        enabled: v.boolean(),
-        beginTime: v.string(), // "HH:MM:SS"
-        endTime: v.string(),   // "HH:MM:SS"
-        verifyMode: v.string(), // "cardOrFace", "card", vb.
-      })
-    ),
+    hikVerifyPlan: v.optional(verifyPlanValidator),
+    hikVerifyPlanSavedAt: v.optional(v.string()),
+    hikVerifyPlanReaderNos: v.optional(v.array(v.number())),
+    hikDoorHolidayPlan: v.optional(holidayPlanValidator),
+    hikDoorHolidaySlots: v.optional(v.array(v.number())),
+    hikDoorStatusTemplateId: v.optional(v.id("accessScheduleTemplates")),
+    hikDoorStatusTemplateUpdatedAt: v.optional(v.string()),
+    hikPlanSavedAt: v.optional(v.string()),
+    hikPlanRevision: v.optional(v.number()),
+    hikPlanAppliedAt: v.optional(v.string()),
+    hikPlanApplyError: v.optional(v.string()),
+    hikPlanResults: v.optional(v.object({
+      status: v.optional(v.object({ revision: v.number(), appliedAt: v.optional(v.string()), error: v.optional(v.string()) })),
+      verify: v.optional(v.object({ revision: v.number(), appliedAt: v.optional(v.string()), error: v.optional(v.string()) })),
+    })),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
   })

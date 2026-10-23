@@ -179,7 +179,7 @@ describe("DoorStatusPlanEditor", () => {
     expect(weekly.find((day) => day.day === "Saturday")?.segments).toHaveLength(1);
   });
 });
-describe("EditDoorDialog haftalık kayıt", () => {
+describe("EditDoorDialog (Cihazlar)", () => {
   const door = {
     _id: "door" as Id<"doors">,
     name: "Kapı",
@@ -200,59 +200,15 @@ describe("EditDoorDialog haftalık kayıt", () => {
       },
     });
   }
-  it("weekly değişikliğini guard'a dahil eder, saniyeleri ve modları kaydet payload'unda korur", async () => {
+  it("kapı durum/doğrulama planlarını göstermez, kaydederken planlara dokunmaz", async () => {
     const initial = dialog();
+    expect(() => find(initial, (element) => element.type === DoorStatusPlanEditor)).toThrow();
     expect(state.dirty).toBe(false);
-    const onChange = find(
-      initial,
-      (element) => element.type === DoorStatusPlanEditor,
-    ).props.onChange as (plan: DoorStatusPlan) => void;
-    onChange({
-      ...legacy,
-      weekly: [
-        {
-          day: "Monday",
-          segments: [
-            {
-              beginTime: "09:00:01",
-              endTime: "12:00:02",
-              mode: "remainClosed",
-            },
-          ],
-        },
-        { day: "Sunday", segments: [] },
-      ],
-    });
-    const updated = dialog();
-    expect(state.dirty).toBe(true);
     await (
-      find(updated, (element) => element.type === "form").props
+      find(initial, (element) => element.type === "form").props
         .onSubmit as (event: { preventDefault: () => void }) => Promise<void>
     )({ preventDefault: vi.fn() });
-    expect(state.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        doorId: door._id,
-        hikDoorStatusPlan: {
-          enabled: true,
-          beginTime: "09:00:01",
-          endTime: "12:00:02",
-          mode: "remainClosed",
-          weekly: [
-            {
-              day: "Monday",
-              segments: [
-                {
-                  beginTime: "09:00:01",
-                  endTime: "12:00:02",
-                  mode: "remainClosed",
-                },
-              ],
-            },
-            { day: "Sunday", segments: [] },
-          ],
-        },
-      }),
-    );
-    expect(state.apply).toHaveBeenCalledTimes(2);
+    expect(state.save).toHaveBeenCalledWith({ doorId: door._id, name: "Kapı", doorCode: undefined, hikDoorNo: 2 });
+    expect(state.apply).not.toHaveBeenCalled();
   });
 });

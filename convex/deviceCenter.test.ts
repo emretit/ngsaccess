@@ -17,6 +17,12 @@ const gateway = vi.hoisted(() => ({
 vi.mock("./lib/hikGateway", async importOriginal => ({
   ...await importOriginal<typeof import("./lib/hikGateway")>(), ...gateway,
 }));
+vi.mock("./lib/gateway/core", async importOriginal => ({
+  ...await importOriginal<typeof import("./lib/gateway/core")>(),
+  gatewayApiCall: vi.fn(async () => ({ status: 200, raw: "{}", data: {
+    isSupportDoorStatusPlan: true, isSupportCardReaderPlan: true,
+  } })),
+}));
 const modules = import.meta.glob("./**/*.ts");
 const now = new Date("2026-10-21T12:00:00Z");
 beforeEach(() => {
@@ -128,6 +134,8 @@ describe("drawer commands authorization and server audit", () => {
   });
   it("audits the four newly wrapped writes exactly once", async () => {
     const f = await fixture();
+    // An actual app-owned binding is required before a verify unlink is a write.
+    await f.t.run(ctx => ctx.db.patch(f.doorId, { hikVerifyPlanReaderNos: [1] }));
     await f.caller.action(api.actions.hikGatewayDevice.registerDeviceOnGateway, { deviceId: f.hikId });
     await f.caller.action(api.actions.hikGatewayDevice.applyDoorStatusPlan, { doorId: f.doorId });
     await f.caller.action(api.actions.hikGatewayDevice.applyVerifyPlan, { doorId: f.doorId });

@@ -1,11 +1,12 @@
-import { requirePermission } from "./lib/permissions";
-import { doorStatusPlanValidator, normalizeDoorStatusPlan } from "./lib/doorStatusPlan";
+import { deviceConnection } from "./lib/deviceConnection";
+import { hasPermission, requirePermission } from "./lib/permissions";
+import { doorStatusPlanValidator, normalizeDoorStatusPlan, normalizeVerifyPlan, verifyPlanValidator, templateToDoorStatusPlan, holidayPlanValidator, holidayRanges, holidaySupportFromSnapshot } from "./lib/doorStatusPlan";
 
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -190,6 +191,9 @@ export const create = authedMutation({
     if (args.deviceId && !targetDevice) throw new ConvexError("Cihaz bulunamadı");
     const projectId = args.projectId ?? targetZone?.projectId ?? targetDevice?.projectId;
     await requirePermission(ctx, ctx.user, projectId, "devices.manage");
+    if (args.hikDoorStatusPlan !== undefined || args.hikVerifyPlan !== undefined) {
+      await requirePermission(ctx, ctx.user, projectId, "accessRules.manage");
+    }
     if (!projectId) {
       throw new ConvexError("Kapı oluşturmak için bir proje seçmelisiniz");
     }
@@ -263,20 +267,17 @@ export const update = authedMutation({
     ),
     hikDoorNo: v.optional(v.number()),
     hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
-    hikVerifyPlan: v.optional(
-      v.object({
-        enabled: v.boolean(),
-        beginTime: v.string(),
-        endTime: v.string(),
-        verifyMode: v.string(),
-      })
-    ),
+    hikVerifyPlan: v.optional(verifyPlanValidator),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const door = await ctx.db.get(args.doorId);
     if (!door) throw new Error("Kapı bulunamadı");
     await requirePermission(ctx, ctx.user, door.projectId, "devices.manage");
+    // Planlar Geçiş Kontrol'den (updatePlans) yönetilir; eski yol aynı yetkiyi ister.
+    if (args.hikDoorStatusPlan !== undefined || args.hikVerifyPlan !== undefined) {
+      await requirePermission(ctx, ctx.user, door.projectId, "accessRules.manage");
+    }
     if (!isProjectAllowed(allowedProjectIds, door.projectId)) {
       throw new Error("Bu kapıya erişim yetkiniz yok");
     }
@@ -302,8 +303,20 @@ export const update = authedMutation({
     }
     const { doorId, ...updates } = args;
     if (updates.hikDoorStatusPlan) updates.hikDoorStatusPlan = normalizeDoorStatusPlan(updates.hikDoorStatusPlan);
+    if (updates.hikVerifyPlan) updates.hikVerifyPlan = normalizeVerifyPlan(updates.hikVerifyPlan);
     const now = new Date().toISOString();
-    await ctx.db.patch(doorId, { ...updates, updatedAt: now });
+    const targetChanged = (args.hikDoorNo !== undefined && args.hikDoorNo !== door.hikDoorNo) ||
+      (args.deviceId !== undefined && args.deviceId !== door.deviceId);
+    const plansChanged = updates.hikDoorStatusPlan !== undefined || updates.hikVerifyPlan !== undefined;
+    await ctx.db.patch(doorId, { ...updates, updatedAt: now, ...(plansChanged ? {
+      hikPlanSavedAt: now, hikPlanRevision: (door.hikPlanRevision ?? 0) + 1,
+      hikPlanResults: undefined, hikPlanApplyError: undefined,
+      ...(updates.hikDoorStatusPlan ? { hikDoorStatusTemplateId: undefined, hikDoorStatusTemplateUpdatedAt: undefined } : {}),
+    } : {}), ...(targetChanged ? {
+      hikPlanRevision: (door.hikPlanRevision ?? 0) + 1,
+      hikPlanResults: undefined, hikPlanApplyError: undefined, hikPlanAppliedAt: undefined,
+      hikPlanSavedAt: undefined, hikDoorHolidaySlots: undefined, hikVerifyPlanReaderNos: undefined,
+    } : {}) });
     if (args.hikDoorNo !== undefined) {
       const readers = await ctx.db
         .query("readers")
@@ -527,5 +540,199 @@ export const getByIdInternal = internalQuery({
   args: { id: v.id("doors") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.id);
+  },
+});
+
+/** Plan yönetimi cihaz yapılandırma yetkisinden bağımsızdır. */
+export const updatePlans = authedMutation({
+  args: {
+    doorId: v.id("doors"),
+    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
+    hikVerifyPlan: v.optional(verifyPlanValidator),
+    hikDoorHolidayPlan: v.optional(holidayPlanValidator),
+    hikDoorStatusTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
+  },
+  handler: async (ctx, args) => {
+    const door = await ctx.db.get(args.doorId);
+    if (!door) throw new ConvexError("Kapı bulunamadı");
+    await requirePermission(ctx, ctx.user, door.projectId, "accessRules.manage");
+    const device = door.deviceId ? await ctx.db.get(door.deviceId) : null;
+    if (!device || device.projectId !== door.projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway") {
+      throw new ConvexError("Planlar yalnız Hikvision gateway kapılarında desteklenir");
+    }
+    let statusPlan = args.hikDoorStatusPlan;
+    const templateId = args.hikDoorStatusTemplateId;
+    let templateUpdatedAt: string | undefined;
+    if (templateId) {
+      const template = await ctx.db.get(templateId);
+      if (!template || template.projectId !== door.projectId || (template.isArchived && templateId !== door.hikDoorStatusTemplateId))
+        throw new ConvexError("Zaman şablonu bulunamadı veya kullanılamıyor");
+      if (!statusPlan || statusPlan.mode === "normal") throw new ConvexError("Şablon için sürekli açık veya sürekli kilitli seçin");
+      statusPlan = templateToDoorStatusPlan(template.week, statusPlan.mode, statusPlan.enabled);
+      templateUpdatedAt = template.updatedAt;
+    }
+    if (args.hikDoorHolidayPlan && (!Number.isInteger(args.hikDoorHolidayPlan.year) || args.hikDoorHolidayPlan.year < 2000 || args.hikDoorHolidayPlan.year > 2100))
+      throw new ConvexError("Tatil yılı 2000–2100 arasında olmalıdır");
+    const normalizedStatus = statusPlan === undefined ? undefined : normalizeDoorStatusPlan(statusPlan);
+    const normalizedVerify = args.hikVerifyPlan === undefined ? undefined : normalizeVerifyPlan(args.hikVerifyPlan);
+    const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    const statusChanged = normalizedStatus !== undefined &&
+      (!same(normalizedStatus, door.hikDoorStatusPlan && normalizeDoorStatusPlan(door.hikDoorStatusPlan)) ||
+        (templateId ?? undefined) !== door.hikDoorStatusTemplateId || templateUpdatedAt !== door.hikDoorStatusTemplateUpdatedAt);
+    const holidayChanged = args.hikDoorHolidayPlan !== undefined &&
+      !same(args.hikDoorHolidayPlan, door.hikDoorHolidayPlan) &&
+      (!!door.hikDoorHolidayPlan || args.hikDoorHolidayPlan.enabled);
+    const verifyChanged = normalizedVerify !== undefined &&
+      (!!door.hikVerifyPlan || normalizedVerify.enabled) &&
+      (!door.hikVerifyPlanSavedAt || !same(normalizedVerify, door.hikVerifyPlan && normalizeVerifyPlan(door.hikVerifyPlan)));
+    const changed: ("status" | "verify")[] = [];
+    if (statusChanged || holidayChanged) changed.push("status");
+    if (verifyChanged) changed.push("verify");
+    if (!changed.length) return changed;
+    const holiday = args.hikDoorHolidayPlan ?? door.hikDoorHolidayPlan;
+    if (changed.includes("status") && holiday?.enabled && !(await planHolidayRanges(ctx, door.projectId, holiday.year)).length)
+      throw new ConvexError("Seçilen yılda uygulanacak tatil yok");
+    const now = new Date().toISOString();
+    const revision = (door.hikPlanRevision ?? 0) + 1;
+    // Unchanged plans retain their acknowledgements under the new aggregate revision.
+    const results = {
+      ...(!changed.includes("status") && door.hikPlanResults?.status ? { status: { ...door.hikPlanResults.status, revision } } : {}),
+      ...(!changed.includes("verify") && door.hikVerifyPlanSavedAt && door.hikPlanResults?.verify ? { verify: { ...door.hikPlanResults.verify, revision } } : {}),
+    };
+    await ctx.db.patch(door._id, {
+      ...(holidayChanged ? { hikDoorHolidayPlan: args.hikDoorHolidayPlan } : {}),
+      ...(statusChanged ? { hikDoorStatusPlan: normalizedStatus,
+        hikDoorStatusTemplateId: templateId ?? undefined, hikDoorStatusTemplateUpdatedAt: templateUpdatedAt } : {}),
+      ...(verifyChanged ? { hikVerifyPlan: normalizedVerify, hikVerifyPlanSavedAt: now } : {}),
+      hikPlanSavedAt: now, hikPlanRevision: revision,
+      hikPlanResults: results, hikPlanApplyError: [results.status?.error, results.verify?.error].filter((e): e is string => !!e).join("; ") || undefined, updatedAt: now,
+    });
+    return changed;
+  },
+});
+
+export const listPlanTargets = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    if (!(await hasPermission(ctx, ctx.user, projectId, "accessRules.manage"))) return [];
+    const doors = await ctx.db.query("doors").withIndex("by_project", q => q.eq("projectId", projectId)).take(1000);
+    const targets = await Promise.all(doors.map(async door => {
+      const device = door.deviceId ? await ctx.db.get(door.deviceId) : null;
+      if (!device || device.projectId !== projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway") return null;
+      const zone = door.zoneId ? await ctx.db.get(door.zoneId) : null;
+      const template = door.hikDoorStatusTemplateId ? await ctx.db.get(door.hikDoorStatusTemplateId) : null;
+      const ownTemplate = template?.projectId === projectId ? template : null;
+      return {
+        projectId, hikDoorHolidayPlan: door.hikDoorHolidayPlan ?? null,
+        holidaySupported: holidaySupportFromSnapshot(device.hikCapabilitiesSnapshot),
+        hikDoorStatusTemplateId: door.hikDoorStatusTemplateId ?? null,
+        templateName: ownTemplate?.name ?? null,
+        templateChanged: !!ownTemplate && ownTemplate.updatedAt !== door.hikDoorStatusTemplateUpdatedAt,
+        hikPlanSavedAt: door.hikPlanSavedAt ?? null, hikPlanAppliedAt: door.hikPlanAppliedAt ?? null,
+        hikPlanApplyError: door.hikPlanApplyError ?? null,
+        plansPending: !!door.hikPlanSavedAt && !["status", "verify"].every(key => {
+          const result = key === "status" ? door.hikPlanResults?.status : door.hikPlanResults?.verify;
+          const plan = key === "status" ? door.hikDoorStatusPlan : door.hikVerifyPlanSavedAt && door.hikVerifyPlan;
+          return !(plan || (key === "status" && door.hikDoorHolidayPlan?.enabled)) || (result?.revision === (door.hikPlanRevision ?? 0) && !!result.appliedAt);
+        }),
+        doorId: door._id, doorName: door.name, deviceName: device.name,
+        zoneName: zone?.projectId === projectId ? zone.name : null,
+        deviceOnline: deviceConnection(device, Date.now()) === "online",
+        hikDoorStatusPlan: door.hikDoorStatusPlan ?? null,
+        hikVerifyPlan: door.hikVerifyPlan ?? null,
+      };
+    }));
+    return targets.filter((target): target is NonNullable<typeof target> => target !== null);
+  },
+});
+
+/** Only action handlers may acknowledge sends; stale revisions never mark new edits applied. */
+export const recordPlanResult = internalMutation({
+  args: { doorId: v.id("doors"), revision: v.number(), key: v.union(v.literal("status"), v.literal("verify")),
+    error: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const door = await ctx.db.get(args.doorId);
+    if (!door || (args.key === "verify" && !door.hikVerifyPlanSavedAt)) return;
+    if ((door.hikPlanRevision ?? 0) !== args.revision) {
+      // An old request may have reached the device after a newer save/send.
+      // Conservatively require a resend instead of displaying a false success.
+      await ctx.db.patch(door._id, { hikPlanResults: undefined, hikPlanApplyError: "Gönderim sırasında plan değişti; yeniden gönderin" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const results = { ...door.hikPlanResults, [args.key]: { revision: args.revision,
+      ...(args.error ? { error: args.error.slice(0, 500) } : { appliedAt: now }) } };
+    const error = [results.status?.error, results.verify?.error].filter((e): e is string => !!e).join("; ");
+    const complete = (!(door.hikDoorStatusPlan || door.hikDoorHolidayPlan?.enabled) || !!results.status?.appliedAt) && (!(door.hikVerifyPlanSavedAt && door.hikVerifyPlan) || !!results.verify?.appliedAt);
+    await ctx.db.patch(door._id, { hikPlanResults: results, hikPlanApplyError: error || undefined,
+      ...(complete && !error ? { hikPlanAppliedAt: now } : {}) });
+  },
+});
+
+export const getPlanReaders = internalQuery({
+  args: { doorId: v.id("doors") },
+  handler: async (ctx, { doorId }) => {
+    const door = await ctx.db.get(doorId);
+    if (!door) return [];
+    const readers = await ctx.db.query("readers").withIndex("by_door", q => q.eq("doorId", doorId)).take(100);
+    const numbers = readers.filter(reader => reader.projectId === door.projectId && (!reader.deviceId || reader.deviceId === door.deviceId))
+      .map(reader => reader.hikReaderNo ?? deriveHikReaderNoFromDoorNo(door.hikDoorNo, reader.direction));
+    if (!readers.length) numbers.push(deriveHikReaderNoFromDoorNo(door.hikDoorNo, door.readerDirection ?? "entry"));
+    return [...new Set(numbers.filter((n): n is number => n !== undefined && Number.isInteger(n) && n > 0))];
+  },
+});
+export const getPlanHolidays = internalQuery({
+  args: { doorId: v.id("doors") },
+  handler: async (ctx, { doorId }) => {
+    const door = await ctx.db.get(doorId);
+    if (!door?.hikDoorHolidayPlan?.enabled) return [];
+    return planHolidayRanges(ctx, door.projectId, door.hikDoorHolidayPlan.year);
+  },
+});
+/** Reserve device-local slots transactionally, retaining old reservations to avoid overwriting linked plans. */
+export const reserveHolidaySlots = internalMutation({
+  args: { doorId: v.id("doors"), count: v.number(), max: v.number() },
+  handler: async (ctx, { doorId, count, max }) => {
+    const door = await ctx.db.get(doorId);
+    if (!door?.deviceId || !Number.isInteger(count) || count < 0 || count > 16 || !Number.isInteger(max) || max < 1) throw new ConvexError("Tatil planı kapasitesi geçersiz");
+    const doors = await ctx.db.query("doors").withIndex("by_device", q => q.eq("deviceId", door.deviceId)).take(1001);
+    if (doors.length > 1000) throw new ConvexError("Cihaz kapı sınırı aşıldı");
+    const used = new Set(doors.filter(row => row._id !== doorId).flatMap(row => row.hikDoorHolidaySlots ?? []));
+    if (door.hikDoorHolidaySlots?.some(slot => used.has(slot))) throw new ConvexError("Tatil planı slotları başka kapıyla çakışıyor");
+    for (const slot of door.hikDoorHolidaySlots ?? []) used.add(slot);
+    const slots = [...(door.hikDoorHolidaySlots ?? [])];
+    for (let i = 1; slots.length < count && i <= max; i++) if (!used.has(i)) slots.push(i);
+    if (slots.length < count || slots.some(i => i > max)) throw new ConvexError("Cihazda yeterli tatil planı kapasitesi yok");
+    await ctx.db.patch(doorId, { hikDoorHolidaySlots: slots });
+    return slots.slice(0, count);
+  },
+});
+
+
+async function planHolidayRanges(ctx: QueryCtx | MutationCtx, projectId: Id<"projects"> | undefined, year: number) {
+  const dates = await Promise.all([...new Set([projectId, undefined])].map(scope => ctx.db.query("holidays")
+    .withIndex("by_project_date", q => q.eq("projectId", scope).gte("date", `${year}-01-01`).lte("date", `${year}-12-31`)).take(367)));
+  if (dates.some(rows => rows.length === 367)) throw new ConvexError("Tatil listesi sınırı aşıldı");
+  return holidayRanges(dates.flat().map(row => row.date));
+}
+
+export const listPlanHolidays = authedQuery({
+  args: { projectId: v.optional(v.id("projects")), year: v.number() },
+  handler: async (ctx, { projectId, year }) => {
+    await requirePermission(ctx, ctx.user, projectId, "accessRules.manage");
+    return planHolidayRanges(ctx, projectId, year);
+  },
+});
+
+/** Per-reader proof survives partial sends; factory bindings never authorize an unlink. */
+export const recordVerifyReaderBinding = internalMutation({
+  args: { doorId: v.id("doors"), deviceId: v.id("devices"), doorNo: v.number(), readerNo: v.number(), linked: v.boolean() },
+  handler: async (ctx, args) => {
+    const door = await ctx.db.get(args.doorId);
+    if (!door || door.deviceId !== args.deviceId || door.hikDoorNo !== args.doorNo) return;
+    const readers = new Set(door.hikVerifyPlanReaderNos ?? []);
+    if (args.linked) readers.add(args.readerNo);
+    else readers.delete(args.readerNo);
+    await ctx.db.patch(door._id, { hikVerifyPlanReaderNos: [...readers] });
   },
 });

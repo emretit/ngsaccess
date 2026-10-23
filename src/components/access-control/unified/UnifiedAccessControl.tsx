@@ -1,3 +1,4 @@
+import { DoorPlansTab } from "../door-plans/DoorPlansTab";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -15,7 +16,9 @@ const ProjectAccessControl = () => {
   const { can } = usePermissions();
   const canManage = can("accessRules.manage");
   const tab =
-    params.get("tab") === "status" && canManage
+    params.get("tab") === "doors" && canManage
+      ? "doors"
+      : params.get("tab") === "status" && canManage
       ? "status"
       : params.get("tab") === "templates"
         ? "templates"
@@ -49,7 +52,7 @@ const ProjectAccessControl = () => {
         onValueChange={(value) =>
           setParams((prev) => {
             const next = new URLSearchParams(prev);
-            if (value === "templates" || value === "status")
+            if (value === "templates" || value === "status" || value === "doors")
               next.set("tab", value);
             else {
               next.delete("tab");
@@ -63,7 +66,9 @@ const ProjectAccessControl = () => {
           <TabsTrigger value="rules">Kurallar</TabsTrigger>
           <TabsTrigger value="templates">Zaman Şablonları</TabsTrigger>
           {canManage && <TabsTrigger value="status">Yetki Durumu</TabsTrigger>}
+          {canManage && <TabsTrigger value="doors">Kapı Planları</TabsTrigger>}
         </TabsList>
+        {canManage && <TabsContent value="doors"><DoorPlansTab /></TabsContent>}
         {canManage && (
           <TabsContent value="status">
             <StatusPage />

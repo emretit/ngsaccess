@@ -1,6 +1,7 @@
 "use node";
 
-import { gatewayApiCallChecked } from "./core";
+import { gatewayApiCallChecked, gatewayApiCall } from "./core";
+import { findSupportFlag } from "./capabilities";
 import { ALL_DAYS, MAX_SEGMENTS_PER_DAY, normalizeEndTime } from "./scheduling";
 import type { Weekday } from "./scheduling";
 
@@ -12,11 +13,11 @@ import type { Weekday } from "./scheduling";
 /** DoorStatus segment: her gün için bir zaman aralığı + kapı modu. */
 export interface DoorStatusSegment {
   week: Weekday;
-  id: number;        // 1-indexed segment sırası (her gün max 8)
+  id: number; // 1-indexed segment sırası (her gün max 8)
   enable: boolean;
   doorStatus: "remainOpen" | "remainClosed" | "normal";
   beginTime: string; // "HH:MM:SS"
-  endTime: string;   // "HH:MM:SS"
+  endTime: string; // "HH:MM:SS"
 }
 
 /**
@@ -94,7 +95,7 @@ export async function setDoorStatusPlanTemplate(
     {
       DoorStatusPlanTemplate: {
         enable: true,
-        templateNo,
+        templateName: `NGS ${templateNo}`,
         weekPlanNo: opts.weekPlanNo,
         holidayGroupNo: opts.holidayGroupNo ? String(opts.holidayGroupNo) : "",
       },
@@ -197,7 +198,7 @@ export async function setVerifyPlanTemplate(
     {
       VerifyPlanTemplate: {
         enable: true,
-        templateNo,
+        templateName: `NGS ${templateNo}`,
         weekPlanNo: opts.weekPlanNo,
         holidayGroupNo: opts.holidayGroupNo ? String(opts.holidayGroupNo) : "",
       },
@@ -206,26 +207,132 @@ export async function setVerifyPlanTemplate(
   );
 }
 
-/**
- * Kapıya Verify plan template'ini bağlar (templateNo=0 ile iptal).
- *
- * // VERIFY: Hik ISAPI dokümantasyonunda VerifyPlan'ın kapıya bağlanma path'i
- * // netleştirilmedi. En makul alternatifler:
- * //   A) /ISAPI/AccessControl/VerifyPlan/<doorNo>  (DoorStatusPlan ile simetrik)
- * //   B) /ISAPI/AccessControl/VerifyWeekPlanCfg/template/<doorNo>
- * //   C) Okuyucu bazlı: /ISAPI/AccessControl/CardReader/VerifyPlan/<readerNo>
- * // Mevcut implementasyon (A) seçeneğini kullanıyor; canlı cihaz testiyle doğrulanmalı.
- */
+/** Official FingerPrint Terminals Pro Series, 7.4.2.1 / 10.3.6.1. */
 export async function linkVerifyPlan(
   devIndex: string,
-  doorNo: number,
+  readerNo: number,
   templateNo: number,
 ): Promise<{ ok: boolean; error?: string }> {
-  // VERIFY: path cihaz firmware'ına göre farklılık gösterebilir (bkz. yukarıdaki yorum).
   return gatewayApiCallChecked(
-    `/ISAPI/AccessControl/VerifyPlan/${doorNo}`,
+    `/ISAPI/AccessControl/CardReaderPlan/${readerNo}`,
     "PUT",
-    { VerifyPlan: { templateNo } },
+    { CardReaderPlan: { templateNo } },
+    devIndex,
+  );
+}
+
+/** Manual 7.7.2.1 and 7.4.2.1–3: parent support implies child support; explicit false wins. */
+export async function requirePlanCapabilities(
+  devIndex: string,
+  fields: string[],
+): Promise<void> {
+  const result = await gatewayApiCall(
+    "/ISAPI/AccessControl/capabilities",
+    "GET",
+    null,
+    devIndex,
+  );
+  if (result.status !== 200) throw new Error("Cihaz yeteneği okunamadı (cihaz çevrimdışı olabilir)");
+  const flag = (field: string) => findSupportFlag(result.data, [field])?.value;
+  const supported = (field: string): boolean => {
+    const value = flag(field);
+    if (value !== undefined) return value;
+    // Preserve the pre-capability status path on older firmware omitting these flags.
+    if (["isSupportDoorStatusPlan", "isSupportDoorStatusWeekPlanCfg", "isSupportDoorStatusPlanTemplate"].includes(field)) return true;
+    if (field === "isSupportVerifyPlanTemplate") return flag("isSupportCardReaderPlan") === true;
+    if (field === "isSupportVerifyWeekPlanCfg")
+      return flag("isSupportCardRightWeekPlanCfg") === true || flag("isSupportVerifyPlanTemplate") === true || flag("isSupportCardReaderPlan") === true;
+    return false;
+  };
+  if (fields.some(field => !supported(field)))
+    throw new Error(fields.some(field => field.includes("Holiday") && !supported(field))
+      ? "Bu cihaz tatil planını desteklemiyor"
+      : "Bu cihaz istenen zaman planını desteklemiyor");
+}
+export async function getHolidayCapacity(
+  devIndex: string,
+  groupNo: number,
+): Promise<number> {
+  const readMax = (data: unknown, root: string, field: string): number => {
+    if (!data || typeof data !== "object" || !(root in data)) return 0;
+    const cfg: unknown = (data as Record<string, unknown>)[root];
+    if (!cfg || typeof cfg !== "object") return 0;
+    const range: unknown = (cfg as Record<string, unknown>)[field];
+    if (
+      !range ||
+      typeof range !== "object" ||
+      !("@max" in range) ||
+      typeof range["@max"] !== "number"
+    )
+      return 0;
+    return Number.isInteger(range["@max"]) ? range["@max"] : 0;
+  };
+  const plan = await gatewayApiCall(
+    "/ISAPI/AccessControl/DoorStatusHolidayPlanCfg/capabilities",
+    "GET",
+    null,
+    devIndex,
+  );
+  const group = await gatewayApiCall(
+    "/ISAPI/AccessControl/DoorStatusHolidayGroupCfg/capabilities",
+    "GET",
+    null,
+    devIndex,
+  );
+  const max = readMax(plan.data, "DoorStatusHolidayPlanCfg", "planNo");
+  if (
+    plan.status !== 200 ||
+    group.status !== 200 ||
+    !max ||
+    groupNo > readMax(group.data, "DoorStatusHolidayGroupCfg", "groupNo")
+  )
+    throw new Error("Cihazın tatil planı kapasitesi doğrulanamadı");
+  return max;
+}
+/** Official manual 10.3.2.7; one dated plan, all 8 slots to clear previous contents. */
+export async function setDoorStatusHolidayPlan(
+  devIndex: string,
+  planNo: number,
+  range: { beginDate: string; endDate: string },
+  mode: DoorStatusSegment["doorStatus"],
+) {
+  return gatewayApiCallChecked(
+    `/ISAPI/AccessControl/DoorStatusHolidayPlanCfg/${planNo}`,
+    "PUT",
+    {
+      DoorStatusHolidayPlanCfg: {
+        enable: true,
+        ...range,
+        HolidayPlanCfg: Array.from({ length: 8 }, (_, index) => ({
+          id: index + 1,
+          enable: index === 0,
+          doorStatus: mode,
+          TimeSegment: {
+            beginTime: "00:00:00",
+            endTime: index === 0 ? normalizeEndTime("23:59:59") : "00:00:00",
+          },
+        })),
+      },
+    },
+    devIndex,
+  );
+}
+/** Official manual 10.3.2.3: CSV plan IDs, not embedded date objects. */
+export async function setDoorStatusHolidayGroup(
+  devIndex: string,
+  groupNo: number,
+  slots: number[],
+) {
+  return gatewayApiCallChecked(
+    `/ISAPI/AccessControl/DoorStatusHolidayGroupCfg/${groupNo}`,
+    "PUT",
+    {
+      DoorStatusHolidayGroupCfg: {
+        enable: true,
+        groupName: `NGS ${groupNo}`,
+        holidayPlanNo: slots.join(","),
+      },
+    },
     devIndex,
   );
 }

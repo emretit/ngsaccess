@@ -344,8 +344,8 @@ export const fetchReaderCfg = authedAction({
  * Kapıya Verify planı uygular.
  * Plan kaynağı: door.hikVerifyPlan. enabled=false ise planı iptal eder.
  *
- * planNo / templateNo konvansiyonu: applyDoorStatusPlan ile aynı slot kuralı ama
- * ayrı ISAPI endpoint'leri (VerifyWeekPlanCfg / VerifyPlanTemplate / VerifyPlan).
+ * planNo / templateNo = fiziksel readerNo; kapının tüm bağlı okuyucularına uygulanır.
+ * ayrı ISAPI endpoint'leri (VerifyWeekPlanCfg / VerifyPlanTemplate / CardReaderPlan).
  * Çakışma yok — DoorStatus ve Verify plan numaraları ayrı cihaz-tarafı havuzlarda tutuluyor.
  */
 export const applyVerifyPlan = authedAction({

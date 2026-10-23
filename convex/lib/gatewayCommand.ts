@@ -1,6 +1,7 @@
 "use node";
 
-import { buildDoorStatusSegments } from "./doorStatusPlan";
+import { requirePlanCapabilities, getHolidayCapacity, setDoorStatusHolidayPlan, setDoorStatusHolidayGroup } from "./gateway/plans";
+import { buildDoorStatusSegments, buildVerifySegments } from "./doorStatusPlan";
 import { internal } from "../_generated/api";
 import { type ActionCtx } from "../_generated/server";
 import { canAccessEmployeeProject, isProjectAllowed } from "./auth";
@@ -30,7 +31,6 @@ import {
   setVerifyWeekPlan,
   type HikCapabilitySnapshot,
   type HikCardReaderSnapshot,
-  type Weekday,
 } from "./hikGateway";
 
 export async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; error?: string }>(
@@ -525,62 +525,45 @@ export async function runCaptureFaceFromDevice(
 
 export async function runApplyDoorStatusPlan(
   ctx: ActionCtx & { user: Doc<"users"> },
-  args: { doorId: Id<"doors"> }
+  args: { doorId: Id<"doors"> },
 ): Promise<{ ok: boolean; error?: string }> {
   const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
     internal.users.listProjectIdsForCurrentUser,
     {},
   );
-  const door = await ctx.runQuery(internal.doors.getByIdInternal, { id: args.doorId });
+  const door = await ctx.runQuery(internal.doors.getByIdInternal, {
+    id: args.doorId,
+  });
   if (!door) return { ok: false, error: "Kapı bulunamadı" };
   if (!door.deviceId) return { ok: false, error: "Kapıya bağlı cihaz yok" };
 
-  const device = await ctx.runQuery(internal.devices.getByIdInternal, { id: door.deviceId });
-  if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+  const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+    id: door.deviceId,
+  });
+  if (
+    !device ||
+    device.projectId !== door.projectId ||
+    device.brand !== "hikvision"
+  )
+    return { ok: false, error: "Cihaz bulunamadı" };
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  const permitted: boolean = await ctx.runQuery(
+    internal.roles.checkPermission,
+    {
+      userId: ctx.user._id,
+      projectId: device.projectId,
+      permission: "accessRules.manage",
+    },
+  );
   if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
-  if (device.hikTransport !== "gateway") {
-    return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
-  }
-  if (!device.hikDevIndex) {
-    return { ok: false, error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)" };
-  }
-
-  const devIndex = device.hikDevIndex;
-
-  // hikDoorNo tanımsızsa sessiz ?‌? 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
-  if (door.hikDoorNo === undefined || door.hikDoorNo === null) {
-    return { ok: false, error: "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin" };
-  }
-  const doorNo = door.hikDoorNo;
-  const planNo = doorNo;
-  const templateNo = doorNo + 100;
-  const plan = door.hikDoorStatusPlan;
-
-  return await auditDeviceCommand(ctx, door.deviceId, "Kapı durum planı uygula", async () => {
-    // enabled=false veya plan yoksa iptal et
-    if (!plan || !plan.enabled) {
-      return await linkDoorStatusPlan(devIndex, doorNo, 0);
-    }
-
-    const segments = buildDoorStatusSegments(plan);
-
-    const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
-    if (!r1.ok) return r1;
-
-    const r2 = await setDoorStatusPlanTemplate(devIndex, templateNo, { weekPlanNo: planNo });
-    if (!r2.ok) return r2;
-
-    return await linkDoorStatusPlan(devIndex, doorNo, templateNo);
-  });
+  return sendStoredDoorStatusPlan(ctx, door, device);
 }
 
 export async function runFetchReaderCfg(
   ctx: ActionCtx & { user: Doc<"users"> },
-  args: { readerId: Id<"readers"> }
+  args: { readerId: Id<"readers"> },
 ): Promise<{ ok: boolean; snapshot?: HikCardReaderSnapshot; error?: string }> {
   const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
     internal.users.listProjectIdsForCurrentUser,
@@ -594,20 +577,34 @@ export async function runFetchReaderCfg(
     return { ok: false, error: "Bu okuyucuya erişim yetkiniz yok" };
   }
 
-  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: reader.projectId, permission: "devices.manage" });
+  const permitted: boolean = await ctx.runQuery(
+    internal.roles.checkPermission,
+    {
+      userId: ctx.user._id,
+      projectId: reader.projectId,
+      permission: "devices.manage",
+    },
+  );
   if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
-  const door = await ctx.runQuery(internal.doors.getByIdInternal, { id: reader.doorId });
+  const door = await ctx.runQuery(internal.doors.getByIdInternal, {
+    id: reader.doorId,
+  });
   if (!door) return { ok: false, error: "Kapı bulunamadı" };
   const deviceId = reader.deviceId ?? door.deviceId;
   if (!deviceId) return { ok: false, error: "Okuyucuya bağlı cihaz yok" };
 
-  const device = await ctx.runQuery(internal.devices.getByIdInternal, { id: deviceId });
+  const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+    id: deviceId,
+  });
   if (!device) return { ok: false, error: "Cihaz bulunamadı" };
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
   if (device.brand !== "hikvision" || device.hikTransport !== "gateway") {
-    return { ok: false, error: "Bu işlem yalnızca Hikvision gateway cihazlarında desteklenir" };
+    return {
+      ok: false,
+      error: "Bu işlem yalnızca Hikvision gateway cihazlarında desteklenir",
+    };
   }
   if (!device.hikDevIndex) {
     return { ok: false, error: "Cihaz gateway'e kayıtlı değil" };
@@ -621,83 +618,301 @@ export async function runFetchReaderCfg(
   }
 
   const devIndex = device.hikDevIndex;
-  return await auditDeviceCommand(ctx, deviceId, "Okuyucu ayarlarını oku", async (): Promise<{ ok: boolean; snapshot?: HikCardReaderSnapshot; error?: string }> => {
-    const snapshot = await fetchCardReaderSnapshot(devIndex, readerNo);
-    await ctx.runMutation(internal.readers.setHikReaderSnapshot, {
-      readerId: args.readerId,
-      snapshot: JSON.stringify(snapshot),
-      updatedAt: snapshot.updatedAt,
-      hikVerifyMode: undefined,
-      hikCardReaderName: snapshot.summary.cardReaderName,
-      hikCardReaderPlanTemplateNo: snapshot.summary.templateNo,
-      hikCardReaderAntiSneakEnabled: snapshot.summary.antiSneakEnabled,
-    });
+  return await auditDeviceCommand(
+    ctx,
+    deviceId,
+    "Okuyucu ayarlarını oku",
+    async (): Promise<{
+      ok: boolean;
+      snapshot?: HikCardReaderSnapshot;
+      error?: string;
+    }> => {
+      const snapshot = await fetchCardReaderSnapshot(devIndex, readerNo);
+      await ctx.runMutation(internal.readers.setHikReaderSnapshot, {
+        readerId: args.readerId,
+        snapshot: JSON.stringify(snapshot),
+        updatedAt: snapshot.updatedAt,
+        hikVerifyMode: undefined,
+        hikCardReaderName: snapshot.summary.cardReaderName,
+        hikCardReaderPlanTemplateNo: snapshot.summary.templateNo,
+        hikCardReaderAntiSneakEnabled: snapshot.summary.antiSneakEnabled,
+      });
 
-    return { ok: true, snapshot };
-  });
+      return { ok: true, snapshot };
+    },
+  );
 }
 
 export async function runApplyVerifyPlan(
   ctx: ActionCtx & { user: Doc<"users"> },
-  args: { doorId: Id<"doors"> }
+  args: { doorId: Id<"doors"> },
 ): Promise<{ ok: boolean; error?: string }> {
   const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
     internal.users.listProjectIdsForCurrentUser,
     {},
   );
-  const door = await ctx.runQuery(internal.doors.getByIdInternal, { id: args.doorId });
+  const door = await ctx.runQuery(internal.doors.getByIdInternal, {
+    id: args.doorId,
+  });
   if (!door) return { ok: false, error: "Kapı bulunamadı" };
   if (!door.deviceId) return { ok: false, error: "Kapıya bağlı cihaz yok" };
 
-  const device = await ctx.runQuery(internal.devices.getByIdInternal, { id: door.deviceId });
-  if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+  const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+    id: door.deviceId,
+  });
+  if (
+    !device ||
+    device.projectId !== door.projectId ||
+    device.brand !== "hikvision"
+  )
+    return { ok: false, error: "Cihaz bulunamadı" };
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  const permitted: boolean = await ctx.runQuery(
+    internal.roles.checkPermission,
+    {
+      userId: ctx.user._id,
+      projectId: device.projectId,
+      permission: "accessRules.manage",
+    },
+  );
   if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
-  if (device.hikTransport !== "gateway") {
-    return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
-  }
-  if (!device.hikDevIndex) {
-    return { ok: false, error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)" };
-  }
+  return sendStoredVerifyPlan(ctx, door, device);
+}
 
-  const devIndex = device.hikDevIndex;
-
-  // hikDoorNo tanımsızsa sessiz ?‌? 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
-  if (door.hikDoorNo === undefined || door.hikDoorNo === null) {
-    return { ok: false, error: "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin" };
+async function trackPlanResult(
+  ctx: ActionCtx,
+  door: Doc<"doors">,
+  key: "status" | "verify",
+  run: () => Promise<{ ok: boolean; error?: string }>,
+) {
+  let result: { ok: boolean; error?: string };
+  try {
+    result = await run();
+  } catch (error) {
+    result = {
+      ok: false,
+      error: error instanceof Error ? error.message : "Plan gönderilemedi",
+    };
   }
-  const doorNo = door.hikDoorNo;
-  const planNo = doorNo;
-  const templateNo = doorNo + 100;
-  const plan = door.hikVerifyPlan;
+  await ctx.runMutation(internal.doors.recordPlanResult, {
+    doorId: door._id,
+    revision: door.hikPlanRevision ?? 0,
+    key,
+    ...(!result.ok ? { error: result.error || "Plan gönderilemedi" } : {}),
+  });
+  return result;
+}
 
-  return await auditDeviceCommand(ctx, door.deviceId, "Doğrulama planı uygula", async () => {
-    // enabled=false veya plan yoksa iptal et
-    if (!plan || !plan.enabled) {
-      return await linkVerifyPlan(devIndex, doorNo, 0);
+export async function sendStoredDoorStatusPlan(
+  ctx: ActionCtx,
+  door: Doc<"doors">,
+  device: Doc<"devices">,
+): Promise<{ ok: boolean; error?: string }> {
+  if (
+    door.deviceId !== device._id ||
+    door.projectId !== device.projectId ||
+    device.brand !== "hikvision"
+  )
+    return { ok: false, error: "Kapı ve cihaz eşleşmiyor" };
+  return trackPlanResult(ctx, door, "status", async () => {
+    if (device.hikTransport !== "gateway") {
+      return {
+        ok: false,
+        error: "Bu işlem yalnızca gateway transport'ta desteklenir",
+      };
+    }
+    if (!device.hikDevIndex) {
+      return {
+        ok: false,
+        error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)",
+      };
     }
 
-    const ALL_WEEKDAYS: Weekday[] = [
-      "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-    ];
-    const segments = ALL_WEEKDAYS.map((week, idx) => ({
-      week,
-      id: idx + 1,
-      enable: true,
-      verifyMode: plan.verifyMode,
-      beginTime: plan.beginTime,
-      endTime: plan.endTime,
-    }));
+    const devIndex = device.hikDevIndex;
 
-    const r1 = await setVerifyWeekPlan(devIndex, planNo, segments);
-    if (!r1.ok) return r1;
+    // hikDoorNo tanımsızsa sessiz ?‌? 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
+    if (
+      door.hikDoorNo === undefined ||
+      !Number.isInteger(door.hikDoorNo) ||
+      door.hikDoorNo < 1
+    ) {
+      return {
+        ok: false,
+        error:
+          "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin",
+      };
+    }
+    const doorNo = door.hikDoorNo;
+    const planNo = doorNo;
+    const templateNo = doorNo + 100;
+    const plan = door.hikDoorStatusPlan;
 
-    const r2 = await setVerifyPlanTemplate(devIndex, templateNo, { weekPlanNo: planNo });
-    if (!r2.ok) return r2;
+    return await auditDeviceCommand(
+      ctx,
+      device._id,
+      "Kapı durum planı uygula",
+      async () => {
+        const holiday = door.hikDoorHolidayPlan;
+        const active = plan?.enabled || holiday?.enabled;
+        await requirePlanCapabilities(devIndex, [
+          "isSupportDoorStatusPlan",
+          ...(active
+            ? [
+                "isSupportDoorStatusWeekPlanCfg",
+                "isSupportDoorStatusPlanTemplate",
+              ]
+            : []),
+          ...(holiday?.enabled
+            ? [
+                "isSupportDoorStatusHolidayPlanCfg",
+                "isSupportDoorStatusHolidayGroupCfg",
+              ]
+            : []),
+        ]);
+        if (!active) {
+          return await linkDoorStatusPlan(devIndex, doorNo, 0);
+        }
 
-    return await linkVerifyPlan(devIndex, doorNo, templateNo);
+        const segments = plan?.enabled ? buildDoorStatusSegments(plan) : [];
+        let holidayGroupNo: number | undefined;
+        if (holiday?.enabled) {
+          const ranges = await ctx.runQuery(internal.doors.getPlanHolidays, {
+            doorId: door._id,
+          });
+          if (!ranges.length) throw new Error("Seçilen yılda uygulanacak tatil yok");
+          const max = await getHolidayCapacity(devIndex, doorNo);
+          const slots = await ctx.runMutation(
+            internal.doors.reserveHolidaySlots,
+            { doorId: door._id, count: ranges.length, max },
+          );
+          for (const [index, range] of ranges.entries()) {
+            const slot = slots[index];
+            if (slot === undefined)
+              throw new Error("Tatil planı slotu bulunamadı");
+            const result = await setDoorStatusHolidayPlan(
+              devIndex,
+              slot,
+              range,
+              holiday.mode,
+            );
+            if (!result.ok) return result;
+          }
+          const group = await setDoorStatusHolidayGroup(
+            devIndex,
+            doorNo,
+            slots,
+          );
+          if (!group.ok) return group;
+          holidayGroupNo = doorNo;
+        }
+
+        const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
+        if (!r1.ok) return r1;
+
+        const r2 = await setDoorStatusPlanTemplate(devIndex, templateNo, {
+          weekPlanNo: planNo,
+          holidayGroupNo,
+        });
+        if (!r2.ok) return r2;
+
+        return await linkDoorStatusPlan(devIndex, doorNo, templateNo);
+      },
+    );
+  });
+}
+
+export async function sendStoredVerifyPlan(
+  ctx: ActionCtx,
+  door: Doc<"doors">,
+  device: Doc<"devices">,
+): Promise<{ ok: boolean; error?: string }> {
+  if (
+    door.deviceId !== device._id ||
+    door.projectId !== device.projectId ||
+    device.brand !== "hikvision"
+  )
+    return { ok: false, error: "Kapı ve cihaz eşleşmiyor" };
+  return trackPlanResult(ctx, door, "verify", async () => {
+    if (device.hikTransport !== "gateway") {
+      return {
+        ok: false,
+        error: "Bu işlem yalnızca gateway transport'ta desteklenir",
+      };
+    }
+    if (!device.hikDevIndex) {
+      return {
+        ok: false,
+        error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)",
+      };
+    }
+
+    const devIndex = device.hikDevIndex;
+
+    // hikDoorNo tanımsızsa sessiz ?‌? 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
+    if (
+      door.hikDoorNo === undefined ||
+      !Number.isInteger(door.hikDoorNo) ||
+      door.hikDoorNo < 1
+    ) {
+      return {
+        ok: false,
+        error:
+          "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin",
+      };
+    }
+    const doorNo = door.hikDoorNo;
+    const plan = door.hikVerifyPlan;
+    // A legacy DB record is not consent to install the newly corrected ISAPI path.
+    if (plan?.enabled && !door.hikVerifyPlanSavedAt)
+      return { ok: false, error: "Doğrulama planını önce açıkça kaydedin" };
+    if (!plan?.enabled && !door.hikVerifyPlanReaderNos?.length) return { ok: true };
+    return await auditDeviceCommand(
+      ctx,
+      device._id,
+      "Doğrulama planı uygula",
+      async () => {
+        await requirePlanCapabilities(devIndex, [
+          "isSupportCardReaderPlan",
+          ...(plan?.enabled
+            ? ["isSupportVerifyWeekPlanCfg", "isSupportVerifyPlanTemplate"]
+            : []),
+        ]);
+        const readerNos = plan?.enabled
+          ? await ctx.runQuery(internal.doors.getPlanReaders, { doorId: door._id })
+          : door.hikVerifyPlanReaderNos ?? [];
+        if (!readerNos.length)
+          return {
+            ok: false,
+            error: "Kapının fiziksel okuyucu numarası bulunamadı",
+          };
+        for (const readerNo of readerNos) {
+          if (plan?.enabled) {
+            const r1 = await setVerifyWeekPlan(
+              devIndex,
+              readerNo,
+              buildVerifySegments(plan),
+            );
+            if (!r1.ok) return r1;
+            const r2 = await setVerifyPlanTemplate(devIndex, readerNo, {
+              weekPlanNo: readerNo,
+            });
+            if (!r2.ok) return r2;
+          }
+          const linked = await linkVerifyPlan(
+            devIndex,
+            readerNo,
+            plan?.enabled ? readerNo : 0,
+          );
+          if (!linked.ok) return linked;
+          await ctx.runMutation(internal.doors.recordVerifyReaderBinding, {
+            doorId: door._id, deviceId: device._id, doorNo,
+            readerNo, linked: !!plan?.enabled,
+          });
+        }
+        return { ok: true };
+      },
+    );
   });
 }

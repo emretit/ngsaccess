@@ -275,7 +275,7 @@ async function runCapabilityProbe(
   }
 }
 
-function findSupportFlag(
+export function findSupportFlag(
   value: unknown,
   fields: readonly string[],
 ): { field: string; value: boolean } | null {

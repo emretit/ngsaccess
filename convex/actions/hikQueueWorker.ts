@@ -1,7 +1,7 @@
 "use node";
 
 import { internalAction, type ActionCtx } from "../_generated/server";
-import { buildDoorStatusSegments } from "../lib/doorStatusPlan";
+import { sendStoredDoorStatusPlan, sendStoredVerifyPlan } from "../lib/gatewayCommand";
 import { internal } from "../_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import type { Id } from "../_generated/dataModel";
@@ -16,13 +16,6 @@ import {
   setWeekPlanOnDevice,
   setDoorParam,
   openDoor,
-  linkDoorStatusPlan,
-  linkVerifyPlan,
-  setDoorStatusPlanTemplate,
-  setDoorStatusWeekPlan,
-  setVerifyPlanTemplate,
-  setVerifyWeekPlan,
-  type Weekday,
 } from "../lib/hikGateway";
 import { hikValidBeginFromAccessStart } from "../lib/gateway/persons";
 import { defaultRuleSchedule } from "../lib/hikSync";
@@ -218,77 +211,19 @@ async function executeOperation(
     case "rebootDevice": {
       return await rebootDeviceOnGateway(devIndex);
     }
-    case "syncDoorStatusPlan": {
-      const doorId = payload.doorId as string | undefined;
-      if (!doorId) return { ok: false, error: "syncDoorStatusPlan: payload.doorId eksik" };
-
-      const door = await ctx.runQuery(internal.doors.getByIdInternal, {
-        id: doorId as Id<"doors">,
-      });
-      if (!door) return { ok: false, error: "Kapı bulunamadı" };
-
-      // hikDoorNo tanımsızsa sessiz 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
-      if (door.hikDoorNo === undefined || door.hikDoorNo === null) {
-        return { ok: false, error: "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin" };
-      }
-      const plan = door.hikDoorStatusPlan;
-      const doorNo = door.hikDoorNo;
-      const planNo = doorNo;
-      const templateNo = doorNo + 100;
-
-      if (!plan || !plan.enabled) {
-        return await linkDoorStatusPlan(devIndex, doorNo, 0);
-      }
-
-      const segments = buildDoorStatusSegments(plan);
-
-      const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
-      if (!r1.ok) return r1;
-      const r2 = await setDoorStatusPlanTemplate(devIndex, templateNo, { weekPlanNo: planNo });
-      if (!r2.ok) return r2;
-      return await linkDoorStatusPlan(devIndex, doorNo, templateNo);
-    }
+    case "syncDoorStatusPlan":
     case "syncVerifyPlan": {
-      const doorId = payload.doorId as string | undefined;
-      if (!doorId) return { ok: false, error: "syncVerifyPlan: payload.doorId eksik" };
-
-      const door = await ctx.runQuery(internal.doors.getByIdInternal, {
-        id: doorId as Id<"doors">,
-      });
+      const doorId = payload.doorId;
+      if (typeof doorId !== "string") return { ok: false, error: "Plan payload.doorId eksik" };
+      const door = await ctx.runQuery(internal.doors.getByIdInternal, { id: doorId as Id<"doors"> });
       if (!door) return { ok: false, error: "Kapı bulunamadı" };
-
-      // hikDoorNo tanımsızsa sessiz 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
-      if (door.hikDoorNo === undefined || door.hikDoorNo === null) {
-        return { ok: false, error: "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin" };
-      }
-      const plan = door.hikVerifyPlan;
-      const doorNo = door.hikDoorNo;
-      const planNo = doorNo;
-      const templateNo = doorNo + 100;
-
-      if (!plan || !plan.enabled) {
-        return await linkVerifyPlan(devIndex, doorNo, 0);
-      }
-
-      const ALL_WEEKDAYS: Weekday[] = [
-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-      ];
-      const segments = ALL_WEEKDAYS.map((week, idx) => ({
-        week,
-        id: idx + 1,
-        enable: true,
-        verifyMode: plan.verifyMode,
-        beginTime: plan.beginTime,
-        endTime: plan.endTime,
-      }));
-
-      const r1 = await setVerifyWeekPlan(devIndex, planNo, segments);
-      if (!r1.ok) return r1;
-      const r2 = await setVerifyPlanTemplate(devIndex, templateNo, { weekPlanNo: planNo });
-      if (!r2.ok) return r2;
-      return await linkVerifyPlan(devIndex, doorNo, templateNo);
+      const device = await ctx.runQuery(internal.devices.getByIdInternal, { id: c.device._id });
+      if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+      return c.operation === "syncDoorStatusPlan"
+        ? sendStoredDoorStatusPlan(ctx, door, device)
+        : sendStoredVerifyPlan(ctx, door, device);
     }
-    // addFace + syncHoliday: retry yolu şimdilik desteklenmiyor (binary upload + tatil planı UI'sı yok).
+
     default:
       return {
         ok: false,
