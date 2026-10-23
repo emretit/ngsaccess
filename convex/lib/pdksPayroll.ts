@@ -1,3 +1,4 @@
+import { hasDirectionalPdksCheckpoints } from "./pdksRules";
 import { flexibleMinuteFields } from "./pdksFlexible";
 import type { PdksPolicyResolver } from "./pdksRules";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
@@ -69,7 +70,7 @@ export function computePayrollCell(params: {
   return {
     date,
     ...flexibleMinuteFields(day),
-    ...(day.scheduleType === "flexible" || params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
+    ...(day.scheduleType === "flexible" || params.policyFor?.(date).calculationMode === "eachPunch" || params.policyFor?.(date).punchMode === "requirements" || params.policyFor && hasDirectionalPdksCheckpoints(params.policyFor(date)) ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
     overtimeSegments: day.overtimeSegments,
     status,
     payrollCode:

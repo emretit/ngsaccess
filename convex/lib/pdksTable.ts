@@ -1,3 +1,4 @@
+import { hasDirectionalPdksCheckpoints } from "./pdksRules";
 import { flexibleMinuteFields, type FlexibleMinutes } from "./pdksFlexible";
 import { employedOn } from "./employment";
 import type { PdksPolicyResolver } from "./pdksRules";
@@ -330,7 +331,7 @@ export function computePdksTableRow(params: {
     const cell: PdksTableDayCell = {
       date,
       ...flexibleMinuteFields(day),
-      ...(day.scheduleType === "flexible" || params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
+      ...(day.scheduleType === "flexible" || params.policyFor?.(date).calculationMode === "eachPunch" || params.policyFor?.(date).punchMode === "requirements" || params.policyFor && hasDirectionalPdksCheckpoints(params.policyFor(date)) ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
       firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
       lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
       totalMinutes: day.totalMinutes,

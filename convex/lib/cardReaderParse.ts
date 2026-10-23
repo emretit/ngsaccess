@@ -38,6 +38,7 @@ export type CardReaderParseResult = {
   hikMajorEventType?: number;
   hikSubEventType?: number;
   hikCurrentVerifyMode?: string;
+  hikCardReaderNo?: number;
   hikSerialNo?: number;
   hikFrontSerialNo?: number;
   hikDateTime?: string;
@@ -108,6 +109,7 @@ type HikEventFields = Pick<
   | "hikMajorEventType"
   | "hikSubEventType"
   | "hikCurrentVerifyMode"
+  | "hikCardReaderNo"
   | "hikSerialNo"
   | "hikFrontSerialNo"
   | "hikDateTime"
@@ -148,6 +150,9 @@ function extractHikEventFields(
         "currentVerifyMode",
         "verifyMode",
       ]);
+    }
+    if (result.hikCardReaderNo === undefined) {
+      result.hikCardReaderNo = getFirstNumber(c, ["cardReaderNo"]);
     }
     if (result.hikSerialNo === undefined) {
       result.hikSerialNo = getFirstNumber(c, ["serialNo", "eventSerialNo"]);
@@ -423,6 +428,7 @@ export function parseCardReaderBody(
       hikMajorEventType: num("majorEventType"),
       hikSubEventType: num("subEventType"),
       hikCurrentVerifyMode: str("currentVerifyMode"),
+      hikCardReaderNo: num("cardReaderNo"),
       hikSerialNo: num("serialNo"),
       hikFrontSerialNo: num("frontSerialNo"),
       hikDateTime: str("dateTime"),

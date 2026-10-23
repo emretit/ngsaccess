@@ -64,7 +64,7 @@ export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects
     workDate = buildPdksWorkDateResolver(employees, shifts.resolve, flexible ? {
       readings, manualEntryFor: (id, date) => manualByDate.get(`${id}__${date}`)?.entryTime,
       eligibleEntry: reading => filterPdksReadings([reading], undefined, r => policies(r.projectId, trDateKey(r.accessTime))).length > 0,
-    } : undefined);
+    } : undefined, (reading, date) => policies(reading.projectId, date));
   }
   const dateFor = workDate;
   return filterPdksReadings(readings, undefined, r => policies(r.projectId, dateFor(r)));

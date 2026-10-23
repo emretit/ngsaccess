@@ -1,6 +1,7 @@
 import { flexibleSchedule, relativeMinute, validFlexibleEntry, validFlexibleExit, type ShiftSchedule } from "./pdksFlexible";
 import type { Doc, Id } from "../_generated/dataModel";
 import { isoTimeToTRMinutes, parseHHMM } from "./pdksHelpers";
+import { effectiveDirection, matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
 import { trDateKey, trDayRangeISO } from "./trDate";
 
 export type PdksShift = ShiftSchedule;
@@ -176,6 +177,8 @@ export function manualPdksTimes(
 
 /** Project availability uses the same work-day attribution as attendance pairs.
  * Unmatched readings retain their calendar day, as before. */
+type WorkDateReading = Pick<Doc<"cardReadings">, "accessTime" | "employeeId" | "cardNo" | "direction"> & Partial<Pick<Doc<"cardReadings">, "_id" | "deviceId" | "projectId" | "ideIoId" | "hikCardReaderNo">>;
+
 export function buildPdksWorkDateResolver(
   employees: readonly Doc<"employees">[],
   resolve: PdksShiftResolver,
@@ -184,6 +187,7 @@ export function buildPdksWorkDateResolver(
     manualEntryFor?: (employeeId: Id<"employees">, date: string) => string | undefined;
     eligibleEntry?: (reading: Doc<"cardReadings">) => boolean;
   },
+  policyFor?: (reading: WorkDateReading, date: string) => PdksDayPolicy,
 ) {
   const byId = new Map(
     employees.map((employee) => [String(employee._id), employee]),
@@ -193,13 +197,28 @@ export function buildPdksWorkDateResolver(
   );
   const employeeFor = (reading: Pick<Doc<"cardReadings">, "employeeId" | "cardNo">) =>
     (reading.employeeId ? byId.get(String(reading.employeeId)) : undefined) ?? byCard.get(reading.cardNo);
+  // Resolve the previous shift's policy for a night tail before choosing a day.
+  // This also preserves the previous version across a midnight rule transition.
+  const withDirection = <T extends WorkDateReading>(reading: T): T => {
+    if (!policyFor) return reading;
+    const day = trDateKey(reading.accessTime);
+    const previous = addWorkDate(day, -1);
+    const employee = employeeFor(reading);
+    const previousPolicy = policyFor(reading, previous);
+    const previousDirection = effectiveDirection(reading, previousPolicy);
+    const date = employee && matchesPdksCheckpoint(reading, previousPolicy) &&
+      pdksWorkDay(reading.accessTime, employee._id, resolve, previousDirection) === previous ? previous : day;
+    const direction = effectiveDirection(reading, policyFor(reading, date));
+    return direction === reading.direction ? reading : { ...reading, direction };
+  };
   // Build once on first use, after callers have loaded date-specific policies.
   let workDates: Map<string, string> | undefined;
   function preparedWorkDates() {
     if (workDates) return workDates;
     workDates = new Map();
     const byEmployee = new Map<string, { employee: Doc<"employees">; readings: Doc<"cardReadings">[] }>();
-    for (const reading of options?.readings ?? []) {
+    for (const rawReading of options?.readings ?? []) {
+      const reading = withDirection(rawReading);
       const employee = employeeFor(reading);
       if (!employee || reading.direction === "entry" && options?.eligibleEntry && !options.eligibleEntry(reading)) continue;
       const bucket = byEmployee.get(String(employee._id)) ?? { employee, readings: [] };
@@ -213,12 +232,8 @@ export function buildPdksWorkDateResolver(
     }
     return workDates;
   }
-  return (
-    reading: Pick<
-      Doc<"cardReadings">,
-      "accessTime" | "employeeId" | "cardNo" | "direction"
-    > & { _id?: Id<"cardReadings"> },
-  ) => {
+  return (rawReading: WorkDateReading) => {
+    const reading = withDirection(rawReading);
     const employee = employeeFor(reading);
     const day = trDateKey(reading.accessTime);
     if (options && employee && reading._id && (flexibleSchedule(resolve(employee._id, day)) || flexibleSchedule(resolve(employee._id, addWorkDate(day, -1))))) {

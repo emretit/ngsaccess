@@ -21,6 +21,7 @@ export interface ProcessCardReadingArgs {
   hikMajorEventType?: number;
   hikSubEventType?: number;
   hikCurrentVerifyMode?: string;
+  hikCardReaderNo?: number;
   hikSerialNo?: number;
   hikFrontSerialNo?: number;
   hikDateTime?: string;
@@ -46,7 +47,7 @@ type ReadingState = {
   projectForRow: (employeeProject?: Id<"projects">, deviceProject?: Id<"projects">) => Id<"projects"> | undefined;
   hikFields: Pick<ProcessCardReadingArgs,
     "hikDevIndex" | "hikMajorEventType" | "hikSubEventType" | "hikCurrentVerifyMode" |
-    "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL" |
+    "hikCardReaderNo" | "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL" |
     "hikMask" | "hikHelmet" | "hikTemperature" | "hikEventState">;
   findDeviceCardEmployee: FindDeviceCardEmployee;
 };
@@ -70,6 +71,7 @@ export async function processCardReadingCore(
     hikMajorEventType: args.hikMajorEventType,
     hikSubEventType: args.hikSubEventType,
     hikCurrentVerifyMode: args.hikCurrentVerifyMode,
+    hikCardReaderNo: args.hikCardReaderNo,
     hikSerialNo: args.hikSerialNo,
     hikFrontSerialNo: args.hikFrontSerialNo,
     hikDateTime: args.hikDateTime,

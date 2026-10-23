@@ -151,7 +151,7 @@ export const summary = employeeAuthedQuery({
     const workDate = buildPdksWorkDateResolver([employee], resolveShift, hasFlexible ? {
       readings: rows.page, manualEntryFor: (id, date) => manualByDate.get(`${id}__${date}`)?.entryTime,
       eligibleEntry: reading => filterPdksReadings([reading], projectId, r => policyFor(trDateKey(r.accessTime))).length > 0,
-    } : undefined);
+    } : undefined, (_reading, date) => policyFor(date));
     const included = filterPdksReadings(rows.page, projectId, reading => policyFor(workDate(reading)));
     const row = computePdksTableRow({
       policyFor, employee, empKey: employee._id, empReadings: included, departmentName: "", periodDateKeys: dates,

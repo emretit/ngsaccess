@@ -9,21 +9,24 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import type { RuleConfirmation } from "./pdksRulesModel";
+import { calculationSummary, checkpointSummary, type Targets, type RuleConfirmation } from "./pdksRulesModel";
 
 export function PdksRulesConfirmation({
+  targets,
   confirmation,
   pending,
   error,
   onClose,
   onConfirm,
 }: {
+  targets?: Targets;
   confirmation: RuleConfirmation;
   pending: boolean;
   error: string;
   onClose: () => void;
   onConfirm: MouseEventHandler<HTMLButtonElement>;
 }) {
+  const selected = confirmation?.kind === "publish" ? confirmation.values : confirmation?.rule;
   return (
     <AlertDialog
       open={confirmation !== null}
@@ -43,6 +46,9 @@ export function PdksRulesConfirmation({
               ? `${confirmation.rule.effectiveFrom} tarihli gelecek sürüm silinecek.`
               : `${confirmation?.values.effectiveFrom ?? ""} tarihindeki yayın, o tarihteki sürümün yerine geçer.`}{" "}
             Geçmiş günler değişmez.
+            {selected && ` ${calculationSummary(selected)}`}
+            {selected?.checkpointMode === "selected" &&
+              ` Seçili noktalar: ${checkpointSummary(selected.targets, targets)}`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error && (

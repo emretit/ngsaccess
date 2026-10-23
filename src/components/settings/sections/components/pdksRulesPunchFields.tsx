@@ -1,3 +1,4 @@
+import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,6 +49,20 @@ export function PdksRulesPunchFields({
           }}
         />
       </div>
+      <div className="grid gap-4 min-[761px]:grid-cols-2">
+        <Choice id="pdks-calculation-mode" label="Çalışma süresi hesabı"
+          value={values.calculationMode ?? "firstLast"}
+          options={[["firstLast", "İlk giriş–son çıkış"], ["eachPunch", "Her giriş-çıkışı topla"]]}
+          onChange={mode => { if (mode === "firstLast" || mode === "eachPunch") change({ calculationMode: mode }); }} />
+        <div className="space-y-2">
+          <Label htmlFor="pdks-min-punch-interval">Tekrar okutma aralığı (dk)</Label>
+          <Input id="pdks-min-punch-interval" type="number" min={0} max={60} step="any"
+            value={values.minPunchIntervalMinutes ?? 1}
+            onChange={event => change({ minPunchIntervalMinutes: event.target.value === "" ? NaN : Number(event.target.value) })} />
+          <p className="text-xs text-muted-foreground">0–60 dakika. Her giriş-çıkışı topla modunda aynı yönlü tekrarları eler.</p>
+        </div>
+      </div>
+      {values.calculationMode === "eachPunch" && <p className="text-xs text-muted-foreground">Ara çıkışlar çalışma süresinden düşülür; ayrıca otomatik mola düşülmez. Yönsüz okutmalar dönüşümlü giriş ve çıkış sayılır.</p>}
       {values.punchMode === "requirements" && (
         <div className="space-y-4 border-l-2 pl-4">
           <div className="flex flex-wrap gap-5">
@@ -92,8 +107,7 @@ export function PdksRulesPunchFields({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Tek yönlü günde süre hesaplanamaz. Yön bilgisi olmayan okutmalar
-            İnceleme'ye düşer.
+            {values.calculationMode === "eachPunch" ? "Tamamlanan giriş-çıkış çiftleri toplanır; eksik çiftler seçilen kurala göre değerlendirilir." : "Tek yönlü günde süre hesaplanamaz. Yön bilgisi olmayan okutmalar İnceleme'ye düşer."}
           </p>
         </div>
       )}

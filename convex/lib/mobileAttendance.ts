@@ -134,13 +134,15 @@ export function summarizeMovements(
     // An indexed in-range row resolving outside this calendar range indicates
     // inconsistent stored time data, not an authoritative zero movement count.
     if (!day) throw attendanceError("SUMMARY_INVALID_DATA");
+    const included = reading.accessStatus === "izin_verildi" && projectId && reading.projectId === projectId
+      ? filterPdksReadings([reading], projectId, policyFor ? r => policyFor(rules?.workDate(r) ?? new Date(Date.parse(r.accessTime) + ISTANBUL_OFFSET_MS).toISOString().slice(0, 10)) : undefined)[0]
+      : undefined;
     if (reading.accessStatus === "reddedildi") {
       day.deniedCount++;
-    } else if (reading.accessStatus !== "izin_verildi" || !projectId || reading.projectId !== projectId ||
-        !filterPdksReadings([reading], projectId, policyFor ? r => policyFor(rules?.workDate(r) ?? new Date(Date.parse(r.accessTime) + ISTANBUL_OFFSET_MS).toISOString().slice(0, 10)) : undefined).length || (reading.direction !== "entry" && reading.direction !== "exit")) {
+    } else if (!included || (included.direction !== "entry" && included.direction !== "exit")) {
       day.unknownCount++;
       day.lastDirection = "unknown";
-    } else if (reading.direction === "entry") {
+    } else if (included.direction === "entry") {
       day.entryCount++;
       day.firstEntry ??= reading.accessTime;
       day.lastEntry = reading.accessTime;

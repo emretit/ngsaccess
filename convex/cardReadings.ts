@@ -475,6 +475,7 @@ export const processCardReading = internalMutation({
     hikMajorEventType: v.optional(v.number()),
     hikSubEventType: v.optional(v.number()),
     hikCurrentVerifyMode: v.optional(v.string()),
+    hikCardReaderNo: v.optional(v.number()),
     hikSerialNo: v.optional(v.number()),
     hikFrontSerialNo: v.optional(v.number()),
     hikDateTime: v.optional(v.string()),
@@ -583,7 +584,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
       .withIndex("by_employee_date", q => q.eq("employeeId", args.employeeId).gte("date", addWorkDate(overtimeRange.startDate, -1)).lte("date", addWorkDate(overtimeRange.endDate, 1))).take(1001) : undefined;
     if (earlyDetailRecords && earlyDetailRecords.length > 1000) throw new Error("Manuel kayıt sınırı aşıldı; tarih aralığını daraltın");
     const detailBoundaryManual = new Map((earlyDetailRecords ?? []).filter(record => record.manualEntry && (!args.projectId || record.projectId === args.projectId)).map(record => [record.date, record]));
-    const detailBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: sourceReadings, manualEntryFor: (id, date) => id === employee._id ? detailBoundaryManual.get(date)?.entryTime : undefined, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 });
+    const detailBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: sourceReadings, manualEntryFor: (id, date) => id === employee._id ? detailBoundaryManual.get(date)?.entryTime : undefined, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date));
     const policies = await loadPdksPolicies(ctx, availabilityEmployees.map(e => e.projectId), detailHasFlexible ? addWorkDate(overtimeRange.startDate, -1) : overtimeRange.startDate, overtimeRange.endDate);
     readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, detailBoundaryWorkDate(r)));
 
@@ -728,6 +729,7 @@ export const backfillHikEventRow = internalMutation({
       major: v.number(),
       minor: v.number(),
       doorNo: v.optional(v.number()),
+      cardReaderNo: v.optional(v.number()),
       currentVerifyMode: v.optional(v.string()),
       serialNo: v.number(),
       pictureURL: v.optional(v.string()),
@@ -831,6 +833,7 @@ export const backfillHikEventRow = internalMutation({
       hikMajorEventType: args.event.major,
       hikSubEventType: args.event.minor,
       hikCurrentVerifyMode: args.event.currentVerifyMode,
+      hikCardReaderNo: args.event.cardReaderNo,
       hikSerialNo: args.event.serialNo,
       hikDevIndex: device.hikDevIndex,
       hikPictureURL: args.event.pictureURL,

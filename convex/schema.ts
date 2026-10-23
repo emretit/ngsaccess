@@ -252,6 +252,8 @@ export default defineSchema({
     .index("by_ide_device", ["ideDeviceId"]),
 
   pdksRuleVersions: defineTable({
+    calculationMode: v.optional(v.union(v.literal("firstLast"), v.literal("eachPunch"))),
+    minPunchIntervalMinutes: v.optional(v.number()),
     projectId: v.id("projects"),
     effectiveFrom: v.string(),
     punchMode: v.union(v.literal("legacy"), v.literal("requirements")),
@@ -266,7 +268,9 @@ export default defineSchema({
   pdksCheckpointSelections: defineTable({
     projectId: v.id("projects"),
     ruleVersionId: v.id("pdksRuleVersions"),
-    targetType: v.union(v.literal("door"), v.literal("device")),
+    targetType: v.union(v.literal("door"), v.literal("device"), v.literal("reader")),
+    readerId: v.optional(v.id("readers")),
+    pointType: v.optional(v.union(v.literal("both"), v.literal("entry"), v.literal("exit"))),
     deviceId: v.id("devices"),
     doorId: v.optional(v.id("doors")),
     ioId: v.optional(v.number()),
@@ -587,6 +591,7 @@ export default defineSchema({
     hikMajorEventType: v.optional(v.number()),
     hikSubEventType: v.optional(v.number()),
     hikCurrentVerifyMode: v.optional(v.string()),
+    hikCardReaderNo: v.optional(v.number()),
     hikSerialNo: v.optional(v.number()),
     hikFrontSerialNo: v.optional(v.number()),
     hikDevIndex: v.optional(v.string()),

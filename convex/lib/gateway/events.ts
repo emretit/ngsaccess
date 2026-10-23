@@ -22,6 +22,7 @@ export interface AcsEventRow {
   major: number;
   minor: number;
   doorNo?: number;
+  cardReaderNo?: number;
   currentVerifyMode?: string;
   serialNo: number;
   pictureURL?: string;
@@ -118,6 +119,8 @@ export async function searchAcsEventsOnDevice(
         major: (row.major as number | undefined) ?? 0,
         minor: (row.minor as number | undefined) ?? 0,
         doorNo: row.doorNo as number | undefined,
+        cardReaderNo: typeof row.cardReaderNo === "number" ? row.cardReaderNo
+          : typeof row.cardReaderNo === "string" && /^\d+$/.test(row.cardReaderNo) ? Number(row.cardReaderNo) : undefined,
         currentVerifyMode: row.currentVerifyMode as string | undefined,
         serialNo,
         pictureURL: row.pictureURL as string | undefined,

@@ -1,4 +1,4 @@
-import { hasVersionedPdksPolicy, loadPdksPolicies } from "./pdksRules";
+import { hasDirectionalPdksCheckpoints, hasVersionedPdksPolicy, loadPdksPolicies } from "./pdksRules";
 import { employedDuring, employedOn } from "./employment";
 import { pdksAvailableDateKeys, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import type { enrichReadingsForList } from "./cardReadingAudit";
@@ -107,7 +107,7 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
     const workDate = buildPdksWorkDateResolver(allEmployees.filter(e => employedDuring(e, startDate, endDate)), (id, date) => { const shift = shiftResolver.resolve(id, date); return shift?.projectId === projectId || shift?.scheduleType === "flexible" && !shift.projectId ? shift : null; }, flexible ? {
       readings: raw, manualEntryFor: (id, date) => manualEntries.get(`${id}__${date}`)?.entryTime,
       eligibleEntry: reading => filterPdksReadings([reading], projectId, r => policies(projectId, trDateKey(r.accessTime))).length > 0,
-    } : undefined);
+    } : undefined, (_reading, date) => policies(projectId, date));
     const readings = flexible ? filterPdksReadings(raw, projectId, r => policies(projectId, workDate(r))) : await readReportReadings(ctx, [projectId], startISO, endISO, { policies, workDate });
     const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
     const availableDateKeys = pdksAvailableDateKeys(readings, workDate);
@@ -298,7 +298,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
       continue;
     }
     let raw: Doc<"cardReadings">[];
-    const boundaryWorkDate = buildPdksWorkDateResolver(allEmployees, shifts.resolve);
+    const boundaryWorkDate = buildPdksWorkDateResolver(allEmployees, shifts.resolve, undefined, (_reading, date) => policies(projectId, date));
     const range = pdksWorkDayRange(addWorkDate(startDate, -7), endDate);
     const preloaded = options.preloadedReadings;
     if (preloaded) {
@@ -324,7 +324,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     const flexibleWorkDate = flexible ? buildPdksWorkDateResolver(allEmployees, shifts.resolve, {
       readings: raw, manualEntryFor: (id, date) => manualEntries.get(`${id}__${date}`)?.entryTime,
       eligibleEntry: reading => filterPdksReadings([reading], projectId, r => policies(projectId, trDateKey(r.accessTime))).length > 0,
-    }) : boundaryWorkDate;
+    }, (_reading, date) => policies(projectId, date)) : boundaryWorkDate;
     const employeesById = new Map(allEmployees.map(employee => [employee._id, employee]));
     const employeesByCard = new Map(allEmployees.map(employee => [employee.cardNumber, employee]));
     const workDate = (reading: Doc<"cardReadings">) => {
@@ -337,7 +337,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     for (const [key, record] of manualEntries) manualEntriesByEmployee.set(key, record);
     for (const reading of raw) workDates.set(reading._id, workDate(reading));
     readingsByProject.set(projectId, readings.filter(reading => workDate(reading) >= startDate && workDate(reading) <= endDate));
-    if (!flexible && !dates.some(date => policies(projectId, date).punchMode === "requirements")) continue;
+    if (!flexible && !dates.some(date => policies(projectId, date).calculationMode === "eachPunch" || policies(projectId, date).punchMode === "requirements" || hasDirectionalPdksCheckpoints(policies(projectId, date)))) continue;
     const [workSettings, overtimeRates, holidayMap, general] = await Promise.all([
       getEffectiveWorkSettings(ctx, projectId), getEffectiveOvertimeRates(ctx, projectId), getHolidaysMap(ctx, projectId, startDate, endDate),
       ctx.db.query("generalSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first(),
@@ -361,7 +361,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
         workingDays: general?.workingDays?.length ? general.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"],
         workSettings, overtimeRates, resolveShift: shifts.resolve, manualEditedBy: null,
       });
-      const managedDays = row.days.filter(day => policies(projectId, day.date).punchMode === "requirements" || shifts.resolve(employee._id, day.date)?.scheduleType === "flexible");
+      const managedDays = row.days.filter(day => policies(projectId, day.date).calculationMode === "eachPunch" || policies(projectId, day.date).punchMode === "requirements" || hasDirectionalPdksCheckpoints(policies(projectId, day.date)) || shifts.resolve(employee._id, day.date)?.scheduleType === "flexible");
       rememberLegacyManual(employee, records, new Set(managedDays.map(day => day.date)));
       if (managedDays.length) {
         ruleEmployees.set(employee._id, employee);
@@ -374,7 +374,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
   const managesReading = (reading: Doc<"cardReadings">) => {
     const date = dateFor(reading);
     const employeeId = reading.employeeId ?? employeeByCard.get(`${reading.projectId}__${reading.cardNo}`)?._id;
-    return policies(reading.projectId, date).punchMode === "requirements" ||
+    return policies(reading.projectId, date).calculationMode === "eachPunch" || policies(reading.projectId, date).punchMode === "requirements" || hasDirectionalPdksCheckpoints(policies(reading.projectId, date)) ||
       (employeeId !== undefined && result.get(employeeId)?.days.some(day => day.date === date) === true);
   };
   return { policies, workDate: dateFor, managesReading,

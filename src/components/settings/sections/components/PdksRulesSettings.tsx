@@ -8,6 +8,7 @@ import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { errorMessage } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import {
+  checkpointKey,
   tomorrowInTurkey,
   pdksRuleSchema,
   recommendedPunchRules,
@@ -76,6 +77,8 @@ function RulesEditor({
   const [values, setValues] = useState<PdksRuleValues>(() => ({
     effectiveFrom: tomorrowInTurkey(),
     punchMode: "legacy",
+    calculationMode: "firstLast",
+    minPunchIntervalMinutes: 1,
     ...recommendedPunchRules,
     checkpointMode: "all",
     targets: [],
@@ -107,14 +110,10 @@ function RulesEditor({
     target: PdksRuleValues["targets"][number],
     checked: boolean,
   ) => {
-    const key = (item: PdksRuleValues["targets"][number]) =>
-      item.targetType === "door"
-        ? `door:${item.doorId}`
-        : `device:${item.deviceId}`;
     change({
       targets: checked
-        ? [...values.targets, target]
-        : values.targets.filter((item) => key(item) !== key(target)),
+        ? [...values.targets.filter(item => checkpointKey(item) !== checkpointKey(target)), { ...target, pointType: target.pointType ?? "both" }]
+        : values.targets.filter((item) => checkpointKey(item) !== checkpointKey(target)),
     });
   };
   return (
@@ -233,6 +232,7 @@ function RulesEditor({
         </p>
       )}
       <PdksRulesConfirmation
+        targets={targets}
         confirmation={confirmation}
         pending={pending}
         error={error}

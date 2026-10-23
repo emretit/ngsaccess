@@ -22,6 +22,8 @@ const doorId = z
   .string()
   .min(1)
   .transform((value) => value as Id<"doors">);
+const readerId = z.string().min(1).transform(value => value as Id<"readers">);
+const pointType = z.enum(["both", "entry", "exit"]).optional();
 export const pdksRuleSchema = z
   .object({
     effectiveFrom: z
@@ -35,6 +37,8 @@ export const pdksRuleSchema = z
           value >= tomorrowInTurkey()
         );
       }, "Geçerlilik tarihi en erken yarın olmalı."),
+    calculationMode: z.enum(["firstLast", "eachPunch"]).optional(),
+    minPunchIntervalMinutes: z.number().finite().min(0, "Aralık 0–60 dakika olmalı.").max(60, "Aralık 0–60 dakika olmalı.").optional(),
     punchMode: z.enum(["legacy", "requirements"]),
     requireCheckIn: z.boolean(),
     requireCheckOut: z.boolean(),
@@ -44,8 +48,9 @@ export const pdksRuleSchema = z
     targets: z
       .array(
         z.discriminatedUnion("targetType", [
-          z.object({ targetType: z.literal("device"), deviceId }),
-          z.object({ targetType: z.literal("door"), deviceId, doorId }),
+          z.object({ targetType: z.literal("device"), deviceId, pointType }),
+          z.object({ targetType: z.literal("door"), deviceId, doorId, pointType }),
+          z.object({ targetType: z.literal("reader"), deviceId, doorId, readerId, pointType }),
         ]),
       )
       .max(500, "En fazla 500 nokta seçebilirsiniz."),
@@ -72,6 +77,8 @@ export function pdksPublishPayload(
     projectId,
     effectiveFrom: values.effectiveFrom,
     punchMode: values.punchMode,
+    ...(values.calculationMode !== undefined ? { calculationMode: values.calculationMode } : {}),
+    ...(values.minPunchIntervalMinutes !== undefined ? { minPunchIntervalMinutes: values.minPunchIntervalMinutes } : {}),
     ...(values.punchMode === "requirements"
       ? {
           requireCheckIn: values.requireCheckIn,
@@ -93,6 +100,24 @@ export type Targets = FunctionReturnType<
   typeof api.pdksRules.listCheckpointTargets
 >;
 
+export const pointTypeLabels = { both: "Giriş ve çıkış", entry: "Yalnız giriş", exit: "Yalnız çıkış" } as const;
+export function checkpointKey(target: { targetType: string; deviceId: string; doorId?: string; readerId?: string }): string {
+  return `${target.targetType}:${target.targetType === "reader" ? target.readerId : target.targetType === "door" ? target.doorId : target.deviceId}`;
+}
+export function checkpointSummary(selected: readonly { targetType: string; deviceId: string; doorId?: string; readerId?: string; pointType?: keyof typeof pointTypeLabels }[], targets?: Targets): string {
+  return selected.map(target => {
+    const name = target.targetType === "reader"
+      ? targets?.readers?.find(reader => reader.readerId === target.readerId)?.name ?? "Okuyucu (artık listede yok)"
+      : target.targetType === "door"
+      ? targets?.doors.find(door => door.doorId === target.doorId)?.name ?? "Kapı (artık listede yok)"
+      : `${targets?.devices.find(device => device.deviceId === target.deviceId)?.name ?? "Cihaz (artık listede yok)"} — tüm geçişler`;
+    return `${name}: ${pointTypeLabels[target.pointType ?? "both"]}`;
+  }).join(", ");
+}
+
+export function calculationSummary(rule: { calculationMode?: "firstLast" | "eachPunch"; minPunchIntervalMinutes?: number }): string {
+  return `${rule.calculationMode === "eachPunch" ? "Her giriş-çıkışı topla" : "İlk giriş–son çıkış"} · Tekrar okutma aralığı: ${rule.minPunchIntervalMinutes ?? 1} dk`;
+}
 export function ruleSummary(
   rule: Rule | null,
   targets: Targets | undefined,
@@ -105,8 +130,8 @@ export function ruleSummary(
   const points =
     rule.checkpointMode === "all"
       ? "Tüm kapı ve cihazlar"
-      : `${rule.targets.length} seçili nokta: ${rule.targets.map((target) => (target.targetType === "door" ? (targets?.doors.find((door) => door.doorId === target.doorId)?.name ?? "Kapı (artık listede yok)") : `${targets?.devices.find((device) => device.deviceId === target.deviceId)?.name ?? "Cihaz (artık listede yok)"} — tüm geçişler`)).join(", ")}`;
-  return `${mode} · ${points}`;
+      : `${rule.targets.length} seçili nokta: ${checkpointSummary(rule.targets, targets)}`;
+  return `${mode} · ${points} · ${calculationSummary(rule)}`;
 }
 
 export type RuleConfirmation =

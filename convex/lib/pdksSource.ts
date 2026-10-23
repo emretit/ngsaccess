@@ -1,10 +1,10 @@
-import { matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
+import { effectiveDirection, matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
 import { parseCardReaderBody } from "./cardReaderParse";
 import type { Doc } from "../_generated/dataModel";
 
 export type PdksReadingSource = "card" | "pin" | "qr" | "mobile" | "manual" | "biometric" | "unknown";
 export type PdksSourceReading = Partial<Pick<Doc<"cardReadings">,
-  "deviceId" | "accessTime" | "projectId" | "cardNo" | "rawData" | "ideIoId" | "hikCurrentVerifyMode" | "hikMajorEventType" | "hikSubEventType" | "hikDevIndex" | "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL"
+  "direction" | "hikCardReaderNo" | "deviceId" | "accessTime" | "projectId" | "cardNo" | "rawData" | "ideIoId" | "hikCurrentVerifyMode" | "hikMajorEventType" | "hikSubEventType" | "hikDevIndex" | "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL"
 >>;
 
 function object(value: unknown): Record<string, unknown> {
@@ -81,7 +81,12 @@ export function isPdksIncludedReading(reading: PdksSourceReading, projectId?: st
   return (projectId === undefined || reading.projectId === projectId) && isPdksEligibleReading(reading) && (!policy || matchesPdksCheckpoint(reading, policy));
 }
 export function filterPdksReadings<T extends PdksSourceReading>(readings: readonly T[], projectId?: string, policyFor?: (reading: T) => PdksDayPolicy): T[] {
-  return readings.filter(reading => isPdksIncludedReading(reading, projectId, policyFor?.(reading)));
+  return readings.flatMap(reading => {
+    const policy = policyFor?.(reading);
+    if (!isPdksIncludedReading(reading, projectId, policy)) return [];
+    const direction = policy ? effectiveDirection(reading, policy) : reading.direction;
+    return [direction === reading.direction ? reading : { ...reading, direction }];
+  });
 }
 
 export function countPdksReadingSources(readings: readonly PdksSourceReading[]): Record<PdksReadingSource, number> {
