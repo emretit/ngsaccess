@@ -5,10 +5,10 @@ import CardReadings from "../access-control/CardReadings";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { watchReadingScroll } from "./lib/scroll";
 import { CardReadingsFilters } from "../access-control/CardReadingsFilters";
 import { CardReadingsTable } from "../access-control/CardReadingsTable";
 import { Detail } from "./ReadingDetailPanel";
+import { LiveStatus } from "./LiveStatus";
 import { emptyFilters, readFilters, writeFilters, type Reading } from "./lib/readings";
 import type { Id } from "../../../convex/_generated/dataModel";
 const mocks = vi.hoisted(() => ({ query: vi.fn() }));
@@ -19,31 +19,19 @@ const row: Reading = { _id: "reading" as Id<"cardReadings">, _creationTime: 1, p
 beforeEach(() => { mocks.query.mockReset().mockReturnValue([]); });
 
 describe("monitoring UI audit", () => {
-  it("pauses on the real scroll container and removes its listener", () => {
-    const container = new EventTarget();
-    Object.assign(container, { scrollTop: 120 });
-    const pause = vi.fn();
-    const cleanup = watchReadingScroll(container as Element, pause);
-    expect(pause).not.toHaveBeenCalled();
-    Object.assign(container, { scrollTop: 0 });
-    container.dispatchEvent(new Event("scroll")); expect(pause).not.toHaveBeenCalled();
-    Object.assign(container, { scrollTop: 81 });
-    container.dispatchEvent(new Event("scroll")); expect(pause).toHaveBeenCalledOnce();
-    cleanup?.(); container.dispatchEvent(new Event("scroll")); expect(pause).toHaveBeenCalledOnce();
+  it("shows every filter, including dates, in one bar with accessible custom controls", () => {
+    const html = renderToStaticMarkup(<CardReadingsFilters projectId={projectId} filters={emptyFilters} change={vi.fn()} />);
+    expect(html).toContain("Başlangıç (TR günü)"); expect(html).toContain("Bitiş (TR günü)"); expect(html).not.toContain("Diğer filtreler");
+    expect(html.match(/<select /g)).toHaveLength(4); expect(html.match(/<select aria-hidden="true"/g)).toHaveLength(4);
+    expect(html).toContain('aria-label="Kaynak"'); expect(html).toContain('aria-label="Cihaz"');
   });
-  it("shows dates only in history and uses accessible custom filter controls", () => {
-    const live = renderToStaticMarkup(<CardReadingsFilters projectId={projectId} filters={emptyFilters} change={vi.fn()} />);
-    expect(live).not.toContain("Başlangıç (TR günü)"); expect(live.match(/<select /g)).toHaveLength(4); expect(live.match(/<select aria-hidden="true"/g)).toHaveLength(4);
-    expect(live).toContain('aria-label="Kaynak"'); expect(live).toContain('aria-label="Cihaz"');
-    const history = renderToStaticMarkup(<CardReadingsFilters projectId={projectId} filters={{ ...emptyFilters, mode: "history" }} change={vi.fn()} />);
-    expect(history).toContain("Başlangıç (TR günü)"); expect(history).toContain("Bitiş (TR günü)");
-  });
-  it("labels the view group for assistive technology and simplifies history guidance", () => {
-    const live = renderToStaticMarkup(<MemoryRouter><CardReadings /></MemoryRouter>);
-    expect(live).toContain('role="group" aria-label="Görünüm"');
-    const history = renderToStaticMarkup(<MemoryRouter initialEntries={["/?mode=history"]}><CardReadings /></MemoryRouter>);
-    expect(history).toContain("0 kayıt tarandı, 0 eşleşti, 0 gösteriliyor.");
-    expect(history).toContain("Daha eski kayıtları yükle"); expect(history).not.toContain("aday kayıt");
+  it("renders one view without live/history toggles or a pause control", () => {
+    for (const entry of ["/", "/?mode=history"]) {
+      const html = renderToStaticMarkup(<MemoryRouter initialEntries={[entry]}><CardReadings /></MemoryRouter>);
+      expect(html).not.toContain('aria-label="Görünüm"'); expect(html).not.toContain("Görüntüyü durdur"); expect(html).not.toContain(">Geçmiş<");
+    }
+    expect(renderToStaticMarkup(<LiveStatus projectId={projectId} live />)).toContain(">Canlı<");
+    expect(renderToStaticMarkup(<LiveStatus projectId={projectId} live={false} />)).not.toContain(">Canlı<");
   });
   it("persists the source filter in the URL and rejects unknown values", () => {
     const filters = { ...emptyFilters, source: "biometric" as const };
@@ -52,12 +40,12 @@ describe("monitoring UI audit", () => {
   });
   it("shows the last reading date even when today's feed has no rows", () => {
     mocks.query.mockImplementation((ref: Parameters<typeof getFunctionName>[0]) => ref && getFunctionName(ref) === "cardReadings:lastMonitoringReading" ? { accessTime: "2026-08-18T13:06:00Z" } : []);
-    const html = renderToStaticMarkup(<MemoryRouter><CardReadings /></MemoryRouter>);
+    const html = renderToStaticMarkup(<LiveStatus projectId={projectId} live />);
     expect(html).toContain("Son okuma 18.08.2026 16:06:00");
   });
-  it("offers explicit detail actions and a live empty title", () => {
+  it("offers explicit detail actions and an empty title", () => {
     expect(renderToStaticMarkup(<CardReadingsTable readings={[row]} onOpen={vi.fn()} />)).toContain("Ayrıntı");
-    expect(renderToStaticMarkup(<CardReadingsTable readings={[]} live onOpen={vi.fn()} />)).toContain("Bugün okuma yok");
+    expect(renderToStaticMarkup(<CardReadingsTable readings={[]} onOpen={vi.fn()} />)).toContain("Okuma bulunamadı");
   });
   it("hides biometric card and redundant project fields, and uses a dash for missing department", () => {
     mocks.query.mockReturnValue(row);

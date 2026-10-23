@@ -2,8 +2,8 @@ import { formatTrDateTime } from "@/lib/date";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../../convex/_generated/api";
 export type Reading = FunctionReturnType<typeof api.cardReadings.listLiveSince>["rows"][number];
-export type Filters = { mode: "live" | "history"; search: string; device: string; employee: string; door: string; source: "all" | "card" | "qr" | "mobile" | "biometric"; result: "all" | "granted" | "denied" | "unknown"; start: string; end: string };
-export const emptyFilters: Filters = { mode: "live", search: "", device: "", employee: "", door: "", result: "all", source: "all", start: "", end: "" };
+export type Filters = { search: string; device: string; employee: string; door: string; source: "all" | "card" | "qr" | "mobile" | "biometric"; result: "all" | "granted" | "denied" | "unknown"; start: string; end: string };
+export const emptyFilters: Filters = { search: "", device: "", employee: "", door: "", result: "all", source: "all", start: "", end: "" };
 export const sourceLabel = (source: Reading["source"]) => ({ card: "Kart", qr: "QR", mobile: "Mobil", biometric: "Biyometrik · PDKS dışı", unknown: "Kaynak bilinmiyor" })[source];
 export const resultLabel = (r: Pick<Reading, "accessStatus">) => r.accessStatus === "izin_verildi" ? "İzin verildi" : r.accessStatus === "reddedildi" ? "Reddedildi" : "Sonuç bilinmiyor";
 export const personLabel = (r: Reading) => r.employeeName?.trim() || (r.employeeId ? "Kişi bilgisi yok" : "Kişi eşleşmedi");
@@ -21,12 +21,13 @@ export function readFilters(params: URLSearchParams, project: string): Filters {
   const result = params.get("result");
   const source = params.get("source");
   const start = params.get("start") ?? "", end = params.get("end") ?? "";
-  return { mode: params.get("mode") === "history" || start || end ? "history" : "live", source: source === "card" || source === "qr" || source === "mobile" || source === "biometric" ? source : "all", search: params.get("q") ?? "", device: params.get("device") ?? "", employee: params.get("employee") ?? "", door: params.get("door") ?? "", result: result === "granted" || result === "denied" || result === "unknown" ? result : "all", start: /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : "", end: /^\d{4}-\d{2}-\d{2}$/.test(end) ? end : "" };
+  return { source: source === "card" || source === "qr" || source === "mobile" || source === "biometric" ? source : "all", search: params.get("q") ?? "", device: params.get("device") ?? "", employee: params.get("employee") ?? "", door: params.get("door") ?? "", result: result === "granted" || result === "denied" || result === "unknown" ? result : "all", start: /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : "", end: /^\d{4}-\d{2}-\d{2}$/.test(end) ? end : "" };
 }
 export function writeFilters(params: URLSearchParams, filters: Filters, project: string) {
   const next = new URLSearchParams(params);
   next.set("liveProject", project);
-  for (const [key, value] of Object.entries({ mode: filters.mode, source: filters.source, q: filters.search, device: filters.device, employee: filters.employee, door: filters.door, result: filters.result, start: filters.start, end: filters.end })) {
+  next.delete("mode"); // Eski Canlı/Geçmiş bağlantılarından kalan parametre.
+  for (const [key, value] of Object.entries({ source: filters.source, q: filters.search, device: filters.device, employee: filters.employee, door: filters.door, result: filters.result, start: filters.start, end: filters.end })) {
     if (value && value !== "all") next.set(key, value); else next.delete(key);
   }
   return next;

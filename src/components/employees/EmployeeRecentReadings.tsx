@@ -33,7 +33,7 @@ export function EmployeeRecentReadings({
       ) : (
         <ReadingsList readings={result} />
       )}
-      <Link className="inline-flex items-center max-sm:min-h-11 text-sm underline" to={`/live-monitoring?mode=history&employee=${encodeURIComponent(employeeId)}&liveProject=${encodeURIComponent(projectId ?? "")}`}>Tüm geçişler</Link>
+      <Link className="inline-flex items-center max-sm:min-h-11 text-sm underline" to={`/live-monitoring?employee=${encodeURIComponent(employeeId)}&liveProject=${encodeURIComponent(projectId ?? "")}`}>Tüm geçişler</Link>
     </section>
   );
 }

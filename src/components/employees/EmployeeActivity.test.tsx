@@ -13,6 +13,6 @@ it("02-O7/D1: requests five readings and links history with person and project f
   const html = renderToStaticMarkup(<MemoryRouter><EmployeeRecentReadings employeeId={employeeId} /></MemoryRouter>);
   expect(mocks.query.mock.calls[0]?.[1]).toEqual({ employeeId, limit: 5 });
   expect(html).toContain("01.01.2026 03:30");
-  expect(html).toContain('/live-monitoring?mode=history&amp;employee=employee-a&amp;liveProject=project-a');
+  expect(html).toContain('/live-monitoring?employee=employee-a&amp;liveProject=project-a');
   expect(html).toContain("Tüm geçişler");
 });
