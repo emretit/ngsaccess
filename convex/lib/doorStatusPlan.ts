@@ -6,7 +6,7 @@ import {
   splitOvernight,
   type WeekSchedule,
 } from "./accessSchedule";
-import type { DoorStatusSegment } from "./gateway/plans";
+import type { DoorStatusSegment, VerifySegment } from "./gateway/plans";
 
 export const DOOR_STATUS_DAYS = [
   "Monday",
@@ -19,6 +19,7 @@ export const DOOR_STATUS_DAYS = [
 ] as const;
 // gateway/scheduling.ts MAX_SEGMENTS_PER_DAY (Node runtime) ile aynı Hik sınırı.
 export const DOOR_STATUS_MAX_SEGMENTS = 8;
+const dayValidator = v.union(...DOOR_STATUS_DAYS.map((day) => v.literal(day)));
 const modeValidator = v.union(
   v.literal("remainOpen"),
   v.literal("normal"),
@@ -32,15 +33,7 @@ export const doorStatusPlanValidator = v.object({
   weekly: v.optional(
     v.array(
       v.object({
-        day: v.union(
-          v.literal("Monday"),
-          v.literal("Tuesday"),
-          v.literal("Wednesday"),
-          v.literal("Thursday"),
-          v.literal("Friday"),
-          v.literal("Saturday"),
-          v.literal("Sunday"),
-        ),
+        day: dayValidator,
         segments: v.array(
           v.object({
             beginTime: v.string(),
@@ -177,7 +170,6 @@ export function templateToDoorStatusPlan(
   });
 }
 
-const dayValidator = v.union(...DOOR_STATUS_DAYS.map((day) => v.literal(day)));
 export const verifyPlanValidator = v.object({
   enabled: v.boolean(),
   beginTime: v.string(),
@@ -239,7 +231,7 @@ export function normalizeVerifyPlan(plan: VerifyPlan): VerifyPlan {
     ...(weekly ? { weekly } : {}),
   };
 }
-export function buildVerifySegments(plan: VerifyPlan) {
+export function buildVerifySegments(plan: VerifyPlan): VerifySegment[] {
   const normalized = normalizeVerifyPlan(plan);
   const days =
     normalized.weekly ??
@@ -259,11 +251,7 @@ export function buildVerifySegments(plan: VerifyPlan) {
 export const holidayPlanValidator = v.object({
   enabled: v.boolean(),
   year: v.number(),
-  mode: v.union(
-    v.literal("remainOpen"),
-    v.literal("remainClosed"),
-    v.literal("normal"),
-  ),
+  mode: modeValidator,
 });
 export function holidayRanges(
   dates: string[],

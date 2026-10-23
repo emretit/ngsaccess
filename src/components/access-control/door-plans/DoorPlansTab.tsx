@@ -17,7 +17,11 @@ import {
 } from "@/components/ui/table";
 import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import { DoorPlanDialog, type DoorPlanTarget } from "./DoorPlanDialog";
-import { DOOR_STATUS_DAYS } from "../../../../convex/lib/doorStatusPlan";
+import {
+  DOOR_STATUS_DAYS,
+  type DoorStatusInterval,
+} from "../../../../convex/lib/doorStatusPlan";
+import { WEEKDAYS } from "../unified/components/weekdays";
 
 const modes: Record<string, string> = {
   remainOpen: "sürekli açık",
@@ -31,12 +35,10 @@ const modes: Record<string, string> = {
   cardAndFace: "Kart + Yüz",
   faceAndCard: "Kart + Yüz",
 };
-const days = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+const days = WEEKDAYS.map((day) => day.short);
 function statusSummary(plan: DoorPlanTarget["hikDoorStatusPlan"]) {
   if (!plan?.enabled) return "Kapalı";
-  const interval = (
-    segment: Pick<NonNullable<typeof plan>, "beginTime" | "endTime" | "mode">,
-  ) =>
+  const interval = (segment: DoorStatusInterval) =>
     `${segment.beginTime.slice(0, 5)}–${segment.endTime.slice(0, 5)} ${modes[segment.mode]}`;
   if (!plan.weekly) return `Her gün ${interval(plan)}`;
   const groups: { first: number; last: number; summary: string }[] = [];
