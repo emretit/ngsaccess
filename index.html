@@ -7,7 +7,7 @@
   <script id="theme-bootstrap">
     (() => {
       try {
-        const prefixes = ['/home', '/employees', '/devices', '/access-control', '/visitors', '/live-monitoring', '/pdks-records', '/shifts', '/leaves', '/reports', '/audit-log', '/alarms', '/engineering-department', '/system-admin', '/settings', '/profile'];
+        const prefixes = ['/home', '/employees', '/devices', '/access-control', '/visitors', '/live-monitoring', '/pdks-records', '/leaves', '/reports', '/audit-log', '/alarms', '/engineering-department', '/system-admin', '/settings', '/profile'];
         const path = location.pathname;
         if (!prefixes.some(prefix => path === prefix || path.startsWith(prefix + '/'))) return;
         const scope = JSON.parse(localStorage.getItem('ngs.theme.activeScope.v1') || 'null');

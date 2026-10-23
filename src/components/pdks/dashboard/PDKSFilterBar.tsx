@@ -35,7 +35,6 @@ export function clearPdksFilters(values: FilterValues): FilterValues {
     companyId: undefined,
     departmentId: undefined,
     positionId: undefined,
-    shiftId: undefined,
     statusFilter: "all",
   };
 }
@@ -50,7 +49,7 @@ export function PDKSFilterBar({
 }) {
   const [mobileFilters, setMobileFilters] = useState(false);
   const [advanced, setAdvanced] = useState(false);
-  const { departments, companies, positions, shifts } = usePdksFilterOptions();
+  const { departments, companies, positions } = usePdksFilterOptions();
 
   return (
     <>
@@ -65,7 +64,6 @@ export function PDKSFilterBar({
         values.companyId ||
         values.departmentId ||
         values.positionId ||
-        values.shiftId ||
         values.statusFilter !== "all",
       )}
       onClear={() => {
@@ -90,9 +88,9 @@ export function PDKSFilterBar({
       </label>
       <Button variant="outline" onClick={() => setAdvanced(true)}>
         Diğer filtreler
-        {[values.companyId, values.positionId, values.shiftId].filter(Boolean)
+        {[values.companyId, values.positionId].filter(Boolean)
           .length > 0 &&
-          ` (${[values.companyId, values.positionId, values.shiftId].filter(Boolean).length})`}
+          ` (${[values.companyId, values.positionId].filter(Boolean).length})`}
       </Button>
       <Sheet open={advanced} onOpenChange={setAdvanced}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-md">
@@ -118,15 +116,6 @@ export function PDKSFilterBar({
                 <SelectTrigger className="mt-1" aria-label="Tüm pozisyonlar"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="all">Tüm pozisyonlar</SelectItem>
                   {positions?.map(p => <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </label>
-            <label className="block text-sm">
-              Vardiya
-              <Select value={values.shiftId ?? "all"} onValueChange={value => onChange({ ...values, shiftId: value === "all" ? undefined : value as Id<"shifts"> })}>
-                <SelectTrigger className="mt-1" aria-label="Tüm vardiyalar"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="all">Tüm vardiyalar</SelectItem>
-                  {shifts?.map(s => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </label>

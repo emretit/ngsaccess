@@ -37,7 +37,7 @@ export default function Settings() {
     if (previousTab.current !== activeTab) { heading.current?.focus(); previousTab.current = activeTab; }
   }, [activeTab]);
   useEffect(() => {
-    // Mesai ve tatil bölümü PDKS Kayıtları › Ayarlar sekmesine taşındı; eski bağlantılar oraya gider.
+    // Mesai ve tatil bölümü PDKS › Ayarlar sekmesine taşındı; eski bağlantılar oraya gider.
     if (requestedTab === "work-payroll") { navigate(PDKS_SETTINGS_PATH, { replace: true }); return; }
     if (requestedTab !== null && !SETTINGS_SECTIONS.some(item => item.key === requestedTab)) {
       const next = new URLSearchParams(searchParams); next.delete("tab"); setSearchParams(next, { replace: true });

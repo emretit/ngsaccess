@@ -20,8 +20,6 @@ const Visitors = lazy(() => import('@/pages/Visitors'));
 const LiveMonitoring = lazy(() => import('@/pages/LiveMonitoring'));
 const PDKSRecords = lazy(() => import('@/pages/PDKSRecords'));
 const PdksSettings = lazy(() => import('@/pages/PdksSettings'));
-const Shifts = lazy(() => import('@/pages/Shifts'));
-const ShiftDefinitions = lazy(() => import('@/pages/ShiftDefinitions'));
 const Leaves = lazy(() => import('@/pages/Leaves'));
 const CheckIn = lazy(() => import('@/pages/CheckIn'));
 const Settings = lazy(() => import('@/pages/Settings'));
@@ -79,8 +77,8 @@ function AppContent() {
           <Route path="/live-monitoring" element={<LiveMonitoring />} />
           <Route path="/pdks-records" element={<PDKSRecords />} />
           <Route path="/pdks-records/settings" element={<PdksSettings />} />
-          <Route path="/shifts" element={<Shifts />} />
-          <Route path="/shifts/definitions" element={<ShiftDefinitions />} />
+          <Route path="/shifts" element={<Navigate to="/pdks-records?plan=1" replace />} />
+          <Route path="/shifts/definitions" element={<Navigate to="/pdks-records" replace />} />
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit-log" element={<AuditLog />} />

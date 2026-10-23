@@ -6,6 +6,8 @@ import PDKSRecords from "@/pages/PDKSRecords";
 import type { FilterValues } from "./dashboard/PDKSFilterBar";
 const state = vi.hoisted(() => ({ admin: false, reportType: "daily" as FilterValues["reportType"] }));
 vi.mock("convex/react", () => ({ useQuery: () => ({ leaves: 0, corrections: 0, capped: false }), useMutation: () => vi.fn() }));
+vi.mock("@/components/shifts/ShiftTree", () => ({ ShiftTree: () => <div>Vardiya ağacı</div> }));
+vi.mock("@/components/shifts/ShiftPlanSheet", () => ({ ShiftPlanSheet: () => null, useShiftPlanOpen: () => ({ setOpen: vi.fn() }) }));
 vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn(), Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a> }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "p", activeProject: { name: "Merkez" }, canManage: state.admin, loading: false }) }));
 vi.mock("@/hooks/usePdksFilterParams", () => ({ usePdksFilterParams: () => ({ filters: { reportType: state.reportType, statusFilter: "all", person: "", dateRange: {} }, setFilters: vi.fn() }) }));

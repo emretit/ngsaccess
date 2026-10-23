@@ -15,13 +15,14 @@ vi.mock("@/components/ui/dropdown-menu", () => {
 const noOp = () => undefined;
 const employee = { _id: "employee", projectId: "project", firstName: "İpek", lastName: "Yıldız" } as Employee;
 const shift = { _id: "shift", projectId: "project", name: "Gündüz", startTime: "08:00", endTime: "16:00", isActive: true } as Shift;
-const header = (activeCount = 1) => renderToStaticMarkup(<CalendarHeader activeCount={activeCount} loading={false} exporting={false} onAssign={noOp} openDefinitions={noOp} onExport={noOp} onClear={noOp} />);
+const header = (activeCount = 1) => renderToStaticMarkup(<CalendarHeader activeCount={activeCount} loading={false} exporting={false} onAssign={noOp} onExport={noOp} onClear={noOp} />);
 beforeEach(() => { permissions.manage = false; permissions.reports = false; });
 
 describe("Vardiya başlık ve araç çubuğu", () => {
   it("proje kapsamı yoktur; yetkisiz kullanıcıda İşlemler ve atama görünmez", () => {
     const html = header();
-    expect(html).toContain("Vardiya tanımları");
+    expect(html).not.toContain("Vardiya tanımları");
+    expect(html).not.toContain("<h1");
     expect(html).not.toContain("Çalışma planı");
     expect(html).not.toContain("İşlemler");
     expect(html).not.toContain("Vardiya ata");

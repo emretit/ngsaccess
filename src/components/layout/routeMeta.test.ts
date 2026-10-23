@@ -16,3 +16,8 @@ describe("Sanal okuyucular menüsü", () => {
     expect(visibleRoutes("admin").some(route => route.href === "/devices")).toBe(true);
   });
 });
+
+it("PDKS contains the plan and shift definitions without a separate shifts menu", () => {
+  expect(routeMeta.find(route => route.href === "/pdks-records")?.name).toBe("PDKS");
+  expect(routeMeta.some(route => route.href === "/shifts")).toBe(false);
+});

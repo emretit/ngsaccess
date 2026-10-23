@@ -1,6 +1,6 @@
 import { permissionCapabilities } from "./capabilities";
 import { ROLE_DEFAULTS, legacyRoleToProjectRole, type Permission } from "../../convex/lib/roleCatalog";
-import { Activity, BarChart3, BellRing, CalendarClock, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, User, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, BellRing, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, User, type LucideIcon } from "lucide-react";
 
 export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; permission?: Permission; settings?: boolean; superAdminOnly?: boolean; menu?: boolean; badge?: "Yakında"; group?: "main" | "attendance" | "management" }
 export const routeMeta: RouteMeta[] = [
@@ -10,8 +10,7 @@ export const routeMeta: RouteMeta[] = [
   { href: "/access-control", group: "main", name: "Geçiş Kontrol", icon: Shield },
   { href: "/visitors", group: "main", name: "Ziyaretçiler", icon: DoorOpen },
   { href: "/live-monitoring", group: "main", name: "Canlı İzleme", icon: Activity },
-  { href: "/pdks-records", group: "attendance", name: "PDKS Kayıtları", icon: FileText },
-  { href: "/shifts", group: "attendance", name: "Vardiyalar", icon: CalendarClock },
+  { href: "/pdks-records", group: "attendance", name: "PDKS", icon: FileText },
   { href: "/leaves", group: "attendance", name: "İzinler", icon: Palmtree },
   { href: "/reports", group: "attendance", name: "Raporlar", icon: BarChart3, permission: "reports.view" },
   { href: "/alarms", group: "management", name: "Alarmlar", icon: BellRing },

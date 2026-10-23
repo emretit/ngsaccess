@@ -43,7 +43,7 @@ export interface AssignShiftDialogProps {
   projectId: Id<"projects">;
   employees: Employee[];
   shifts: Shift[];
-  initial?: { employeeIds?: string[]; startDate?: string; endDate?: string };
+  initial?: { shiftId?: Id<"shifts">; employeeIds?: string[]; startDate?: string; endDate?: string };
 }
 export function AssignShiftDialog({
   open,
@@ -55,7 +55,8 @@ export function AssignShiftDialog({
 }: AssignShiftDialogProps) {
   const [values, setValues] = useState<BulkAssignmentFormValues>(() => ({
     employeeIds: initial?.employeeIds ?? [],
-    shiftId: "",
+    // Pasif vardiya seçeneklerde yok; önceden seçilmiş gelirse görünmeyen değer gönderilmesin.
+    shiftId: shifts.some(s => s._id === initial?.shiftId && s.isActive !== false) ? initial?.shiftId ?? "" : "",
     startDate: initial?.startDate ?? istanbulToday(),
     endDate: initial?.endDate ?? istanbulToday(),
     specificDays: false,

@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
-import { Settings } from "lucide-react";
+import { useState } from "react";
+import { ShiftTree } from "@/components/shifts/ShiftTree";
+import { ShiftPlanSheet, useShiftPlanOpen } from "@/components/shifts/ShiftPlanSheet";
+import { Settings, CalendarClock } from "lucide-react";
 import { PDKS_SETTINGS_FROM_RECORDS, PDKS_SETTINGS_PATH } from "@/components/pdks/settings/route";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
@@ -46,6 +49,8 @@ function PDKSContent({
   filters: FilterValues;
   setFilters: (v: FilterValues) => void;
 }) {
+  const [createShiftOpen, setCreateShiftOpen] = useState(false);
+  const { setOpen: setPlanOpen } = useShiftPlanOpen();
   const view = usePdksRecordsView(filters, setFilters);
   const canSettings = usePermissions().can("schedule.manage");
   const {
@@ -58,7 +63,7 @@ function PDKSContent({
   return (
     <div className="min-w-0 max-w-full space-y-4">
       <PageHeader
-        title="PDKS Kayıtları"
+        title="PDKS"
         scope={`${activeProject?.name ?? "Proje seçin"} · ${dateRangeLabel}`}
         secondaryMenu={
           <PDKSEnhancedExportPanel
@@ -90,6 +95,9 @@ function PDKSContent({
           </PDKSEnhancedExportPanel>
         }
       >
+        <Button variant="outline" onClick={() => setPlanOpen(true)} disabled={!projectId}>
+          <CalendarClock className="h-4 w-4" aria-hidden="true" />Vardiya planı
+        </Button>
         {canSettings && (
           <Button asChild>
             <Link to={PDKS_SETTINGS_PATH} state={PDKS_SETTINGS_FROM_RECORDS}>
@@ -99,31 +107,41 @@ function PDKSContent({
           </Button>
         )}
       </PageHeader>
-      <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
-        <PdksPeriodSwitcher filters={filters} setFilters={setFilters} />
-        <PDKSDateNavigator values={filters} onChange={setFilters} />
-        <Button variant="ghost" onClick={() => setDatesOpen(true)}>
-          Tarih ve kayıtlı görünümler
-        </Button>
-      </div>
-      <PDKSFilterBar
-        values={filters}
-        onChange={setFilters}
-        onClear={() => setSmartPreset(null)}
-      />
-      {effectiveSmartPreset && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span>{effectiveSmartPreset.label}</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSmartPreset(null)}
-          >
-            Uyarı filtresini kaldır
-          </Button>
+      <div className="flex min-w-0 flex-col gap-4 min-[1100px]:flex-row min-[1100px]:gap-5">
+        {projectId && <QuerySectionBoundary resetKey={projectId} title="Vardiyalar yüklenemedi" className="w-full min-w-0 shrink-0 min-[1100px]:w-[220px]">
+          <ShiftTree key={projectId} projectId={projectId} selectedShiftId={filters.shiftId}
+            onSelectShift={shiftId => setFilters({ ...filters, shiftId })}
+            createOpen={createShiftOpen} onCreateOpenChange={setCreateShiftOpen} />
+        </QuerySectionBoundary>}
+        <div className="min-w-0 flex-1 space-y-4">
+          <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
+            <PdksPeriodSwitcher filters={filters} setFilters={setFilters} />
+            <PDKSDateNavigator values={filters} onChange={setFilters} />
+            <Button variant="ghost" onClick={() => setDatesOpen(true)}>
+              Tarih ve kayıtlı görünümler
+            </Button>
+          </div>
+          <PDKSFilterBar
+            values={filters}
+            onChange={setFilters}
+            onClear={() => setSmartPreset(null)}
+          />
+          {effectiveSmartPreset && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span>{effectiveSmartPreset.label}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSmartPreset(null)}
+              >
+                Uyarı filtresini kaldır
+              </Button>
+            </div>
+          )}
+          <PdksRecordsResults view={view} />
         </div>
-      )}
-      <PdksRecordsResults view={view} />
+      </div>
+      <ShiftPlanSheet onCreateShift={() => setCreateShiftOpen(true)} />
       <PDKSEmployeeDetailDrawer
         returnFocusTo={detailTrigger}
         open={detail !== null}

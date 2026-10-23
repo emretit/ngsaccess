@@ -13,6 +13,11 @@ import {
 import { PdksRowStatus } from "./PdksRowStatus";
 import { PDKSMobileCardList } from "./PDKSMobileCardList";
 import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
+/** Dar sütunda uzun "Süre hesaplanamadı" yan sütuna taşar; nedeni Durum sütununda yazdığı için kısa gösterilir. */
+function DurationCell({ minutes, status, measured }: { minutes: number; status: PdksRow["status"]; measured?: boolean }) {
+  if (measured === false) return <span title="Süre hesaplanamadı">—<span className="sr-only">Süre hesaplanamadı</span></span>;
+  return <>{displayDuration(minutes, status)}</>;
+}
 interface Props {
   records: PdksRow[];
   loading?: boolean;
@@ -151,11 +156,11 @@ export function PDKSTableView({
                 </td>
                 <td className="px-2 tabular-nums">{displayTime(r.lastExit)}</td>
                 <td className="px-2 tabular-nums">
-                  {displayDuration(r.totalMinutes, r.status, r.durationMeasured)}
+                  <DurationCell minutes={r.totalMinutes} status={r.status} measured={r.durationMeasured} />
                   {(r.nightMinutes ?? 0) > 0 && <span className="block text-muted-foreground">Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}</span>}
                 </td>
                 <td className="px-2 tabular-nums">
-                  {displayDuration(r.overtimeMinutes, r.status, r.durationMeasured)}
+                  <DurationCell minutes={r.overtimeMinutes} status={r.status} measured={r.durationMeasured} />
                 </td>
                 <td className="px-2 py-1">
                   <PdksRowStatus record={r} />

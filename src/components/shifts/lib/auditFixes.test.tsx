@@ -47,9 +47,9 @@ beforeEach(() => {
 });
 describe("09 denetim düzeltmeleri", () => {
   it("O1/O2/D1/D2/D5: tanımsız projede eylem tanımı açar, imkânsız atama ipucu ve gün sayacı yoktur", () => {
-    const html = renderToStaticMarkup(<MemoryRouter><ShiftCalendarView projectId={"project" as Id<"projects">} projectName="Proje" /></MemoryRouter>);
-    expect(state.primary).toBeUndefined();
-    expect(html).toContain("Vardiya tanımlarına git");
+    const html = renderToStaticMarkup(<MemoryRouter><ShiftCalendarView projectId={"project" as Id<"projects">} projectName="Proje" openDefinitions={() => undefined} /></MemoryRouter>);
+    expect(html).not.toContain(">Vardiya ata<");
+    expect(html).toContain("Vardiya tanımla");
     expect(html).toContain("Atama yapmak için önce bir vardiya tanımlayın.");
     expect(html).not.toContain("Vardiya takvimi");
     expect(html).not.toContain("Çalışan ara");
@@ -64,8 +64,8 @@ describe("09 denetim düzeltmeleri", () => {
   });
   it("O1/O2: aktif tanım varsa atama ve boş gün yönlendirmesi görünür", () => {
     state.shifts = [shift];
-    const html = renderToStaticMarkup(<MemoryRouter><ShiftCalendarView projectId={"project" as Id<"projects">} projectName="Proje" /></MemoryRouter>);
-    expect(state.primary?.label).toBe("Vardiya ata");
+    const html = renderToStaticMarkup(<MemoryRouter><ShiftCalendarView projectId={"project" as Id<"projects">} projectName="Proje" openDefinitions={() => undefined} /></MemoryRouter>);
+    expect(html).toContain(">Vardiya ata<");
     expect(html).toContain("Bu dönemde atama yok.");
     expect(html).not.toContain("Boş bir gün seçerek");
   });
@@ -93,6 +93,12 @@ describe("09 denetim düzeltmeleri", () => {
       expect(html).toContain("max-sm:min-h-11");
     }
     expect(edit).toContain("Gece · 22:00–06:00 (+1 gün)");
+  });
+  it("opens assignment with the shift supplied by the tree already selected", () => {
+    const html = renderToStaticMarkup(<AssignShiftDialog open projectId={"project" as Id<"projects">} employees={[employee]} shifts={[shift]} initial={{ shiftId: shift._id }} onOpenChange={() => undefined} />);
+    expect(html).toContain("Gece · 22:00–06:00 (+1 gün)");
+    const inactive = renderToStaticMarkup(<AssignShiftDialog open projectId={"project" as Id<"projects">} employees={[employee]} shifts={[{ ...shift, isActive: false }]} initial={{ shiftId: shift._id }} onOpenChange={() => undefined} />);
+    expect(inactive).not.toContain("Gece · 22:00–06:00 (+1 gün)");
   });
   it("D7: ay veya hafta değişse de yeni atama yalnız seçili günden başlar", () => {
     expect(assignmentInitial("2026-10-19", [employee._id])).toEqual({ startDate: "2026-10-19", endDate: "2026-10-19", employeeIds: [employee._id] });

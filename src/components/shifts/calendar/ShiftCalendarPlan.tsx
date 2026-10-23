@@ -130,20 +130,20 @@ export function ShiftCalendarPlan({
   return (
     <div className="space-y-4 [&_button]:max-sm:min-h-11 [&_input]:max-sm:min-h-11">
       <CalendarHeader activeCount={active.length} loading={loading} exporting={exporting}
-        onAssign={() => setAssign(assignmentInitial(day))} openDefinitions={openDefinitions}
+        onAssign={() => setAssign(assignmentInitial(day))}
         onExport={exportPlan} onClear={() => setClearOpen(true)} />
       {clearOpen && <ClearAssignmentsDialog projectId={projectId} employees={employees} initialIds={[...selected]} start={range.rangeStart} end={range.rangeEnd} onClose={() => { setClearOpen(false); clearSelection(); }} />}
       {!shifts.length ? (
         <EmptyState
           title="Henüz vardiya tanımlanmamış"
           description={canManage ? "Atama yapmak için önce bir vardiya tanımlayın." : "Vardiya tanımlarını yetkili yöneticiler ekler."}
-          action={canManage ? { label: "Vardiya tanımlarına git", onClick: openDefinitions } : undefined}
+          action={canManage ? { label: "Vardiya tanımla", onClick: openDefinitions } : undefined}
         />
       ) : <>
       {!active.length && (
         <p role="status" className="text-sm text-muted-foreground">
           Tüm vardiya tanımları pasif; mevcut atamalar görünür ama yeni atama yapılamaz.
-          {canManage && <> <Button variant="link" className="h-auto p-0 align-baseline" onClick={openDefinitions}>Bir tanımı etkinleştirin</Button>.</>}
+          {canManage && <> <Button variant="link" className="h-auto p-0 align-baseline" onClick={openDefinitions}>Sol panelden bir vardiyayı etkinleştirin</Button>.</>}
         </p>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
