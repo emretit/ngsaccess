@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { Settings } from "lucide-react";
-import { CorrectionRequestsEntry } from "@/components/pdks/CorrectionRequestsPanel";
 import { PDKS_SETTINGS_FROM_RECORDS, PDKS_SETTINGS_PATH } from "@/components/pdks/settings/route";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
@@ -52,7 +51,7 @@ function PDKSContent({
   const {
     projectId, activeProject, canManage, setImport, setWarningsOpen, setAi,
     exportRows, dateRangeLabel, selectedDate, filterSummary, selectedIds,
-    records, isLoading, setDatesOpen, analysis, setAnalysis, setSmartPreset,
+    records, isLoading, setDatesOpen, setSmartPreset,
     effectiveSmartPreset, detailTrigger, detail, setDrilldown,
     startDate, endDate, importOpen,
   } = view;
@@ -62,39 +61,43 @@ function PDKSContent({
         title="PDKS Kayıtları"
         scope={`${activeProject?.name ?? "Proje seçin"} · ${dateRangeLabel}`}
         secondaryMenu={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">Diğer</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {canManage && <DropdownMenuItem onClick={() => setImport(true)}>İçe aktar</DropdownMenuItem>}
-              <DropdownMenuItem onClick={() => setWarningsOpen(true)}>
-                Uyarılar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setAi(true)}>
-                Asistan
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <PDKSEnhancedExportPanel
+            records={exportRows}
+            dateRange={dateRangeLabel}
+            selectedDate={selectedDate}
+            filterSummary={filterSummary}
+            selectedCount={selectedIds.size}
+            totalCount={records.length}
+            disabled={isLoading || !projectId}
+          >
+            {(exportMenu) => (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">İşlemler</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {exportMenu}
+                  {canManage && <DropdownMenuItem onClick={() => setImport(true)}>İçe aktar</DropdownMenuItem>}
+                  <DropdownMenuItem onClick={() => setWarningsOpen(true)}>
+                    Uyarılar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setAi(true)}>
+                    Asistan
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </PDKSEnhancedExportPanel>
         }
       >
         {canSettings && (
-          <Button variant="outline" asChild>
+          <Button asChild>
             <Link to={PDKS_SETTINGS_PATH} state={PDKS_SETTINGS_FROM_RECORDS}>
               <Settings className="h-4 w-4" aria-hidden="true" />
               Ayarlar
             </Link>
           </Button>
         )}
-        <PDKSEnhancedExportPanel
-          records={exportRows}
-          dateRange={dateRangeLabel}
-          selectedDate={selectedDate}
-          filterSummary={filterSummary}
-          selectedCount={selectedIds.size}
-          totalCount={records.length}
-          disabled={isLoading || !projectId}
-        />
       </PageHeader>
       <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
         <PdksPeriodSwitcher filters={filters} setFilters={setFilters} />
@@ -103,13 +106,6 @@ function PDKSContent({
           Tarih ve kayıtlı görünümler
         </Button>
       </div>
-      <div role="group" aria-label="Görünüm" className="flex gap-1">
-        <Button variant={!analysis || filters.reportType === "daily" ? "secondary" : "ghost"} aria-pressed={!analysis || filters.reportType === "daily"} onClick={() => setAnalysis(false)}>Kayıtlar</Button>
-        <Button disabled={filters.reportType === "daily"} variant={analysis && filters.reportType !== "daily" ? "secondary" : "ghost"} aria-pressed={analysis && filters.reportType !== "daily"} onClick={() => setAnalysis(true)}>Analiz</Button>
-      </div>
-      {canManage && projectId && (
-        <CorrectionRequestsEntry key={projectId} projectId={projectId} />
-      )}
       <PDKSFilterBar
         values={filters}
         onChange={setFilters}

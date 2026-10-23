@@ -4,18 +4,18 @@ import { readPDKSPreferences, savePDKSPreferences, type PDKSExportPreferences } 
 import type { ColumnScope } from '@/lib/reports/columns';
 import { PDKSExportColumns } from './export/PDKSExportColumns';
 import { pdksToday } from "@/components/pdks/lib/calendar";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useConvex } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -50,6 +50,8 @@ interface Props {
   selectedCount?: number;
   totalCount?: number;
   disabled?: boolean;
+  /** Dışa aktar alt menüsünü sayfanın menüsüne yerleştirir; yetki yoksa `null` alır. */
+  children: (exportMenu: ReactNode) => ReactNode;
 }
 export function PDKSEnhancedExportPanel(props: Props) {
   const { profile } = useAuth();
@@ -57,7 +59,7 @@ export function PDKSEnhancedExportPanel(props: Props) {
   const { projectId } = useActiveProject();
   const scope = projectId && profile?._id ? { projectId, userId: profile._id } : undefined;
   const canSeePay = can("pay.view");
-  if (!can("reports.view")) return null;
+  if (!can("reports.view")) return <>{props.children(null)}</>;
   return <ExportPanel key={`${scope?.projectId}:${scope?.userId}:${canSeePay}`} {...props} scope={scope} canSeePay={canSeePay} />;
 }
 function ExportPanel({
@@ -70,6 +72,7 @@ function ExportPanel({
   disabled,
   scope,
   canSeePay,
+  children,
 }: Props & { scope?: ColumnScope; canSeePay: boolean }) {
   const { projectId, activeProject } = useActiveProject();
   const convex = useConvex();
@@ -151,24 +154,24 @@ function ExportPanel({
   };
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button disabled={disabled}>Dışa aktar</Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {(["Excel", "CSV", "PDF"] as const).map((k) => (
-            <DropdownMenuItem key={k} onClick={() => choose(k)}>
-              {labels[k]}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          {(["payroll", "aphb"] as const).map((k) => (
-            <DropdownMenuItem key={k} onClick={() => choose(k)}>
-              {labels[k]}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {children(
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger disabled={disabled}>Dışa aktar</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {(["Excel", "CSV", "PDF"] as const).map((k) => (
+              <DropdownMenuItem key={k} onClick={() => choose(k)}>
+                {labels[k]}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            {(["payroll", "aphb"] as const).map((k) => (
+              <DropdownMenuItem key={k} onClick={() => choose(k)}>
+                {labels[k]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>,
+      )}
       <Dialog
         open={type !== null}
         onOpenChange={(open) => {

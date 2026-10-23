@@ -182,6 +182,9 @@ vi.mock("@/components/ui/dropdown-menu", () => {
     DropdownMenuTrigger: Box,
     DropdownMenuSeparator: () => null,
     DropdownMenuItem: Box,
+    DropdownMenuSub: Box,
+    DropdownMenuSubContent: Box,
+    DropdownMenuSubTrigger: Box,
   };
 });
 const rules = {
@@ -388,7 +391,9 @@ describe("APHB inceleme engeli", () => {
             status: "",
           },
         ]}
-      />,
+      >
+        {(menu) => menu}
+      </PDKSEnhancedExportPanel>,
     );
   }
   it("çalışan adı ve ilk 10 günü listeler, kalanı sayar ve indirmeyi kapatır", () => {
@@ -438,13 +443,13 @@ it.each([true, undefined])(
       employees: [{ employeeId: "e", reviewDays: ["2026-10-21"] }],
       ...(blockedByReview === undefined ? {} : { blockedByReview }),
     });
-    render(<PDKSEnhancedExportPanel />);
+    render(<PDKSEnhancedExportPanel>{(menu) => menu}</PDKSEnhancedExportPanel>);
     state.actions
       .find((action) => action.label === "Önizlemeyi hazırla")
       ?.invoke({ preventDefault: vi.fn() });
     await Promise.resolve();
     await Promise.resolve();
-    const html = render(<PDKSEnhancedExportPanel />);
+    const html = render(<PDKSEnhancedExportPanel>{(menu) => menu}</PDKSEnhancedExportPanel>);
     expect(state.fetch).toHaveBeenCalledOnce();
     expect(html).toContain("2026-10-21");
     expect(html).toContain("İnceleme günleri var");
@@ -462,13 +467,13 @@ it("APHB boş XML inceleme yoksa mevcut veri yok hatasını gösterir", async ()
     employees: [],
     blockedByReview: false,
   });
-  render(<PDKSEnhancedExportPanel />);
+  render(<PDKSEnhancedExportPanel>{(menu) => menu}</PDKSEnhancedExportPanel>);
   state.actions
     .find((action) => action.label === "Önizlemeyi hazırla")
     ?.invoke({ preventDefault: vi.fn() });
   await Promise.resolve();
   await Promise.resolve();
-  expect(render(<PDKSEnhancedExportPanel />)).toContain(
+  expect(render(<PDKSEnhancedExportPanel>{(menu) => menu}</PDKSEnhancedExportPanel>)).toContain(
     "Bildirim için veri bulunamadı",
   );
 });

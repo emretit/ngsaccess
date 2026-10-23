@@ -18,7 +18,7 @@ vi.mock("@/components/ui/dropdown-menu", () => {
   const Box = ({ children }: { children: ReactNode }) => <div>{children}</div>;
   return { DropdownMenu: Box, DropdownMenuContent: Box, DropdownMenuItem: Box, DropdownMenuTrigger: Box };
 });
-vi.mock("@/components/pdks/dashboard/PDKSEnhancedExportPanel", () => ({ PDKSEnhancedExportPanel: () => null }));
+vi.mock("@/components/pdks/dashboard/PDKSEnhancedExportPanel", () => ({ PDKSEnhancedExportPanel: ({ children }: { children: (menu: ReactNode) => ReactNode }) => children(<div>Dışa aktar</div>) }));
 vi.mock("@/components/pdks/dashboard/PDKSFilterBar", () => ({ PDKSFilterBar: () => null, clearPdksFilters: vi.fn() }));
 vi.mock("@/components/pdks/dashboard/PDKSTableView", () => ({ PDKSTableView: () => <div>Kayıt tablosu</div> }));
 vi.mock("@/components/pdks/dashboard/PDKSHeatmapView", () => ({ PDKSHeatmapView: () => <div>Puantaj tablosu</div> }));
@@ -30,26 +30,33 @@ vi.mock("@/components/pdks/dashboard/PDKSOvertimeAlert", () => ({ PDKSOvertimeAl
 vi.mock("@/components/pdks/dashboard/PDKSSavedViews", () => ({ PDKSSavedViews: () => null }));
 vi.mock("@/components/pdks/PDKSAiChat", () => ({ PDKSAiChat: () => null }));
 describe("PDKS sayfa davranışları", () => {
-  it("D3/D4/D11: pasif günler özette görünür; işe başlamadan önceki gün sayılmaz; günlük analiz kilitlidir", () => {
+  it("D3/D4/D11: pasif günler özette görünür; işe başlamadan önceki gün sayılmaz; Analiz ve düzeltme talebi yok", () => {
     state.reportType = "daily"; state.admin = false;
     const html = renderToStaticMarkup(<PDKSRecords />);
     for (const label of ["Hafta tatili", "Resmî tatil", "Veri yok", "Henüz gelmedi"]) expect(html).toContain(`${label} <strong>1</strong>`);
     expect(html).toContain("Merkez · 19 Ekim 2026");
-    expect(html).toMatch(/disabled=""[^>]*aria-pressed="false"[^>]*>Analiz/);
+    expect(html).not.toContain(">Analiz<");
+    expect(html).not.toContain("Düzeltme talepleri");
     expect(html).toContain("Kayıt tablosu");
     expect(html).not.toContain("İçe aktar");
   });
-  it("O4/D11: içe aktar yöneticiye görünür; haftalıkta analiz kullanılabilir", () => {
+  it("O4/D11: içe aktar yöneticiye görünür; haftalıkta puantaj tablosu gelir", () => {
     state.reportType = "weekly"; state.admin = true;
     const html = renderToStaticMarkup(<PDKSRecords />);
     expect(html).toContain("İçe aktar");
     expect(html).toContain("Puantaj tablosu");
-    expect(html).not.toMatch(/disabled=""[^>]*aria-pressed="false"[^>]*>Analiz/);
+    expect(html).not.toContain("Düzeltme talepleri");
   });
   it("Ayarlar düğmesi yalnız vardiya yöneticisine görünür ve ayrı ayar sayfasına gider", () => {
     state.reportType = "daily"; state.admin = false;
     expect(renderToStaticMarkup(<PDKSRecords />)).not.toContain('href="/pdks-records/settings"');
     state.admin = true;
     expect(renderToStaticMarkup(<PDKSRecords />)).toMatch(/href="\/pdks-records\/settings"[^>]*>.*Ayarlar/);
+  });
+  it("Dışa aktar İşlemler menüsünde; ayrı Dışa aktar/Diğer düğmesi yok", () => {
+    state.reportType = "daily"; state.admin = true;
+    const html = renderToStaticMarkup(<PDKSRecords />);
+    expect(html).toMatch(/>İşlemler<\/button>.*Dışa aktar.*İçe aktar.*Uyarılar.*Asistan/);
+    expect(html).not.toContain(">Diğer<");
   });
 });

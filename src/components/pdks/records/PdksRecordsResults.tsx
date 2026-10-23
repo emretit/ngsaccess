@@ -4,11 +4,10 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { BulkBar } from "@/components/shared/BulkBar";
 import { clearPdksFilters } from "@/components/pdks/dashboard/PDKSFilterBar";
-import { PDKSChartView } from "@/components/pdks/dashboard/PDKSChartView";
 import { PDKSTableView } from "@/components/pdks/dashboard/PDKSTableView";
 import { PDKSHeatmapView } from "@/components/pdks/dashboard/PDKSHeatmapView";
 export function PdksRecordsResults({ view }: { view: PdksRecordsView }) {
-  const { projectLoading, isLoading, projectId, selectedIds, setSelection, scope, records, hasFilters, setSmartPreset, setFilters, filters, navigate, analysis, activeProject, dateRangeLabel, filterSummary, openDetail, selectedDateKey, startDate, endDate } = view;
+  const { projectLoading, isLoading, projectId, selectedIds, setSelection, scope, records, hasFilters, setSmartPreset, setFilters, filters, navigate, openDetail, selectedDateKey, startDate, endDate } = view;
   return (<>
       {projectLoading || isLoading ? (
         <SectionSkeleton rows={6} label="PDKS kayıtları yükleniyor." />
@@ -49,11 +48,6 @@ export function PdksRecordsResults({ view }: { view: PdksRecordsView }) {
                   } else navigate("/employees");
                 },
               }}
-            />
-          ) : analysis && filters.reportType !== "daily" ? (
-            <PDKSChartView
-              records={records}
-              scope={`${activeProject?.name} · ${dateRangeLabel} · ${filterSummary}`}
             />
           ) : filters.reportType === "daily" ? (
             <PDKSTableView
