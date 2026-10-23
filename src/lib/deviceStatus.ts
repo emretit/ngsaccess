@@ -17,7 +17,7 @@ export function computeDeviceStatus(
     : "offline";
 }
 
-export { deviceConnection } from "../../convex/lib/deviceConnection";
+export { deviceConnection, deviceLastSignal } from "../../convex/lib/deviceConnection";
 
 export function commandResultMessage(result: { ok: boolean; queued?: boolean; error?: string }): string {
   if (!result.ok) return errorMessage(result.error ?? "İşlem başarısız");

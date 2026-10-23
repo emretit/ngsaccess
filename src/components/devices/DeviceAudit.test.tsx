@@ -141,6 +141,20 @@ describe("cihaz audit görünümü", () => {
     expect(never).not.toContain("status-warning-badge");
     expect(never).not.toContain("önce");
   });
+  it("çevrimiçide süre yazmaz; ISUP cihazında kopma anını eski hikLastSeenAt yerine gösterir", () => {
+    vi.useFakeTimers({ now: new Date("2026-10-23T11:00:00Z") });
+    const row = (patch: Partial<Device>) => renderToStaticMarkup(
+      <table><tbody><DeviceTableRow device={{ ...device, hikTransport: "gateway", hikLastSeenAt: Date.parse("2026-10-23T08:34:00Z"), ...patch }} selected={false} onSelect={noop} onDeleteDevice={noop} onEditDevice={noop} /></tbody></table>,
+    );
+    try {
+      expect(row({ connectionStatus: "online", hikIsupOnline: true, hikIsupStatusAt: Date.parse("2026-10-23T10:52:00Z") })).not.toContain("önce");
+      const offline = row({ hikIsupOnline: false, hikIsupStatusAt: Date.parse("2026-10-23T10:52:00Z"), hikIsupOfflineSince: Date.parse("2026-10-23T10:51:00Z") });
+      expect(offline).toContain('title="23.10.2026 13:51"');
+      expect(offline).toContain("9 dakika önce");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("seçim hücresinin boş alanına dokunmak cihazı bir kez seçer", () => {
     const select = vi.fn();
     renderToStaticMarkup(

@@ -31,6 +31,9 @@ export interface Device {
   hikModel?: string;
   hikLastSeenAt?: number;
   hikOfflineHint?: string;
+  hikIsupOnline?: boolean;
+  hikIsupStatusAt?: number;
+  hikIsupOfflineSince?: number;
   hikTransport?: "gateway" | "localBridge";
   hikDoorCount?: number;
   hikPort?: number;

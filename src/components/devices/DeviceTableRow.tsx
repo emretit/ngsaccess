@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Device } from "@/types/device";
+import { deviceLastSignal } from "@/lib/deviceStatus";
 import { Edit2, Trash2, MapPin, QrCode, Undo2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -69,13 +70,9 @@ export function DeviceTableRow({
     </StatusBadge>
   );
 
-  const lastSeenValue =
-    device.brand === "hikvision" && device.hikTransport !== "localBridge"
-      ? (device.hikLastSeenAt ?? device.lastSeen)
-      : device.lastSeen;
-  const lastSeen = lastSeenValue === undefined ? null : new Date(lastSeenValue);
-  const validLastSeen =
-    lastSeen && !Number.isNaN(lastSeen.getTime()) ? lastSeen : null;
+  // Çevrimdışı cihazda kopma anı; durumla aynı sinyalden (ISUP anlık durumu dahil) okunur.
+  const offlineSince =
+    device.connectionStatus === "offline" ? deviceLastSignal(device) : undefined;
   const brandModel = [deviceBrandLabel(device.brand), device.hikModel?.trim()]
     .filter(Boolean)
     .join(" · ");
@@ -153,13 +150,13 @@ export function DeviceTableRow({
       )}
       <TableCell className="px-1 whitespace-normal [&_span]:whitespace-normal">
         {getStatusBadge()}
-        {validLastSeen && device.connectionStatus !== "never" && (
+        {offlineSince !== undefined && (
           <span
             className="block text-xs text-muted-foreground"
-            title={formatTrDateTime(validLastSeen)}
+            title={formatTrDateTime(offlineSince)}
           >
             ·{" "}
-            {formatDistanceToNow(validLastSeen, {
+            {formatDistanceToNow(offlineSince, {
               addSuffix: true,
               locale: tr,
             })}

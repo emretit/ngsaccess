@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { notify } from "@/lib/notify";
+import { deviceLastSignal } from "@/lib/deviceStatus";
 import { deviceDateTime } from "./deviceAdapter";
 import { Metric } from "./DeviceCenterMetric";
 import type { DeviceCenterView } from "./deviceCenterView";
@@ -15,12 +16,7 @@ export function DeviceConnectionSection({
   DeviceCenterView,
   "overview" | "adapter" | "connected" | "connection"
 >) {
-  const lastSignal = deviceDateTime(
-    overview.device.brand === "hikvision" &&
-      overview.device.hikTransport !== "localBridge"
-      ? (overview.device.hikLastSeenAt ?? overview.device.lastSeen)
-      : overview.device.lastSeen,
-  );
+  const lastSignal = deviceDateTime(deviceLastSignal(overview.device));
   return (
     <section className="min-w-0 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
