@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Logo from '@/components/ui/logo';
 import { usePublicTheme } from '@/hooks/usePublicTheme';
 import { PublicFooter } from './PublicFooter';
+import '@/components/public/public.css';
 
 type AuthShellProps = {
   title: string;
@@ -36,7 +37,7 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
             </Link>
           </header>
           <div className="mx-auto my-10 w-full max-w-[var(--public-form-max)] sm:my-12 lg:my-[72px] [&_input]:min-h-12 [&_input]:border-control [&_input]:bg-surface [&_input]:text-base [&_label]:text-sm [&_button[type=submit]]:min-h-12 [&_button[type=submit]]:text-[15px] [&_button]:font-semibold [&_button]:shadow-none">
-            <h1 className="mb-3.5 text-[30px] font-semibold leading-[1.12] tracking-[-.035em] sm:text-4xl">
+            <h1 className="mb-3.5 text-[30px] font-(family-name:--public-display) font-bold leading-[1.12] tracking-[-.025em] sm:text-4xl">
               {title}
             </h1>
             <p className="mb-7 text-[15px] leading-[1.6] text-muted-foreground sm:mb-8 sm:text-base">
@@ -51,14 +52,14 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
           </div>
           <p className="mt-auto text-[13px] leading-relaxed text-muted-foreground">
             Yardıma ihtiyacınız varsa{' '}
-            <a href="mailto:info@ngsplus.app" className="underline underline-offset-4">
-              info@ngsplus.app
+            <a href="mailto:info@ngsteknoloji.com" className="underline underline-offset-4">
+              info@ngsteknoloji.com
             </a>
           </p>
         </section>
         <aside className="hidden min-w-0 flex-col justify-center gap-10 bg-side-bg px-8 py-18 text-side-text lg:flex xl:px-12">
           <div>
-            <h2 className="max-w-[520px] text-[40px] font-semibold leading-[1.12] tracking-[-.035em]">
+            <h2 className="max-w-[520px] text-[40px] font-(family-name:--public-display) font-bold leading-[1.12] tracking-[-.025em]">
               İşyerinizin günlük akışı,
               <br />
               aynı ekranda.
@@ -68,11 +69,7 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
             </p>
           </div>
           <figure>
-            <a
-              href="/marketing/ana-sayfa-1600.webp"
-              aria-label="Ana Sayfa: proje özeti ve son kart okumaları: büyük görseli aç"
-              className="block overflow-hidden rounded-lg border border-line bg-surface shadow-[var(--public-shot-shadow)] focus-visible:outline-side-indicator"
-            >
+            <div className="overflow-hidden rounded-lg border border-line bg-surface shadow-[var(--public-shot-shadow)]">
               <img
                 src="/marketing/ana-sayfa-1600.webp"
                 srcSet="/marketing/ana-sayfa-800.webp 800w, /marketing/ana-sayfa-1600.webp 1600w"
@@ -82,7 +79,7 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
                 alt="Ana Sayfa: proje özeti ve son kart okumaları"
                 className="h-auto w-full"
               />
-            </a>
+            </div>
             <figcaption className="pt-3 text-xs text-side-muted">
               NGS Plus ürün ekranı · Örnek proje ve kayıtlar
             </figcaption>

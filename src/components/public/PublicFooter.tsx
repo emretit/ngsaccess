@@ -11,6 +11,7 @@ export function PublicFooter() {
             <Logo tone="dark" size="md" />
           </Link>
           <p>{copy.footerDescription}</p>
+          <p>{copy.footerLocation}</p>
         </div>
         <nav className="pub-footer-links" aria-label="Alt menü">
           <Link to="/#ozellikler">{copy.nav[0].label}</Link>
@@ -21,7 +22,9 @@ export function PublicFooter() {
       <div className="pub-footer-bottom">
         <p>© {new Date().getFullYear()} NGS Plus</p>
         <p>
-          {copy.footerPrivacy} <a href={`mailto:${copy.email}`}>{copy.email}</a>
+          <span>{copy.footerPrivacy}</span>
+          <a href={`mailto:${copy.email}`}>{copy.email}</a>
+          <a href={copy.phoneHref}>{copy.phone}</a>
         </p>
       </div>
     </footer>

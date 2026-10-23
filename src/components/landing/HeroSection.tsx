@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import ProductShot from '@/components/public/ProductShot';
 import { marketingFacts as copy } from './marketingFacts';
+import LiveFeedDemo from './LiveFeedDemo';
+import HardwareStrip from './HardwareStrip';
 import { LandingTitle } from './LandingTitle';
 export default function HeroSection() {
   return (
@@ -11,8 +13,6 @@ export default function HeroSection() {
             <h1>
               <LandingTitle text={copy.heroTitle} />
             </h1>
-          </div>
-          <div>
             <p className="pub-lead">{copy.heroDescription}</p>
             <div className="pub-actions">
               <Link className="pub-btn" to="/register">
@@ -24,29 +24,30 @@ export default function HeroSection() {
             </div>
             <p className="pub-small">{copy.accountDescription}</p>
           </div>
+          <LiveFeedDemo />
         </div>
       </section>
       <div className="pub-hero-shot pub-wrap">
         <ProductShot
-          name="ana-sayfa"
+          src="/marketing/ana-sayfa-2400.webp"
+          srcSet="/marketing/ana-sayfa-2400.webp 2400w"
+          width={2400}
+          height={1500}
+          mobile={{
+            media: '(max-width: 600px)',
+            src: '/marketing/ana-sayfa-m-1400.webp',
+            srcSet: '/marketing/ana-sayfa-m-700.webp 700w, /marketing/ana-sayfa-m-1400.webp 1400w',
+            width: 1400,
+            height: 1835,
+          }}
           alt={copy.heroAlt}
           priority
           elevated
-          caption={copy.productCaption}
+          caption={copy.heroCaption}
           sizes="(max-width: 600px) calc(100vw - 40px), (max-width: 1264px) calc(100vw - 64px), 1200px"
         />
       </div>
-      <div className="pub-wrap">
-        <div className="pub-hardware">
-          <p>{copy.hardware[0]}</p>
-          <div className="pub-hardware-brands">
-            {copy.hardwareBrands.map((brand) => (
-              <span key={brand}>{brand}</span>
-            ))}
-          </div>
-          <p>{copy.hardware[1]}</p>
-        </div>
-      </div>
+      <HardwareStrip />
     </>
   );
 }

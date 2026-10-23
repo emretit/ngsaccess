@@ -2,7 +2,7 @@ import Section from '@/components/public/Section';
 import { marketingFacts as copy } from './marketingFacts';
 export default function HowItWorksSection() {
   return (
-    <Section id="kurulum" title={copy.setupTitle} description={copy.setupDescription}>
+    <Section id="kurulum" title={copy.setupTitle}>
       <div className="pub-steps">
         {copy.steps.map((step, i) => (
           <article className="pub-step" key={step.title}>

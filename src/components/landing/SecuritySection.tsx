@@ -4,7 +4,7 @@ import { LandingTitle } from './LandingTitle';
 export default function SecuritySection() {
   const [privacyIntro] = copy.privacyContact.split(copy.email);
   return (
-    <Section id="guvenlik" className="pub-security">
+    <Section id="guvenlik" className="pub-security pub-band">
       <div className="pub-security-intro">
         <h2>
           <LandingTitle text={copy.securityTitle} />

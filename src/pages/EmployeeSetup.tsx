@@ -61,7 +61,7 @@ export default function EmployeeSetup() {
     void savePassword.run();
   };
 
-  const support = { label: 'Destek: info@ngsplus.app', href: 'mailto:info@ngsplus.app' };
+  const support = { label: 'Destek: info@ngsteknoloji.com', href: 'mailto:info@ngsteknoloji.com' };
   if (!token)
     return (
       <StatusScreen

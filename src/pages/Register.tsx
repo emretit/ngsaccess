@@ -176,8 +176,8 @@ export default function Register() {
       </p>
       <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
         Kişisel verileriniz hesap oluşturmak için işlenir. Aydınlatma metnini talep etmek için{' '}
-        <a href="mailto:info@ngsplus.app" className="underline underline-offset-4">
-          info@ngsplus.app
+        <a href="mailto:info@ngsteknoloji.com" className="underline underline-offset-4">
+          info@ngsteknoloji.com
         </a>{' '}
         adresine yazabilirsiniz.
       </p>

@@ -9,7 +9,6 @@ export default function FinalCTASection() {
           <h2>
             <LandingTitle text={copy.finalTitle} />
           </h2>
-          <p>{copy.accountDescription}</p>
         </div>
         <div className="pub-actions">
           <Link className="pub-btn" to="/register">

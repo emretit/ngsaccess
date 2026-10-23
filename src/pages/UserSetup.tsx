@@ -158,7 +158,7 @@ export default function UserSetup() {
             : 'Bağlantı eksik, kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni davet isteyin.'
         }
         primaryAction={{ label: 'Giriş yap', href: '/login' }}
-        secondaryAction={{ label: 'Destek: info@ngsplus.app', href: 'mailto:info@ngsplus.app' }}
+        secondaryAction={{ label: 'Destek: info@ngsteknoloji.com', href: 'mailto:info@ngsteknoloji.com' }}
       />
     );
   if (inviteData === undefined)

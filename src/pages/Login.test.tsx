@@ -52,7 +52,7 @@ describe('Login', () => {
     expect(html).toMatch(/<details[^>]*><summary[^>]*>Şifremi unuttum<\/summary><p/);
     expect(html).not.toMatch(/<details[^>]*open/);
     expect(html).toContain('Şifrenizi yöneticiniz sıfırlayabilir. Yöneticinize ulaşamıyorsanız');
-    expect(html).toContain('href="mailto:info@ngsplus.app"');
+    expect(html).toContain('href="mailto:info@ngsteknoloji.com"');
     expect(html.match(/<h1\b/g)).toHaveLength(1);
   });
 });

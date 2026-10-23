@@ -7,7 +7,7 @@
   <script id="theme-bootstrap">
     (() => {
       try {
-        const prefixes = ['/home', '/employees', '/devices', '/virtual-readers', '/access-control', '/visitors', '/live-monitoring', '/pdks-records', '/shifts', '/leaves', '/reports', '/audit-log', '/alarms', '/engineering-department', '/system-admin', '/settings', '/profile'];
+        const prefixes = ['/home', '/employees', '/devices', '/access-control', '/visitors', '/live-monitoring', '/pdks-records', '/shifts', '/leaves', '/reports', '/audit-log', '/alarms', '/engineering-department', '/system-admin', '/settings', '/profile'];
         const path = location.pathname;
         if (!prefixes.some(prefix => path === prefix || path.startsWith(prefix + '/'))) return;
         const scope = JSON.parse(localStorage.getItem('ngs.theme.activeScope.v1') || 'null');
@@ -19,8 +19,8 @@
     })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Personel ve geçiş yönetimi · NGS Plus</title>
-  <meta name="description" content="Personel girişlerini, kapı yetkilerini ve çalışma planlarını NGS Plus ile aynı yerde takip edin." />
+  <title>Bulut PDKS ve Geçiş Kontrol Sistemi · NGS Plus</title>
+  <meta name="description" content="Kart, terminal ve QR ile yapılan giriş-çıkışlar puantaja dönüşür; kapı yetkileri, vardiya ve izinler aynı bulut hesapta." />
   <meta name="keywords" content="PDKS, personel devam kontrol, QR giriş çıkış, kart okuyucu, vardiya yönetimi, izin takibi, Hikvision, bulut PDKS" />
   <meta name="author" content="NGS Plus" />
   <meta name="theme-color" content="#711A1A" />
@@ -31,8 +31,8 @@
   <link rel="manifest" href="/branding/site.webmanifest">
 
   <!-- Open Graph -->
-  <meta property="og:title" content="Personel ve geçiş yönetimi · NGS Plus" />
-  <meta property="og:description" content="Personel girişlerini, kapı yetkilerini ve çalışma planlarını NGS Plus ile aynı yerde takip edin." />
+  <meta property="og:title" content="Bulut PDKS ve Geçiş Kontrol Sistemi · NGS Plus" />
+  <meta property="og:description" content="Kart, terminal ve QR ile yapılan giriş-çıkışlar puantaja dönüşür; kapı yetkileri, vardiya ve izinler aynı bulut hesapta." />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="tr_TR" />
   <meta property="og:image" content="https://ngsplus.app/branding/og-image.png" />
@@ -43,8 +43,8 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:site" content="@ngsplus_app" />
-  <meta name="twitter:title" content="Personel ve geçiş yönetimi · NGS Plus" />
-  <meta name="twitter:description" content="Personel girişlerini, kapı yetkilerini ve çalışma planlarını NGS Plus ile aynı yerde takip edin." />
+  <meta name="twitter:title" content="Bulut PDKS ve Geçiş Kontrol Sistemi · NGS Plus" />
+  <meta name="twitter:description" content="Kart, terminal ve QR ile yapılan giriş-çıkışlar puantaja dönüşür; kapı yetkileri, vardiya ve izinler aynı bulut hesapta." />
   <meta name="twitter:image" content="https://ngsplus.app/branding/og-image.png" />
 
   <!-- Organization JSON-LD -->
@@ -55,7 +55,7 @@
     "name": "NGS Plus",
     "url": "https://ngsplus.app",
     "logo": "https://ngsplus.app/branding/logo-brand.svg",
-    "email": "info@ngsplus.app",
+    "email": "info@ngsteknoloji.com",
     "telephone": "+90-212-577-3572",
     "address": {
       "@type": "PostalAddress",

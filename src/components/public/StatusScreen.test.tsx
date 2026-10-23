@@ -11,7 +11,7 @@ const render = (tone: 'loading' | 'success' | 'error' | 'info') =>
         title="Durum başlığı"
         description="Durum açıklaması"
         primaryAction={{ label: 'Giriş yap', href: '/login' }}
-        secondaryAction={{ label: 'Destek', href: 'mailto:info@ngsplus.app' }}
+        secondaryAction={{ label: 'Destek', href: 'mailto:info@ngsteknoloji.com' }}
       >
         <p>Ek içerik</p>
       </StatusScreen>
@@ -26,7 +26,7 @@ describe('StatusScreen', () => {
       expect(html.match(/<h1\b/g)).toHaveLength(1);
       expect(html.match(/<main\b/g)).toHaveLength(1);
       expect(html).toContain('href="/login"');
-      expect(html).toContain('href="mailto:info@ngsplus.app"');
+      expect(html).toContain('href="mailto:info@ngsteknoloji.com"');
       expect(html).toContain('Ek içerik');
       expect(html).not.toMatch(/<main[^>]*aria-live/);
     },

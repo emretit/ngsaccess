@@ -13,7 +13,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { usePublicTheme } from '@/hooks/usePublicTheme';
 
 export default function LandingPage() {
-  usePageTitle('Personel ve geçiş yönetimi');
+  usePageTitle('Bulut PDKS ve Geçiş Kontrol Sistemi');
   usePublicTheme();
   const { hash, key } = useLocation();
   useEffect(() => {

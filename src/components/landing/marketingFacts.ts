@@ -1,16 +1,34 @@
 export const marketingFacts = {
   accountCta: 'Hesap oluştur',
-  accountDescription:
-    'Bu işlem bir kullanıcı hesabı oluşturur. Satış talebi göndermez ve ücretli plan satın almaz.',
-  setupDescription: 'Hesabınızı oluşturun, projenizi adım adım hazırlayın.',
+  accountDescription: 'Hesap oluşturmak ücretli plan satın almaz.',
   planDescription:
-    'Plan kapsamı, çalışan kapasitesi ve ücretlendirme kuruluşunuzun ihtiyaçlarına göre netleştirilir. Hesap oluşturmak ücretli plan satın almaz.',
+    'Plan kapsamı, çalışan kapasitesi ve ücretlendirme kuruluşunuzun ihtiyaçlarına göre netleştirilir.',
   mobileDescription:
     'Mobil uygulama yakında. Şimdilik işyerinizin web QR girişini kullanın; erişim için yöneticinize başvurun.',
-  heroTitle: 'İşyerindeki hareketi <br>tek yerden yönetin.',
+  heroTitle: 'Bulut PDKS ve <br>Geçiş\u00a0Kontrol Sistemi',
   heroDescription:
-    'Personel girişlerini, kapı yetkilerini ve çalışma planlarını NGS Plus ile aynı yerde takip edin.',
-  productCaption: 'NGS Plus ürün ekranı · Örnek proje ve kayıtlar',
+    'Kart, terminal ve QR ile yapılan giriş-çıkışlar puantaja dönüşür; kapı yetkileri, vardiya ve izinler aynı bulut hesapta.',
+  heroCaption: 'Ana Sayfa: günün özeti ve son kart okutmaları. Ekranlardaki veriler örnektir.',
+  liveFeed: {
+    title: 'Canlı İzleme',
+    badge: 'Canlı',
+    sample: 'Örnek veri',
+    pause: 'Durdur',
+    resume: 'Sürdür',
+    allowed: 'İzin verildi',
+    denied: 'Reddedildi',
+    label: 'Canlı İzleme örneği: kart okutmaları izin verildi veya reddedildi olarak listelenir.',
+    events: [
+      { name: 'Deniz A.', door: 'Otopark', result: 'denied', reason: 'Yetki yok' },
+      { name: 'Burak Y.', door: 'Ana Giriş', result: 'allowed' },
+      { name: 'Selin K.', door: 'Ana Giriş', result: 'allowed' },
+      { name: 'Mert Ç.', door: 'Depo', result: 'allowed' },
+      { name: 'Elif Ş.', door: 'Lobi', result: 'denied', reason: 'Saat dışı' },
+      { name: 'Can Ö.', door: 'Ana Giriş', result: 'allowed' },
+      { name: 'Ece A.', door: 'Otopark', result: 'allowed' },
+      { name: 'Zeynep K.', door: 'Depo', result: 'denied', reason: 'Kart tanımlı değil' },
+    ],
+  },
   nav: [
     {
       href: '/#ozellikler',
@@ -34,11 +52,13 @@ export const marketingFacts = {
   skipLabel: 'İçeriğe geç',
   heroSecondary: 'Özellikleri incele',
   heroAlt: 'Ana Sayfa: proje özeti, personel ve son kart okumaları',
-  hardware: ['Kart okuyucu entegrasyonları', 'Model ve bağlantı uygunluğunu birlikte değerlendirelim.'],
-  hardwareBrands: ['Hikvision', 'IDE Smart'],
-  featuresTitle: 'Günün tamamı.<br>Aynı çalışma alanı.',
-  featuresDescription:
-    'Kapıdaki ilk geçişten çalışma raporuna kadar, ihtiyacınız olan kayıtlar ve kontroller bir arada.',
+  hardware: [
+    'Entegre olduğumuz markalar',
+    'Cihaz modelinizin uygunluğunu kurulumdan önce birlikte değerlendirelim.',
+  ],
+  hardwareBrands: ['Hikvision', 'Dahua', 'IDE Smart', 'Mavisoft'],
+  featuresTitle: 'Kapıdan puantaja,<br>günün bütün kaydı.',
+  featuresDescription: 'Kart okutması geçiş kaydına, geçiş kaydı puantaja dönüşür.',
   features: [
     {
       name: 'Canlı İzleme',
@@ -50,7 +70,8 @@ export const marketingFacts = {
         'Akışı duraklatıp kayıtları kendi hızınızda kontrol edin.',
       ],
       shot: 'canli-izleme',
-      alt: 'Canlı İzleme: örnek proje ekranı',
+      alt: 'Canlı İzleme: izin verilen ve reddedilen kart okutmaları, red nedenleriyle',
+      caption: 'Reddedilen geçişin nedeni satırda yazar.',
     },
     {
       name: 'PDKS Kayıtları',
@@ -62,7 +83,8 @@ export const marketingFacts = {
         'PDKS yapay zekâ asistanına kayıtlarınızla ilgili soru sorun.',
       ],
       shot: 'pdks-kayitlari',
-      alt: 'PDKS Kayıtları: örnek proje ekranı',
+      alt: 'PDKS Kayıtları: kişi bazında giriş, çıkış ve çalışma süreleri tablosu',
+      caption: 'Günlük, haftalık, aylık görünüm; Excel ve PDF çıktısı.',
     },
     {
       name: 'Geçiş Kontrol',
@@ -74,7 +96,8 @@ export const marketingFacts = {
         'Ziyaretçi kayıtlarını aynı projede takip edin.',
       ],
       shot: 'gecis-kontrol',
-      alt: 'Geçiş Kontrol: örnek proje ekranı',
+      alt: 'Geçiş Kontrol: kişi, kapı ve saat aralığıyla tanımlanmış geçiş kuralları',
+      caption: 'Her kural kişi, kapı ve saat aralığıyla tanımlanır.',
     },
     {
       name: 'Vardiya ve İzin',
@@ -86,10 +109,11 @@ export const marketingFacts = {
         'Günlük çalışma planını takvim üzerinde inceleyin.',
       ],
       shot: 'vardiyalar',
-      alt: 'Vardiya ve İzin: örnek proje ekranı',
+      alt: 'Vardiyalar: haftalık takvimde gündüz ve gece vardiyaları, yıllık izin günleri',
+      caption: 'Gece vardiyası ertesi güne taşar, izinler takvimde görünür.',
     },
   ],
-  setupTitle: 'Çalışma alanınızı<br>adım adım hazırlayın.',
+  setupTitle: 'Üç adımda kurulum.',
   steps: [
     {
       title: 'Projenizi açın.',
@@ -104,31 +128,33 @@ export const marketingFacts = {
       description: 'Personeli tanımlayın, geçiş yetkilerini ve çalışma planını düzenleyin.',
     },
   ],
-  securityTitle: 'Erişimi tanımlayın.<br>İşlemleri izleyin.',
-  securityDescription: 'Proje, rol ve denetim kaydıyla yönetim alanınızın sınırlarını belirleyin.',
+  securityTitle: 'Kim neyi görür,<br>kim neyi değiştirir?',
+  securityDescription: 'Erişim projeye, yetki role bağlıdır. Her yönetim işlemi kayda geçer.',
   privacyContact:
-    'Kişisel verilerin işlenmesine ilişkin bilgi ve aydınlatma metni talepleriniz için info@ngsplus.app.',
+    'Kişisel verilerin işlenmesine ilişkin bilgi ve aydınlatma metni talepleriniz için info@ngsteknoloji.com.',
   securityItems: [
     {
       title: 'Proje bazlı erişim',
-      description: 'Kullanıcılar, yetkili oldukları projelerin verileriyle çalışır.',
+      description: 'Her kullanıcı yalnız yetkili olduğu projelerin kayıtlarını görür.',
     },
     {
-      title: 'Roller ve yetkiler',
-      description: 'Yönetim işlemlerini kullanıcının rolüne göre sınırlandırın.',
+      title: '5 rol, 13 yetki',
+      description: 'Kimin kapı açacağı, kimin ücret bilgisini göreceği role göre belirlenir.',
     },
     {
       title: 'Denetim kaydı',
-      description: 'Yönetim işlemlerinin kayıtlarını inceleyin.',
+      description: 'Kim, neyi, ne zaman değiştirdi; Denetim Kaydı sayfasında.',
     },
   ],
   contactTitle: 'İşyerinize uygun<br>kapsamı konuşalım.',
   contactNote: 'Plan ve kullanım koşulları için bize ulaşın.',
   contactHelp: 'Cihaz uyumluluğu ve kurulum için de yazabilirsiniz.',
-  email: 'info@ngsplus.app',
+  contactLabels: { email: 'E-posta', phone: 'Telefon', location: 'Konum' },
+  email: 'info@ngsteknoloji.com',
   phone: '0 (212) 577 35 72',
   phoneHref: 'tel:+902125773572',
   faqTitle: 'Merak ettikleriniz.',
+  faqHelp: 'Cevabını bulamadığınız soruları bize yazın:',
   faq: [
     {
       question: 'Hesap oluşturduğumda ne olur?',
@@ -137,7 +163,7 @@ export const marketingFacts = {
     {
       question: 'Mevcut kart okuyucularımı kullanabilir miyim?',
       answer:
-        'Hikvision ve IDE Smart entegrasyonları desteklenir. Modelinizin ve bağlantı yönteminizin uygunluğunu kurulumdan önce bizimle değerlendirin.',
+        'Hikvision, Dahua, IDE Smart ve Mavisoft entegrasyonları desteklenir. Modelinizin ve bağlantı yönteminizin uygunluğunu kurulumdan önce bizimle değerlendirin.',
     },
     {
       question: 'QR ile giriş nasıl çalışır?',
@@ -156,11 +182,11 @@ export const marketingFacts = {
     {
       question: 'Plan ve kullanım koşullarını nasıl öğrenebilirim?',
       answer:
-        'Plan kapsamı, çalışan kapasitesi ve ücretlendirme için info@ngsplus.app adresine yazın veya 0 (212) 577 35 72 numarasını arayın.',
+        'Plan kapsamı, çalışan kapasitesi ve ücretlendirme için info@ngsteknoloji.com adresine yazın veya 0 (212) 577 35 72 numarasını arayın.',
     },
   ],
-  finalTitle: 'İşyerinizi NGS Plus ile<br>yönetmeye başlayın.',
-  footerDescription: 'Personel ve geçiş yönetimi.',
+  finalTitle: 'Projenizi açın,<br>ilk kapıyı bağlayın.',
+  footerDescription: 'Personel ve geçiş yönetimi. NGS Plus, NGS Teknoloji ürünüdür.',
+  footerLocation: 'Kadıköy, İstanbul',
   footerPrivacy: 'Bilgi ve aydınlatma metni talepleri:',
-  extraShot: 'İzinler ekranını incele',
 } as const;

@@ -197,8 +197,8 @@ export default function Login() {
           </summary>
           <p className="pb-3 text-[13px] leading-relaxed text-muted-foreground">
             Şifrenizi yöneticiniz sıfırlayabilir. Yöneticinize ulaşamıyorsanız{' '}
-            <a href="mailto:info@ngsplus.app" className="underline">
-              info@ngsplus.app
+            <a href="mailto:info@ngsteknoloji.com" className="underline">
+              info@ngsteknoloji.com
             </a>{' '}
             adresine yazın.
           </p>

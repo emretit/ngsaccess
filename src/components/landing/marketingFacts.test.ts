@@ -22,6 +22,6 @@ describe('public marketing claims', () => {
   });
   it('keeps four visible features and the approved hardware integrations', () => {
     expect(marketingFacts.features).toHaveLength(4);
-    expect(marketingFacts.hardwareBrands).toEqual(['Hikvision', 'IDE Smart']);
+    expect(marketingFacts.hardwareBrands).toEqual(['Hikvision', 'Dahua', 'IDE Smart', 'Mavisoft']);
   });
 });

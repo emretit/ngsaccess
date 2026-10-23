@@ -193,7 +193,7 @@ export default function CheckIn() {
             ? 'İşyerinizdeki güncel QR giriş bağlantısını kullanın. Yardım için yöneticinize başvurun.'
             : 'Giriş bağlantısını yöneticinizle kontrol edin.'
       }
-      secondaryAction={{ label: 'Destek: info@ngsplus.app', href: 'mailto:info@ngsplus.app' }}
+      secondaryAction={{ label: 'Destek: info@ngsteknoloji.com', href: 'mailto:info@ngsteknoloji.com' }}
     >
       {failure === 'invalid' && (
         <p className="text-xs leading-relaxed text-muted-foreground">
