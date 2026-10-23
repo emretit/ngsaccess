@@ -31,7 +31,7 @@ vi.mock("convex/react", () => ({
 vi.mock("@/components/shared/PageHeader", () => ({ PageHeader: (props: PageHeaderProps) => { state.primary = props.primaryAction; return <h1>{props.title}</h1>; } }));
 vi.mock("@/components/ui/dialog", () => {
   const Box = ({ children }: { children: ReactNode }) => <div>{children}</div>;
-  return { Dialog: Box, DialogContent: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>, DialogHeader: Box, DialogTitle: Box, DialogDescription: Box };
+  return { Dialog: Box, DialogContent: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>, DialogHeader: Box, DialogTitle: Box, DialogDescription: Box, DialogFooter: Box };
 });
 const employee = { _id: "employee", projectId: "project", firstName: "İpek", lastName: "Yıldız" } as Employee;
 const shift = { _id: "night", projectId: "project", name: "Gece", startTime: "22:00", endTime: "06:00", isActive: true } as Shift;
@@ -48,11 +48,16 @@ beforeEach(() => {
 describe("09 denetim düzeltmeleri", () => {
   it("O1/O2/D1/D2/D5: tanımsız projede eylem tanımı açar, imkânsız atama ipucu ve gün sayacı yoktur", () => {
     const html = renderToStaticMarkup(<MemoryRouter><ShiftCalendarView projectId={"project" as Id<"projects">} projectName="Proje" /></MemoryRouter>);
-    expect(state.primary?.label).toBe("Önce vardiya tanımla");
+    expect(state.primary).toBeUndefined();
+    expect(html).toContain("Vardiya tanımlarına git");
+    expect(html).toContain("Atama yapmak için önce bir vardiya tanımlayın.");
+    expect(html).not.toContain("Vardiya takvimi");
+    expect(html).not.toContain("Çalışan ara");
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+    expect(html).not.toContain("çalışan · İstanbul saati");
     expect(html).not.toContain("Boş bir gün seçerek");
     expect(html).not.toContain(">Gün<");
-    expect(html).toContain("flex flex-col gap-1");
-    expect(html).toContain('role="combobox"');
+    expect(html).not.toContain('role="combobox"');
     expect(html).not.toMatch(/<select(?! aria-hidden="true")/);
     expect(state.calls).not.toContain("shifts:definitionImpacts");
     expect(state.calls).not.toContain("shifts:assignmentDeleteImpact");
@@ -61,7 +66,8 @@ describe("09 denetim düzeltmeleri", () => {
     state.shifts = [shift];
     const html = renderToStaticMarkup(<MemoryRouter><ShiftCalendarView projectId={"project" as Id<"projects">} projectName="Proje" /></MemoryRouter>);
     expect(state.primary?.label).toBe("Vardiya ata");
-    expect(html).toContain("Boş bir gün seçerek");
+    expect(html).toContain("Bu dönemde atama yok.");
+    expect(html).not.toContain("Boş bir gün seçerek");
   });
   it("O2/O3/O4: gün ayrıntısı Türkçe seri tarihlerini ve gece etiketini gösterir, pasif atamanın nedenini açıklar", () => {
     const html = renderToStaticMarkup(<ShiftDayDetails employee={employee} date="2026-10-19" data={cellData(employee, "2026-10-19", [assignment], [shift], [], [])} canAssign={false} onClose={() => undefined} onAssign={() => undefined} onEdit={() => undefined} />);

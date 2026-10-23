@@ -25,11 +25,13 @@ describe("Sabit / Esnek vardiya formu", () => {
   it("esnek geçişinde gizlenen sabit saatleri kullanmaz; tipli payload pencereleri taşır", () => {
     const payload: ShiftFormPayload = shiftPayloadSchema.parse({ ...fixed, startTime: "", endTime: "", scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE });
     expect(payload).toMatchObject({ scheduleType: "flexible", startTime: "05:00", endTime: "22:00", breakStart: null, breakEnd: null, flexible: DEFAULT_FLEXIBLE });
-    const html = render({ ...payload, _id: "shift" as Id<"shifts">, breakStart: undefined, breakEnd: undefined, lateToleranceMinutes: undefined, earlyExitToleranceMinutes: undefined, overtimeStartToleranceMinutes: undefined });
+    const html = render({ ...payload, color: undefined, _id: "shift" as Id<"shifts">, breakStart: undefined, breakEnd: undefined, lateToleranceMinutes: undefined, earlyExitToleranceMinutes: undefined, overtimeStartToleranceMinutes: undefined });
     expect(html).toContain("Günlük net hedef (dk)");
     expect(html).toContain("En geç çıkış günü");
-    expect(html).toContain("Yeni tanım olarak kaydet");
-    expect(html).toContain("gelecek tarihli atayın");
+    // Hesap alanı değişmeden açılan esnek tanım yerinde güncellenir (ad/renk/aktiflik).
+    expect(html).toContain("Ad, renk ve aktiflik bu tanımda güncellenir.");
+    expect(html).not.toContain("Yeni tanım olarak kaydet");
+    expect(html).toContain("Saat veya hesap değişikliği yeni tanım olarak kaydedilir.");
     expect(html).not.toContain("Başlangıç saati");
     expect(html).not.toContain("Geç kalma toleransı");
     expect(html).not.toContain("Mola başlangıcı");
@@ -51,4 +53,10 @@ describe("Sabit / Esnek vardiya formu", () => {
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues.some(issue => issue.message.includes(text))).toBe(true);
   });
+});
+
+it("accepts allowed colors, rejects unknown ones and encodes no color as null", () => {
+  expect(shiftPayloadSchema.parse({ ...fixed, color: "blue" }).color).toBe("blue");
+  expect(shiftPayloadSchema.parse(fixed).color).toBeNull();
+  expect(shiftPayloadSchema.safeParse({ ...fixed, color: "red" }).success).toBe(false);
 });

@@ -42,7 +42,7 @@ describe("Vardiya takvimi erişilebilir sunum sözleşmesi", () => {
     expect(html).toContain('scope="col"');
     expect(html).toContain('scope="row"');
     expect(html).toContain(
-      'aria-label="İpek Yıldız, 20 Ekim 2026 Sal, 1 atama, ayrıntıları aç"',
+      'aria-label="İpek Yıldız, 20 Ekim 2026 Sal, 1 atama: Gece, ayrıntıları aç"',
     );
     expect(html).toContain('role="region"');
     expect(html).toContain('tabindex="0"');
@@ -77,7 +77,7 @@ describe("Vardiya takvimi erişilebilir sunum sözleşmesi", () => {
         }
       />,
     );
-    expect(html).toContain("4 atama, ayrıntıları aç");
+    expect(html).toContain("4 atama: Gece, Gece, Gece, Gece, ayrıntıları aç");
     expect(html).toContain("+2 atama · tümünü gör");
     expect(html.match(/Gece<\/span>/g)).toHaveLength(2);
     expect(html).toContain("Çakışma");
@@ -87,7 +87,7 @@ describe("Vardiya takvimi erişilebilir sunum sözleşmesi", () => {
 
 it("09-D3/D10: başlıkta kısa Türkçe gün, erişilebilir adda tam tarih ve 24px seçim alanı vardır", () => {
   const html = renderToStaticMarkup(<ShiftCalendarGrid {...props} />);
-  expect(html).toContain('<span aria-hidden="true">20 Sal</span>');
+  expect(html).toContain('<span aria-hidden="true">Sal 20</span>');
   expect(html).toContain('<span class="sr-only">20 Ekim 2026 Sal</span>');
   expect(html).toContain("size-6 shrink-0 accent-primary");
   expect(html).not.toContain("2026-10-20");

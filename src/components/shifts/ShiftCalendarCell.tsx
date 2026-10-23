@@ -2,72 +2,75 @@ import { shiftTimeLabel } from "./lib/planning";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { dayLabel, type DayData } from "./lib/planning";
 import { LEAVE_TYPE_LABEL_TR } from "./lib/calendarOverlays";
+import { shiftColorClasses } from "./lib/shiftColors";
+
+export function ShiftDayBadges({ data, compact = false }: { data: DayData; compact?: boolean }) {
+  const badges = [
+    ...(data.conflict ? [{ label: "Çakışma", short: "!", tone: "danger" as const }] : []),
+    ...(data.leave ? [{ label: `${LEAVE_TYPE_LABEL_TR[data.leave.leaveType] ?? data.leave.leaveType} izni`, short: "İ", tone: "info" as const }] : []),
+    ...(data.holiday ? [{ label: `${data.holiday.name}${data.holiday.isHalfDay ? " · Yarım gün" : ""}`, short: "T", tone: "warning" as const }] : []),
+  ];
+  if (!badges.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {badges.map(({ label, short, tone }) => (
+        <StatusBadge key={tone} className={compact ? "px-1 py-0 text-[9px]" : "max-w-full whitespace-normal text-left"} tone={tone} role={compact ? "img" : undefined} aria-label={label} title={label}>
+          {compact ? short : label}
+        </StatusBadge>
+      ))}
+    </div>
+  );
+}
+
+function cellTimeLabel(shift: DayData["records"][number]["shift"], continuation: boolean, compact: boolean) {
+  const flexible = shift.scheduleType === "flexible";
+  if (compact) return flexible ? "Esnek" : `${continuation ? "00:00" : shift.startTime}–${shift.endTime}`;
+  if (!continuation) return shiftTimeLabel(shift);
+  return flexible ? `Önceki günden · ${shiftTimeLabel(shift)}` : `Önceki günden · 00:00–${shift.endTime}`;
+}
+
 export function ShiftCalendarCell({
-  data,
-  date,
-  employeeName,
-  onOpen,
+  data, date, employeeName, onOpen, canAssign = false, compact = false,
 }: {
   data: DayData;
   date: string;
   employeeName: string;
   onOpen?: () => void;
+  canAssign?: boolean;
+  compact?: boolean;
 }) {
+  const limit = compact ? 1 : 2;
   return (
-    <div className="relative min-h-[68px] rounded p-2 text-left text-xs break-words hover:bg-subtle">
+    <div className={`group relative rounded text-left text-xs break-words hover:bg-subtle ${compact ? "min-h-10 p-0.5" : "min-h-[68px] p-2"}`}>
       {onOpen && (
         <button
           type="button"
           onClick={onOpen}
-          aria-label={`${employeeName}, ${dayLabel(date)}, ${data.records.length ? `${data.records.length} atama, ayrıntıları aç` : "atama yok, günü aç"}`}
+          title={compact && data.records.length ? data.records.map(({ shift }) => `${shift.name} · ${shiftTimeLabel(shift)}`).join(", ") : undefined}
+          aria-label={`${employeeName}, ${dayLabel(date)}, ${data.records.length ? `${data.records.length} atama: ${data.records.map(({ shift }) => shift.name).join(", ")}, ayrıntıları aç` : `atama yok, ${canAssign ? "vardiya ata" : "günü aç"}`}`}
           className="absolute inset-0 z-10 w-full rounded focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
-        />
+        >
+          {!data.records.length && canAssign && <span aria-hidden="true" className="text-xl text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">+</span>}
+        </button>
       )}
       <div className="pointer-events-none space-y-1">
-        {data.records.slice(0, 2).map(({ assignment, shift, continuation }) => (
-          <span key={assignment._id} className="block">
-            <span className="block font-medium">{shift.name}</span>
-            <span className="text-muted-foreground tabular-nums">
-              {continuation
-                ? shift.scheduleType === "flexible" ? `Önceki günden · ${shiftTimeLabel(shift)}` : `Önceki günden · 00:00–${shift.endTime}`
-                : shiftTimeLabel(shift)}
+        {data.records.slice(0, limit).map(({ assignment, shift, continuation }) => {
+          const bar = shiftColorClasses(shift.color)?.bar;
+          return (
+            <span key={assignment._id} className={`block ${bar ? `${bar} pl-1.5` : ""}`} title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
+              {!compact && <span className="block font-medium">{shift.name}</span>}
+              <span className={`text-muted-foreground tabular-nums ${compact ? "block text-[10px] leading-tight tracking-tight" : ""}`}>
+                {cellTimeLabel(shift, continuation, compact)}
+              </span>
             </span>
-          </span>
-        ))}
-        {!data.records.length && (
-          <span className="block text-muted-foreground">Atama yok</span>
-        )}
-        {data.records.length > 2 && (
-          <span className="block underline">
-            +{data.records.length - 2} atama · tümünü gör
+          );
+        })}
+        {data.records.length > limit && (
+          <span className={compact ? "text-[10px]" : "block underline"}>
+            {`+${data.records.length - limit}${compact ? "" : " atama · tümünü gör"}`}
           </span>
         )}
-        {data.conflict && (
-          <StatusBadge
-            className="max-w-full whitespace-normal text-left"
-            tone="danger"
-          >
-            Çakışma
-          </StatusBadge>
-        )}
-        {data.leave && (
-          <StatusBadge
-            className="max-w-full whitespace-normal text-left"
-            tone="info"
-          >
-            {LEAVE_TYPE_LABEL_TR[data.leave.leaveType] ?? data.leave.leaveType}{" "}
-            izni
-          </StatusBadge>
-        )}
-        {data.holiday && (
-          <StatusBadge
-            className="max-w-full whitespace-normal text-left"
-            tone="warning"
-          >
-            {data.holiday.name}
-            {data.holiday.isHalfDay ? " · Yarım gün" : ""}
-          </StatusBadge>
-        )}
+        <ShiftDayBadges data={data} compact={compact} />
       </div>
     </div>
   );

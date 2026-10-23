@@ -6,9 +6,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ShiftCalendarCell } from "./ShiftCalendarCell";
+import { ShiftDayBadges } from "./ShiftCalendarCell";
 import {
   DAYS,
   dayLabel,
@@ -46,16 +47,12 @@ export function ShiftDayDetails({
           <DialogTitle>
             {employee.firstName} {employee.lastName} · {dayLabel(date)}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="pr-8">
             Bu günün ayrıntıları. Düzenleme ve silme tüm atama serisine
             uygulanır. Tek gün istisnası desteklenmiyor.
           </DialogDescription>
         </DialogHeader>
-        <ShiftCalendarCell
-          data={data}
-          date={date}
-          employeeName={employee.firstName}
-        />
+        <ShiftDayBadges data={data} />
         {data.records.map(({ assignment, shift, continuation }) => (
           <div key={assignment._id} className="border-t py-3 space-y-2">
             <p className="font-medium">{shift.name}</p>
@@ -76,15 +73,15 @@ export function ShiftDayDetails({
                     .join(", ")
                 : "Her gün"}
             </p>
-            {can("schedule.manage") && <Button variant="outline" onClick={() => onEdit(assignment)}>
+            {can("schedule.manage") && <DialogFooter className="flex-row justify-end"><Button variant="outline" onClick={() => onEdit(assignment)}>
               Tüm seriyi düzenle
-            </Button>}
+            </Button></DialogFooter>}
           </div>
         ))}
         {!canAssign && <p id="day-assign-help" className="text-sm text-muted-foreground">Önce vardiya tanımlayın veya bir tanımı etkinleştirin.</p>}
-        {can("schedule.manage") && <Button aria-describedby={!canAssign ? "day-assign-help" : undefined} disabled={!canAssign} onClick={onAssign}>
+        {can("schedule.manage") && <DialogFooter className="flex-row justify-end"><Button aria-describedby={!canAssign ? "day-assign-help" : undefined} disabled={!canAssign} onClick={onAssign}>
           Bu tarihe vardiya ata
-        </Button>}
+        </Button></DialogFooter>}
       </DialogContent>
     </Dialog>
   );

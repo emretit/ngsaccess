@@ -316,7 +316,7 @@ export function AssignShiftDialog({
                 <Button variant="outline" disabled={pending} onClick={close}>
                   Vazgeç
                 </Button>
-                <Button disabled={pending} onClick={prepare}>
+                <Button variant={previewValues ? "outline" : "default"} disabled={pending} onClick={prepare}>
                   {previewValues ? "Önizlemeyi yenile" : "Önizle"}
                 </Button>
               </div>
@@ -360,7 +360,7 @@ export function PreviewPanel({
   if (!preview)
     return <SectionSkeleton label="Atama önizlemesi hesaplanıyor" />;
   return (
-    <section className="space-y-3 border-t pt-3">
+    <section ref={(node) => { if (node && !node.dataset.shown) { node.dataset.shown = "1"; node.querySelector("[data-apply]")?.scrollIntoView?.({ block: "center" }); } }} className="space-y-3 border-t pt-3">
       <h3 className="font-medium">Önizleme</h3>
       <p role="status" className="text-sm">
         {previewSummary(preview.summary)}
@@ -396,7 +396,7 @@ export function PreviewPanel({
         Uygulamada yeniden kontrol edilir. Uygun kişiler atanır; diğerlerinin
         gerekçeleri sonuçta kalır.
       </p>
-      <Button onClick={onSave} disabled={pending}>
+      <Button data-apply onClick={onSave} disabled={pending}>
         {pending ? "Atanıyor…" : "Önizlenen kişilere uygula"}
       </Button>
     </section>

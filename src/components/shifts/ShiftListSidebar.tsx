@@ -6,19 +6,16 @@ import { useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
+import { shiftColorClasses } from "./lib/shiftColors";
 import { RowActions } from "@/components/shared/RowActions";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/notify";
@@ -27,157 +24,93 @@ import {
   type ShiftFormPayload,
 } from "./definitions/AddShiftDialog";
 import type { Shift } from "./lib/planning";
-export function ShiftListSidebar({
-  open,
-  onOpenChange,
-  shifts,
-  projectId,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+/** Definitions table shared by the dedicated definitions page. */
+export function ShiftListSidebar({ shifts, projectId, createOpen, onCreateOpenChange }: {
   shifts: Shift[];
   projectId: Id<"projects">;
+  createOpen: boolean;
+  onCreateOpenChange: (open: boolean) => void;
 }) {
   const { can } = usePermissions();
   const canManage = can("schedule.manage");
   const create = useMutation(api.shifts.create);
   const update = useMutation(api.shifts.update);
   const [editing, setEditing] = useState<Shift | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<Shift | null>(null);
-  const add = async (payload: ShiftFormPayload) => {
-    await create({ ...payload, projectId });
+  const closeForm = () => { setEditing(null); onCreateOpenChange(false); };
+  const add = async ({ color, ...payload }: ShiftFormPayload) => {
+    await create({ ...payload, color: color ?? undefined, projectId });
     notify.success("Vardiya oluşturuldu");
   };
-  const edit = async (shiftId: Id<"shifts">, payload: ShiftFormPayload) => {
-    await update({ ...payload, shiftId });
+  const edit = async (shiftId: Id<"shifts">, { color, ...payload }: ShiftFormPayload) => {
+    const current = shifts.find((shift) => shift._id === shiftId);
+    // Renk yalnız değiştiyse gönderilir: Convex'ten önce yayınlanan web eski backend'de düzenlemeyi bozmasın.
+    const colorPatch = (color ?? null) !== (current?.color ?? null) ? { color } : {};
+    await update(current?.scheduleType === "flexible"
+      ? { shiftId, name: payload.name, isActive: payload.isActive, ...colorPatch }
+      : { ...payload, ...colorPatch, shiftId });
     notify.success("Vardiya güncellendi");
   };
-  return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-[420px] overflow-y-auto min-w-0">
-          <SheetHeader>
-            <SheetTitle>Vardiya tanımları</SheetTitle>
-            <SheetDescription>
-              Çalışma saatleri burada; genel mesai ve tatil politikaları
-              Ayarlar'da yönetilir.
-            </SheetDescription>
-          </SheetHeader>
-          {canManage && <Button
-            className="my-4"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            Yeni vardiya tanımla
-          </Button>}
-          {!shifts.length ? (
-            <EmptyState
-              compact
-              title="Henüz vardiya tanımlanmamış"
-              description="Atama yapabilmek için çalışma saatlerini tanımlayın."
-            />
-          ) : (
-            <ul className="divide-y">
-              {[...shifts]
-                .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                .map((shift) => (
-                  <li key={shift._id} className="flex items-center gap-2 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium break-words">{shift.name}</p>
-                      <p className="text-xs text-muted-foreground tabular-nums">
-                        {shiftTimeLabel(shift)}
-                      </p>
-                      <QuerySectionBoundary
-                        resetKey={shift._id}
-                        title="Sayı yüklenemedi"
-                      >
-                        <DefinitionCount projectId={projectId} shiftId={shift._id} enabled={open} />
-                      </QuerySectionBoundary>
-                      <StatusBadge
-                        tone={shift.isActive === false ? "neutral" : "success"}
-                      >
-                        {shift.isActive === false ? "Pasif" : "Aktif"}
-                      </StatusBadge>
-                    </div>
-                    {canManage && <RowActions label={`${shift.name} işlemleri`}>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setEditing(shift);
-                          setFormOpen(true);
-                        }}
-                      >
-                        Düzenle
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => setDeleting(shift)}
-                        className="text-danger"
-                      >
-                        Silme etkisini incele
-                      </DropdownMenuItem>
-                    </RowActions>}
-                  </li>
-                ))}
-            </ul>
-          )}
-        </SheetContent>
-      </Sheet>
-      {formOpen && (
-        <QuerySectionBoundary
-          resetKey={editing?._id ?? "new"}
-          title="Vardiya formu yüklenemedi"
-        >
-          <AddShiftDialog
-            open
-            onOpenChange={setFormOpen}
-            onClose={() => setFormOpen(false)}
-            editingShift={
-              editing
-                ? {
-                    ...editing,
-                    overtimeEnabled: editing.overtimeEnabled ?? true,
-                    isActive: editing.isActive ?? true,
-                  }
-                : null
-            }
-            onAdd={add}
-            onUpdate={edit}
-          />
-        </QuerySectionBoundary>
-      )}
-      {deleting && (
-        <QuerySectionBoundary
-          resetKey={deleting._id}
-          title="Silme etkisi yüklenemedi"
-        >
-          <DeleteImpact shift={deleting} onClose={() => setDeleting(null)} />
-        </QuerySectionBoundary>
-      )}
-    </>
-  );
+  const table = (impacts: DefinitionImpact[] | undefined | null) => <div className="overflow-hidden rounded-md border">
+        <Table aria-label="Vardiya tanımları">
+          <TableHeader><TableRow>
+            <TableHead>Ad</TableHead><TableHead>Tür</TableHead><TableHead>Saat</TableHead>
+            <TableHead>Mola</TableHead><TableHead>Atama serisi</TableHead><TableHead>Durum</TableHead>
+            {canManage && <TableHead className="w-11"><span className="sr-only">İşlemler</span></TableHead>}
+          </TableRow></TableHeader>
+          <TableBody>{[...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime)).map(shift => {
+            const color = shiftColorClasses(shift.color);
+            return <TableRow key={shift._id} className={canManage ? ROW_CLICK_CLASS : undefined}
+              onClick={canManage ? onRowActivate(() => setEditing(shift)) : undefined}>
+              <TableCell><span className="flex items-center gap-2 font-medium">
+                {color && <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${color.dot}`} />}
+                {shift.name}</span></TableCell>
+              <TableCell>{shift.scheduleType === "flexible" ? "Esnek" : "Sabit"}</TableCell>
+              <TableCell className="whitespace-nowrap tabular-nums">{shiftTimeLabel(shift)}</TableCell>
+              <TableCell className="whitespace-nowrap tabular-nums">{shift.breakStart && shift.breakEnd ? `${shift.breakStart}–${shift.breakEnd}` : "—"}</TableCell>
+              <TableCell><DefinitionCount impact={impacts?.find(item => item.shiftId === shift._id)} loading={impacts === undefined} /></TableCell>
+              <TableCell><StatusBadge tone={shift.isActive === false ? "neutral" : "success"}>{shift.isActive === false ? "Pasif" : "Aktif"}</StatusBadge></TableCell>
+              {canManage && <TableCell><RowActions label={`${shift.name} işlemleri`}>
+                <DropdownMenuItem onSelect={() => setEditing(shift)}>Düzenle</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setDeleting(shift)} className="text-danger">Silme etkisini incele</DropdownMenuItem>
+              </RowActions></TableCell>}
+            </TableRow>;
+          })}</TableBody>
+        </Table>
+      </div>;
+  return <>
+    {!shifts.length ? <EmptyState title="Henüz vardiya tanımlanmamış"
+      description="Atama yapabilmek için çalışma saatlerini tanımlayın."
+      action={canManage ? { label: "Yeni vardiya tanımla", onClick: () => onCreateOpenChange(true) } : undefined} />
+      : <ErrorBoundary key={projectId} fallback={() => table(null)}>
+        <DefinitionImpacts projectId={projectId}>{table}</DefinitionImpacts>
+      </ErrorBoundary>}
+    {canManage && (createOpen || editing) && <QuerySectionBoundary resetKey={editing?._id ?? "new"} title="Vardiya formu yüklenemedi">
+      <AddShiftDialog key={editing?._id ?? "new"} open onOpenChange={next => { if (!next) closeForm(); }} onClose={closeForm}
+        editingShift={editing ? { ...editing, overtimeEnabled: editing.overtimeEnabled ?? true, isActive: editing.isActive ?? true } : null}
+        onAdd={add} onUpdate={edit} />
+    </QuerySectionBoundary>}
+    {canManage && deleting && <QuerySectionBoundary resetKey={deleting._id} title="Silme etkisi yüklenemedi">
+      <DeleteImpact shift={deleting} onClose={() => setDeleting(null)} />
+    </QuerySectionBoundary>}
+  </>;
 }
-export function DefinitionCount({ projectId, shiftId, enabled }: { projectId: Id<"projects">; shiftId: Id<"shifts">; enabled: boolean }) {
-  const impacts = useQuery(api.shifts.definitionImpacts, enabled ? { projectId } : "skip");
-  const impact: DefinitionImpact | undefined = impacts?.find(item => item.shiftId === shiftId);
-  if (!enabled || (impacts && !impact)) return <span className="text-xs text-muted-foreground">Sayı yüklenemedi</span>;
-  if (impact?.assignmentCount === null) return <span className="text-xs text-muted-foreground">Hesaplanamadı</span>;
-  return impact ? (
-    <p className="text-xs text-muted-foreground">
-      Tüm dönemlerde {impact.countLabel.toLocaleLowerCase("tr-TR")}{" "}
-      {impact.assignmentCount} atama serisi
-      {impact.skippedAssignments > 0 && (
-        <span className="block">
-          Proje bilgisi eksik veya uyuşmayan {impact.skippedAssignments} seri sayım dışında.
-        </span>
-      )}
-    </p>
-  ) : (
-    <span role="status" className="text-xs text-muted-foreground">
-      Atama sayısı yükleniyor…
-    </span>
-  );
+
+function DefinitionImpacts({ projectId, children }: {
+  projectId: Id<"projects">;
+  children: (impacts: DefinitionImpact[] | undefined) => ReactNode;
+}) {
+  return children(useQuery(api.shifts.definitionImpacts, { projectId }));
+}
+
+export function DefinitionCount({ impact, loading = false }: { impact?: DefinitionImpact; loading?: boolean }) {
+  if (loading) return <span role="status" className="text-muted-foreground">Atama sayısı yükleniyor…</span>;
+  if (!impact) return <span className="text-muted-foreground">Sayı yüklenemedi</span>;
+  if (impact.assignmentCount === null) return <span className="text-muted-foreground">Hesaplanamadı</span>;
+  return <span className="text-muted-foreground">
+    <span title="Tüm dönemlerdeki atama serileri">{impact.countLabel} {impact.assignmentCount}</span>
+    {impact.skippedAssignments > 0 && <span className="block">Proje bilgisi eksik veya uyuşmayan {impact.skippedAssignments} seri sayım dışında.</span>}
+  </span>;
 }
 export function DeleteImpact({
   shift,

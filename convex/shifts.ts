@@ -3,6 +3,7 @@ import { writeAudit } from "./lib/audit";
 import { assertPeopleProject } from "./lib/peopleScope";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
+import { shiftColorValidator } from "./lib/shiftColors";
 import { validateShift, type ScheduleRange } from "./lib/shiftUx";
 import { trDateKey } from "./lib/trDate";
 import {
@@ -397,6 +398,7 @@ const scheduleArgs = {
 export const create = authedMutation({
   args: {
     ...scheduleArgs,
+    color: v.optional(shiftColorValidator),
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     startTime: v.string(),
@@ -435,6 +437,7 @@ export const create = authedMutation({
 export const update = authedMutation({
   args: {
     ...scheduleArgs,
+    color: v.optional(v.union(v.null(), shiftColorValidator)),
     shiftId: v.id("shifts"),
     name: v.optional(v.string()),
     startTime: v.optional(v.string()),
@@ -457,7 +460,9 @@ export const update = authedMutation({
     }
     const { shiftId, ...updates } = args;
     const patch = toPatch(updates);
-    if (shift.scheduleType === "flexible" || patch.scheduleType === "flexible") {
+    // Ad, renk ve aktiflik hesabı değiştirmez; esnek tanımda da yerinde güncellenir.
+    const cosmeticOnly = Object.keys(patch).every((key) => key === "name" || key === "color" || key === "isActive");
+    if ((shift.scheduleType === "flexible" || patch.scheduleType === "flexible") && !cosmeticOnly) {
       throw new Error("Esnek vardiya değişikliği için yeni tanım oluşturun ve gelecek tarihli atama yapın; geçmiş hesaplar değiştirilmez");
     }
     validateShift({ ...shift, ...patch });

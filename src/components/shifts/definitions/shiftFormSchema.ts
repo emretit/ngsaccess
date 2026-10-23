@@ -1,6 +1,7 @@
 import { errorMessage } from "@/lib/notify";
 import { validateShift } from "../../../../convex/lib/shiftUx";
 import { z } from "zod";
+import { SHIFT_COLOR_KEYS } from "../../../../convex/lib/shiftColors";
 
 export const flexibleFormSchema = z.object({
   requiredNetMinutes: z.number({ message: "Hedef süre dakika olmalıdır" }),
@@ -16,6 +17,7 @@ const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 const rawShiftFormSchema = z
   .object({
     name: z.string().trim().min(1, "Vardiya adı gereklidir").max(100),
+    color: z.enum(SHIFT_COLOR_KEYS).optional(),
     scheduleType: z.enum(["fixed", "flexible"]).optional(),
     flexible: flexibleFormSchema.optional(),
     startTime: z.string().regex(TIME_REGEX, "HH:MM formatında olmalı"),
@@ -86,6 +88,7 @@ export type ShiftFormValues = z.infer<typeof shiftFormSchema>;
 
 export const shiftPayloadSchema = shiftFormSchema.transform(data => ({
   ...data,
+  color: data.color ?? null,
   ...(data.scheduleType === "flexible" && data.flexible ? {
     startTime: data.flexible.checkInStart, endTime: data.flexible.checkInEnd,
   } : { flexible: undefined }),

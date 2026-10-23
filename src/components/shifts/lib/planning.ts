@@ -186,9 +186,6 @@ export function shortDate(day: string) {
   const date = new Date(`${day}T12:00:00Z`);
   return Number.isFinite(date.getTime()) ? formatTrDate(date) : "Tarih seçilmedi";
 }
-export function shortDayLabel(day: string) {
-  return new Intl.DateTimeFormat("tr-TR", { day: "numeric", weekday: "short", timeZone: "Europe/Istanbul" }).format(new Date(`${day}T12:00:00Z`));
-}
 export function assignmentInitial(day: string, employeeIds?: string[]) {
   return { startDate: day, endDate: day, ...(employeeIds ? { employeeIds } : {}) };
 }
@@ -196,4 +193,11 @@ export function assignmentInitial(day: string, employeeIds?: string[]) {
 /** Old deployments may still include ISO keys inside conflict/error messages. */
 export function shiftMessage(message: string) {
   return message.replace(/\b\d{4}-\d{2}-\d{2}\b/g, shortDate);
+}
+
+/** Column heading with the weekday before the date, e.g. Pzt 19. */
+export function calendarDayLabel(day: string) {
+  const date = new Date(`${day}T12:00:00Z`);
+  const weekday = DAYS[(date.getUTCDay() + 6) % 7]?.[1] ?? "";
+  return `${weekday} ${date.getUTCDate()}`;
 }

@@ -3,6 +3,7 @@ import { inviteRoleValidator, permissionValidator, projectRoleValidator } from "
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import { shiftColorValidator } from "./lib/shiftColors";
 
 /**
  * NGS Access - Convex Schema
@@ -994,6 +995,7 @@ export default defineSchema({
 
   shifts: defineTable({
     name: v.string(),
+    color: v.optional(shiftColorValidator),
     projectId: v.optional(v.id("projects")),
     scheduleType: v.optional(v.union(v.literal("fixed"), v.literal("flexible"))),
     flexible: v.optional(v.object({

@@ -20,8 +20,11 @@ import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog
 import { errorMessage } from "@/lib/notify";
 import { istanbulToday } from "../lib/planning";
 import { shiftPayloadSchema, type ShiftFormPayload, type ShiftFormValues } from "./shiftFormSchema";
+import { SHIFT_COLOR_KEYS } from "../../../../convex/lib/shiftColors";
+import { SHIFT_COLORS } from "../lib/shiftColors";
+import { cn } from "@/lib/utils";
 export type { ShiftFormPayload } from "./shiftFormSchema";
-export type EditingShift = Pick<Doc<"shifts">, "_id" | "name" | "startTime" | "endTime" | "scheduleType" | "flexible" | "breakStart" | "breakEnd" | "lateToleranceMinutes" | "earlyExitToleranceMinutes" | "overtimeStartToleranceMinutes"> & { overtimeEnabled: boolean; isActive: boolean };
+export type EditingShift = Pick<Doc<"shifts">, "_id" | "name" | "color" | "startTime" | "endTime" | "scheduleType" | "flexible" | "breakStart" | "breakEnd" | "lateToleranceMinutes" | "earlyExitToleranceMinutes" | "overtimeStartToleranceMinutes"> & { overtimeEnabled: boolean; isActive: boolean };
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,6 +48,7 @@ export function AddShiftDialog({
     scheduleType: editingShift?.scheduleType ?? "fixed",
     flexible: editingShift?.flexible ?? { ...DEFAULT_FLEXIBLE },
     name: editingShift?.name ?? "",
+    color: editingShift?.color,
     startTime: editingShift?.startTime ?? "",
     endTime: editingShift?.endTime ?? "",
     breakStart: editingShift?.breakStart ?? "",
@@ -61,6 +65,10 @@ export function AddShiftDialog({
   const [baseline, setBaseline] = useState(() =>
     JSON.stringify([values, breakEnabled]),
   );
+  const [initialStructure] = useState(() => withoutCosmetic(values));
+  // Esnek tanımda yalnız ad/renk/aktiflik değiştiyse yeni tanım açılmaz, yerinde güncellenir.
+  const flexibleCosmeticEdit = editingShift?.scheduleType === "flexible" && values.scheduleType === "flexible"
+    && withoutCosmetic(values) === initialStructure;
   const guard = useUnsavedChangesGuard(
     JSON.stringify([values, breakEnabled]) !== baseline,
   );
@@ -121,7 +129,7 @@ export function AddShiftDialog({
     setPending(true);
     const payload: ShiftFormPayload = parsed.data;
     try {
-      if (editingShift && editingShift.scheduleType !== "flexible" && values.scheduleType !== "flexible") await onUpdate(editingShift._id, payload);
+      if (editingShift && ((editingShift.scheduleType !== "flexible" && values.scheduleType !== "flexible") || flexibleCosmeticEdit)) await onUpdate(editingShift._id, payload);
       else await onAdd(payload);
       setBaseline(JSON.stringify([values, breakEnabled]));
       onClose();
@@ -228,7 +236,9 @@ export function AddShiftDialog({
                     </p>
                   )}
                   <p>
-                    {editingShift.scheduleType === "flexible" || values.scheduleType === "flexible"
+                    {flexibleCosmeticEdit
+                      ? "Ad, renk ve aktiflik bu tanımda güncellenir. Saat veya hesap değişikliği yeni tanım olarak kaydedilir."
+                      : editingShift.scheduleType === "flexible" || values.scheduleType === "flexible"
                       ? "Yeni tanım kaydedilir; geçmiş atamalar korunur. Yeni tanımı gelecek tarihli atayın."
                       : "Saat ve mola değişiklikleri geçmiş atamaların görünümünü de değiştirir. Pasifleştirme mevcut atamaları silmez."}
                   </p>
@@ -236,13 +246,34 @@ export function AddShiftDialog({
               ))}
             <fieldset disabled={pending} className="space-y-4">
               {textFields(["name"])}
-              <FormFieldWrapper htmlFor="shift-scheduleType" label="Vardiya türü">
-                <select id="shift-scheduleType" className="w-full rounded-md border bg-surface p-2" value={values.scheduleType ?? "fixed"}
-                  onChange={e => { setValues({ ...values, scheduleType: e.target.value === "flexible" ? "flexible" : "fixed" }); setErrors({}); }}>
-                  <option value="fixed">Sabit</option><option value="flexible">Esnek</option>
-                </select>
-              </FormFieldWrapper>
-              {(values.scheduleType === "flexible" || editingShift?.scheduleType === "flexible") && (
+              <div className="space-y-2">
+                <p id="shift-type-label" className="text-sm font-medium">Vardiya türü</p>
+                <div role="group" aria-labelledby="shift-type-label" className="flex gap-1">
+                  {([["fixed", "Sabit"], ["flexible", "Esnek"]] as const).map(([value, label]) => (
+                    <Button key={value} type="button" variant={(values.scheduleType ?? "fixed") === value ? "secondary" : "ghost"}
+                      aria-pressed={(values.scheduleType ?? "fixed") === value}
+                      onClick={() => { setValues({ ...values, scheduleType: value }); setErrors({}); }}>{label}</Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p id="shift-color-label" className="text-sm font-medium">Renk</p>
+                <div role="radiogroup" aria-labelledby="shift-color-label" className="flex flex-wrap gap-1">
+                  <label className="relative flex min-h-11 cursor-pointer items-center px-1 text-sm sm:min-h-9">
+                    <input className="peer sr-only" type="radio" name="shift-color" aria-label="Renksiz" checked={!values.color}
+                      onChange={() => setValues({ ...values, color: undefined })} />
+                    <span className="rounded px-2 py-1 peer-checked:ring-2 peer-checked:ring-primary peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4">Renksiz</span>
+                  </label>
+                  {SHIFT_COLOR_KEYS.map(color => (
+                    <label key={color} className="relative flex size-11 cursor-pointer items-center justify-center sm:size-9">
+                      <input className="peer sr-only" type="radio" name="shift-color" aria-label={SHIFT_COLORS[color].label} checked={values.color === color}
+                        onChange={() => setValues({ ...values, color })} />
+                      <span aria-hidden="true" className={cn("size-6 rounded-full peer-checked:ring-2 peer-checked:ring-primary peer-checked:ring-offset-2 peer-checked:ring-offset-background peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4", SHIFT_COLORS[color].dot)} />
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {(values.scheduleType === "flexible" || editingShift?.scheduleType === "flexible") && !flexibleCosmeticEdit && (
                 <p role="status" className="text-sm text-muted-foreground">Esnek vardiya değişikliğinde yeni tanım oluşturulur. Geçmiş hesapları korumak için yeni tanımı gelecek tarihli atayın.</p>
               )}
               {values.scheduleType === "flexible" ? (
@@ -278,20 +309,24 @@ export function AddShiftDialog({
                 </p>
               )}
               </>}
-              <label className="flex gap-2 items-center text-sm">
+              <label className="flex gap-2 items-start text-sm">
                 <input
                   type="checkbox" className="size-6 shrink-0 accent-primary"
                   checked={values.overtimeEnabled}
+                  aria-label="Mesai etkin"
+                  aria-describedby="shift-overtime-hint"
                   onChange={(e) =>
                     setValues({ ...values, overtimeEnabled: e.target.checked })
                   }
                 />
-                Mesai etkin
+                <span className="min-w-0">
+                  <span className="block leading-6">Mesai etkin</span>
+                  <span id="shift-overtime-hint" className="block text-xs text-muted-foreground">
+                    Kapalıyken bu vardiyaya bağlı kayıtlarda mesai hesaplanmaz
+                    (hafta sonu ve tatil dahil).
+                  </span>
+                </span>
               </label>
-              <p className="text-xs text-muted-foreground">
-                Kapalıyken bu vardiyaya bağlı kayıtlarda mesai hesaplanmaz
-                (hafta sonu ve tatil dahil).
-              </p>
               <label className="flex gap-2 items-center text-sm">
                 <input
                   type="checkbox" className="size-6 shrink-0 accent-primary"
@@ -375,7 +410,7 @@ export function AddShiftDialog({
                 disabled={pending || (!!editingShift && (!usage || usageStale))}
                 type="submit"
               >
-                {pending ? "Kaydediliyor…" : editingShift && (values.scheduleType === "flexible" || editingShift.scheduleType === "flexible") ? "Yeni tanım olarak kaydet" : "Kaydet"}
+                {pending ? "Kaydediliyor…" : editingShift && !flexibleCosmeticEdit && (values.scheduleType === "flexible" || editingShift.scheduleType === "flexible") ? "Yeni tanım olarak kaydet" : "Kaydet"}
               </Button>
             </div>
           </form>
@@ -418,4 +453,8 @@ function FlexibleFields({ value, error, onChange }: {
       <Input id="flex-breakMinutes" type="number" min={0} max={1439} step={1} aria-invalid={!!error} value={value.breakMinutes ?? ""} onChange={e => onChange({ ...value, breakMinutes: e.target.value === "" ? undefined : Number(e.target.value) })} />
     </FormFieldWrapper>}
   </fieldset>;
+}
+
+function withoutCosmetic(values: ShiftFormValues) {
+  return JSON.stringify({ ...values, name: undefined, color: undefined, isActive: undefined });
 }

@@ -8,14 +8,13 @@ import { assignmentInitial, shiftTimeLabel } from "../lib/planning";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { StatInline } from "@/components/shared/StatInline";
-import { FilterBar } from "@/components/shared/FilterBar";
+import { Input } from "@/components/ui/input";
 import { BulkBar } from "@/components/shared/BulkBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Button } from "@/components/ui/button";
 import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
-import { ShiftCalendarGrid } from "../ShiftCalendarGrid";
+import { ShiftCalendarGrid, type CalendarProps } from "../ShiftCalendarGrid";
 import { ShiftAgendaView } from "../ShiftAgendaView";
 import { ShiftDayDetails } from "../ShiftDayDetails";
 import { AssignShiftDialog } from "../AssignShiftDialog";
@@ -29,6 +28,7 @@ import {
 } from "../lib/planning";
 import { useShiftCalendarData } from "./useShiftCalendarData";
 import { calendarDayResolver, groupAssignments } from "./shiftCalendarModel";
+import { openCalendarDay } from "./calendarActions";
 import { CalendarHeader } from "./CalendarHeader";
 import { CalendarNavigation } from "./CalendarNavigation";
 function useCompact() {
@@ -109,58 +109,60 @@ export function ShiftCalendarPlan({
       else next.add(id);
       return next;
     });
-  const calendarProps = {
+  const allVisibleSelected = visible.length > 0 && visible.every((employee) => selected.has(employee._id));
+  const calendarProps: CalendarProps = {
     employees: visible,
     days: range.days,
     getData,
-    onOpen: (employee: Employee, date: string) => setDetail({ employee, date }),
+    onOpen: (employee: Employee, date: string) => openCalendarDay(
+      employee, date, canManage && active.length > 0, getData(employee, date), setAssign, setDetail,
+    ),
+    canAssign: canManage && active.length > 0,
+    ...(canManage ? {
+      selectAll: {
+        checked: allVisibleSelected ? true : visible.some((employee) => selected.has(employee._id)) ? "indeterminate" : false,
+        onToggle: () => setSelected(allVisibleSelected ? new Set() : new Set(visible.map((employee) => employee._id))),
+      },
+      onSelect: select,
+    } : {}),
     selected,
-    onSelect: select,
   };
   return (
     <div className="space-y-4 [&_button]:max-sm:min-h-11 [&_input]:max-sm:min-h-11">
-      <CalendarHeader projectName={projectName} activeCount={active.length} loading={loading}
-        onAssign={() => setAssign(assignmentInitial(day))} openDefinitions={openDefinitions} />
-      <div className="flex flex-wrap gap-2">
-        {canManage && <Button variant="outline" onClick={() => setClearOpen(true)}>Toplu temizle</Button>}
-        {can("reports.view") && <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('xlsx')}>Excel'e aktar</Button>}
-        {can("reports.view") && <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('csv')}>CSV'ye aktar</Button>}
-        {can("reports.view") && <span className="self-center text-xs text-muted-foreground">Dışa aktarım: görünen sayfa ve dönem</span>}
-      </div>
+      <CalendarHeader activeCount={active.length} loading={loading} exporting={exporting}
+        onAssign={() => setAssign(assignmentInitial(day))} openDefinitions={openDefinitions}
+        onExport={exportPlan} onClear={() => setClearOpen(true)} />
       {clearOpen && <ClearAssignmentsDialog projectId={projectId} employees={employees} initialIds={[...selected]} start={range.rangeStart} end={range.rangeEnd} onClose={() => { setClearOpen(false); clearSelection(); }} />}
-      <StatInline
-        items={[
-          { label: "Görünen çalışan", value: filtered.length },
-          { label: "Proje genelinde aktif tanım", value: active.length },
-        ]}
-      />
-      <div className="space-y-2">
-        <FilterBar
-          search={search}
-          onSearchChange={(value) => {
-            setSearch(value);
-            setPage(0);
-            clearSelection();
-          }}
-          searchLabel="Çalışan ara"
-          placeholder="Çalışan ara · Ad veya e-posta"
-          hasFilters={shiftFilter !== "all"}
-          onClear={() => {
-            setSearch("");
-            setShiftFilter("all");
-            setPage(0);
-            clearSelection();
-          }}
-        >
-          <label className="text-xs flex flex-col gap-1 min-w-0 max-w-full">
-            Vardiya
+      {!shifts.length ? (
+        <EmptyState
+          title="Henüz vardiya tanımlanmamış"
+          description={canManage ? "Atama yapmak için önce bir vardiya tanımlayın." : "Vardiya tanımlarını yetkili yöneticiler ekler."}
+          action={canManage ? { label: "Vardiya tanımlarına git", onClick: openDefinitions } : undefined}
+        />
+      ) : <>
+      {!active.length && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Tüm vardiya tanımları pasif; mevcut atamalar görünür ama yeni atama yapılamaz.
+          {canManage && <> <Button variant="link" className="h-auto p-0 align-baseline" onClick={openDefinitions}>Bir tanımı etkinleştirin</Button>.</>}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <CalendarNavigation day={day} effectivePeriod={effectivePeriod} period={period} compact={compact}
+          range={range} changeDay={changeDay} setPeriod={setPeriod} clearSelection={clearSelection} />
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-[760px]:w-full">
+          <Input aria-label="Çalışan ara" placeholder="Çalışan ara" value={search}
+            className="w-32 max-[760px]:flex-1" onChange={(event) => {
+              setSearch(event.target.value); setPage(0); clearSelection();
+            }} />
+          <div className="w-36 max-[760px]:flex-1">
             <ShiftSelect label="Vardiya" value={shiftFilter} onChange={(value) => { setShiftFilter(value); clearSelection(); }}
               options={[{ value: "all", label: "Tüm vardiyalar" }, ...shifts.map(s => ({ value: s._id, label: `${s.name} · ${shiftTimeLabel(s)}` }))]} />
-          </label>
-        </FilterBar>
+          </div>
+          {(search.trim() !== "" || shiftFilter !== "all") && <Button variant="ghost" className="px-2" onClick={() => {
+            setSearch(""); setShiftFilter("all"); setPage(0); clearSelection();
+          }}>Temizle</Button>}
+        </div>
       </div>
-      <CalendarNavigation day={day} effectivePeriod={effectivePeriod} period={period} compact={compact}
-        range={range} changeDay={changeDay} setPeriod={setPeriod} clearSelection={clearSelection} />
       {canManage && <BulkBar count={selected.size} onClear={clearSelection}>
         <Button
           disabled={loading || !active.length}
@@ -171,17 +173,6 @@ export function ShiftCalendarPlan({
           Seçilenlere ata
         </Button>
       </BulkBar>}
-      {!active.length && (
-        <EmptyState
-          title={
-            shifts.length
-              ? "Atanabilir vardiya yok"
-              : "Henüz vardiya tanımlanmamış"
-          }
-          description="Bir vardiyayı etkinleştirin veya yeni tanım ekleyin."
-          action={{ label: "Tanımları aç", onClick: openDefinitions }}
-        />
-      )}
       {loading ? (
         <SectionSkeleton label="Plan, izin ve tatiller kontrol ediliyor" />
       ) : !employees.length ? (
@@ -202,7 +193,7 @@ export function ShiftCalendarPlan({
         <>
           {assignments.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              Bu dönemde atama yok.{active.length > 0 ? " Boş bir gün seçerek plan oluşturabilirsiniz." : ""}
+              Bu dönemde atama yok.
             </p>
           )}
           {compact ? (
@@ -213,7 +204,7 @@ export function ShiftCalendarPlan({
         </>
       )}
       <PaginationBar
-        summary={`${pageRange(filtered.length, currentPage + 1, 50)} / ${filtered.length} çalışan · İstanbul saati`}
+        summary={`${pageRange(filtered.length, currentPage + 1, 50)} / ${filtered.length} çalışan`}
         page={currentPage + 1}
         pageCount={pageCount}
         onPrevious={() => {
@@ -225,6 +216,7 @@ export function ShiftCalendarPlan({
           clearSelection();
         }}
       />
+      </>}
       {assign && (
         <AssignShiftDialog
           open
@@ -242,7 +234,7 @@ export function ShiftCalendarPlan({
           {...detail}
           data={getData(detail.employee, detail.date)}
           onClose={() => setDetail(null)}
-          canAssign={!!active.length}
+          canAssign={canManage && active.length > 0}
           onEdit={(assignment) => {
             setDetail(null);
             setEdit(assignment);
