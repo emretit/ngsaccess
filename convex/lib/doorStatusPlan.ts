@@ -259,20 +259,16 @@ export function holidayRanges(
 ): { beginDate: string; endDate: string }[] {
   const ranges: { beginDate: string; endDate: string }[] = [];
   for (const date of [...new Set(dates)].sort()) {
-    // Date.parse NaN döndürür ("2026-13-45"); toISOString o durumda RangeError atardı.
-    const time = /^\d{4}-\d{2}-\d{2}$/.test(date)
-      ? Date.parse(`${date}T00:00:00Z`)
-      : Number.NaN;
+    // Date.parse atmaz, NaN döndürür ("2026-13-45"); toISOString NaN'da RangeError atardı.
+    const time = Date.parse(`${date}T00:00:00Z`);
     if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
       Number.isNaN(time) ||
       new Date(time).toISOString().slice(0, 10) !== date
     )
       throw new ConvexError("Geçersiz tatil tarihi");
     const previous = ranges[ranges.length - 1];
-    if (
-      previous &&
-      Date.parse(date) - Date.parse(previous.endDate) === 86400000
-    )
+    if (previous && time - Date.parse(previous.endDate) === 86400000)
       previous.endDate = date;
     else ranges.push({ beginDate: date, endDate: date });
   }
