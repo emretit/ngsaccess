@@ -1,6 +1,6 @@
 import { planShiftIds } from "../../../convex/lib/shiftPlan";
 import { AssignmentPatternEditor } from "./AssignmentPatternEditor";
-import { assignmentFields, focusAssignmentError, planFormError } from "./lib/planForm";
+import { assignmentFields, focusAssignmentError, planFormError, planSummary } from "./lib/planForm";
 import type { DepartmentAssignment } from "./lib/planning";
 import { WeekdaySelection } from "./WeekdaySelection";
 import { ShiftSelect } from "./ShiftSelect";
@@ -65,6 +65,7 @@ function EditForm({
       assignment.weekPattern?.includes(code),
     ).map(([code]) => code),
   });
+  const assignmentLabel = assignment.plan && planShiftIds(assignment.plan).length > 1 ? planSummary(assignment.plan) : shiftName;
   const [baseline, setBaseline] = useState(() => JSON.stringify(values));
   const guard = useUnsavedChangesGuard(JSON.stringify(values) !== baseline);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -146,7 +147,7 @@ function EditForm({
           <DialogHeader>
             <DialogTitle>Tüm atama serisini düzenle</DialogTitle>
             <DialogDescription>
-              {employeeName} · {shiftName} · {shortDate(assignment.startDate)}–
+              {employeeName} · {assignmentLabel} · {shortDate(assignment.startDate)}–
               {shortDate(assignment.endDate)}. Kaydetme ve silme tüm seriye uygulanır. Tek
               gün istisnası desteklenmiyor.
             </DialogDescription>
@@ -254,7 +255,7 @@ function EditForm({
             ? "Tüm seri silinsin mi?"
             : "Tüm seri güncellensin mi?"
         }
-        objectName={`${employeeName} · ${shiftName} · ${shortDate(assignment.startDate)}–${shortDate(assignment.endDate)}`}
+        objectName={`${employeeName} · ${assignmentLabel} · ${shortDate(assignment.startDate)}–${shortDate(assignment.endDate)}`}
         effects={[
           confirm === "delete"
             ? "Bu atamanın tüm tarih aralığı kalıcı silinir."

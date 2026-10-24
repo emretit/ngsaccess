@@ -31,6 +31,7 @@ export function displaySegmentTime(iso: string | null): string {
 export function segmentTimeRange(segments: readonly PdksSegment[]): string {
   const first = segments.find(segment => segment.firstISO)?.firstISO ?? null;
   const last = [...segments].reverse().find(segment => segment.lastISO)?.lastISO ?? null;
+  if (!first && !last) return "—";
   return `${displaySegmentTime(first)}–${displaySegmentTime(last)}`;
 }
 export const SEGMENT_DECISION_LABELS: Record<PdksSegment["decision"], string> = {

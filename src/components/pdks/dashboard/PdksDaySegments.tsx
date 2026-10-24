@@ -1,6 +1,6 @@
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { STATUS_META } from "../statusMeta";
-import { displaySegmentTime, formatDuration, segmentDecisionLabel, SEGMENT_DECISION_LABELS, type PdksPlanDay } from "../lib/presentation";
+import { segmentTimeRange, formatDuration, segmentDecisionLabel, SEGMENT_DECISION_LABELS, type PdksPlanDay } from "../lib/presentation";
 
 export function PdksDaySegments({ day }: { day: PdksPlanDay }) {
   if (!day.segments || day.segments.length < 2) return null;
@@ -18,7 +18,7 @@ export function PdksDaySegments({ day }: { day: PdksPlanDay }) {
         <dl className="grid grid-cols-2 gap-2 text-xs tabular-nums">
           {[
             ["Planlanan", `${segment.plannedStart}–${segment.plannedEnd}${segment.plannedEnd <= segment.plannedStart ? " (ertesi gün)" : ""}`],
-            ["Gerçekleşen", `${displaySegmentTime(segment.firstISO)}–${displaySegmentTime(segment.lastISO)}`],
+            ["Gerçekleşen", segmentTimeRange([segment])],
             ["Toplam süre", formatDuration(segment.totalMinutes)],
             ["Geç giriş", formatDuration(segment.lateMinutes)],
             ["Erken çıkış", formatDuration(segment.earlyExitMinutes)],

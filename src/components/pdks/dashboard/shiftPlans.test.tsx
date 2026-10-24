@@ -84,7 +84,7 @@ describe("PDKS vardiya planı sunumu", () => {
     expect(displaySegmentTime("invalid")).toBe("—");
     expect(displaySegmentTime(null)).toBe("—");
     expect(segmentTimeRange([...segments, { ...segments[1], lastISO: "2026-10-19T14:00:00Z" }])).toBe("08:10–17:00");
-    expect(segmentTimeRange([])).toBe("—–—");
+    expect(segmentTimeRange([])).toBe("—");
   });
 });
 
@@ -113,5 +113,40 @@ describe("Birleşik denetim: sunucu günü ve segment etiketleri", () => {
     const html = render(<PdksDaySegments day={{ ...day, status: "holiday", segments: [segments[0], { ...segments[1], decision: "incomplete" }] }} />);
     expect(html).toContain("Geldi");
     expect(html).toContain("İncelenecek");
+  });
+});
+
+describe("Orca turu: kısa hücre ve boş saat aralığı", () => {
+  const visibleText = (html: string) => html.replace(/<[^>]*>/g, "");
+  it("uzun adları yalnız title/aria içinde tutar, hücre 42px düzeninde kısa rozet basar", () => {
+    const longSegments = segments.map(segment => ({ ...segment, shiftName: `TEST ${segment.shiftName} (silinecek)` }));
+    const cell = { ...day, segments: longSegments };
+    const html = heatmap({ ...row, days: [cell] });
+    const cellMarkup = html.match(/<button[^>]*aria-label="Ada[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(cellMarkup).toContain('title="TEST Sabah (silinecek) + TEST Akşam (silinecek)"');
+    expect(cellMarkup).toMatch(/aria-label="[^"]*TEST Sabah \(silinecek\) \+ TEST Akşam \(silinecek\)/);
+    expect(cellMarkup).toContain("h-[42px] overflow-hidden");
+    expect(visibleText(cellMarkup)).not.toContain("TEST");
+    expect(visibleText(cellMarkup)).toContain("2 vardiya");
+    expect(visibleText(render(<PdksPlanSummary day={cell} />))).toContain("TEST Sabah (silinecek) + TEST Akşam (silinecek)");
+    expect(visibleText(render(<PdksPlanSummary day={{ ...day, planKind: "rest" }} compact />))).toBe("Boş gün");
+  });
+  it("okutmasız aralık ve detay tek çizgi gösterir, heatmap saat satırını basmaz", () => {
+    const emptySegments = segments.map(segment => ({ ...segment, firstISO: null, lastISO: null }));
+    expect(segmentTimeRange(emptySegments)).toBe("—");
+    const detail = render(<PdksDaySegments day={{ ...day, segments: emptySegments }} />);
+    expect(detail).not.toContain("—–—");
+    expect(detail.match(/Gerçekleşen<\/dt><dd>—<\/dd>/g)).toHaveLength(2);
+    const html = heatmap({ ...row, days: [{ ...day, segments: emptySegments }] });
+    expect(html).not.toContain('class="block text-[10px] leading-[10px]"');
+    expect(html).not.toContain("—–—");
+  });
+  it.each([
+    ["2026-10-19T05:01:00Z", null, "08:01–—"],
+    [null, "2026-10-19T14:00:00Z", "—–17:00"],
+  ])("tek uç mevcutsa aralığı korur: %s / %s", (firstISO, lastISO, expected) => {
+    const partial = { ...segments[0], firstISO, lastISO };
+    expect(segmentTimeRange([partial])).toBe(expected);
+    expect(render(<PdksDaySegments day={{ ...day, segments: [partial, segments[1]] }} />)).toContain(expected ?? "");
   });
 });

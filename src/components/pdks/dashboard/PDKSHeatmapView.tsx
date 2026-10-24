@@ -1,5 +1,5 @@
 import { PdksPlanSummary } from "./PdksPlanSummary";
-import { segmentTimeRange } from "../lib/presentation";
+import { planDayLabel, segmentTimeRange } from "../lib/presentation";
 import { eachDayOfInterval, format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { STATUS_META, IN_PROGRESS_META, statusMetaFor } from "../statusMeta";
@@ -83,6 +83,8 @@ export function PDKSHeatmapView({
                   const cell = cells.get(date);
                   const status = cell?.status ?? "noData";
                   const meta = statusMetaFor(cell ?? { status });
+                  const planLabel = planDayLabel(cell);
+                  const timeRange = cell?.segments && cell.segments.length > 1 ? segmentTimeRange(cell.segments) : undefined;
                   const duration =
                     !cell ||
                     status === "future" ||
@@ -103,13 +105,14 @@ export function PDKSHeatmapView({
                       type="button"
                       key={date}
                       aria-label={cellLabel(row.name, date, cell)}
-                      className={`min-h-[42px] border-r px-1 py-2 text-center text-[11px] whitespace-nowrap hover:underline ${meta.bgClass} ${meta.textClass}`}
+                      title={planLabel || undefined}
+                      className={`min-h-[42px] border-r px-1 ${planLabel ? "h-[42px] overflow-hidden py-1 leading-[11px]" : "py-2"} text-center text-[11px] whitespace-nowrap hover:underline ${meta.bgClass} ${meta.textClass}`}
                       onClick={() => onCellClick?.(row.id, date)}
                     >
                       {meta.code} · {duration}
-                      <PdksPlanSummary day={cell} />
-                      {cell?.segments && cell.segments.length > 1 && <span className="block text-[10px]">
-                        {segmentTimeRange(cell.segments)}
+                      <PdksPlanSummary day={cell} compact />
+                      {timeRange && timeRange !== "—" && <span className="block text-[10px] leading-[10px]">
+                        {timeRange}
                       </span>}
                     </button>
                   );
