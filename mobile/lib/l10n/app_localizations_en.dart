@@ -1354,4 +1354,182 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get visitorRecoveryStorageError =>
       'The visitor request could not be safely saved or read. Check its status again before continuing.';
+
+  @override
+  String get errorRequestProjectMissing =>
+      'Your employee project could not be found.';
+
+  @override
+  String get errorRequestNoteTooLong => 'Notes must be at most 500 characters.';
+
+  @override
+  String get errorRequestDateInvalid => 'Enter a valid date (YYYY-MM-DD).';
+
+  @override
+  String get errorRequestRangeInvalid =>
+      'The end date cannot precede the start date.';
+
+  @override
+  String get errorRequestStartTooOld =>
+      'Leave may start at most 30 days in the past.';
+
+  @override
+  String get errorRequestRangeTooLong => 'Leave can cover at most 60 days.';
+
+  @override
+  String get errorRequestPendingLimit =>
+      'The pending leave request limit has been reached.';
+
+  @override
+  String get errorRequestOverlapPending =>
+      'These dates overlap another pending leave request.';
+
+  @override
+  String get errorRequestOverlapApproved =>
+      'These dates overlap approved leave.';
+
+  @override
+  String get errorRequestNotFound => 'The request could not be found.';
+
+  @override
+  String get errorRequestNotPending =>
+      'Only your own pending request can be withdrawn.';
+
+  @override
+  String get errorCorrectionDateOutOfRange =>
+      'Choose today or a date within the past 30 days.';
+
+  @override
+  String get errorCorrectionReasonLength =>
+      'The reason must contain 5–300 characters.';
+
+  @override
+  String get errorCorrectionTimesMismatch =>
+      'Provide only the times required by the correction type.';
+
+  @override
+  String get errorCorrectionTimeInvalid => 'Enter a valid time (HH:mm).';
+
+  @override
+  String get errorCorrectionPendingExists =>
+      'You already have a pending correction for this date.';
+
+  @override
+  String get requestsTitle => 'My requests';
+
+  @override
+  String get requestsLeave => 'Leave';
+
+  @override
+  String get requestsCorrection => 'Attendance correction';
+
+  @override
+  String get requestsNew => 'New request';
+
+  @override
+  String get requestsEmpty => 'You have no requests yet.';
+
+  @override
+  String get requestsRetry => 'Retry';
+
+  @override
+  String get requestsWithdraw => 'Withdraw';
+
+  @override
+  String get requestsWithdrawConfirm => 'Withdraw this request?';
+
+  @override
+  String get requestsCancel => 'Cancel';
+
+  @override
+  String get requestsSubmit => 'Submit';
+
+  @override
+  String get requestsUncertain =>
+      'The request may have been submitted; check the list.';
+
+  @override
+  String get requestsAdmin => 'Administrator record';
+
+  @override
+  String get requestsPending => 'Pending';
+
+  @override
+  String get requestsApproved => 'Approved';
+
+  @override
+  String get requestsRejected => 'Rejected';
+
+  @override
+  String get requestsWithdrawn => 'Withdrawn';
+
+  @override
+  String get requestsUnknown => 'Unknown';
+
+  @override
+  String get requestsOther => 'Other';
+
+  @override
+  String get requestsStart => 'Start date';
+
+  @override
+  String get requestsEnd => 'End date';
+
+  @override
+  String get requestsDate => 'Date';
+
+  @override
+  String get requestsNotes => 'Notes';
+
+  @override
+  String get requestsReason => 'Reason';
+
+  @override
+  String get requestsType => 'Type';
+
+  @override
+  String get requestsCheckIn => 'Check-in';
+
+  @override
+  String get requestsCheckOut => 'Check-out';
+
+  @override
+  String get requestsBoth => 'Both';
+
+  @override
+  String get requestsDecision => 'Manager decision note';
+
+  @override
+  String get requestsLeaveAnnual => 'Annual leave';
+
+  @override
+  String get requestsLeaveSick => 'Sick leave';
+
+  @override
+  String get requestsLeaveExcuse => 'Excuse leave';
+
+  @override
+  String get requestsLeaveUnpaid => 'Unpaid leave';
+
+  @override
+  String get requestsLeaveParental => 'Parental leave';
+
+  @override
+  String get requestsLeaveMarriage => 'Marriage leave';
+
+  @override
+  String get requestsLeaveBereavement => 'Bereavement leave';
+
+  @override
+  String get requestsLeavePaternity => 'Paternity leave';
+
+  @override
+  String get requestsLeaveLactation => 'Lactation leave';
+
+  @override
+  String get requestsLeaveCompensatory => 'Compensatory leave';
+
+  @override
+  String get requestsWithdrawUncertain =>
+      'The request may have been withdrawn; check the list.';
 }

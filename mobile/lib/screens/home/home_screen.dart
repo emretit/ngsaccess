@@ -241,6 +241,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       color: AppTheme.info,
                       onTap: () => context.go(AppRoute.visitor),
                     ),
+                    QuickActionCard(
+                      icon: Icons.assignment_outlined,
+                      label: l10n.requestsTitle,
+                      color: AppTheme.primaryBurgundy2,
+                      onTap: () => context.push(AppRoute.requests),
+                    ),
                   ],
                 ),
               ],

@@ -15,6 +15,7 @@ import 'package:ngsplusapp/providers/preferred_device_provider.dart';
 import 'package:ngsplusapp/repositories/device_repository.dart';
 import 'package:ngsplusapp/screens/home/home_screen.dart';
 import 'package:ngsplusapp/widgets/cards/quick_action_card.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 import '../helpers/mocks.dart';
@@ -230,6 +231,29 @@ void main() {
     await tester.pump();
   }
 
+  testWidgets(
+    'requests and visitor quick action cards use different existing theme accents',
+    (tester) async {
+      await mount(tester);
+      final requests = tester.widget<QuickActionCard>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is QuickActionCard &&
+              widget.icon == Icons.assignment_outlined,
+        ),
+      );
+      final visitor = tester.widget<QuickActionCard>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is QuickActionCard &&
+              widget.icon == Icons.person_add_alt_1,
+        ),
+      );
+      expect(requests.color, AppTheme.primaryBurgundy2);
+      expect(requests.color, isNot(visitor.color));
+      await unmount(tester);
+    },
+  );
   testWidgets(
     'home requests independent summary and recovers from first-load error',
     (tester) async {

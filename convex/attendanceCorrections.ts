@@ -7,7 +7,7 @@ import { authedMutation, authedQuery, employeeAuthedMutation, employeeAuthedQuer
 import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from "./lib/auth";
 import { findManualPdksRecord, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
 import { writeAudit } from "./lib/audit";
-import { istanbulToday, validateCorrectionDate } from "./lib/requestRules";
+import { requestError, istanbulToday, validateCorrectionDate } from "./lib/requestRules";
 
 const correctionType = v.union(v.literal("checkIn"), v.literal("checkOut"), v.literal("both"));
 const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -16,16 +16,16 @@ export const submit = employeeAuthedMutation({
   args: { date: v.string(), correctionType, requestedCheckIn: v.optional(v.string()), requestedCheckOut: v.optional(v.string()), reason: v.string() },
   handler: async (ctx, args) => {
     const { employee } = ctx;
-    if (!employee.projectId) throw new ConvexError("Çalışanın proje bilgisi bulunamadı");
+    if (!employee.projectId) throw requestError("REQUEST_PROJECT_MISSING");
     validateCorrectionDate(args.date, istanbulToday());
-    if (args.reason.trim().length < 5 || args.reason.trim().length > 300) throw new ConvexError("Gerekçe 5–300 karakter olmalı");
+    if (args.reason.trim().length < 5 || args.reason.trim().length > 300) throw requestError("CORRECTION_REASON_LENGTH");
     const needsIn = args.correctionType !== "checkOut";
     const needsOut = args.correctionType !== "checkIn";
-    if ((needsIn && !args.requestedCheckIn) || (needsOut && !args.requestedCheckOut) || (!needsIn && args.requestedCheckIn) || (!needsOut && args.requestedCheckOut)) throw new ConvexError("Düzeltme türüne uygun giriş ve çıkış saatlerini belirtin");
-    if (args.requestedCheckIn && !hhmm.test(args.requestedCheckIn)) throw new ConvexError("Geçersiz giriş saati (HH:mm)");
-    if (args.requestedCheckOut && !hhmm.test(args.requestedCheckOut)) throw new ConvexError("Geçersiz çıkış saati (HH:mm)");
+    if ((needsIn && !args.requestedCheckIn) || (needsOut && !args.requestedCheckOut) || (!needsIn && args.requestedCheckIn) || (!needsOut && args.requestedCheckOut)) throw requestError("CORRECTION_TIMES_MISMATCH");
+    if (args.requestedCheckIn && !hhmm.test(args.requestedCheckIn)) throw requestError("CORRECTION_TIME_INVALID");
+    if (args.requestedCheckOut && !hhmm.test(args.requestedCheckOut)) throw requestError("CORRECTION_TIME_INVALID", "Geçersiz çıkış saati (HH:mm)");
     const sameDay = await ctx.db.query("attendanceCorrections").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).eq("date", args.date)).take(100);
-    if (sameDay.some(item => item.status === "pending")) throw new ConvexError("Bu gün için bekleyen bir düzeltme talebiniz var");
+    if (sameDay.some(item => item.status === "pending")) throw requestError("CORRECTION_PENDING_EXISTS");
     const now = new Date().toISOString();
     const id = await ctx.db.insert("attendanceCorrections", { ...args, reason: args.reason.trim(), employeeId: employee._id, projectId: employee.projectId, status: "pending", createdAt: now, updatedAt: now });
     await writeAudit(ctx, { user: null, projectId: employee.projectId, action: "create", targetTable: "attendanceCorrections", targetId: id, newValue: { actorType: "employee", employeeId: employee._id, status: "pending" }, note: "Çalışan talebi" });
@@ -37,8 +37,8 @@ export const withdraw = employeeAuthedMutation({
   args: { id: v.id("attendanceCorrections") },
   handler: async (ctx, { id }) => {
     const row = await ctx.db.get(id);
-    if (!row || row.employeeId !== ctx.employee._id) throw new ConvexError("Bu düzeltme talebine erişim yetkiniz yok");
-    if (row.status !== "pending") throw new ConvexError("Yalnız bekleyen düzeltme talebinizi geri çekebilirsiniz");
+    if (!row || row.employeeId !== ctx.employee._id) throw requestError("REQUEST_NOT_FOUND", "Bu düzeltme talebine erişim yetkiniz yok");
+    if (row.status !== "pending") throw requestError("REQUEST_NOT_PENDING", "Yalnız bekleyen düzeltme talebinizi geri çekebilirsiniz");
     await ctx.db.patch(id, { status: "withdrawn", updatedAt: new Date().toISOString() });
     await writeAudit(ctx, { user: null, projectId: row.projectId, action: "update", targetTable: "attendanceCorrections", targetId: id, oldValue: { actorType: "employee", employeeId: ctx.employee._id, status: row.status }, newValue: { actorType: "employee", employeeId: ctx.employee._id, status: "withdrawn" }, note: "Çalışan talebi" });
     return null;
@@ -47,9 +47,18 @@ export const withdraw = employeeAuthedMutation({
 
 export const listMine = employeeAuthedQuery({
   args: {},
+  returns: v.array(v.object({
+    _id: v.id("attendanceCorrections"), date: v.string(), correctionType,
+    requestedCheckIn: v.optional(v.string()), requestedCheckOut: v.optional(v.string()), reason: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"), v.literal("withdrawn")),
+    decisionNote: v.optional(v.string()), decidedAt: v.optional(v.string()), createdAt: v.string(),
+  })),
   handler: async (ctx) => {
     const since = istanbulToday(Date.now() - 90 * 86_400_000);
-    return await ctx.db.query("attendanceCorrections").withIndex("by_employee_date", q => q.eq("employeeId", ctx.employee._id).gte("date", since)).order("desc").take(100);
+    const rows = await ctx.db.query("attendanceCorrections").withIndex("by_employee_date", q => q.eq("employeeId", ctx.employee._id).gte("date", since)).order("desc").take(100);
+    return rows.map(({ _id, date, correctionType, requestedCheckIn, requestedCheckOut, reason, status, decisionNote, decidedAt, createdAt }) => ({
+      _id, date, correctionType, requestedCheckIn, requestedCheckOut, reason, status, decisionNote, decidedAt, createdAt,
+    }));
   },
 });
 

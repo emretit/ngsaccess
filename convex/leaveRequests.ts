@@ -13,7 +13,7 @@ import {
   employeeAuthedMutation,
   employeeAuthedQuery,
 } from "./lib/customFunctions";
-import { istanbulToday, overlaps, validateLeaveRequestRange } from "./lib/requestRules";
+import { requestError, istanbulToday, overlaps, validateLeaveRequestRange } from "./lib/requestRules";
 import { writeAudit } from "./lib/audit";
 
 const leaveType = v.union(v.literal("annual"), v.literal("sick"), v.literal("excuse"), v.literal("unpaid"), v.literal("parental"), v.literal("marriage"), v.literal("bereavement"), v.literal("paternity"), v.literal("lactation"), v.literal("compensatory"));
@@ -23,15 +23,15 @@ export const submit = employeeAuthedMutation({
   args: { leaveType, startDate: v.string(), endDate: v.string(), notes: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const employee = ctx.employee;
-    if (!employee.projectId) throw new ConvexError("Çalışanın proje bilgisi bulunamadı");
-    if (args.notes !== undefined && args.notes.length > 500) throw new ConvexError("Not en fazla 500 karakter olabilir");
+    if (!employee.projectId) throw requestError("REQUEST_PROJECT_MISSING");
+    if (args.notes !== undefined && args.notes.length > 500) throw requestError("REQUEST_NOTE_TOO_LONG");
     validateLeaveRequestRange(args.startDate, args.endDate, istanbulToday());
     const rows = await ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", employee._id)).order("desc").take(SCAN_LIMIT + 1);
-    if (rows.length > SCAN_LIMIT) throw new ConvexError("İzin çakışması kontrol sınırına ulaştı");
+    if (rows.length > SCAN_LIMIT) throw requestError("REQUEST_PENDING_LIMIT", "İzin çakışması kontrol sınırına ulaştı");
     const pendingCount = rows.filter(row => row.status === "pending").length;
-    if (pendingCount >= 10) throw new ConvexError("En fazla 10 bekleyen izin talebiniz olabilir");
-    if (rows.some(row => row.status === "pending" && overlaps(args.startDate, args.endDate, row.startDate, row.endDate))) throw new ConvexError("Seçilen tarihler bekleyen başka bir izin talebiyle çakışıyor");
-    if (rows.some(row => row.status === "approved" && overlaps(args.startDate, args.endDate, row.startDate, row.endDate))) throw new ConvexError("Seçilen tarihler onaylı başka bir izinle çakışıyor");
+    if (pendingCount >= 10) throw requestError("REQUEST_PENDING_LIMIT");
+    if (rows.some(row => row.status === "pending" && overlaps(args.startDate, args.endDate, row.startDate, row.endDate))) throw requestError("REQUEST_OVERLAP_PENDING");
+    if (rows.some(row => row.status === "approved" && overlaps(args.startDate, args.endDate, row.startDate, row.endDate))) throw requestError("REQUEST_OVERLAP_APPROVED");
     const now = new Date().toISOString();
     const id = await ctx.db.insert("leaves", { employeeId: employee._id, projectId: employee.projectId, ...args, status: "pending", source: "employee", createdAt: now, updatedAt: now });
     await writeAudit(ctx, { user: null, projectId: employee.projectId, action: "create", targetTable: "leaves", targetId: id, newValue: { actorType: "employee", employeeId: employee._id, status: "pending" }, note: "Çalışan talebi" });
@@ -43,8 +43,8 @@ export const withdraw = employeeAuthedMutation({
   args: { leaveId: v.id("leaves") },
   handler: async (ctx, { leaveId }) => {
     const leave = await ctx.db.get(leaveId);
-    if (!leave || leave.employeeId !== ctx.employee._id) throw new ConvexError("Bu izin talebine erişim yetkiniz yok");
-    if (leave.status !== "pending" || leave.source !== "employee") throw new ConvexError("Yalnız bekleyen kendi izin talebinizi geri çekebilirsiniz");
+    if (!leave || leave.employeeId !== ctx.employee._id) throw requestError("REQUEST_NOT_FOUND");
+    if (leave.status !== "pending" || leave.source !== "employee") throw requestError("REQUEST_NOT_PENDING");
     await ctx.db.delete(leaveId);
     await writeAudit(ctx, { user: null, projectId: leave.projectId, action: "delete", targetTable: "leaves", targetId: leaveId, oldValue: { actorType: "employee", employeeId: ctx.employee._id, status: leave.status }, note: "Çalışan talebi" });
     return null;
@@ -53,9 +53,18 @@ export const withdraw = employeeAuthedMutation({
 
 export const listMine = employeeAuthedQuery({
   args: {},
+  returns: v.array(v.object({
+    _id: v.id("leaves"), leaveType, startDate: v.string(), endDate: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+    notes: v.optional(v.string()), decisionNote: v.optional(v.string()), decidedAt: v.optional(v.string()),
+    source: v.optional(v.union(v.literal("admin"), v.literal("employee"))), createdAt: v.string(),
+  })),
   handler: async (ctx) => {
     const since = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
-    return await ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", ctx.employee._id).gte("startDate", since)).order("desc").take(100);
+    const rows = await ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", ctx.employee._id).gte("startDate", since)).order("desc").take(100);
+    return rows.map(({ _id, leaveType, startDate, endDate, status, notes, decisionNote, decidedAt, source, createdAt }) => ({
+      _id, leaveType, startDate, endDate, status, notes, decisionNote, decidedAt, source, createdAt,
+    }));
   },
 });
 // Keep project authorization failures readable by clients as Convex errors.

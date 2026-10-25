@@ -106,6 +106,30 @@ class BusinessError extends AppError {
   String get userMessage => isAccessDenied
       ? 'Erişim reddedildi.'
       : switch (safeCode) {
+          'REQUEST_PROJECT_MISSING' => "Çalışanın proje bilgisi bulunamadı",
+          'REQUEST_NOTE_TOO_LONG' => "Not en fazla 500 karakter olabilir",
+          'REQUEST_DATE_INVALID' => "Geçerli bir tarih girin (YYYY-MM-DD)",
+          'REQUEST_RANGE_INVALID' => "Bitiş tarihi başlangıçtan önce olamaz",
+          'REQUEST_START_TOO_OLD' =>
+            "İzin başlangıcı en fazla 30 gün geçmiş olabilir",
+          'REQUEST_RANGE_TOO_LONG' => "İzin aralığı en fazla 60 gün olabilir",
+          'REQUEST_PENDING_LIMIT' =>
+            "En fazla 10 bekleyen izin talebiniz olabilir",
+          'REQUEST_OVERLAP_PENDING' =>
+            "Seçilen tarihler bekleyen başka bir izin talebiyle çakışıyor",
+          'REQUEST_OVERLAP_APPROVED' =>
+            "Seçilen tarihler onaylı başka bir izinle çakışıyor",
+          'REQUEST_NOT_FOUND' => "Talep bulunamadı.",
+          'REQUEST_NOT_PENDING' =>
+            "Yalnız bekleyen kendi talebinizi geri çekebilirsiniz.",
+          'CORRECTION_DATE_OUT_OF_RANGE' =>
+            "Tarih bugün ile son 30 gün arasında olmalı",
+          'CORRECTION_REASON_LENGTH' => "Gerekçe 5–300 karakter olmalı",
+          'CORRECTION_TIMES_MISMATCH' =>
+            "Düzeltme türüne uygun giriş ve çıkış saatlerini belirtin",
+          'CORRECTION_TIME_INVALID' => "Geçerli bir saat girin (HH:mm).",
+          'CORRECTION_PENDING_EXISTS' =>
+            "Bu gün için bekleyen bir düzeltme talebiniz var",
           'INVALID_CREDENTIALS' => 'E-posta veya şifre hatalı',
           'MOBILE_PASSWORD_NOT_SET' =>
             'Mobil şifreniz henüz kurulmamış. Yöneticinizden kurulum bağlantısı isteyin.',
@@ -186,6 +210,22 @@ String? normalizeBusinessCode(String? code) => switch (code) {
   'OPERATION_NOT_FOUND' ||
   'OPERATION_STORAGE_FAILED' ||
   'OPERATION_UNRESOLVED' ||
+  'REQUEST_PROJECT_MISSING' ||
+  'REQUEST_NOTE_TOO_LONG' ||
+  'REQUEST_DATE_INVALID' ||
+  'REQUEST_RANGE_INVALID' ||
+  'REQUEST_START_TOO_OLD' ||
+  'REQUEST_RANGE_TOO_LONG' ||
+  'REQUEST_PENDING_LIMIT' ||
+  'REQUEST_OVERLAP_PENDING' ||
+  'REQUEST_OVERLAP_APPROVED' ||
+  'REQUEST_NOT_FOUND' ||
+  'REQUEST_NOT_PENDING' ||
+  'CORRECTION_DATE_OUT_OF_RANGE' ||
+  'CORRECTION_REASON_LENGTH' ||
+  'CORRECTION_TIMES_MISMATCH' ||
+  'CORRECTION_TIME_INVALID' ||
+  'CORRECTION_PENDING_EXISTS' ||
   'READER_REQUIRED' => code,
   _ => null,
 };

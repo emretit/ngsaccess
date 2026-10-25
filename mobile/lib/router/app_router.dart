@@ -16,6 +16,7 @@ import '../screens/qr_scan/qr_scan_screen.dart';
 import '../screens/settings/select_device_screen.dart';
 import '../screens/splash_screen.dart';
 import '../screens/visitor/visitor_screen.dart';
+import '../screens/requests/requests_screen.dart';
 import 'route_paths.dart';
 
 export 'route_paths.dart';
@@ -118,6 +119,11 @@ GoRouter buildRouter(
           context,
           (_) => const SelectDeviceScreen(),
         ),
+      ),
+      GoRoute(
+        path: AppRoute.requests,
+        builder: (context, _) =>
+            screen(AppRoute.requests, context, (_) => const RequestsScreen()),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>

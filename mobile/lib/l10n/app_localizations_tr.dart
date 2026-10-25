@@ -1338,4 +1338,182 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get visitorRecoveryStorageError =>
       'Ziyaretçi isteği güvenli biçimde saklanamadı veya okunamadı. Devam etmeden önce durumu tekrar kontrol edin.';
+
+  @override
+  String get errorRequestProjectMissing => 'Çalışanın proje bilgisi bulunamadı';
+
+  @override
+  String get errorRequestNoteTooLong => 'Not en fazla 500 karakter olabilir';
+
+  @override
+  String get errorRequestDateInvalid => 'Geçerli bir tarih girin (YYYY-MM-DD)';
+
+  @override
+  String get errorRequestRangeInvalid =>
+      'Bitiş tarihi başlangıçtan önce olamaz';
+
+  @override
+  String get errorRequestStartTooOld =>
+      'İzin başlangıcı en fazla 30 gün geçmiş olabilir';
+
+  @override
+  String get errorRequestRangeTooLong =>
+      'İzin aralığı en fazla 60 gün olabilir';
+
+  @override
+  String get errorRequestPendingLimit =>
+      'En fazla 10 bekleyen izin talebiniz olabilir';
+
+  @override
+  String get errorRequestOverlapPending =>
+      'Seçilen tarihler bekleyen başka bir izin talebiyle çakışıyor';
+
+  @override
+  String get errorRequestOverlapApproved =>
+      'Seçilen tarihler onaylı başka bir izinle çakışıyor';
+
+  @override
+  String get errorRequestNotFound => 'Talep bulunamadı.';
+
+  @override
+  String get errorRequestNotPending =>
+      'Yalnız bekleyen kendi talebinizi geri çekebilirsiniz.';
+
+  @override
+  String get errorCorrectionDateOutOfRange =>
+      'Tarih bugün ile son 30 gün arasında olmalı';
+
+  @override
+  String get errorCorrectionReasonLength => 'Gerekçe 5–300 karakter olmalı';
+
+  @override
+  String get errorCorrectionTimesMismatch =>
+      'Düzeltme türüne uygun giriş ve çıkış saatlerini belirtin';
+
+  @override
+  String get errorCorrectionTimeInvalid => 'Geçerli bir saat girin (HH:mm).';
+
+  @override
+  String get errorCorrectionPendingExists =>
+      'Bu gün için bekleyen bir düzeltme talebiniz var';
+
+  @override
+  String get requestsTitle => 'Taleplerim';
+
+  @override
+  String get requestsLeave => 'İzin';
+
+  @override
+  String get requestsCorrection => 'PDKS düzeltme';
+
+  @override
+  String get requestsNew => 'Yeni talep';
+
+  @override
+  String get requestsEmpty => 'Henüz talebiniz yok.';
+
+  @override
+  String get requestsRetry => 'Yeniden dene';
+
+  @override
+  String get requestsWithdraw => 'Geri çek';
+
+  @override
+  String get requestsWithdrawConfirm =>
+      'Bu talebi geri çekmek istiyor musunuz?';
+
+  @override
+  String get requestsCancel => 'Vazgeç';
+
+  @override
+  String get requestsSubmit => 'Gönder';
+
+  @override
+  String get requestsUncertain =>
+      'Talep gönderilmiş olabilir; listeyi kontrol edin.';
+
+  @override
+  String get requestsAdmin => 'Yönetici kaydı';
+
+  @override
+  String get requestsPending => 'Bekliyor';
+
+  @override
+  String get requestsApproved => 'Onaylandı';
+
+  @override
+  String get requestsRejected => 'Reddedildi';
+
+  @override
+  String get requestsWithdrawn => 'Geri çekildi';
+
+  @override
+  String get requestsUnknown => 'Bilinmiyor';
+
+  @override
+  String get requestsOther => 'Diğer';
+
+  @override
+  String get requestsStart => 'Başlangıç tarihi';
+
+  @override
+  String get requestsEnd => 'Bitiş tarihi';
+
+  @override
+  String get requestsDate => 'Tarih';
+
+  @override
+  String get requestsNotes => 'Not';
+
+  @override
+  String get requestsReason => 'Gerekçe';
+
+  @override
+  String get requestsType => 'Tür';
+
+  @override
+  String get requestsCheckIn => 'Giriş';
+
+  @override
+  String get requestsCheckOut => 'Çıkış';
+
+  @override
+  String get requestsBoth => 'İkisi';
+
+  @override
+  String get requestsDecision => 'Yönetici karar notu';
+
+  @override
+  String get requestsLeaveAnnual => 'Yıllık izin';
+
+  @override
+  String get requestsLeaveSick => 'Hastalık izni';
+
+  @override
+  String get requestsLeaveExcuse => 'Mazeret izni';
+
+  @override
+  String get requestsLeaveUnpaid => 'Ücretsiz izin';
+
+  @override
+  String get requestsLeaveParental => 'Doğum izni';
+
+  @override
+  String get requestsLeaveMarriage => 'Evlilik izni';
+
+  @override
+  String get requestsLeaveBereavement => 'Vefat izni';
+
+  @override
+  String get requestsLeavePaternity => 'Babalık izni';
+
+  @override
+  String get requestsLeaveLactation => 'Süt izni';
+
+  @override
+  String get requestsLeaveCompensatory => 'Telafi izni';
+
+  @override
+  String get requestsWithdrawUncertain =>
+      'Talep geri çekilmiş olabilir; listeyi kontrol edin.';
 }

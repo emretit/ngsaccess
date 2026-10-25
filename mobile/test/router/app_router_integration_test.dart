@@ -103,6 +103,7 @@ void main() {
         AppRoute.qr: (_) => const _VisibilityPage(),
         AppRoute.visitor: (_) => const _ScrollingPage(),
         AppRoute.profile: (_) => const Text('Profile target'),
+        AppRoute.requests: (_) => const Text('Requests target'),
       },
     );
     await tester.pumpWidget(
@@ -139,6 +140,28 @@ void main() {
       expect(store.reads, 1);
     },
   );
+
+  for (final target in [
+    '/requests',
+    'ngsplus://requests',
+    'ngsplus:///requests',
+  ]) {
+    testWidgets('requests protected route and deep link: $target', (
+      tester,
+    ) async {
+      initialize();
+      await auth.bootstrap();
+      await mount(tester, target);
+      await tester.pumpAndSettle();
+      expect(location().path, AppRoute.login);
+      expect(location().queryParameters['from'], AppRoute.requests);
+      await auth.signIn('fixture@example.test', 'fixture-password');
+      await tester.pumpAndSettle();
+      expect(location().path, AppRoute.requests);
+      expect(find.text('Requests target'), findsOneWidget);
+      expect(find.byType(AppBottomNavigation), findsNothing);
+    });
+  }
 
   testWidgets('unauthenticated target survives login and auth notify', (
     tester,

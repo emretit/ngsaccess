@@ -156,8 +156,6 @@ describe("leaveRequests", () => {
     expect(await listMine(f.ctx, {})).toEqual([
       expect.objectContaining({
         _id: id,
-        employeeId: f.employeeId,
-        projectId: f.projectId,
         source: "employee",
       }),
     ]);
@@ -436,5 +434,52 @@ describe("leaveRequests yönetici kararları", () => {
     expect(await listPending(f.ctx, { projectId: f.projectId, paginationOpts: { cursor: null, numItems: 25 } })).toMatchObject({
       page: [{ calendarDays: 1 }, { calendarDays: null }, { calendarDays: null }, { calendarDays: null }],
     });
+  });
+});
+
+
+describe("employee typed leave errors", () => {
+  const args = () => ({ leaveType: "annual", startDate: today(), endDate: today() });
+  it("codes project, note, ownership and pending failures", async () => {
+    const f = fixture();
+    const missing = { ...f.ctx, employee: { ...f.ctx.employee, projectId: undefined } };
+    await expect(submit(missing, args())).rejects.toMatchObject({ data: { code: "REQUEST_PROJECT_MISSING", message: "Çalışanın proje bilgisi bulunamadı" } });
+    await expect(submit(f.ctx, { ...args(), notes: "x".repeat(501) })).rejects.toMatchObject({ data: { code: "REQUEST_NOTE_TOO_LONG" } });
+    await expect(withdraw(f.ctx, { leaveId: "missing" })).rejects.toMatchObject({ data: { code: "REQUEST_NOT_FOUND" } });
+    const id = await f.insert("leaves", { employeeId: f.employeeId, projectId: f.projectId, status: "pending", source: "admin", ...args() });
+    await expect(withdraw(f.ctx, { leaveId: id })).rejects.toMatchObject({ data: { code: "REQUEST_NOT_PENDING" } });
+  });
+  it.each(["pending", "approved"] as const)("codes %s overlap", async status => {
+    const f = fixture();
+    await f.insert("leaves", { employeeId: f.employeeId, projectId: f.projectId, status, ...args() });
+    await expect(submit(f.ctx, args())).rejects.toMatchObject({ data: { code: status === "pending" ? "REQUEST_OVERLAP_PENDING" : "REQUEST_OVERLAP_APPROVED" } });
+  });
+  it("codes both the pending limit and scan cap while preserving their messages", async () => {
+    const f = fixture();
+    for (let i = 0; i < 10; i++) await f.insert("leaves", { employeeId: f.employeeId, status: "pending", ...args() });
+    await expect(submit(f.ctx, args())).rejects.toMatchObject({ data: { code: "REQUEST_PENDING_LIMIT", message: "En fazla 10 bekleyen izin talebiniz olabilir" } });
+    for (let i = 0; i < 4991; i++) await f.insert("leaves", { employeeId: f.employeeId, status: "rejected", ...args() });
+    await expect(submit(f.ctx, args())).rejects.toMatchObject({ data: { code: "REQUEST_PENDING_LIMIT", message: "İzin çakışması kontrol sınırına ulaştı" } });
+  });
+});
+
+
+describe("listMine mobile data minimization", () => {
+  it("returns only the mobile fields and never approval, project or employee identifiers", async () => {
+    const f = fixture();
+    const id = await f.insert("leaves", {
+      employeeId: f.employeeId, projectId: f.projectId, approvedBy: f.ctx.user._id,
+      leaveType: "annual", startDate: today(), endDate: today(), status: "approved", source: "employee",
+      notes: "Özgün not", decisionNote: "Uygundur", decidedAt: "2026-10-25T10:00:00Z", createdAt: "2026-10-24T10:00:00Z", updatedAt: "2026-10-25T10:00:00Z",
+    });
+    const rows = await listMine(f.ctx, {});
+    expect(rows).toEqual([{
+      _id: id, leaveType: "annual", startDate: today(), endDate: today(), status: "approved", source: "employee",
+      notes: "Özgün not", decisionNote: "Uygundur", decidedAt: "2026-10-25T10:00:00Z", createdAt: "2026-10-24T10:00:00Z",
+    }]);
+    expect(rows).not.toEqual(expect.arrayContaining([expect.objectContaining({ approvedBy: expect.anything() })]));
+    for (const row of rows as Record<string, unknown>[]) {
+      for (const key of ["approvedBy", "decidedBy", "projectId", "employeeId", "_creationTime", "updatedAt"]) expect(row).not.toHaveProperty(key);
+    }
   });
 });

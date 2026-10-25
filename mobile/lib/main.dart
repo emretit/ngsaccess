@@ -15,6 +15,8 @@ import 'providers/locale_provider.dart';
 import 'providers/preferred_device_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/visitor_provider.dart';
+import 'providers/request_provider.dart';
+import 'repositories/request_repository.dart';
 import 'repositories/attendance_repository.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/device_repository.dart';
@@ -120,6 +122,8 @@ class _MyAppState extends State<MyApp> {
   late final AttendanceProvider _attendanceProvider;
   late final VisitorProvider _visitorProvider;
   late final DoorOperationProvider _doorProvider;
+  late final RequestRepository _requestRepo;
+  late final RequestProvider _requestProvider;
   late final GoRouter _router;
   late final AuthExpiryCallback _authExpired;
   bool _composed = false;
@@ -189,6 +193,8 @@ class _MyAppState extends State<MyApp> {
     _qrRepo = QrRepository(client);
     _visitorRepo = VisitorRepository(client);
     _doorRepo = DoorOperationRepository(client);
+    _requestRepo = RequestRepository(client);
+    _requestProvider = RequestProvider(repository: _requestRepo);
     _authProvider =
         widget.authProvider ??
         AuthProvider(repository: _authRepo, sessionStore: widget.sessionStore);
@@ -249,6 +255,7 @@ class _MyAppState extends State<MyApp> {
       );
     }
     _visitorProvider.synchronizeSession(_authProvider);
+    _requestProvider.synchronizeSession(_authProvider);
     if (user == null) {
       _visitorProvider.setVisible(false);
     }
@@ -270,6 +277,7 @@ class _MyAppState extends State<MyApp> {
       _attendanceProvider.dispose();
       _visitorProvider.dispose();
       _doorProvider.dispose();
+      _requestProvider.dispose();
       if (widget.authProvider == null) {
         _authProvider.dispose();
       }
@@ -295,6 +303,8 @@ class _MyAppState extends State<MyApp> {
       ),
       if (_composed) ...[
         Provider<AuthRepository>.value(value: _authRepo),
+        Provider<RequestRepository>.value(value: _requestRepo),
+        ChangeNotifierProvider<RequestProvider>.value(value: _requestProvider),
         Provider<AttendanceRepository>.value(value: _attendanceRepo),
         Provider<DeviceRepository>.value(value: _deviceRepo),
         Provider<QrRepository>.value(value: _qrRepo),

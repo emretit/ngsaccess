@@ -6,6 +6,7 @@ class AppRoute {
   static const login = '/login';
   static const forgotPassword = '/forgot-password';
   static const home = '/home';
+  static const requests = '/requests';
   static const history = '/history';
   static const qr = '/qr';
   static const visitor = '/visitor';
@@ -13,6 +14,7 @@ class AppRoute {
   static const selectDevice = '/select-device';
   static const protectedPaths = {
     home,
+    requests,
     history,
     qr,
     visitor,

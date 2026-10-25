@@ -2509,6 +2509,336 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Ziyaretçi isteği güvenli biçimde saklanamadı veya okunamadı. Devam etmeden önce durumu tekrar kontrol edin.'**
   String get visitorRecoveryStorageError;
+
+  /// No description provided for @errorRequestProjectMissing.
+  ///
+  /// In tr, this message translates to:
+  /// **'Çalışanın proje bilgisi bulunamadı'**
+  String get errorRequestProjectMissing;
+
+  /// No description provided for @errorRequestNoteTooLong.
+  ///
+  /// In tr, this message translates to:
+  /// **'Not en fazla 500 karakter olabilir'**
+  String get errorRequestNoteTooLong;
+
+  /// No description provided for @errorRequestDateInvalid.
+  ///
+  /// In tr, this message translates to:
+  /// **'Geçerli bir tarih girin (YYYY-MM-DD)'**
+  String get errorRequestDateInvalid;
+
+  /// No description provided for @errorRequestRangeInvalid.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bitiş tarihi başlangıçtan önce olamaz'**
+  String get errorRequestRangeInvalid;
+
+  /// No description provided for @errorRequestStartTooOld.
+  ///
+  /// In tr, this message translates to:
+  /// **'İzin başlangıcı en fazla 30 gün geçmiş olabilir'**
+  String get errorRequestStartTooOld;
+
+  /// No description provided for @errorRequestRangeTooLong.
+  ///
+  /// In tr, this message translates to:
+  /// **'İzin aralığı en fazla 60 gün olabilir'**
+  String get errorRequestRangeTooLong;
+
+  /// No description provided for @errorRequestPendingLimit.
+  ///
+  /// In tr, this message translates to:
+  /// **'En fazla 10 bekleyen izin talebiniz olabilir'**
+  String get errorRequestPendingLimit;
+
+  /// No description provided for @errorRequestOverlapPending.
+  ///
+  /// In tr, this message translates to:
+  /// **'Seçilen tarihler bekleyen başka bir izin talebiyle çakışıyor'**
+  String get errorRequestOverlapPending;
+
+  /// No description provided for @errorRequestOverlapApproved.
+  ///
+  /// In tr, this message translates to:
+  /// **'Seçilen tarihler onaylı başka bir izinle çakışıyor'**
+  String get errorRequestOverlapApproved;
+
+  /// No description provided for @errorRequestNotFound.
+  ///
+  /// In tr, this message translates to:
+  /// **'Talep bulunamadı.'**
+  String get errorRequestNotFound;
+
+  /// No description provided for @errorRequestNotPending.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yalnız bekleyen kendi talebinizi geri çekebilirsiniz.'**
+  String get errorRequestNotPending;
+
+  /// No description provided for @errorCorrectionDateOutOfRange.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tarih bugün ile son 30 gün arasında olmalı'**
+  String get errorCorrectionDateOutOfRange;
+
+  /// No description provided for @errorCorrectionReasonLength.
+  ///
+  /// In tr, this message translates to:
+  /// **'Gerekçe 5–300 karakter olmalı'**
+  String get errorCorrectionReasonLength;
+
+  /// No description provided for @errorCorrectionTimesMismatch.
+  ///
+  /// In tr, this message translates to:
+  /// **'Düzeltme türüne uygun giriş ve çıkış saatlerini belirtin'**
+  String get errorCorrectionTimesMismatch;
+
+  /// No description provided for @errorCorrectionTimeInvalid.
+  ///
+  /// In tr, this message translates to:
+  /// **'Geçerli bir saat girin (HH:mm).'**
+  String get errorCorrectionTimeInvalid;
+
+  /// No description provided for @errorCorrectionPendingExists.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu gün için bekleyen bir düzeltme talebiniz var'**
+  String get errorCorrectionPendingExists;
+
+  /// No description provided for @requestsTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Taleplerim'**
+  String get requestsTitle;
+
+  /// No description provided for @requestsLeave.
+  ///
+  /// In tr, this message translates to:
+  /// **'İzin'**
+  String get requestsLeave;
+
+  /// No description provided for @requestsCorrection.
+  ///
+  /// In tr, this message translates to:
+  /// **'PDKS düzeltme'**
+  String get requestsCorrection;
+
+  /// No description provided for @requestsNew.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeni talep'**
+  String get requestsNew;
+
+  /// No description provided for @requestsEmpty.
+  ///
+  /// In tr, this message translates to:
+  /// **'Henüz talebiniz yok.'**
+  String get requestsEmpty;
+
+  /// No description provided for @requestsRetry.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yeniden dene'**
+  String get requestsRetry;
+
+  /// No description provided for @requestsWithdraw.
+  ///
+  /// In tr, this message translates to:
+  /// **'Geri çek'**
+  String get requestsWithdraw;
+
+  /// No description provided for @requestsWithdrawConfirm.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu talebi geri çekmek istiyor musunuz?'**
+  String get requestsWithdrawConfirm;
+
+  /// No description provided for @requestsCancel.
+  ///
+  /// In tr, this message translates to:
+  /// **'Vazgeç'**
+  String get requestsCancel;
+
+  /// No description provided for @requestsSubmit.
+  ///
+  /// In tr, this message translates to:
+  /// **'Gönder'**
+  String get requestsSubmit;
+
+  /// No description provided for @requestsUncertain.
+  ///
+  /// In tr, this message translates to:
+  /// **'Talep gönderilmiş olabilir; listeyi kontrol edin.'**
+  String get requestsUncertain;
+
+  /// No description provided for @requestsAdmin.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yönetici kaydı'**
+  String get requestsAdmin;
+
+  /// No description provided for @requestsPending.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bekliyor'**
+  String get requestsPending;
+
+  /// No description provided for @requestsApproved.
+  ///
+  /// In tr, this message translates to:
+  /// **'Onaylandı'**
+  String get requestsApproved;
+
+  /// No description provided for @requestsRejected.
+  ///
+  /// In tr, this message translates to:
+  /// **'Reddedildi'**
+  String get requestsRejected;
+
+  /// No description provided for @requestsWithdrawn.
+  ///
+  /// In tr, this message translates to:
+  /// **'Geri çekildi'**
+  String get requestsWithdrawn;
+
+  /// No description provided for @requestsUnknown.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bilinmiyor'**
+  String get requestsUnknown;
+
+  /// No description provided for @requestsOther.
+  ///
+  /// In tr, this message translates to:
+  /// **'Diğer'**
+  String get requestsOther;
+
+  /// No description provided for @requestsStart.
+  ///
+  /// In tr, this message translates to:
+  /// **'Başlangıç tarihi'**
+  String get requestsStart;
+
+  /// No description provided for @requestsEnd.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bitiş tarihi'**
+  String get requestsEnd;
+
+  /// No description provided for @requestsDate.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tarih'**
+  String get requestsDate;
+
+  /// No description provided for @requestsNotes.
+  ///
+  /// In tr, this message translates to:
+  /// **'Not'**
+  String get requestsNotes;
+
+  /// No description provided for @requestsReason.
+  ///
+  /// In tr, this message translates to:
+  /// **'Gerekçe'**
+  String get requestsReason;
+
+  /// No description provided for @requestsType.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tür'**
+  String get requestsType;
+
+  /// No description provided for @requestsCheckIn.
+  ///
+  /// In tr, this message translates to:
+  /// **'Giriş'**
+  String get requestsCheckIn;
+
+  /// No description provided for @requestsCheckOut.
+  ///
+  /// In tr, this message translates to:
+  /// **'Çıkış'**
+  String get requestsCheckOut;
+
+  /// No description provided for @requestsBoth.
+  ///
+  /// In tr, this message translates to:
+  /// **'İkisi'**
+  String get requestsBoth;
+
+  /// No description provided for @requestsDecision.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yönetici karar notu'**
+  String get requestsDecision;
+
+  /// No description provided for @requestsLeaveAnnual.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yıllık izin'**
+  String get requestsLeaveAnnual;
+
+  /// No description provided for @requestsLeaveSick.
+  ///
+  /// In tr, this message translates to:
+  /// **'Hastalık izni'**
+  String get requestsLeaveSick;
+
+  /// No description provided for @requestsLeaveExcuse.
+  ///
+  /// In tr, this message translates to:
+  /// **'Mazeret izni'**
+  String get requestsLeaveExcuse;
+
+  /// No description provided for @requestsLeaveUnpaid.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ücretsiz izin'**
+  String get requestsLeaveUnpaid;
+
+  /// No description provided for @requestsLeaveParental.
+  ///
+  /// In tr, this message translates to:
+  /// **'Doğum izni'**
+  String get requestsLeaveParental;
+
+  /// No description provided for @requestsLeaveMarriage.
+  ///
+  /// In tr, this message translates to:
+  /// **'Evlilik izni'**
+  String get requestsLeaveMarriage;
+
+  /// No description provided for @requestsLeaveBereavement.
+  ///
+  /// In tr, this message translates to:
+  /// **'Vefat izni'**
+  String get requestsLeaveBereavement;
+
+  /// No description provided for @requestsLeavePaternity.
+  ///
+  /// In tr, this message translates to:
+  /// **'Babalık izni'**
+  String get requestsLeavePaternity;
+
+  /// No description provided for @requestsLeaveLactation.
+  ///
+  /// In tr, this message translates to:
+  /// **'Süt izni'**
+  String get requestsLeaveLactation;
+
+  /// No description provided for @requestsLeaveCompensatory.
+  ///
+  /// In tr, this message translates to:
+  /// **'Telafi izni'**
+  String get requestsLeaveCompensatory;
+
+  /// No description provided for @requestsWithdrawUncertain.
+  ///
+  /// In tr, this message translates to:
+  /// **'Talep geri çekilmiş olabilir; listeyi kontrol edin.'**
+  String get requestsWithdrawUncertain;
 }
 
 class _AppLocalizationsDelegate

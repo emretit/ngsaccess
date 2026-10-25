@@ -72,7 +72,7 @@ describe("attendanceCorrections", () => {
     await expect(submit(f.asEmployee(f.employeeId), { ...args(), correctionType: "checkIn", requestedCheckIn: undefined })).rejects.toThrow("uygun");
     const old = new Date(Date.now() - 31 * 86_400_000).toISOString().slice(0, 10);
     await expect(submit(f.asEmployee(f.employeeId), args(old))).rejects.toThrow("son 30 gün");
-    expect(await listMine(f.asEmployee(f.employeeId), {})).toMatchObject([expect.objectContaining({ _id: id, employeeId: f.employeeId })]);
+    expect(await listMine(f.asEmployee(f.employeeId), {})).toMatchObject([expect.objectContaining({ _id: id })]);
     expect(await listMine(f.asEmployee("employee-2" as Id<"employees">), {})).toEqual([]);
     const audit = f.rows.find(row => row.table === "auditLog");
     expect(audit).toMatchObject({ targetTable: "attendanceCorrections", note: "Çalışan talebi", searchText: expect.stringContaining("düzeltme") });
@@ -141,4 +141,45 @@ describe("attendanceCorrections", () => {
     await expect(approve({ ...f.ctx, memberships: [f.otherProjectId] }, { id })).rejects.toThrow("erişim");
     expect(f.rows.find(row => row._id === id)).toMatchObject({ status: "pending" });
   });
+});
+
+
+describe("employee typed correction errors", () => {
+  it.each([
+    ["CORRECTION_REASON_LENGTH", { reason: "abcd" }],
+    ["CORRECTION_REASON_LENGTH", { reason: "x".repeat(301) }],
+    ["CORRECTION_TIMES_MISMATCH", { correctionType: "checkIn" }],
+    ["CORRECTION_TIME_INVALID", { requestedCheckIn: "24:00" }],
+    ["CORRECTION_TIME_INVALID", { requestedCheckOut: "12:60" }],
+    ["REQUEST_DATE_INVALID", { date: "2026-02-30" }],
+  ])("%s is structured", async (code, overrides) => {
+    const f = fixture();
+    await expect(submit(f.ctx, { ...args(), ...overrides as Record<string, unknown> })).rejects.toMatchObject({ data: { code } });
+  });
+  it("codes duplicate, project, ownership, and status denials", async () => {
+    const f = fixture();
+    await expect(submit({ ...f.ctx, employee: { ...f.ctx.employee, projectId: undefined } }, args())).rejects.toMatchObject({ data: { code: "REQUEST_PROJECT_MISSING" } });
+    const id = await submit(f.ctx, args());
+    await expect(submit(f.ctx, args())).rejects.toMatchObject({ data: { code: "CORRECTION_PENDING_EXISTS" } });
+    await expect(withdraw(f.ctx, { id: "missing" })).rejects.toMatchObject({ data: { code: "REQUEST_NOT_FOUND" } });
+    await expect(withdraw(f.asEmployee("other" as Id<"employees">), { id })).rejects.toMatchObject({ data: { code: "REQUEST_NOT_FOUND" } });
+    await withdraw(f.ctx, { id });
+    await expect(withdraw(f.ctx, { id })).rejects.toMatchObject({ data: { code: "REQUEST_NOT_PENDING" } });
+  });
+});
+
+
+it("listMine returns only mobile correction fields without decision, project or employee identifiers", async () => {
+  const f = fixture();
+  const id = await f.insert("attendanceCorrections", {
+    ...args(), employeeId: f.employeeId, projectId: f.projectId, decidedBy: f.ctx.user._id,
+    status: "rejected", decisionNote: "Uygun değil", decidedAt: "2026-10-25T10:00:00Z", createdAt: "2026-10-24T10:00:00Z", updatedAt: "2026-10-25T10:00:00Z",
+  });
+  const rows = await listMine(f.ctx, {});
+  expect(rows).toEqual([{
+    _id: id, ...args(), status: "rejected", decisionNote: "Uygun değil", decidedAt: "2026-10-25T10:00:00Z", createdAt: "2026-10-24T10:00:00Z",
+  }]);
+  for (const row of rows as Record<string, unknown>[]) {
+    for (const key of ["approvedBy", "decidedBy", "projectId", "employeeId", "_creationTime", "updatedAt"]) expect(row).not.toHaveProperty(key);
+  }
 });
