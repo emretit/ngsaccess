@@ -1,0 +1,10 @@
+{
+  "gate": "MOB-N09 Android",
+  "recordedAt": "2026-10-23T10:40:00+03:00",
+  "decisions": {"channel": "public stores", "priorStoreRelease": false, "appleAccount": "Individual (T9QCW8Q2C3)"},
+  "sourceRevision": "bb7d942a (mobile/ clean; includes 20e40ac4)",
+  "uploadKey": {"location": "~/.ngsplus-signing (outside repo, 0600)", "alias": "upload", "algorithm": "RSA 4096 / SHA384withRSA", "validityDays": 10000, "sha256": "20:89:E8:66:A5:33:F0:D9:ED:80:32:22:50:4B:C3:C6:5A:EF:BC:46:46:A1:72:B6:0D:50:54:15:6A:4F:1A:C0"},
+  "artifact": {"file": "~/Downloads/NGSPlus-1.0.4-vc1-release-20261023.aab", "bytes": 65211115, "sha256": "8d9c5e548d0185ce866b660f1afece982b7642e820c878cad9f9b727c6e33a58", "package": "com.ngsplus.app.ngsplusapp", "versionName": "1.0.4", "versionCode": 1, "appEnv": "production", "backendHostSha256": "dc03727fb9e1da675704e5ef1259e0d1a5bf1d544097d40d4f60e5725acc6364", "obfuscated": true, "symbols": "~/.ngsplus-signing/symbols/android-1.0.4-vc1 (private)"},
+  "preflight": {"config": "passed", "sources": "passed", "toolchain": "passed", "androidSigning": "passed", "androidBundle": "signed-verified", "bundleZip16k": "passed", "elf16k": "passed", "bundletool": "1.18.3 (Homebrew, checksum-verified)"},
+  "notVerified": ["install of Play-generated APKs on device", "Play Console upload", "store listing / privacy / deletion URLs (pages do not exist yet)"]
+}

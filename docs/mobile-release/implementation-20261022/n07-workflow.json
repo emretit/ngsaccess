@@ -1,0 +1,80 @@
+{
+  "gate": "MOB-N07",
+  "status": "partial (remaining: employment-ended after publish; history boundary in N08)",
+  "recordedAt": "2026-10-23T10:15:00+03:00",
+  "backend": "notable-tern-4 live = 579db3e7 (EMPLOYMENT_ENDED f4d8787d not yet published)",
+  "account": "isolated test employee (Mobil Test 01, project emre); no PII beyond test identity",
+  "builds": {
+    "android": {
+      "device": "AVD ngs_release_16k_20261022, API36, 16KB",
+      "apkSha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+      "version": "1.0.4 (2001)"
+    },
+    "ios": {
+      "device": "iPhone 17 Pro sim, iOS 27.0",
+      "bundle": "com.ngsplus.app 1.0.4+1",
+      "build": "mobile/build/ios/iphonesimulator/Runner.app (a6c5918 source)"
+    }
+  },
+  "cases": [
+    {
+      "id": "2.1-logout",
+      "android": "pass",
+      "ios": "pass",
+      "note": "confirm dialog -> login screen"
+    },
+    {
+      "id": "2.1-wrong-password",
+      "android": "pass",
+      "ios": "pass",
+      "note": "'Invalid email or password' / 'E-posta veya şifre hatalı' snackbar, no session"
+    },
+    {
+      "id": "2.1-correct-password",
+      "android": "pass",
+      "ios": "pass",
+      "note": "Android restored previous protected tab (Profile) by design; iOS Home"
+    },
+    {
+      "id": "2.1-relaunch",
+      "android": "pass (force-stop)",
+      "ios": "pass (kill -9)",
+      "note": "session kept, Home, timestamps Europe/Istanbul"
+    },
+    {
+      "id": "2.1-password-change",
+      "android": "pass",
+      "ios": "pass",
+      "note": "Changed in-app on Android (web has no admin reset, only setup link). Android -> sign-in required; iOS old session -> login screen on relaunch (passwordVersion revocation); new password sign-in OK. Test credential rotated, stored only in /tmp 0600."
+    },
+    {
+      "id": "2.2-history",
+      "android": "partial",
+      "note": "Records/Calendar/Overview render empty state, 'Türkiye time · UTC+3' label; pagination + 23:59/00:01 boundary need real records (test employee has 0) -> needs approved live check-ins | Decision 2026-10-23: mobile history = raw card readings, page size 50; 150+ fabricated live readings NOT created. Pagination covered by unit tests; 23:59/00:01 boundary moves to N08 with physical card 99900201."
+    },
+    {
+      "id": "2.3-offline",
+      "android": "pass",
+      "ios": "not-run",
+      "note": "airplane mode: Home 'Showing previous data · No internet', Visitor 'Summary could not be refreshed' + Try Again; recovery after re-enable OK. iOS sim shares host network, not toggled"
+    },
+    {
+      "id": "2.3-slow-network",
+      "android": "pass",
+      "note": "adb emu gprs delay/gsm speed, 3x Refresh: single loading state, no freeze/error"
+    },
+    {
+      "id": "2.4-permission-removed",
+      "android": "pass",
+      "note": "Web (ngsplus.app, Emre session) Personel düzenle -> Aktif off -> saved (device push 0/0). Android next call -> login screen; sign-in while inactive -> 'Invalid email or password' (no state leak). Re-activated from web -> sign-in OK 10:12. Project move not done: would expose test person to another project; deactivation covers the safe-drop criterion."
+    },
+    {
+      "id": "employment-ended",
+      "status": "pending",
+      "blocker": "backend f4d8787d + mobile package not yet published"
+    }
+  ],
+  "observations": [
+    "iOS: an open 'Yeni Ziyaretçi' form left for ~2h kept its default start 20:47 (now 22:54); start time is in the past when the form is reopened later. Low severity."
+  ]
+}
