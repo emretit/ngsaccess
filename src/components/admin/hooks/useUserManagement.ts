@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
+import { ConvexError } from "convex/values";
+import type { FunctionArgs } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -91,7 +93,28 @@ export const useUserManagement = () => {
   const { run: handleSaveUser, pending: saving } = useAsyncAction(saveUser, {
     success: currentUser ? "Kullanıcı güncellendi" : "Davet gönderildi",
   });
+  const { run: handlePasswordReset, pending: resettingPassword } = useAsyncAction(
+    async (target: Pick<FunctionArgs<typeof api.actions.sendEmail.sendUserInviteEmail>, "email" | "projectId" | "role">) => {
+      try {
+        if (!permissions.admin) throw new Error("Şifre sıfırlama bağlantısı gönderme yetkiniz yok.");
+        const result = await sendInvite({ ...target, type: "reset" });
+        if (!result.success) throw new Error(result.error ?? "E-posta gönderilemedi. Lütfen tekrar deneyin.");
+      } catch (cause) {
+        const message = errorMessage(cause);
+        const data: unknown = cause instanceof ConvexError ? cause.data : undefined;
+        const code = data && typeof data === "object" && "code" in data && typeof data.code === "string" ? data.code : "";
+        if (code.startsWith("INVITE_") || message.includes("INVITE_")) {
+          throw Object.assign(new Error("Bu kullanıcıya şifre sıfırlama bağlantısı gönderilemiyor."), { cause });
+        }
+        throw Object.assign(new Error(message), { cause });
+      }
+    },
+    { success: "Şifre sıfırlama bağlantısı gönderildi", error: "Şifre sıfırlama bağlantısı gönderilemedi" },
+  );
   return {
+    canResetPassword: permissions.admin,
+    handlePasswordReset,
+    resettingPassword,
     projects: projectsRaw ?? [],
     currentUser,
     formData,

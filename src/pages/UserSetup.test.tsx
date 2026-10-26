@@ -52,12 +52,25 @@ describe('UserSetup', () => {
     mocks.invite = null;
     expect(render()).toContain('Davet bağlantısı geçersiz.');
   });
-  it('identifies a reset link as a different kind of link', () => {
+  it('offers a new-password reset form without account creation or existing-password mode', () => {
     mocks.invite = { email: 'person@example.test', type: 'reset' };
     const html = render();
-    expect(html).toContain('Bu bağlantı hesap daveti değil.');
-    expect(html).toContain('Bu ekran yalnız hesap davetleri içindir.');
+    expect(html).toContain('Yeni şifre belirle');
+    expect(html).toMatch(/<input[^>]*id="email"[^>]*disabled=""[^>]*value="person@example.test"/);
+    expect(html).toContain('Şifreyi yenile');
+    expect(html).toContain('Şifre tekrarı');
+    expect(html).not.toContain('Mevcut hesabımla devam et');
+    expect(html).not.toContain('Mevcut şifreniz');
+    expect(html).not.toMatch(/id="(?:name|firstName|lastName)"/);
     expect(html).not.toContain('Davet bağlantısı geçersiz.');
+  });
+  it('uses reset recovery messages without suggesting the unavailable existing-account mode', () => {
+    for (const error of [new ConvexError({ code: 'INVITE_ACCOUNT_EXISTS' }), new ConvexError({ code: 'INVITE_EMAIL_MISMATCH' }), new Error('PRIVATE')]) {
+      const message = inviteSetupError(error, true);
+      expect(message).toContain('sıfırlama bağlantısı isteyin');
+      expect(message).not.toContain('Mevcut hesabım var');
+      expect(message).not.toContain('PRIVATE');
+    }
   });
   it('locks the invited email and offers existing-account mode', () => {
     mocks.invite = { email: 'person@example.test', type: 'invite' };

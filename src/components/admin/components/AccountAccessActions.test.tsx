@@ -6,7 +6,7 @@ import type { User } from "../types/user-types";
 const user: User = {
   _id: "user" as User["_id"], displayName: "Kullanıcı", email: "", role: "viewer",
   disabledAt: undefined, accessExpiresAt: undefined, setupExpiresAt: undefined,
-  projects: [], isSelf: false, pendingSetup: false, accessExpired: false,
+  projects: [], isSelf: false, canResetPassword: false, pendingSetup: false, accessExpired: false,
 };
 describe("account access badges", () => {
   it("shows frozen and expired states together", () => {

@@ -26,9 +26,12 @@ function fixture() {
   const db = {
     query: () => {
       let requested: unknown;
-      return { withIndex: (_: string, apply: (q: { eq: (field: string, value: unknown) => void }) => void) => {
-        apply({ eq: (_field, value) => { requested = value; } });
-        return { collect: async () => memberships.filter(row => row.userId === requested) };
+      type Eq = { eq: (field: string, value: unknown) => Eq };
+      const builder: Eq = { eq: (_field, value) => { requested ??= value; return builder; } };
+      return { withIndex: (_: string, apply: (q: Eq) => unknown) => {
+        apply(builder);
+        // authAccounts lookup (canResetPassword) finds no password account in this fixture.
+        return { collect: async () => memberships.filter(row => row.userId === requested), unique: async () => null };
       } };
     },
     get: async (id: string) => ({ _id: id, name: id === p1 ? 'Merkez' : 'Gizli proje', isActive: true }),

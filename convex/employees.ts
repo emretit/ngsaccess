@@ -23,6 +23,9 @@ import { writeEmployeePassword } from "./lib/employeeAuth";
 import { visitorSensitiveFields } from "./lib/visitorStatus";
 import { cardConflictMessage, findDuplicateCard } from "./lib/cardIdentity";
 
+import { normalizeEmployeeEmail } from "./lib/employeeEmail";
+export { normalizeEmployeeEmail };
+
 function assertEmployeeRecord(emp: Doc<"employees">) {
   if (emp.isVisitor === true) throw new ConvexError({
     code: "VISITOR_USE_VISITOR_SCREEN",
@@ -48,17 +51,17 @@ export async function findDuplicateEmployee(
   excludeId?: Id<"employees">
 ): Promise<Doc<"employees"> | null> {
   if (field === "cardNumber") return findDuplicateCard(ctx, value, excludeId);
-  const indexName =
-    field === "email" ? "by_email" : "by_tc";
-  const fieldName =
-    field === "email" ? "email" : "tcNo";
-
-  const existing = await ctx.db
-    .query("employees")
-    .withIndex(indexName, (q) => q.eq(fieldName, value))
-    .collect();
-
-  return existing.find((e) => e._id !== excludeId) ?? null;
+  const normalizedValue = field === "email" ? normalizeEmployeeEmail(value) ?? "" : value;
+  if (!normalizedValue) return null;
+  const candidates = field === "email" ? [...new Set([normalizedValue, value.trim()])] : [value];
+  for (const candidate of candidates) {
+    const matches = ctx.db.query("employees")
+      .withIndex(field === "email" ? "by_email" : "by_tc", q => q.eq(field, candidate));
+    for await (const employee of matches) {
+      if (employee._id !== excludeId) return employee;
+    }
+  }
+  return null;
 }
 
 export const DUPLICATE_MESSAGES: Record<DuplicateField, string> = {
@@ -231,7 +234,7 @@ export const create = authedMutation({
     }
 
     for (const field of ["cardNumber", "email", "tcNo"] as const) {
-      const value = args[field];
+      const value = field === "email" ? normalizeEmployeeEmail(args.email) : args[field];
       if (!value) continue;
       const dup = await findDuplicateEmployee(ctx, field, value);
       if (dup) throw new Error(field === "cardNumber" ? cardConflictMessage(value, dup, DUPLICATE_MESSAGES[field]) : DUPLICATE_MESSAGES[field]);
@@ -244,6 +247,7 @@ export const create = authedMutation({
     const now = new Date().toISOString();
     const id = await ctx.db.insert("employees", {
       ...args,
+      email: normalizeEmployeeEmail(args.email) ?? "",
       ...photo,
       accessStartsAt: normalizeEmployeeAccessStart(args.accessStartsAt),
       isActive: args.isActive ?? true,
@@ -329,6 +333,8 @@ export const update = authedMutation({
     ) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
+
+    if (updates.email !== undefined) updates.email = normalizeEmployeeEmail(updates.email) ?? "";
 
     // Sadece DEĞİŞEN alanlar için duplicate kontrol — mevcut çoğaltma kayıtlar
     // başka alanları güncellenirken (örn. pozisyon) bozulmadan saklanır.
@@ -506,7 +512,7 @@ export const getByEmailInternal = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("employees")
-      .withIndex("by_email", (q) => q.eq("email", args.email.trim().toLowerCase()))
+      .withIndex("by_email", (q) => q.eq("email", normalizeEmployeeEmail(args.email) ?? ""))
       .first();
   },
 });
@@ -535,7 +541,7 @@ export const createAuthInternal = internalMutation({
     return await ctx.db.insert("employeeAuth", {
       employeeId: args.employeeId,
       projectId: args.projectId,
-      email: args.email,
+      email: normalizeEmployeeEmail(args.email),
       passwordHash: args.passwordHash,
       passwordVersion: 1,
       createdAt: now,
@@ -553,7 +559,7 @@ export const updateAuthPasswordInternal = internalMutation({
   handler: async (ctx, args) => {
     const auth = await ctx.db.get(args.authId);
     if (!auth) throw new Error("Çalışan kimlik kaydı bulunamadı");
-    await writeEmployeePassword(ctx, auth, args.passwordHash);
+    await writeEmployeePassword(ctx, auth, args.passwordHash, { email: normalizeEmployeeEmail(auth.email) });
   },
 });
 
@@ -601,7 +607,7 @@ export const adminInspectByEmail = internalQuery({
   handler: async (ctx, args) => {
     const employee = await ctx.db
       .query("employees")
-      .withIndex("by_email", (q) => q.eq("email", args.email.trim().toLowerCase()))
+      .withIndex("by_email", (q) => q.eq("email", normalizeEmployeeEmail(args.email) ?? ""))
       .first();
     if (!employee) return null;
     const auth = await ctx.db

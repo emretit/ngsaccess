@@ -53,6 +53,31 @@ export const deleteCheckInTokens = internalMutation({
   },
 });
 
+/** Detach invitations and erase only the promised contact fields, retaining history. */
+async function clearHostedVisitorsPage(ctx: MutationCtx, employeeId: Id<"employees">) {
+  const visitors = await ctx.db.query("employees")
+    .withIndex("by_host_mobile_visitor_request", q => q.eq("hostEmployeeId", employeeId))
+    .take(CASCADE_BATCH_SIZE);
+  for (const visitor of visitors) {
+    await ctx.db.patch(visitor._id, {
+      hostEmployeeId: undefined,
+      ...(visitor.isVisitor === true ? { email: "", visitorPhone: undefined } : {}),
+    });
+  }
+  if (visitors.length === CASCADE_BATCH_SIZE) {
+    await ctx.scheduler.runAfter(0, internal.lib.employeeCascade.clearHostedVisitors, { employeeId });
+  }
+}
+
+export const clearHostedVisitors = internalMutation({
+  args: { employeeId: v.id("employees") },
+  returns: v.null(),
+  handler: async (ctx, { employeeId }) => {
+    await clearHostedVisitorsPage(ctx, employeeId);
+    return null;
+  },
+});
+
 /**
  * KVKK 6698 / GDPR — çalışan silinince:
  *  - Biyometrik şablon (face/fingerprint) tablolarından + storage'tan kayıt sil
@@ -132,6 +157,7 @@ export async function cascadeRemoveEmployeePII(
   // 4) cardReadings — PII anonimleştir
   const readings = await anonymizeReadingsPage(ctx, employeeId, null);
   await deleteCheckInTokensPage(ctx, employeeId);
+  await clearHostedVisitorsPage(ctx, employeeId);
 
   // 5) Audit
   await writeAudit(ctx, {

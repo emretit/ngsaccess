@@ -33,47 +33,63 @@ export function userProtectionError({
   return null;
 }
 
-export const projectDeletionBlockingTables = [
-  { table: "employees", index: "by_project", label: "personel" },
-  { table: "devices", index: "by_project", label: "cihaz" },
-  { table: "zones", index: "by_project", label: "bölge" },
-  { table: "doors", index: "by_project", label: "kapı" },
-  { table: "readers", index: "by_project", label: "okuyucu" },
-  { table: "hikBridges", index: "by_project", label: "Hikvision köprüsü" },
-  { table: "accessRules", index: "by_project", label: "erişim kuralı" },
-  { table: "cardReadings", index: "by_project", label: "kart okuma kaydı" },
-  { table: "pdksRecords", index: "by_project", label: "PDKS kaydı" },
-  { table: "leaves", index: "by_project", label: "izin" },
-  { table: "shifts", index: "by_project", label: "vardiya" },
-  { table: "shiftAssignments", index: "by_project", label: "vardiya ataması" },
-  { table: "departmentShiftAssignments", index: "by_project_end", label: "departman vardiya ataması" },
-  { table: "shiftPlanRefs", index: "by_project", label: "vardiya planı referansı" },
-  { table: "companies", index: "by_project", label: "firma" },
-  { table: "departments", index: "by_project", label: "departman" },
-  { table: "positions", index: "by_project", label: "pozisyon" },
-  { table: "employeeFaces", index: "by_project", label: "yüz kaydı" },
-  { table: "employeeFingerprints", index: "by_project", label: "parmak izi kaydı" },
-  { table: "groupMembers", index: "by_project_employee", label: "grup üyeliği" },
-  { table: "groupDevices", index: "by_project_device", label: "grup cihaz bağlantısı" },
-  { table: "groupDoors", index: "by_project_group", label: "grup kapı bağlantısı" },
-  { table: "deviceEvents", index: "by_project", label: "cihaz olayı" },
+/** Every projectId table has one policy; schema coverage is tested. Histories retain their project reference. */
+export const projectDeletionMatrix = [
+  { table: "employees", index: "by_project", label: "personel", policy: "block" },
+  { table: "devices", index: "by_project", label: "cihaz", policy: "block" },
+  { table: "zones", index: "by_project", label: "bölge", policy: "block" },
+  { table: "doors", index: "by_project", label: "kapı", policy: "block" },
+  { table: "readers", index: "by_project", label: "okuyucu", policy: "block" },
+  { table: "hikBridges", index: "by_project", label: "Hikvision köprüsü", policy: "block" },
+  { table: "accessRules", index: "by_project", label: "erişim kuralı", policy: "block" },
+  { table: "cardReadings", index: "by_project", label: "kart okuma kaydı", policy: "block" },
+  { table: "pdksRecords", index: "by_project", label: "PDKS kaydı", policy: "block" },
+  { table: "leaves", index: "by_project", label: "izin", policy: "block" },
+  { table: "shifts", index: "by_project", label: "vardiya", policy: "block" },
+  { table: "shiftAssignments", index: "by_project", label: "vardiya ataması", policy: "block" },
+  { table: "departmentShiftAssignments", index: "by_project_end", label: "departman vardiya ataması", policy: "block" },
+  { table: "shiftPlanRefs", index: "by_project", label: "vardiya planı referansı", policy: "block" },
+  { table: "companies", index: "by_project", label: "firma", policy: "block" },
+  { table: "departments", index: "by_project", label: "departman", policy: "block" },
+  { table: "positions", index: "by_project", label: "pozisyon", policy: "block" },
+  { table: "employeeFaces", index: "by_project", label: "yüz kaydı", policy: "block" },
+  { table: "employeeFingerprints", index: "by_project", label: "parmak izi kaydı", policy: "block" },
+  { table: "groupMembers", index: "by_project_employee", label: "grup üyeliği", policy: "block" },
+  { table: "groupDevices", index: "by_project_device", label: "grup cihaz bağlantısı", policy: "block" },
+  { table: "groupDoors", index: "by_project_group", label: "grup kapı bağlantısı", policy: "block" },
+  { table: "deviceEvents", index: "by_project", label: "cihaz olayı", policy: "block" },
+  { table: "attendanceCorrections", index: "by_project_status", label: "puantaj düzeltmesi", policy: "block" },
+  { table: "deviceFingerprintEnrollments", index: "scan", label: "cihaz parmak izi kaydı", policy: "block" },
+  { table: "userProjects", index: "by_project", label: "Kullanıcı proje üyelikleri", policy: "delete" },
+  { table: "generalSettings", index: "by_project", label: "Genel ayarlar", policy: "delete" },
+  { table: "mailSettings", index: "by_project", label: "E-posta ayarları", policy: "delete" },
+  { table: "notificationSettings", index: "by_project", label: "Bildirim ayarları", policy: "delete" },
+  { table: "workSettings", index: "by_project", label: "Çalışma ayarları", policy: "delete" },
+  { table: "overtimeRates", index: "by_project", label: "Fazla mesai oranları", policy: "delete" },
+  { table: "holidays", index: "by_project", label: "Tatiller", policy: "delete" },
+  { table: "reportScheduleSettings", index: "by_project", label: "Rapor zamanlamaları", policy: "delete" },
+  { table: "leaveBalances", index: "by_project", label: "İzin bakiyeleri", policy: "delete" },
+  { table: "chatConversations", index: "by_project", label: "Sohbetler", policy: "delete" },
+  { table: "projectPrivacySettings", index: "by_project", label: "Gizlilik ayarları", policy: "delete" },
+  { table: "projectRolePermissions", index: "by_projectId_and_role", label: "Rol yetkileri", policy: "delete" },
+  { table: "invites", index: "scan", label: "Davetler", policy: "delete" },
+  { table: "alarmSettings", index: "by_project", label: "Alarm ayarları", policy: "delete" },
+  { table: "pdksRuleVersions", index: "by_projectId_and_effectiveFrom", label: "PDKS kural sürümleri", policy: "delete" },
+  { table: "pdksCheckpointSelections", index: "scan", label: "PDKS kontrol noktaları", policy: "delete" },
+  { table: "accessScheduleTemplates", index: "by_project", label: "Erişim takvim şablonları", policy: "delete" },
+  { table: "checkInTokens", index: "scan", label: "Mobil giriş tokenları", policy: "delete" },
+  { table: "employeeAuth", index: "scan", label: "Kişi kimlik bilgileri", policy: "delete" },
+  { table: "idePanelUsers", index: "scan", label: "Panel kişi kopyaları", policy: "preserve" },
+  { table: "auditLog", index: "by_project_timestamp", label: "Denetim geçmişi", policy: "preserve" },
+  { table: "accessGrantStatus", index: "by_project_state", label: "Yetki geçmişi", policy: "preserve" },
+  { table: "deviceSyncRuns", index: "by_project_started", label: "Cihaz gönderim geçmişi", policy: "preserve" },
+  { table: "mobileAccessOperations", index: "scan", label: "Mobil işlem geçmişi", policy: "preserve" },
+  { table: "hikPendingOperations", index: "by_project_status_created", label: "Hik işlem geçmişi", policy: "preserve" },
+  { table: "idePendingOperations", index: "by_project_status_created", label: "IDE işlem geçmişi", policy: "preserve" },
 ] as const;
 
-export const projectDeletionCleanupTables = [
-  "userProjects",
-  "generalSettings",
-  "mailSettings",
-  "notificationSettings",
-  "workSettings",
-  "overtimeRates",
-  "holidays",
-  "reportScheduleSettings",
-  "leaveBalances",
-  "chatConversations",
-  "projectPrivacySettings",
-  "projectRolePermissions",
-  "invites",
-] as const;
+export const projectDeletionBlockingTables = projectDeletionMatrix.filter(entry => entry.policy === "block");
+export const projectDeletionCleanupTables = projectDeletionMatrix.filter(entry => entry.policy === "delete").map(entry => entry.table);
 
 export function projectDeletionBlockers(counts: Readonly<Partial<Record<string, number>>>): string[] {
   return projectDeletionBlockingTables
@@ -99,28 +115,11 @@ export function reportSchedulePayload(reportType: string, email: string, enabled
 /** Shared bounded blocker read, also rerun by remove inside its transaction. */
 export async function projectDeletionCounts(ctx: Pick<QueryCtx, "db">, projectId: Id<"projects">) {
   const counts = await Promise.all(projectDeletionBlockingTables.map(async entry => {
-    const rows = entry.index === "by_project"
-      ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
-      : entry.index === "by_project_employee"
-        ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
-        : entry.index === "by_project_device"
-          ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
-          : entry.index === "by_project_end"
-            ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
-            : await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101);
+    const rows = await projectDeletionTableQuery(ctx, entry, projectId).take(101);
     return [entry.table, rows.length] as const;
   }));
   return Object.fromEntries(counts);
 }
-
-const cleanupLabels: Record<typeof projectDeletionCleanupTables[number], string> = {
-  userProjects: "Kullanıcı proje üyelikleri", generalSettings: "Genel ayarlar",
-  mailSettings: "E-posta ayarları", notificationSettings: "Bildirim ayarları",
-  workSettings: "Çalışma ayarları", overtimeRates: "Fazla mesai oranları",
-  holidays: "Tatiller", reportScheduleSettings: "Rapor zamanlamaları",
-  leaveBalances: "İzin bakiyeleri", chatConversations: "Sohbetler",
-  projectPrivacySettings: "Gizlilik ayarları", projectRolePermissions: "Rol yetkileri", invites: "Davetler",
-};
 
 export function projectDeletionImpactRows(counts: Readonly<Partial<Record<string, number>>>) {
   const row = (table: string, label: string) => ({
@@ -129,7 +128,7 @@ export function projectDeletionImpactRows(counts: Readonly<Partial<Record<string
   const blockers = projectDeletionBlockingTables.filter(entry => (counts[entry.table] ?? 0) > 0)
     .map(entry => row(entry.table, entry.label));
   const cleanup = projectDeletionCleanupTables.filter(table => (counts[table] ?? 0) > 0)
-    .map(table => row(table, cleanupLabels[table]));
+    .map(table => row(table, projectDeletionMatrix.find(entry => entry.table === table)?.label ?? table));
   return { canDelete: blockers.length === 0, blockers, cleanup };
 }
 
@@ -149,11 +148,32 @@ export function projectDeletionCleanupQuery(
   table: typeof projectDeletionCleanupTables[number],
   projectId: Id<"projects">,
 ) {
-  return table === "invites"
-    ? ctx.db.query(table).filter(q => q.eq(q.field("projectId"), projectId))
-    : table === "projectRolePermissions"
-      ? ctx.db.query(table).withIndex("by_projectId_and_role", q => q.eq("projectId", projectId))
-      : ctx.db.query(table).withIndex("by_project", q => q.eq("projectId", projectId));
+  const entry = projectDeletionMatrix.find(entry => entry.table === table);
+  if (!entry) throw new Error("Proje silme politikası bulunamadı");
+  return projectDeletionTableQuery(ctx, entry, projectId);
+}
+
+/** Tables without a project index use a bounded result scan; no collect. */
+function projectDeletionTableQuery(
+  ctx: Pick<QueryCtx, "db">,
+  entry: typeof projectDeletionMatrix[number],
+  projectId: Id<"projects">,
+) {
+  if (entry.index === "scan") return ctx.db.query(entry.table).filter(q => q.eq(q.field("projectId"), projectId));
+  // Narrow the discriminated entry before selecting its schema-checked index.
+  if (entry.index === "by_project") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_end") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_employee") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_device") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_group") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_status") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_and_role") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_and_effectiveFrom") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_timestamp") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_state") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_started") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_project_status_created") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  throw new Error("Proje silme indeksi bulunamadı");
 }
 
 /** Stop after two active admins; fail closed if the bounded scan is exhausted. */

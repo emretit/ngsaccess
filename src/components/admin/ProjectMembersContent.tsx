@@ -1,3 +1,4 @@
+import { PasswordResetDialog, type PasswordResetTarget } from "./components/PasswordResetDialog";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -33,10 +34,12 @@ export function ProjectMembersContent() {
   const members = useQuery(api.roles.listProjectMembers, projectId ? { projectId } : "skip");
   const management = useUserManagement();
   const [open, setOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<PasswordResetTarget | null>(null);
   if (!projectId) return null;
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Aktif projedeki kullanıcılar ve proje rolleri.</p><Button onClick={() => { management.resetForm(); setOpen(true); }}>Kullanıcı davet et</Button></div>
-    {members === undefined ? <SectionSkeleton label="Kullanıcılar yükleniyor" /> : <ul className="divide-y rounded-md border">{members.map(member => <li key={member.userId} className="flex flex-wrap items-center justify-between gap-3 p-3"><div><p className="text-sm font-medium">{member.name ?? member.email ?? "Kullanıcı"}</p><p className="text-xs text-muted-foreground">{member.email}</p></div><MemberRoleSelect member={member} projectId={projectId} /></li>)}</ul>}
+    {members === undefined ? <SectionSkeleton label="Kullanıcılar yükleniyor" /> : <ul className="divide-y rounded-md border">{members.map(member => <li key={member.userId} className="flex flex-wrap items-center justify-between gap-3 p-3"><div><p className="text-sm font-medium">{member.name ?? member.email ?? "Kullanıcı"}</p><p className="text-xs text-muted-foreground">{member.email}</p></div><div className="flex flex-wrap items-center gap-2"><MemberRoleSelect member={member} projectId={projectId} />{management.canResetPassword && member.canResetPassword && !member.isSuperAdmin && member.email && <Button variant="outline" size="sm" onClick={() => setResetTarget({ email: member.email ?? "", projectId, role: member.role })}>Şifre sıfırlama bağlantısı gönder</Button>}</div></li>)}</ul>}
+    <PasswordResetDialog target={resetTarget} onClose={() => setResetTarget(null)} onSend={management.handlePasswordReset} pending={management.resettingPassword} />
     {open && <UserFormDialog isOpen onClose={() => setOpen(false)} currentUser={null} formData={management.formData} baseline={management.baseline} onFormDataChange={management.setFormData} onSave={async () => { const ok = await management.handleSaveUser(); if (ok) setOpen(false); return ok; }} isSaving={management.saving} editReady={management.editReady} projects={management.projects} error={management.error} />}
   </div>;
 }

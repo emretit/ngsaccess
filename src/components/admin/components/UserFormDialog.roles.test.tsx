@@ -14,7 +14,7 @@ vi.mock("@/components/ui/dialog", () => {
 it("D-3: platform edit offers exactly super admin and normal; invites keep project roles", () => {
   const data: UserFormData = { email: "normal@test.com", role: "project_user", projectIds: [] };
   const props = { isOpen: true, onClose: vi.fn(), formData: data, baseline: data, onFormDataChange: vi.fn(), onSave: async () => true, projects: [] };
-  const user: User = { _id: "user" as Id<"users">, email: data.email, displayName: data.email, role: "viewer", projects: [], isSelf: false, pendingSetup: false, disabledAt: undefined, accessExpiresAt: undefined, accessExpired: false, setupExpiresAt: undefined };
+  const user: User = { _id: "user" as Id<"users">, email: data.email, displayName: data.email, role: "viewer", projects: [], isSelf: false, canResetPassword: false, pendingSetup: false, disabledAt: undefined, accessExpiresAt: undefined, accessExpired: false, setupExpiresAt: undefined };
   const edit = renderToStaticMarkup(<MemoryRouter><UserFormDialog {...props} currentUser={user} /></MemoryRouter>);
   expect(edit.match(/<option value="[^"]+"/g)).toEqual(['<option value="super_admin"', '<option value="project_user"']);
   expect(edit).toContain('Normal</option>');

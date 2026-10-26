@@ -129,7 +129,9 @@ export function makeFormSchema(adminMode: boolean, isEdit = false) {
       });
     }
   }
-  if (data.brand === "hikvision" && data.hik_transport === "localBridge") {
+  // Yeni seçim kapalı; salt okunur legacy kayıtlara yeni zorunluluk yükleme.
+  if (data.brand === "hikvision" && data.hik_transport === "localBridge" && !isEdit) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["hik_transport"], message: "Windows köprüsü yeni cihazlarda kullanıma kapalıdır; Gateway seçin" });
     for (const field of ["device_ip", "device_username", "device_password"] as const) {
       if (!data[field]?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: "Yerel bridge için bu alan zorunlu" });
     }

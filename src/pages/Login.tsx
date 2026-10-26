@@ -196,7 +196,7 @@ export default function Login() {
             Şifremi unuttum
           </summary>
           <p className="pb-3 text-[13px] leading-relaxed text-muted-foreground">
-            Şifrenizi yöneticiniz sıfırlayabilir. Yöneticinize ulaşamıyorsanız{' '}
+            Şifrenizi unuttuysanız yöneticinizden sıfırlama bağlantısı isteyin. Yöneticinize ulaşamıyorsanız{' '}
             <a href="mailto:info@ngsteknoloji.com" className="underline">
               info@ngsteknoloji.com
             </a>{' '}

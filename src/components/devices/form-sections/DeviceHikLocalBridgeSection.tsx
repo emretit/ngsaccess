@@ -40,6 +40,7 @@ export function DeviceHikLocalBridgeSection({
               <FormLabel>SDK portu</FormLabel>
               <FormControl>
                 <Input
+                  readOnly
                   type="number"
                   placeholder="8000"
                   {...field}
@@ -58,7 +59,7 @@ export function DeviceHikLocalBridgeSection({
             <FormItem>
               <FormLabel>Cihaz kullanıcı adı</FormLabel>
               <FormControl>
-                <Input placeholder="admin" {...field} value={field.value ?? ""} />
+                <Input readOnly placeholder="admin" {...field} value={field.value ?? ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -73,6 +74,7 @@ export function DeviceHikLocalBridgeSection({
               <FormLabel>Cihaz şifresi</FormLabel>
               <FormControl>
                 <PasswordField
+                  readOnly
                   placeholder="Panel şifresi"
                   autoComplete="new-password"
                   {...field}

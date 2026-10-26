@@ -4,6 +4,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import type { Id } from "./_generated/dataModel";
 import { counts as grantCounts } from "./accessGrantStatus";
 import { getFunctionName, type FunctionReference, type FunctionArgs, type FunctionReturnType } from "convex/server";
 import type { Value } from "convex/values";
@@ -224,7 +225,7 @@ describe("grant status queries", () => {
       } finally { queries.mockRestore(); }
     });
     expect(counted).toEqual({ all: 1000, effective: 250, pending: 250, failed: 250, removed: 250, unknown: 0, capped: true });
-    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.ideId, departmentId: ids.departmentId })).toEqual({ all: 500, effective: 250, pending: 0, failed: 250, removed: 0, unknown: 0, capped: true });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.ideId, departmentId: ids.departmentId })).toEqual({ all: 1000, effective: 250, pending: 250, failed: 250, removed: 250, unknown: 0, capped: true });
     expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.otherProjectId, deviceId: ids.ideId }).catch(() => null)).toBeNull();
     expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.hikId })).toMatchObject({ all: 0, capped: false });
   });
@@ -516,4 +517,65 @@ it("inactive numeric IDE credential with leading zeros still records removal", a
   await t.mutation(internal.ideSync.markSent, { opId, msxId: 1 });
   await t.mutation(internal.ideSync.markAck, { opId, result: "success", msxId: 1 });
   expect((await status())?.state).toBe("removed");
+});
+
+it("K-09: list and counts use current department after a move, without rewriting grant snapshots", async () => {
+  const { t, ids, admin, write } = await fixture();
+  await write("effective");
+  const departmentId = await t.run(async ctx => {
+    const id = await ctx.db.insert("departments", { projectId: ids.projectId, name: "Yeni" });
+    await ctx.db.patch(ids.employeeId, { departmentId: id });
+    return id;
+  });
+  const list = (id: Id<"departments">) => admin.query(api.accessGrantStatus.listByProject, { projectId: ids.projectId, departmentId: id, paginationOpts: { cursor: null, numItems: 10 } });
+  expect((await list(ids.departmentId)).page).toEqual([]);
+  expect((await list(departmentId)).page[0]).toMatchObject({ departmentId, departmentName: "Yeni" });
+  expect((await admin.query(api.accessGrantStatus.byEmployee, { employeeId: ids.employeeId })).rows[0]).toMatchObject({ departmentId, departmentName: "Yeni" });
+  expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId })).toMatchObject({ effective: 1 });
+  expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toMatchObject({ all: 0 });
+});
+
+it("K-09: department list, pagination and counts ignore 1500 unrelated project grants", async () => {
+  const { t, ids, admin, reader } = await fixture();
+  const departmentId = await t.run(async ctx => {
+    const selected = await ctx.db.insert("departments", { projectId: ids.projectId, name: "Seçilen" });
+    for (let i = 0; i < 502; i++) {
+      const employeeId = await ctx.db.insert("employees", { projectId: ids.projectId, departmentId: i >= 500 ? selected : ids.departmentId, firstName: "Kişi", lastName: String(i), email: `${i}@example.test`, cardNumber: String(i + 1000) });
+      for (const [index, deviceId] of [ids.ideId, ids.hikId, ids.bridgeId].entries()) {
+        await ctx.db.insert("accessGrantStatus", { projectId: ids.projectId, employeeId, deviceId, departmentId: ids.departmentId,
+          state: index === 0 ? "effective" : index === 1 ? "pending" : "failed", ruleIds: [], updatedAt: Date.now() });
+      }
+    }
+    return selected;
+  });
+  const args = { projectId: ids.projectId, departmentId, paginationOpts: { cursor: null, numItems: 4 } };
+  const first = await admin.query(api.accessGrantStatus.listByProject, args);
+  expect(first.page).toHaveLength(4);
+  expect(first.isDone).toBe(false);
+  const second = await admin.query(api.accessGrantStatus.listByProject, { ...args, paginationOpts: { numItems: 4, cursor: first.continueCursor } });
+  expect(second.page).toHaveLength(2);
+  expect(second.isDone).toBe(true);
+  expect(new Set([...first.page, ...second.page].map(row => row._id)).size).toBe(6);
+  expect([...first.page, ...second.page].every(row => row.departmentId === departmentId && row.departmentName === "Seçilen")).toBe(true);
+  expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId })).toMatchObject({ all: 6, effective: 2, pending: 2, failed: 2, removed: 0, unknown: 0, capped: false });
+  expect((await admin.query(api.accessGrantStatus.listByProject, { ...args, deviceId: ids.ideId, state: "effective" })).page).toHaveLength(2);
+  expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId, deviceId: ids.ideId })).toMatchObject({ all: 2, effective: 2, capped: false });
+  await expect(reader.query(api.accessGrantStatus.listByProject, args)).rejects.toThrow();
+  await expect(reader.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId })).rejects.toThrow();
+  const foreignDepartmentId = await t.run(ctx => ctx.db.insert("departments", { projectId: ids.otherProjectId, name: "Başka proje" }));
+  expect((await admin.query(api.accessGrantStatus.listByProject, { ...args, departmentId: foreignDepartmentId })).page).toEqual([]);
+  await expect(admin.query(api.accessGrantStatus.listByProject, { ...args, projectId: ids.otherProjectId })).rejects.toThrow();
+  // A genuinely oversized selected department remains bounded and reports truncation explicitly.
+  await expect(admin.query(api.accessGrantStatus.listByProject, { ...args, departmentId: ids.departmentId })).rejects.toThrow("Departman yetki okuma sınırı");
+  expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toMatchObject({ all: 1000, capped: true });
+});
+
+it("K-09: department unknown counts ignore unrelated rule members beyond the project member limit", async () => {
+  const { t, ids, admin, write } = await fixture();
+  await write("effective");
+  await t.run(async ctx => {
+    const unrelated = await ctx.db.insert("employees", { projectId: ids.projectId, firstName: "Diğer", lastName: "Kişi", email: "other@example.test", cardNumber: "456" });
+    for (let i = 0; i < 1001; i++) await ctx.db.insert("groupMembers", { projectId: ids.projectId, employeeId: unrelated, groupId: ids.ruleId, createdAt: now });
+  });
+  expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toEqual({ all: 3, effective: 1, pending: 0, failed: 0, removed: 0, unknown: 2, capped: false });
 });

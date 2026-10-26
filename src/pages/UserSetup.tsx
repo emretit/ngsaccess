@@ -15,7 +15,7 @@ import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { api } from '../../convex/_generated/api';
 
-export function inviteSetupError(error: unknown): string {
+export function inviteSetupError(error: unknown, isReset = false): string {
   const data: unknown = error instanceof ConvexError ? error.data : null;
   const code = data && typeof data === 'object' && 'code' in data ? data.code : null;
   switch (code) {
@@ -23,16 +23,19 @@ export function inviteSetupError(error: unknown): string {
     case 'INVITE_AUTH_TIMEOUT':
       return 'Oturumunuz hazırlanamadı. Mevcut hesap seçeneğiyle yeniden giriş yapıp daveti kabul edin.';
     case 'INVITE_EMAIL_MISMATCH':
+      if (isReset) return 'Bağlantıdaki e-posta adresi hesapla eşleşmiyor. Yöneticinizden yeni bir sıfırlama bağlantısı isteyin.';
       return 'Oturum açtığınız hesabın e-posta adresi davetle eşleşmiyor. Davet edilen hesabınızla giriş yapın.';
     case 'INVITE_WRONG_TYPE':
       return 'Bu bağlantı hesap daveti değil. Yöneticinizden yeni bir davet bağlantısı isteyin.';
     case 'INVITE_INVALID':
       return 'Davet kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni bir davet bağlantısı isteyin.';
     case 'INVITE_ACCOUNT_EXISTS':
+      if (isReset) return 'Bu hesap için şifre sıfırlanamıyor. Yöneticinizden yeni bir sıfırlama bağlantısı isteyin.';
       return "Bu e-postayla doğrulanmış bir hesap var; 'Mevcut hesabım var' ile giriş yapın.";
     case 'INVITE_WEAK_PASSWORD':
       return PASSWORD_POLICY_MESSAGE;
     default:
+      if (isReset) return 'Şifre yenilenemedi. Bilgilerinizi kontrol edin; sorun sürerse yöneticinizden yeni bir sıfırlama bağlantısı isteyin.';
       return 'Davet kabul edilemedi. Bilgilerinizi kontrol edin. Hesabınız oluştuysa mevcut hesap seçeneğiyle devam edin; sorun sürerse yöneticinizden yeni davet isteyin.';
   }
 }
@@ -51,6 +54,7 @@ export default function UserSetup() {
   // Token ile davet bilgisini al (email pre-fill)
   const inviteData = useQuery(api.invites.verify, token ? { token } : 'skip');
 
+  const isReset = inviteData?.type === 'reset';
   const [email, setEmail] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const fail: (message: string) => never = (message) => {
@@ -61,7 +65,9 @@ export default function UserSetup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [existingAccount, setExistingAccount] = useState(false);
+  const useExistingAccount = existingAccount && !isReset;
   const [completed, setCompleted] = useState(false);
+  const [resetCompleted, setResetCompleted] = useState(false);
   const [authWaiter, setAuthWaiter] = useState<{
     resolve: () => void;
     reject: (error: unknown) => void;
@@ -101,13 +107,19 @@ export default function UserSetup() {
     setFormError(null);
     if (!password) fail('Şifrenizi girin.');
     if (!token) fail('Davet bağlantısı eksik.');
-    if (!existingAccount && (!passwordValid || password !== confirmPassword)) {
+    if (!useExistingAccount && (!passwordValid || password !== confirmPassword)) {
       fail('Şifre gereksinimlerini ve şifre tekrarını kontrol edin.');
     }
     try {
+      if (isReset) {
+        await consumeInvite({ token, email, password });
+        setResetCompleted(true);
+        setCompleted(true);
+        return;
+      }
       // Mevcut hesapta davet hatası oturumu kapatmaz (doğrulanmamışsa AuthProvider guard'ı kapatır).
       await runSetup(async () => {
-        const flow = existingAccount
+        const flow = useExistingAccount
           ? 'signIn'
           : (await claimSetupAccount({ token, password })).flow;
         await signIn('password', { email, password, flow });
@@ -117,9 +129,9 @@ export default function UserSetup() {
           setAuthWaiter(null);
         }
         await consumeInvite({ token, email });
-      }, { signOutOnError: !existingAccount });
+      }, { signOutOnError: !useExistingAccount });
     } catch (error: unknown) {
-      fail(inviteSetupError(error));
+      fail(inviteSetupError(error, isReset));
     }
     setCompleted(true);
   });
@@ -136,27 +148,21 @@ export default function UserSetup() {
     return (
       <StatusScreen
         tone="success"
-        title="Hesabınız etkinleştirildi."
-        description="Projenizin yönetim alanına geçebilirsiniz."
+        title={resetCompleted ? "Şifreniz yenilendi." : "Hesabınız etkinleştirildi."}
+        description={resetCompleted ? 'Yeni şifrenizle giriş yapabilirsiniz. Tüm eski oturumlarınız kapatıldı.' : 'Projenizin yönetim alanına geçebilirsiniz.'}
         primaryAction={{
-          label: !user || user.verified === false ? 'Oturum hazırlanıyor…' : 'Yönetim alanına geç',
-          disabled: !user || user.verified === false,
-          onClick: () => navigate('/home'),
+          label: resetCompleted ? 'Giriş yap' : !user || user.verified === false ? 'Oturum hazırlanıyor…' : 'Yönetim alanına geç',
+          disabled: !resetCompleted && (!user || user.verified === false),
+          onClick: () => navigate(resetCompleted ? '/login' : '/home'),
         }}
       />
     );
-  if (!token || inviteData === null || inviteData?.type === 'reset')
+  if (!token || inviteData === null)
     return (
       <StatusScreen
         tone="error"
-        title={
-          inviteData?.type === 'reset' ? 'Bu bağlantı hesap daveti değil.' : 'Davet bağlantısı geçersiz.'
-        }
-        description={
-          inviteData?.type === 'reset'
-            ? 'Bu ekran yalnız hesap davetleri içindir. Şifre yardımı için yöneticinizle iletişime geçin.'
-            : 'Bağlantı eksik, kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni davet isteyin.'
-        }
+        title="Davet bağlantısı geçersiz."
+        description="Bağlantı eksik, kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni davet isteyin."
         primaryAction={{ label: 'Giriş yap', href: '/login' }}
         secondaryAction={{ label: 'Destek: info@ngsteknoloji.com', href: 'mailto:info@ngsteknoloji.com' }}
       />
@@ -172,22 +178,22 @@ export default function UserSetup() {
   return (
     <StatusScreen
       tone="info"
-      title="Davetinizi kabul edin."
+      title={isReset ? "Yeni şifre belirle" : "Davetinizi kabul edin."}
       description={
-        existingAccount
+        isReset ? 'Hesabınız için yeni bir şifre belirleyin. Tüm eski oturumlarınız kapatılacak.' : useExistingAccount
           ? 'Davet edilen e-posta adresine ait mevcut hesabınızla devam edin.'
           : 'Davetiniz doğrulandı. Yeni bir hesap oluşturun veya mevcut hesabınızla devam edin.'
       }
     >
-      <Button
+      {!isReset && <Button
         type="button"
         variant="link"
         className="mb-5 min-h-11 p-0"
         disabled={isLoading}
         onClick={() => setExistingAccount((value) => !value)}
       >
-        {existingAccount ? 'Yeni hesap oluştur' : 'Mevcut hesabımla devam et'}
-      </Button>
+        {useExistingAccount ? 'Yeni hesap oluştur' : 'Mevcut hesabımla devam et'}
+      </Button>}
       <form noValidate onSubmit={handleSubmit}>
         <fieldset disabled={isLoading} className="space-y-4">
           <div>
@@ -196,7 +202,7 @@ export default function UserSetup() {
               id="email"
               type="email"
               autoComplete="email"
-              value={email}
+              value={inviteData?.email ?? email}
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={!!inviteData?.email}
@@ -204,19 +210,19 @@ export default function UserSetup() {
             />
           </div>
           <div>
-            <Label htmlFor="password">{existingAccount ? 'Mevcut şifreniz' : 'Yeni şifre'}</Label>
+            <Label htmlFor="password">{useExistingAccount ? 'Mevcut şifreniz' : 'Yeni şifre'}</Label>
             <PasswordField
               aria-invalid={Boolean(formError)}
               aria-describedby={formError ? 'setup-error' : 'password-help'}
               disabled={isLoading}
-              autoComplete={existingAccount ? 'current-password' : 'new-password'}
+              autoComplete={useExistingAccount ? 'current-password' : 'new-password'}
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
-          <div hidden={existingAccount} className="space-y-1 text-sm">
+          <div hidden={useExistingAccount} className="space-y-1 text-sm">
             {Object.entries({
               minLength: 'En az 8 karakter',
               hasUpper: 'Büyük harf',
@@ -244,7 +250,7 @@ export default function UserSetup() {
               </div>
             ))}
           </div>
-          <div hidden={existingAccount}>
+          <div hidden={useExistingAccount}>
             <Label htmlFor="confirmPassword">Şifre tekrarı</Label>
             <PasswordField
               disabled={isLoading}
@@ -254,10 +260,10 @@ export default function UserSetup() {
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              required={!existingAccount}
+              required={!useExistingAccount}
             />
           </div>
-          <p hidden={existingAccount} id="password-help" className="text-xs text-muted-foreground">
+          <p hidden={useExistingAccount} id="password-help" className="text-xs text-muted-foreground">
             {PASSWORD_POLICY_MESSAGE}
           </p>
           {formError && (
@@ -266,7 +272,7 @@ export default function UserSetup() {
             </p>
           )}
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? 'Davet kabul ediliyor…' : 'Daveti kabul et'}
+            {isLoading ? (isReset ? 'Şifre yenileniyor…' : 'Davet kabul ediliyor…') : (isReset ? 'Şifreyi yenile' : 'Daveti kabul et')}
           </Button>
         </fieldset>
       </form>

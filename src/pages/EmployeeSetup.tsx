@@ -84,11 +84,10 @@ export default function EmployeeSetup() {
       <StatusScreen
         tone="success"
         title="Şifreniz belirlendi."
-        description="Personel hesabınız etkinleştirildi. QR giriş adresi ve kurulum yardımı için yöneticinize başvurun."
+        description="Şifreniz hazır. NGS Plus mobil uygulamasıyla giriş yapabilirsiniz."
       >
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Mobil uygulama yakında. Şimdilik işyerinizin web QR girişini kullanın; erişim için yöneticinize
-          başvurun.
+          Kurulum yardımı için yöneticinize başvurun.
         </p>
       </StatusScreen>
     );

@@ -26,7 +26,7 @@ describe("cihaz formu doğruluğu", () => {
       buildDeviceFormValues({ name: "Eski panel", isActive: false }).status,
     ).toBe("inactive");
   });
-  it("yerel bridge bağlantı bilgilerini zorunlu kılar", () => {
+  it("yeni yerel bridge seçimini reddeder, eski eksik kayıtları düzenlemede korur", () => {
     const values = {
       ...buildDeviceFormValues(null, "hikvision"),
       name: "Panel",
@@ -34,11 +34,13 @@ describe("cihaz formu doğruluğu", () => {
       hik_transport: "localBridge",
       hik_model: "__manual__",
     };
-    const result = makeFormSchema(false, true).safeParse(values);
+    expect(makeFormSchema(false, true).safeParse(values).success).toBe(true);
+    const result = makeFormSchema(false, false).safeParse(values);
     expect(result.success).toBe(false);
     if (!result.success)
       expect(result.error.issues.map((issue) => issue.path[0])).toEqual(
         expect.arrayContaining([
+          "hik_transport",
           "device_ip",
           "device_username",
           "device_password",

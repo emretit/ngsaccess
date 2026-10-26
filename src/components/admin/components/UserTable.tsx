@@ -21,10 +21,12 @@ export function UserTable({
   users,
   onEditUser,
   onDeleteUser,
+  onResetPassword,
 }: {
   users: User[];
   onEditUser: (user: User) => void;
   onDeleteUser: (user: User) => void;
+  onResetPassword?: (user: User) => void;
 }) {
   const [accessDialog, setAccessDialog] = useState<{ user: User; mode: "freeze" | "expiry" } | null>(null);
   const { profile } = useAuth();
@@ -45,6 +47,11 @@ export function UserTable({
   const actions = (user: User) =>
     (canManage || can("admin.manage")) && (
       <RowActions label={`${userName(user)} kullanıcı işlemleri`}>
+        {can("admin.manage") && "canResetPassword" in user && user.canResetPassword && user.role !== "super_admin" && onResetPassword && (
+          <DropdownMenuItem onSelect={() => onResetPassword(user)}>
+            Şifre sıfırlama bağlantısı gönder
+          </DropdownMenuItem>
+        )}
         <AccountAccessActions user={user} onSelectMode={mode => setAccessDialog({ user, mode })} />
         {canManage && <DropdownMenuItem onSelect={() => onEditUser(user)}>
           Düzenle

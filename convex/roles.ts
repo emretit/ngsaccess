@@ -1,3 +1,4 @@
+import { accessBlockReason } from "./lib/accountAccess";
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
@@ -154,6 +155,7 @@ export const listProjectMembers = authedQuery({
     email: v.union(v.string(), v.null()),
     role: projectRoleValidator,
     isSuperAdmin: v.boolean(),
+    canResetPassword: v.boolean(),
   })),
   handler: async (ctx, args) => {
     await requirePermission(ctx, ctx.user, args.projectId, "admin.manage");
@@ -171,6 +173,9 @@ export const listProjectMembers = authedQuery({
         email: member.email ?? null,
         role: membershipRole(member, membership),
         isSuperAdmin: isSuperAdmin(member),
+        canResetPassword: member.role !== "super_admin" && member.verified !== false && accessBlockReason(member, Date.now()) === null && Boolean(member.email && (await ctx.db.query("authAccounts")
+          .withIndex("providerAndAccountId", q => q.eq("provider", "password").eq("providerAccountId", member.email?.toLowerCase() ?? ""))
+          .unique())?.userId === member._id),
       });
     }
     return out;

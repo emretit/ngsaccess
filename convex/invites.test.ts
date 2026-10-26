@@ -347,8 +347,8 @@ describe('invites.consume authorization and global role protection', () => {
     expect(f.user().role).toBe(oldRole);
     expect(f.patch.mock.calls.filter(([id]) => id === userId).every(([, patch]) => !('role' in patch))).toBe(true);
   });
-  it('rejects reset tokens even with the matching authenticated account', async () => {
-    await expectRejected(fixture({ invite: { type: 'reset' } }), 'INVITE_WRONG_TYPE');
+  it('rejects reset tokens without an existing password account even for a matching session', async () => {
+    await expectRejected(fixture({ invite: { type: 'reset' } }), 'INVITE_ACCOUNT_EXISTS');
   });
   it.each([
     { missingInvite: true },

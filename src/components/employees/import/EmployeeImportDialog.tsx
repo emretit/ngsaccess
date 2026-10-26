@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -29,6 +30,8 @@ async function downloadImportErrors(results: ImportResult[]) {
 }
 
 export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: boolean; onOpenChange: (open: boolean) => void; projectId: Id<"projects"> }) {
+  const { can } = usePermissions();
+  const canResync = can("devices.manage");
   const importChunk = useMutation(api.employeeImport.importChunk);
   const startProjectResync = useAction(api.deviceSyncRuns.startProjectResync);
   const [stage, setStage] = useState<Stage>("file");
@@ -40,17 +43,15 @@ export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: 
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [wasCancelled, setWasCancelled] = useState(false);
-  const [syncStarted, setSyncStarted] = useState(false);
   const cancelled = useRef(false);
   const runChunk: ImportChunkFn = (chunk, dryRun) => importChunk({ projectId, rows: chunk, dryRun });
 
   const reset = () => {
     cancelled.current = false;
-    setStage("file"); setRows([]); setResults([]); setEligibleRows([]); setProgress(0); setError(null); setSyncMessage(null); setBusy(false); setWasCancelled(false); setSyncStarted(false);
+    setStage("file"); setRows([]); setResults([]); setEligibleRows([]); setProgress(0); setError(null); setSyncMessage(null); setBusy(false); setWasCancelled(false);
   };
   const setOpen = (next: boolean) => {
     if (!next && busy) return;
-    if (!next && stage === "done" && !syncStarted && results.some((result) => result.status === "created" && result.message === "Kişi oluşturuldu") && !window.confirm("İçe aktarılan kişiler henüz cihazlara gönderilmedi. Yine de kapatmak istiyor musunuz?")) return;
     if (!next) reset(); onOpenChange(next);
   };
   const chooseFile = async (file: File | undefined) => {
@@ -99,8 +100,9 @@ export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: 
       {stage === "done" && <div className="space-y-4">
         <p>{results.filter((result) => result.status === "created" && result.message === "Kişi oluşturuldu").length} kişi oluşturuldu · {duplicateCount} yinelenen · {errorResults.length} hatalı{wasCancelled ? " · İptal edildi" : ""}</p>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {!canResync && <p role="status">Kişiler cihazlara otomatik gönderilecek</p>}
         {syncMessage && <p role="status" className="text-sm">{syncMessage}</p>}
-        <div className="flex flex-wrap justify-end gap-2">{errorResults.length > 0 && <Button variant="outline" onClick={() => void downloadImportErrors(results)}>Hatalı satırları indir</Button>}<Button variant="outline" onClick={() => void startProjectResync({ projectId }).then(() => { setSyncStarted(true); setSyncMessage("Cihazlara gönderim başlatıldı."); }).catch((cause: unknown) => setSyncMessage(cause instanceof Error ? cause.message : "Cihazlara gönderim başlatılamadı."))}>Cihazlara gönder</Button><Button onClick={() => setOpen(false)}>Kapat</Button></div>
+        <div className="flex flex-wrap justify-end gap-2">{errorResults.length > 0 && <Button variant="outline" onClick={() => void downloadImportErrors(results)}>Hatalı satırları indir</Button>}{canResync && <Button variant="outline" onClick={() => { if (!can("devices.manage")) return; void startProjectResync({ projectId }).then(() => { setSyncMessage("Cihazlara gönderim başlatıldı."); }).catch((cause: unknown) => setSyncMessage(cause instanceof Error ? cause.message : "Cihazlara gönderim başlatılamadı.")); }}>Cihazlara gönder</Button>}<Button onClick={() => setOpen(false)}>Kapat</Button></div>
       </div>}
       {error && stage !== "done" && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </DialogContent>

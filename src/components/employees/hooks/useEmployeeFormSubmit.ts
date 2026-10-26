@@ -149,6 +149,7 @@ export const useEmployeeFormSubmit = (
           append("Kurulum e-postası gönderilemedi.");
         }
       }
+      if (!can("accessRules.manage")) return;
       try {
         const result = await syncToDevices({ employeeId: savedId });
         append(

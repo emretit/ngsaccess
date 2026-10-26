@@ -7,7 +7,7 @@ import { PROJECT_ROLES } from "../../../convex/lib/roleCatalog";
 const state = vi.hoisted(() => ({ save: vi.fn(), error: vi.fn(), success: vi.fn() }));
 vi.mock("convex/react", () => ({ useMutation: () => Object.assign(state.save, { withOptimisticUpdate: () => state.save }) }));
 vi.mock("@/lib/notify", () => ({ notify: { error: state.error, success: state.success } }));
-const member = { userId: "u" as Id<"users">, name: "Ada", email: "ada@example.com", role: "admin" as const, isSuperAdmin: false };
+const member = { userId: "u" as Id<"users">, name: "Ada", email: "ada@example.com", role: "admin" as const, isSuperAdmin: false, canResetPassword: false };
 const projectId = "p" as Id<"projects">;
 function control() {
   let tree: React.ReactElement<{ children?: React.ReactNode }> | undefined;

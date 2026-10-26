@@ -1,3 +1,4 @@
+import { internal } from "./_generated/api";
 import { requirePermission } from "./lib/permissions";
 import { ConvexError, v } from "convex/values";
 import { authedMutation } from "./lib/customFunctions";
@@ -7,6 +8,7 @@ import { writeAudit } from "./lib/audit";
 import type { Id } from "./_generated/dataModel";
 import { scheduleEmployeeCardChange } from "./lib/employeeCardChange";
 import { cardConflictMessage, cardNumericKey, findDuplicateCard, NUMERIC_CARD_CONFLICT } from "./lib/cardIdentity";
+import { normalizeEmployeeEmail } from "./lib/employeeEmail";
 
 const rowValidator = v.object({
   rowNumber: v.number(), firstName: v.string(), lastName: v.string(), email: v.string(),
@@ -60,33 +62,41 @@ export const importChunk = authedMutation({
       const company = relation(companies, row.company, "Firma");
       if (errors.length) { results.push({ rowNumber: row.rowNumber, status: "error", message: errors.join("; ") }); continue; }
       let duplicateMessage: string | undefined;
-      for (const [field, value] of [["tcNo", row.tcNo?.trim()], ["email", row.email], ["cardNumber", row.cardNumber.trim()]] as const) {
+      const email = normalizeEmployeeEmail(row.email) ?? "";
+      for (const [field, value] of [["tcNo", row.tcNo?.trim()], ["email", email], ["cardNumber", row.cardNumber.trim()]] as const) {
         if (!value) continue;
         if (field === "cardNumber") {
           const duplicate = await findDuplicateCard(ctx, value);
           if (duplicate) duplicateMessage = cardConflictMessage(value, duplicate, duplicateMessages.cardNumber);
           break;
         }
-        const matches = ctx.db.query("employees").withIndex(field === "tcNo" ? "by_tc" : "by_email", q => q.eq(field, value));
-        // Other projects may share identifiers; a global take(20) can hide this project's match.
-        for await (const _employee of matches) {
-          // employees.create tekillik kontrolü projeden bağımsızdır; import da aynı global kapsamı kullanır.
-          duplicateMessage = duplicateMessages[field];
-          break;
+        // Not-yet-backfilled addresses are matched by their raw spelling too (index lookups only, no table scan).
+        const candidates = field === "email" ? [...new Set([value, row.email.trim()])] : [value];
+        for (const candidate of candidates) {
+          const matches = ctx.db.query("employees").withIndex(field === "tcNo" ? "by_tc" : "by_email", q => q.eq(field, candidate));
+          // Other projects may share identifiers; a global take(20) can hide this project's match.
+          for await (const _employee of matches) {
+            // employees.create tekillik kontrolü projeden bağımsızdır; import da aynı global kapsamı kullanır.
+            duplicateMessage = duplicateMessages[field];
+            break;
+          }
+          if (duplicateMessage) break;
         }
         if (duplicateMessage) break;
       }
       if (duplicateMessage) { results.push({ rowNumber: row.rowNumber, status: "skippedDuplicate", message: duplicateMessage }); continue; }
       if (args.dryRun) { results.push({ rowNumber: row.rowNumber, status: "created", message: "İçe aktarmaya hazır" }); continue; }
       const now = new Date().toISOString();
-      await ctx.db.insert("employees", {
-        projectId: args.projectId, firstName: row.firstName.trim(), lastName: row.lastName.trim(), email: row.email,
+      const employeeId = await ctx.db.insert("employees", {
+        projectId: args.projectId, firstName: row.firstName.trim(), lastName: row.lastName.trim(), email,
         tcNo: row.tcNo?.trim() || undefined, payrollCode: row.payrollCode?.trim() || undefined, cardNumber: row.cardNumber.trim(),
         departmentId: department?._id,
         positionId: position?._id,
         companyId: company?._id,
         isActive: row.isActive ?? true, createdAt: now, updatedAt: now,
       });
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
       results.push({ rowNumber: row.rowNumber, status: "created", message: "Kişi oluşturuldu" });
     }
     if (!args.dryRun) {

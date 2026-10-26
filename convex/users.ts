@@ -1,3 +1,4 @@
+import { accessBlockReason } from "./lib/accountAccess";
 import { hasOtherActiveAdmin, getProjectIdsWithPermission, membershipRole, requirePermission } from "./lib/permissions";
 import { projectRoleValidator, legacyRoleToProjectRole, type ProjectRole } from "./lib/roleCatalog";
 import { paginationOptsValidator } from "convex/server";
@@ -429,6 +430,9 @@ export const adminList = authedQuery({
         const projects = (await memberships(user._id)).filter(project => allowedProjects === null || allowedProjects.includes(project._id));
         const selected = projects.find(project => project._id === args.project) ?? projects.find(project => project.role === args.role) ?? projects[0];
         return { ...adminUserRow(user, ctx.user._id, projects), projects,
+          canResetPassword: projects.length > 0 && user.role !== "super_admin" && user.verified !== false && accessBlockReason(user, Date.now()) === null && Boolean(user.email && (await ctx.db.query("authAccounts")
+          .withIndex("providerAndAccountId", q => q.eq("provider", "password").eq("providerAccountId", user.email?.toLowerCase() ?? ""))
+          .unique())?.userId === user._id),
           role: user.role === "super_admin" && allowedProjects === null && !args.project ? "super_admin" as const : selected?.role ?? null };
       })),
       filterScope: "server" as const, totalScanned,

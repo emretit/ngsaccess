@@ -83,6 +83,8 @@ const commonLabels: Record<string, string> = {
   consentsRevoked: "İptal edilen rızalar",
   readingsAnonymized: "Anonimleştirilen okumalar",
   readingsAnonymizationPending: "Anonimleştirme sürüyor",
+  inviteId: "Davet",
+  passwordReset: "Şifre sıfırlandı",
 };
 const tableLabels: Record<string, Record<string, string>> = {
   hikPendingOperations: { dismissedAt: "Uyarının kapatılma zamanı" },

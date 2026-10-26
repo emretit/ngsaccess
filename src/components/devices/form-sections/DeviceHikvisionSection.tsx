@@ -28,6 +28,7 @@ export function DeviceHikvisionSection({
   form,
   device,
 }: DeviceHikvisionSectionProps) {
+  const legacyBridge = device?.hikTransport === "localBridge";
   const transport = form.watch("hik_transport");
   return (
     <div className="space-y-3">
@@ -41,7 +42,7 @@ export function DeviceHikvisionSection({
           render={({ field }) => (
             <FormItem>
               <FormLabel>İletişim yöntemi</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <Select disabled={legacyBridge} onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Seçin" />
@@ -49,7 +50,7 @@ export function DeviceHikvisionSection({
                 </FormControl>
                 <SelectContent>
                   <SelectItem value="gateway">Gateway (ISUP)</SelectItem>
-                  <SelectItem value="localBridge">Yerel köprü (LAN)</SelectItem>
+                  {legacyBridge && <SelectItem value="localBridge">Yerel köprü (LAN) — salt okunur</SelectItem>}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -68,6 +69,7 @@ export function DeviceHikvisionSection({
               </FormLabel>
               <FormControl>
                 <Input
+                  readOnly={legacyBridge}
                   placeholder={deviceLabels.ipPlaceholder}
                   {...field}
                   value={field.value ?? ""}

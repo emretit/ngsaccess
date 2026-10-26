@@ -9,10 +9,12 @@ import { superAdminQuery } from "./lib/customFunctions";
 import { limiter } from "./lib/rateLimit";
 import { getValidAuthUserId, verifyUser } from "./lib/auth";
 import { hasPermission } from "./lib/permissions";
+import { writeAudit } from "./lib/audit";
+import { accessBlockReason } from "./lib/accountAccess";
 import { inviteRoleValidator, legacyRoleToProjectRole, projectRoleValidator } from "./lib/roleCatalog";
 
-/** Kurulumda tüketilebilecek davet: kullanılmamış, süresi dolmamış, "reset" olmayan. */
-async function getOpenSetupInvite(ctx: QueryCtx | MutationCtx, token: string) {
+/** Kullanılmamış ve süresi dolmamış davet. */
+async function getOpenInvite(ctx: QueryCtx | MutationCtx, token: string) {
   const invite = await ctx.db
     .query("invites")
     .withIndex("by_token", (q) => q.eq("token", token))
@@ -20,8 +22,35 @@ async function getOpenSetupInvite(ctx: QueryCtx | MutationCtx, token: string) {
   if (!invite || invite.used || !(Date.parse(invite.expiresAt) > Date.now())) {
     throw new ConvexError({ code: "INVITE_INVALID" });
   }
+  return invite;
+}
+
+async function getOpenSetupInvite(ctx: QueryCtx | MutationCtx, token: string) {
+  const invite = await getOpenInvite(ctx, token);
   if (invite.type === "reset") throw new ConvexError({ code: "INVITE_WRONG_TYPE" });
   return invite;
+}
+
+/** Reset yalnız aynı projenin mevcut, doğrulanmış password hesabına uygulanabilir. */
+async function getResetAccount(ctx: QueryCtx | MutationCtx, email: string, projectId: Id<"projects">, creating = false) {
+  const resetUnavailable = () => new ConvexError({ code: "INVITE_RESET_UNAVAILABLE", message: "Bu kullanıcıya şifre sıfırlama bağlantısı gönderilemiyor." });
+  const account = await ctx.db.query("authAccounts")
+    .withIndex("providerAndAccountId", (q) => q.eq("provider", "password").eq("providerAccountId", email))
+    .unique();
+  const user = account ? await ctx.db.get(account.userId) : null;
+  if (!user || user.verified === false || user.role === "super_admin" || user.email?.toLowerCase() !== email) {
+    if (creating) throw resetUnavailable();
+    throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS", message: "Bu hesap için şifre sıfırlanamıyor. Yöneticinizle iletişime geçin." });
+  }
+  let isMember = false;
+  for await (const membership of ctx.db.query("userProjects").withIndex("by_user", (q) => q.eq("userId", user._id))) {
+    if (membership.projectId === projectId) { isMember = true; break; }
+  }
+  if (!isMember) {
+    if (creating) throw resetUnavailable();
+    throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH", message: "Bu hesap davetin projesine ait değil. Yöneticinizden yeni bağlantı isteyin." });
+  }
+  return user;
 }
 
 /**
@@ -42,8 +71,7 @@ async function isFreshSetupAccount(ctx: QueryCtx | MutationCtx, user: Doc<"users
  * projeye davet eder. Token yalnız e-posta action'ında kalır, istemciye dönmez.
  * Rol proje rolü olarak saklanır; eski project_admin/project_user girdisi dönüştürülür.
  *
- * type === "reset" → mevcut kullanıcıya şifre sıfırlama maili (henüz Convex
- * Auth password reset entegrasyonu yok; bu field gelecek PR için hazırlık).
+ * type === "reset" → yalnız projedeki mevcut password hesabına sıfırlama bağlantısı.
  */
 export const create = internalMutation({
   args: {
@@ -65,6 +93,10 @@ export const create = internalMutation({
 
     if (!(await hasPermission(ctx, caller, args.projectId, "admin.manage"))) {
       throw new Error("Bu projeye davet gönderme yetkin yok");
+    }
+
+    if (args.type === "reset") {
+      await getResetAccount(ctx, args.email.toLowerCase(), args.projectId, true);
     }
 
     await limiter.limit(ctx, "inviteCreate", {
@@ -118,7 +150,7 @@ export const verify = query({
       .withIndex("by_token", (q) => q.eq("token", args.token))
       .first();
 
-    if (!invite || invite.used || new Date(invite.expiresAt) < new Date()) {
+    if (!invite || invite.used || !(Date.parse(invite.expiresAt) > Date.now())) {
       return null;
     }
 
@@ -205,7 +237,8 @@ export const claimSetupAccount = action({
 });
 
 /**
- * Daveti yalnız oturumu davet e-postasıyla eşleşen hesap tüketebilir.
+ * Reset tokenı mevcut password hesabını kurtarır; normal daveti yalnız oturumu
+ * davet e-postasıyla eşleşen hesap tüketebilir.
  * Doğrulanmamış yeni hesaba bu dar yolda izin verilir; genel auth guard değişmez.
  * Proje rolü üyeliğe yazılır; mevcut üyeliğin rolü değişmez. Mevcut hesapların users.role'ü korunur
  * (başka projede yükseltme olmasın); yeni kurulum hesabı platformda her zaman normal kalır.
@@ -214,15 +247,49 @@ export const consume = mutation({
   args: {
     token: v.string(),
     email: v.string(),
+    password: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const invite = await getOpenInvite(ctx, args.token);
+    if (invite.type === "reset") {
+      // Token is the recovery authority; caller-supplied email never selects an account.
+      if (args.email.toLowerCase() !== invite.email) {
+        throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH" });
+      }
+      const user = await getResetAccount(ctx, invite.email, invite.projectId);
+      const creator = await ctx.db.get(invite.createdBy);
+      if (!creator || creator.verified === false || accessBlockReason(creator, Date.now()) !== null ||
+          !(await hasPermission(ctx, creator, invite.projectId, "admin.manage"))) {
+        throw new ConvexError({ code: "INVITE_INVALID" });
+      }
+      const passwordError = getPasswordError(args.password ?? "");
+      if (passwordError || args.password === undefined) {
+        throw new ConvexError({ code: "INVITE_WEAK_PASSWORD", message: passwordError ?? "Yeni şifrenizi girin." });
+      }
+      // Auth's modifyAccountCredentials/invalidateSessions helpers dispatch these same
+      // store operations. Nested mutations keep hashing, revocation and token consumption
+      // in one transaction, including rollback on failure and concurrent token use.
+      await ctx.runMutation(internal.auth.store, { args: {
+        type: "modifyAccount", provider: "password",
+        account: { id: invite.email, secret: args.password },
+      } });
+      await ctx.runMutation(internal.auth.store, { args: {
+        type: "invalidateSessions", userId: user._id,
+      } });
+      await ctx.db.patch(invite._id, { used: true });
+      await writeAudit(ctx, {
+        user: null, projectId: invite.projectId, action: "update", targetTable: "users",
+        targetId: user._id, newValue: { passwordReset: true, inviteId: invite._id },
+        note: "Davet bağlantısıyla şifre sıfırlandı; tüm oturumlar iptal edildi.",
+      });
+      return null;
+    }
+
     const userId = await getValidAuthUserId(ctx);
     if (!userId) throw new ConvexError({ code: "INVITE_AUTH_REQUIRED" });
     const user = await ctx.db.get(userId);
     if (!user) throw new ConvexError({ code: "INVITE_AUTH_REQUIRED" });
-
-    const invite = await getOpenSetupInvite(ctx, args.token);
 
     // args.email eski web sözleşmesi için kalır; kimlik kaynağı değildir.
     if (user.email?.toLowerCase() !== invite.email.toLowerCase() ||

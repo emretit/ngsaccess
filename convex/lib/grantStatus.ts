@@ -71,6 +71,33 @@ export async function employeeGrantGraph(ctx: QueryCtx, employee: Doc<"employees
   return graph;
 }
 
+/** Fetch each current employee once for a bounded page/candidate batch. */
+export async function grantEmployees(ctx: QueryCtx, rows: readonly { employeeId: Id<"employees"> }[]) {
+  return new Map(await Promise.all([...new Set(rows.map(row => row.employeeId))].map(async id =>
+    [id, await ctx.db.get(id)] as const)));
+}
+
+/** Start with current department membership; unrelated project grants use no read budget. */
+export async function departmentGrantCandidates(
+  ctx: QueryCtx, projectId: Id<"projects">, departmentId: Id<"departments">,
+  deviceId?: Id<"devices">,
+) {
+  const members = await ctx.db.query("employees").withIndex("by_department", q => q.eq("departmentId", departmentId)).take(GRANT_LIMIT + 1);
+  const employees = new Map(members.slice(0, GRANT_LIMIT)
+    .filter(employee => employee.projectId === projectId).map(employee => [employee._id, employee] as const));
+  const rows: Doc<"accessGrantStatus">[] = [];
+  for (const employee of employees.values()) {
+    if (deviceId) {
+      const deviceRows = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employee._id).eq("deviceId", deviceId)).take(GRANT_LIMIT + 1 - rows.length);
+      rows.push(...deviceRows.filter(row => row.projectId === projectId));
+    } else {
+      rows.push(...await ctx.db.query("accessGrantStatus").withIndex("by_project_employee", q => q.eq("projectId", projectId).eq("employeeId", employee._id)).take(GRANT_LIMIT + 1 - rows.length));
+    }
+    if (rows.length > GRANT_LIMIT) break;
+  }
+  return { rows: rows.slice(0, GRANT_LIMIT), employees, capped: members.length > GRANT_LIMIT || rows.length > GRANT_LIMIT };
+}
+
 export type GrantResult = {
   projectId: Id<"projects">; employeeId: Id<"employees">; deviceId: Id<"devices">;
   state: GrantState; ruleIds?: Id<"accessRules">[]; lastError?: string; lastRunId?: Id<"deviceSyncRuns">; lastOperationId?: string;

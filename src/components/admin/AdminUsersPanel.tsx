@@ -1,3 +1,4 @@
+import { PasswordResetDialog, type PasswordResetTarget } from "./components/PasswordResetDialog";
 import { ProjectMembersContent } from "./ProjectMembersContent";
 import { PROJECT_ROLES, legacyRoleToProjectRole } from "../../../convex/lib/roleCatalog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -129,6 +130,7 @@ export function AdminUsersContent() {
   );
   const management = useUserManagement();
   const [open, setOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<PasswordResetTarget | null>(null);
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const users = result?.page;
@@ -235,6 +237,12 @@ export function AdminUsersContent() {
       ) : (
         <UserTable
           users={users}
+          onResetPassword={management.canResetPassword ? user => {
+            if (!("projects" in user) || !("canResetPassword" in user) || !user.canResetPassword || user.role === "super_admin" || !user.email) return;
+            const project = user.projects.find(project => project._id === filters.project) ?? user.projects[0];
+            if (!project) return;
+            setResetTarget({ email: user.email, projectId: project._id, role: legacyRoleToProjectRole(user.role) });
+          } : undefined}
           onEditUser={(user) => {
             management.handleEditUser(user);
             setOpen(true);
@@ -277,6 +285,7 @@ export function AdminUsersContent() {
           error={management.error}
         />
       )}
+      <PasswordResetDialog target={resetTarget} onClose={() => setResetTarget(null)} onSend={management.handlePasswordReset} pending={management.resettingPassword} />
       <DeleteUserDialog
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}

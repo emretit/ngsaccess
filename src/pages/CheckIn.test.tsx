@@ -1,18 +1,38 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CheckIn, { checkInPresentation } from './CheckIn';
 
-vi.mock('convex/react', () => ({ useMutation: () => vi.fn() }));
+const mocks = vi.hoisted(() => ({ effects: [] as (() => void)[], checkIn: vi.fn() }));
+vi.mock('@/hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
+vi.mock('convex/react', () => ({ useMutation: () => mocks.checkIn }));
+vi.mock('react', async importOriginal => ({
+  ...await importOriginal<typeof import('react')>(),
+  useEffect: (effect: () => void) => { mocks.effects.push(effect); },
+}));
+beforeEach(() => { mocks.effects = []; mocks.checkIn.mockReset(); });
 describe('CheckIn presentation', () => {
-  it('starts pending rather than claiming success before the backend responds', () => {
+  it('checks the token without promising an attendance write', () => {
     const html = renderToStaticMarkup(
       <MemoryRouter initialEntries={['/check-in?token=test']}>
         <CheckIn />
       </MemoryRouter>,
     );
-    expect(html).toContain('Girişiniz kaydediliyor.');
+    expect(html).toContain('QR kod kontrol ediliyor.');
+    expect(html).not.toContain('Konum');
     expect(html).not.toContain('Girişiniz kaydedildi.');
+  });
+  it('checks unused tokens without calling geolocation and directs to the reader', async () => {
+    const getCurrentPosition = vi.fn();
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+    mocks.checkIn.mockResolvedValue({ success: false, code: 'READER_REQUIRED' });
+    renderToStaticMarkup(<MemoryRouter initialEntries={['/check-in?token=unused']}><CheckIn /></MemoryRouter>);
+    for (const effect of mocks.effects) effect();
+    await Promise.resolve();
+    expect(mocks.checkIn).toHaveBeenCalledWith({ token: 'unused' });
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+    expect(checkInPresentation({ success: false, code: 'READER_REQUIRED' })).toEqual({ status: 'reader' });
+    vi.unstubAllGlobals();
   });
   it('shows neutral used status without personal data', () => {
     expect(checkInPresentation({ success: true, status: 'used', employeeName: 'Private', accessTime: '2026-01-01' })).toEqual({ status: 'used' });

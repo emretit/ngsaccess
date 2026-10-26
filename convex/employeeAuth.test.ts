@@ -140,18 +140,22 @@ const testEmployee: Doc<"employees"> = {
 };
 
 function signInFixture(options: { employee?: boolean; passwordHash?: string | null }) {
+  const lookups: Array<{ table: string; index: string; value: unknown }> = [];
   const ctx = {
     db: {
       query: (table: string) => {
         let indexName = "";
         let indexedValue: unknown;
         const query = {
+          [Symbol.asyncIterator]() { throw new Error("Unindexed employee iteration is forbidden"); },
           withIndex: (name: string, apply: (builder: { eq: (field: string, value: unknown) => unknown }) => unknown) => {
             indexName = name;
             apply({ eq: (_field, value) => { indexedValue = value; } });
+            lookups.push({ table, index: name, value: indexedValue });
             return query;
           },
           first: async () => {
+            if (!indexName) throw new Error("Unindexed read is forbidden");
             if (table === "employees" && indexName === "by_email" && indexedValue === "employee@example.test") {
               return options.employee === false ? null : testEmployee;
             }
@@ -172,18 +176,28 @@ function signInFixture(options: { employee?: boolean; passwordHash?: string | nu
       },
     },
   } as unknown as MutationCtx;
-  return ctx;
+  return { ctx, lookups };
 }
 
 describe("employeeAuth signIn errors", () => {
+  it.each([
+    [" unknown@example.test ", ["unknown@example.test"]],
+    [" Unknown@Example.test ", ["unknown@example.test", "Unknown@Example.test"]],
+  ])("looks up unknown %s only through by_email", async (email, values) => {
+    const { ctx, lookups } = signInFixture({ employee: false });
+    await expect(signInHandler(ctx, { email, password: "wrong-password" })).resolves.toEqual({
+      error: { code: "INVALID_CREDENTIALS", message: "E-posta veya şifre hatalı" },
+    });
+    expect(lookups).toEqual(values.map(value => ({ table: "employees", index: "by_email", value })));
+  });
   it("returns the same error for a missing employee, missing password, and wrong password", async () => {
     const args = { email: "employee@example.test", password: "wrong-password" };
     const expected = { error: { code: "INVALID_CREDENTIALS", message: "E-posta veya şifre hatalı" } };
 
-    await expect(signInHandler(signInFixture({ employee: false }), args)).resolves.toEqual(expected);
-    await expect(signInHandler(signInFixture({ passwordHash: undefined }), args)).resolves.toEqual(expected);
-    await expect(signInHandler(signInFixture({ passwordHash: null }), args)).resolves.toEqual(expected);
-    await expect(signInHandler(signInFixture({ passwordHash: "$2b$10$Oc3g9F8bRESoAK3pHZmgg.DudLaDxEGGGIZL4kHrbH1on0BK6pB4a" }), args))
+    await expect(signInHandler(signInFixture({ employee: false }).ctx, args)).resolves.toEqual(expected);
+    await expect(signInHandler(signInFixture({ passwordHash: undefined }).ctx, args)).resolves.toEqual(expected);
+    await expect(signInHandler(signInFixture({ passwordHash: null }).ctx, args)).resolves.toEqual(expected);
+    await expect(signInHandler(signInFixture({ passwordHash: "$2b$10$Oc3g9F8bRESoAK3pHZmgg.DudLaDxEGGGIZL4kHrbH1on0BK6pB4a" }).ctx, args))
       .resolves.toEqual(expected);
   });
 });

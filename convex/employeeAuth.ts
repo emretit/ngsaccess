@@ -1,3 +1,4 @@
+import { normalizeEmployeeEmail } from "./employees";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
@@ -46,7 +47,7 @@ async function setupEmailTarget(ctx: QueryCtx, employeeId: Doc<"employees">["_id
   if (employee.isActive !== true || employmentEnded(employee, trTodayKey())) {
     throw new Error("Pasif veya işten ayrılmış çalışana kurulum e-postası gönderilemez.");
   }
-  if (!employee.email.trim()) throw new Error("Önce çalışanın e-posta adresini kaydedin.");
+  if (!normalizeEmployeeEmail(employee.email)) throw new Error("Önce çalışanın e-posta adresini kaydedin.");
   return { user, employee };
 }
 
@@ -64,7 +65,7 @@ export const issueSetupEmailToken = internalMutation({
     if (!limit.ok) throw new Error("Bu çalışana az önce kurulum bağlantısı üretildi. 60 saniye sonra tekrar deneyin.");
     const now = new Date().toISOString();
     const existing = await ctx.db.query("employeeAuth").withIndex("by_employee", q => q.eq("employeeId", employeeId)).first();
-    const values = { email: employee.email, projectId: employee.projectId, setupToken,
+    const values = { email: normalizeEmployeeEmail(employee.email), projectId: employee.projectId, setupToken,
       tokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: now };
     if (existing) await ctx.db.patch(existing._id, values);
     else await ctx.db.insert("employeeAuth", { employeeId, ...values, createdAt: now });
@@ -72,7 +73,7 @@ export const issueSetupEmailToken = internalMutation({
     const maskedEmail = `${local.slice(0, 1)}***@${domain ?? "***"}`;
     await writeAudit(ctx, { user, projectId: employee.projectId, action: "update", targetTable: "employeeAuth", targetId: employeeId,
       newValue: { employeeId, email: maskedEmail }, note: "Mobil hesap kurulum bağlantısı üretildi" });
-    return { email: employee.email, firstName: employee.firstName, lastName: employee.lastName };
+    return { email: normalizeEmployeeEmail(employee.email) ?? "", firstName: employee.firstName, lastName: employee.lastName };
   },
 });
 
@@ -133,6 +134,7 @@ export const create = internalMutation({
     const now = new Date().toISOString();
     return await ctx.db.insert("employeeAuth", {
       ...args,
+      email: normalizeEmployeeEmail(args.email),
       createdAt: now,
       updatedAt: now,
     });
@@ -152,7 +154,7 @@ export const update = internalMutation({
     const { authId, ...updates } = args;
     const clean: Partial<Omit<Doc<"employeeAuth">, "_id" | "_creationTime">> = {
       updatedAt: new Date().toISOString(),
-      ...(updates.email === undefined ? {} : { email: updates.email }),
+      ...(updates.email === undefined ? {} : { email: normalizeEmployeeEmail(updates.email) }),
       ...(updates.setupToken === undefined ? {} : { setupToken: updates.setupToken ?? undefined }),
       ...(updates.tokenExpiresAt === undefined ? {} : { tokenExpiresAt: updates.tokenExpiresAt ?? undefined }),
       ...(updates.lastLogin === undefined ? {} : { lastLogin: updates.lastLogin }),
@@ -160,7 +162,9 @@ export const update = internalMutation({
     if (updates.passwordHash !== undefined) {
       const auth = await ctx.db.get(authId);
       if (!auth) throw new Error("Çalışan kimlik kaydı bulunamadı");
-      await writeEmployeePassword(ctx, auth, updates.passwordHash, clean);
+      await writeEmployeePassword(ctx, auth, updates.passwordHash, { ...clean,
+        email: normalizeEmployeeEmail(updates.email === undefined ? auth.email : updates.email),
+      });
     } else {
       await ctx.db.patch(authId, clean);
     }
@@ -184,7 +188,7 @@ export const consumeSetupToken = internalMutation({
       return { status: "expired" as const };
     }
 
-    await writeEmployeePassword(ctx, auth, args.passwordHash);
+    await writeEmployeePassword(ctx, auth, args.passwordHash, { email: normalizeEmployeeEmail(auth.email) });
     return { status: "ok" as const };
   },
 });
@@ -248,16 +252,21 @@ export const signIn = mutation({
     retryAfterMs: v.optional(v.number()),
   }) })),
   handler: async (ctx, args) => {
-    const normalizedEmail = args.email.trim().toLowerCase();
+    const normalizedEmail = normalizeEmployeeEmail(args.email) ?? "";
     // Return expected failures: throwing would roll back the limiter write.
     const limit = await limiter.limit(ctx, "employeeSignIn", { key: normalizedEmail, throws: false });
     if (!limit.ok) {
       return { error: mobileErrorData("RATE_LIMITED", Math.max(1, Math.ceil(limit.retryAfter ?? 1))) };
     }
-    const employee = await ctx.db
+    let employee = normalizedEmail ? await ctx.db
       .query("employees")
       .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
-      .first();
+      .first() : null;
+    const rawEmail = args.email.trim();
+    if (!employee && normalizedEmail && rawEmail !== normalizedEmail) {
+      employee = await ctx.db.query("employees")
+        .withIndex("by_email", q => q.eq("email", rawEmail)).first();
+    }
 
     // İşten ayrılan (cron isActive'i kapatmış olsa da) EMPLOYMENT_ENDED alır, ama yalnız şifre
     // doğruysa: yanlış şifre genel hata kalır, hesabın durumu dışarı sızmaz.
@@ -299,6 +308,7 @@ export const signIn = mutation({
     });
 
     await ctx.db.patch(auth._id, {
+      email: normalizeEmployeeEmail(auth.email),
       lastLogin: now.toISOString(),
       updatedAt: now.toISOString(),
     });
@@ -373,7 +383,7 @@ export const changePassword = employeeAuthedMutation({
       return { error: mobileErrorData("INVALID_CREDENTIALS") };
     }
     const passwordHash = await hashEmployeePassword(args.newPassword);
-    await writeEmployeePassword(ctx, auth, passwordHash);
+    await writeEmployeePassword(ctx, auth, passwordHash, { email: normalizeEmployeeEmail(auth.email) });
     return { requiresSignIn: true as const };
   },
 });
@@ -432,7 +442,7 @@ export const wipeLegacyHashes = internalMutation({
     let wiped = 0;
     for (const row of page.page) {
       if (row.passwordHash && !row.passwordHash.startsWith("$2")) {
-        await writeEmployeePassword(ctx, row, undefined);
+        await writeEmployeePassword(ctx, row, undefined, { email: normalizeEmployeeEmail(row.email) });
         wiped++;
       }
     }

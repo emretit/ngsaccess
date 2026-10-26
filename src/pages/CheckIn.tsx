@@ -1,4 +1,3 @@
-import { optionalLocationWithin } from '../../convex/lib/checkInUx';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation } from 'convex/react';
@@ -17,6 +16,7 @@ type CheckInResult = {
 };
 
 export function checkInPresentation(result: CheckInResult) {
+  if (result.code === "READER_REQUIRED") return { status: "reader" as const };
   if (result.success && result.status === "used") return { status: "used" as const };
   if (result.success) {
     return {
@@ -40,11 +40,9 @@ export default function CheckIn() {
   const token = searchParams.get('token');
   const checkIn = useMutation(api.employeeCheckIn.checkInWithToken);
   const running = useRef<string | null>(null);
-  const [phase, setPhase] = useState('Konum bilgisi bekleniyor…');
-  const [status, setStatus] = useState<'loading' | 'success' | 'used' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'used' | 'reader' | 'error'>('loading');
   const [failure, setFailure] = useState<'invalid' | 'rejected' | 'unknown'>('invalid');
   const [record, setRecord] = useState<{ name: string; accessTime?: string | number } | null>(null);
-  const [locationNotice, setLocationNotice] = useState('');
   const [usedLocation, setUsedLocation] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
@@ -58,46 +56,18 @@ export default function CheckIn() {
     if (running.current === token) return;
     running.current = token;
     setUsedLocation(undefined);
-    setPhase('Konum bilgisi bekleniyor…');
-    setLocationNotice('');
     setStatus('loading');
 
     const doCheckIn = async () => {
       try {
-        let lat: number | undefined;
-        let lng: number | undefined;
-
-        if (navigator.geolocation) {
-          const pos = await optionalLocationWithin(
-            () =>
-              new Promise<GeolocationPosition>((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                  timeout: 3000,
-                  maximumAge: 60000,
-                });
-              }),
-            3000,
-          );
-          if (pos) {
-            lat = pos.coords.latitude;
-            lng = pos.coords.longitude;
-          } else {
-            setLocationNotice('Konum alınamadı; giriş kaydı konum eklenmeden oluşturuluyor.');
-          }
-        } else {
-          setLocationNotice('Bu tarayıcı konum bilgisi sağlayamıyor; konum eklenmeden devam ediliyor.');
-        }
-
-        if (running.current !== token) return;
-        setPhase('Giriş kaydediliyor…');
-        const result = await checkIn({
-          token,
-          ...(lat != null && lng != null && { latitude: lat, longitude: lng }),
-        });
+        const result = await checkIn({ token });
 
         if (running.current !== token) return;
         const presentation = checkInPresentation(result);
-        if (presentation.status === 'used') {
+        if (presentation.status === 'reader') {
+          setStatus('reader');
+          setRecord(null);
+        } else if (presentation.status === 'used') {
           setStatus('used');
           setRecord(null);
         } else if (presentation.status === 'success') {
@@ -120,17 +90,9 @@ export default function CheckIn() {
 
   if (status === 'loading')
     return (
-      <StatusScreen iconSize="large" tone="loading" title="Girişiniz kaydediliyor." description={phase}>
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Konum alınamazsa kayıt, konum eklenmeden oluşturulur.
-        </p>
-        {locationNotice && (
-          <p role="status" className="mt-4 text-sm text-muted-foreground">
-            {locationNotice}
-          </p>
-        )}
-      </StatusScreen>
+      <StatusScreen iconSize="large" tone="loading" title="QR kod kontrol ediliyor." description="Kodun durumu kontrol ediliyor." />
     );
+  if (status === 'reader') return <StatusScreen iconSize="large" tone="info" title="QR kodunuzu okuyucuya gösterin." description="Giriş için NGS Plus mobil uygulamasındaki QR kodunuzu işyerinizdeki fiziksel okuyucuya gösterin." />;
   if (status === 'used') return <StatusScreen iconSize="large" tone="success" title="Bu QR kod daha önce kullanıldı." description="Bu sayfayı kapatabilirsiniz." />;
   if (status === 'success') {
     const time = record?.accessTime ? new Date(record.accessTime) : null;

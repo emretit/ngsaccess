@@ -7,7 +7,7 @@ import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { getCurrentUser } from "./lib/auth";
 import { requirePermission } from "./lib/permissions";
 import { resolveProjectScope } from "./lib/projectScope";
-import { bounded, employeeGrantGraph, grantRuleScope, grantStale, grantState, upsertGrantStatus } from "./lib/grantStatus";
+import { bounded, departmentGrantCandidates, grantEmployees, employeeGrantGraph, grantRuleScope, grantStale, grantState, upsertGrantStatus } from "./lib/grantStatus";
 import { createGrantRun, createRunInTransaction } from "./deviceSyncRuns";
 
 async function authorize(ctx: QueryCtx, projectId: Id<"projects">) {
@@ -18,10 +18,11 @@ async function authorize(ctx: QueryCtx, projectId: Id<"projects">) {
 
 type GrantRow = Omit<Doc<"accessGrantStatus">, "_id" | "_creationTime"> & { _id: Id<"accessGrantStatus"> | null; _creationTime: number };
 type ScopeCache = Map<Id<"accessRules">, Promise<Awaited<ReturnType<typeof grantRuleScope>>>>;
-async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map()) {
-  const [rawEmployee, rawDevice, rawDepartment] = await Promise.all([
-    ctx.db.get(row.employeeId), ctx.db.get(row.deviceId), row.departmentId ? ctx.db.get(row.departmentId) : null,
+async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map(), employees?: Awaited<ReturnType<typeof grantEmployees>>) {
+  const [rawEmployee, rawDevice] = await Promise.all([
+    employees ? employees.get(row.employeeId) : ctx.db.get(row.employeeId), ctx.db.get(row.deviceId),
   ]);
+  const rawDepartment = rawEmployee?.projectId === row.projectId && rawEmployee.departmentId ? await ctx.db.get(rawEmployee.departmentId) : null;
   const employee = rawEmployee?.projectId === row.projectId ? rawEmployee : null;
   const device = rawDevice?.projectId === row.projectId ? rawDevice : null;
   const department = rawDepartment?.projectId === row.projectId ? rawDepartment : null;
@@ -39,7 +40,8 @@ async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map
       for (const door of scope.doors) doors.set(door._id, door);
     }
   }
-  return { ...row, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : "Silinmiş kişi",
+  const currentDepartment: { departmentId?: Id<"departments"> } = { departmentId: employee?.departmentId };
+  return { ...row, ...currentDepartment, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : "Silinmiş kişi",
     departmentName: department?.name ?? null, deviceName: device?.name ?? "Silinmiş cihaz", brand: device?.brand ?? "other",
     doorIds: [...doors.keys()], doorNames: [...doors.values()].map(door => door.name),
     ruleNames: rules.map(rule => rule.name), templateIds: [...new Set(templates.map(template => template._id))],
@@ -58,28 +60,33 @@ export const listByProject = authedQuery({
     if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 50) throw new ConvexError("Sayfa en fazla 50 satır olabilir");
     const deviceId = args.deviceId;
     const scopes: ScopeCache = new Map();
-    const base = () => args.departmentId
-      ? ctx.db.query("accessGrantStatus").withIndex("by_project_department_state", q => args.state ? q.eq("projectId", args.projectId).eq("departmentId", args.departmentId).eq("state", args.state) : q.eq("projectId", args.projectId).eq("departmentId", args.departmentId))
-      : deviceId ? ctx.db.query("accessGrantStatus").withIndex("by_project_device", q => q.eq("projectId", args.projectId).eq("deviceId", deviceId))
+    const base = () => deviceId
+      ? ctx.db.query("accessGrantStatus").withIndex("by_project_device", q => q.eq("projectId", args.projectId).eq("deviceId", deviceId))
       : ctx.db.query("accessGrantStatus").withIndex("by_project_state", q => args.state ? q.eq("projectId", args.projectId).eq("state", args.state) : q.eq("projectId", args.projectId));
-    const scanRequired = !!(args.ruleId || args.templateId || args.search?.trim() || (args.departmentId && args.deviceId) || (args.deviceId && args.state && !args.departmentId));
+    const scanRequired = !!(args.departmentId || args.ruleId || args.templateId || args.search?.trim() || (args.deviceId && args.state));
     if (!scanRequired) {
       const result = await base().paginate(args.paginationOpts);
-      return { ...result, page: await Promise.all(result.page.map(row => enrich(ctx, row, scopes))), boundedScan: false };
+      const employees = await grantEmployees(ctx, result.page);
+      return { ...result, page: await Promise.all(result.page.map(row => enrich(ctx, row, scopes, employees))), boundedScan: false };
     }
     // Non-indexed intersections/search scan the COMPLETE candidate set (max 1000),
     // THEN paginate matches. Never filter only a fetched page or silently truncate.
-    const candidates = bounded(await base().take(1001));
+    const department = args.departmentId
+      ? await departmentGrantCandidates(ctx, args.projectId, args.departmentId, deviceId) : undefined;
+    if (department?.capped) throw new ConvexError("Departman yetki okuma sınırı aşıldı (1000); departman ve cihaz seçerek kapsamı daraltın");
+    const candidates = department?.rows ?? bounded(await base().take(1001));
+    const employees = department?.employees ?? await grantEmployees(ctx, candidates);
     const matched = [];
     const search = args.search?.trim().toLocaleLowerCase("tr");
     for (const row of candidates) {
+      const employee = employees.get(row.employeeId);
+      if (args.departmentId && (employee?.projectId !== args.projectId || employee.departmentId !== args.departmentId)) continue;
       if ((args.deviceId !== undefined && row.deviceId !== args.deviceId) || args.state && row.state !== args.state || args.ruleId && !row.ruleIds.includes(args.ruleId)) continue;
       if (args.templateId) {
         const rules = await Promise.all(row.ruleIds.map(id => ctx.db.get(id)));
         if (!rules.some(rule => rule?.projectId === args.projectId && rule.scheduleTemplateId === args.templateId)) continue;
       }
       if (search) {
-        const employee = await ctx.db.get(row.employeeId);
         const name = employee?.projectId === row.projectId ? `${employee.firstName} ${employee.lastName}` : "Silinmiş kişi";
         if (!name.toLocaleLowerCase("tr").includes(search)) continue;
       }
@@ -89,7 +96,7 @@ export const listByProject = authedQuery({
     if (cursor !== null && !/^grant-scan:\d+$/.test(cursor)) throw new ConvexError("Geçersiz yetki sayfa imleci");
     const offset = cursor ? Number(cursor.slice("grant-scan:".length)) : 0;
     const end = offset + args.paginationOpts.numItems;
-    return { page: await Promise.all(matched.slice(offset, end).map(row => enrich(ctx, row, scopes))), isDone: end >= matched.length, continueCursor: `grant-scan:${end}`, boundedScan: true };
+    return { page: await Promise.all(matched.slice(offset, end).map(row => enrich(ctx, row, scopes, employees))), isDone: end >= matched.length, continueCursor: `grant-scan:${end}`, boundedScan: true };
   },
 });
 
@@ -99,23 +106,47 @@ export const counts = authedQuery({
     await authorize(ctx, args.projectId);
     let capped = false;
     const deviceId = args.deviceId;
-    if (deviceId) {
-      // Bound reads before applying department/state filters in memory.
+    let departmentRows: Doc<"accessGrantStatus">[] | undefined;
+    let departmentEmployees: Awaited<ReturnType<typeof departmentGrantCandidates>>["employees"] | undefined;
+    if (args.departmentId) {
+      const department = await departmentGrantCandidates(ctx, args.projectId, args.departmentId, deviceId);
+      departmentRows = department.rows;
+      departmentEmployees = department.employees;
+      capped = department.capped;
+    } else if (deviceId) {
       const candidates = await ctx.db.query("accessGrantStatus").withIndex("by_project_device", q => q.eq("projectId", args.projectId).eq("deviceId", deviceId)).take(1001);
-      const rows = candidates.slice(0, 1000).filter(row => !args.departmentId || row.departmentId === args.departmentId);
-      return { all: rows.length, effective: rows.filter(row => row.state === "effective").length,
-        pending: rows.filter(row => row.state === "pending").length, failed: rows.filter(row => row.state === "failed").length,
-        removed: rows.filter(row => row.state === "removed").length, unknown: 0, capped: candidates.length > 1000 };
+      departmentRows = candidates.slice(0, 1000);
+      capped = candidates.length > 1000;
     }
+    if (deviceId && departmentRows) return { all: departmentRows.length, effective: departmentRows.filter(row => row.state === "effective").length,
+      pending: departmentRows.filter(row => row.state === "pending").length, failed: departmentRows.filter(row => row.state === "failed").length,
+      removed: departmentRows.filter(row => row.state === "removed").length, unknown: 0, capped };
     const count = async (state?: Doc<"accessGrantStatus">["state"]) => {
-      const rows = await (args.departmentId
-        ? ctx.db.query("accessGrantStatus").withIndex("by_project_department_state", q => state ? q.eq("projectId", args.projectId).eq("departmentId", args.departmentId).eq("state", state) : q.eq("projectId", args.projectId).eq("departmentId", args.departmentId))
-        : ctx.db.query("accessGrantStatus").withIndex("by_project_state", q => state ? q.eq("projectId", args.projectId).eq("state", state) : q.eq("projectId", args.projectId))).take(1001);
+      if (departmentRows) return departmentRows.filter(row => !state || row.state === state).length;
+      const rows = await ctx.db.query("accessGrantStatus").withIndex("by_project_state", q => state ? q.eq("projectId", args.projectId).eq("state", state) : q.eq("projectId", args.projectId)).take(1001);
       if (rows.length > 1000) capped = true;
       return Math.min(rows.length, 1000);
     };
     const all = await count();
     const effective = await count("effective"), pending = await count("pending"), failed = await count("failed"), removed = await count("removed");
+    if (departmentEmployees) {
+      let unknown = 0;
+      let examinedPairs = 0;
+      department: for (const employee of departmentEmployees.values()) {
+        if (employee.isActive === false) continue;
+        let graph: Awaited<ReturnType<typeof employeeGrantGraph>>;
+        try { graph = await employeeGrantGraph(ctx, employee); } catch (error) {
+          if (!(error instanceof ConvexError)) throw error;
+          capped = true; continue;
+        }
+        for (const deviceId of graph.keys()) {
+          if (++examinedPairs > 1000) { capped = true; break department; }
+          const row = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employee._id).eq("deviceId", deviceId)).unique();
+          if (!row) unknown++;
+        }
+      }
+      return { all: Math.min(1000, all + unknown), effective, pending, failed, removed, unknown, capped: capped || all + unknown > 1000 };
+    }
     // Graph enumeration has explicit rule/member/pair bounds. Unknown counts are
     // lower bounds when capped, never asserted complete after a truncated scan.
     const rules = await ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(101);
@@ -162,11 +193,12 @@ export const byEmployee = authedQuery({
     const stored = bounded(await ctx.db.query("accessGrantStatus").withIndex("by_project_employee", q => q.eq("projectId", projectId).eq("employeeId", args.employeeId)).take(201), 200);
     const rows = [];
     const scopes: ScopeCache = new Map();
-    for (const row of stored) rows.push({ ...await enrich(ctx, row, scopes), authorized: graph.has(row.deviceId), removalRequired: !graph.has(row.deviceId) && row.state !== "removed" });
+    const employees = new Map([[employee._id, employee]]);
+    for (const row of stored) rows.push({ ...await enrich(ctx, row, scopes, employees), authorized: graph.has(row.deviceId), removalRequired: !graph.has(row.deviceId) && row.state !== "removed" });
     for (const [deviceId, scope] of graph) {
       if (stored.some(row => row.deviceId === deviceId)) continue;
       const synthetic = await enrich(ctx, { _id: null, _creationTime: 0, projectId, employeeId: employee._id, deviceId,
-        departmentId: employee.departmentId, state: "pending", ruleIds: scope.ruleIds, updatedAt: 0 }, scopes);
+        departmentId: employee.departmentId, state: "pending", ruleIds: scope.ruleIds, updatedAt: 0 }, scopes, employees);
       rows.push({ ...synthetic, _id: null, state: synthetic.state === "failed" ? "failed" as const : "unknown" as const, authorized: true, removalRequired: false });
     }
     const allowedDoors = new Set([...graph.values()].flatMap(scope => scope.doors.map(door => door._id)));

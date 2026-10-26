@@ -1,3 +1,6 @@
+import { v } from "convex/values";
+import { internal } from "./_generated/api";
+import { normalizeEmployeeEmail } from "./lib/employeeEmail";
 import { internalMutation, internalQuery } from "./_generated/server";
 
 /**
@@ -110,5 +113,50 @@ export const verifyDecouple = internalQuery({
       panels: out,
       deprecatedZoneLinks: zones.filter((z) => z.ideDeviceId).length,
     };
+  },
+});
+
+/** Approval-only backfill. At most 200 employee records/page and 20 scheduled pages/run.
+ * Resume a capped run with its returned cursor and round=0 after reviewing logs.
+ * Collisions are checked globally through by_email before each employee is patched.
+ */
+export const normalizeEmployeeEmails = internalMutation({
+  args: {
+    cursor: v.optional(v.string()), round: v.optional(v.number()),
+    updated: v.optional(v.number()), collisions: v.optional(v.number()),
+  },
+  returns: v.object({ updated: v.number(), collisions: v.number(), isDone: v.boolean(),
+    continueCursor: v.string(), scheduled: v.boolean() }),
+  handler: async (ctx, args) => {
+    const round = args.round ?? 0;
+    if (!Number.isInteger(round) || round < 0 || round >= 20) throw new Error("Parti sayısı 0–19 arasında olmalıdır");
+    const page = await ctx.db.query("employees").paginate({ numItems: 200, cursor: args.cursor ?? null });
+    let updated = args.updated ?? 0;
+    let collisions = args.collisions ?? 0;
+    for (const employee of page.page) {
+      const email = normalizeEmployeeEmail(employee.email);
+      const matches = email ? await ctx.db.query("employees")
+        .withIndex("by_email", q => q.eq("email", email)).take(2) : [];
+      const conflict = matches.find(peer => peer._id !== employee._id);
+      if (conflict) {
+        collisions++;
+        console.warn("Employee email normalization collision", { employeeId: employee._id, conflictingEmployeeId: conflict._id });
+        continue;
+      }
+      if (employee.email !== (email ?? "")) {
+        await ctx.db.patch(employee._id, { email: email ?? "" });
+        updated++;
+      }
+      const auth = await ctx.db.query("employeeAuth").withIndex("by_employee", q => q.eq("employeeId", employee._id)).first();
+      if (auth && auth.email !== normalizeEmployeeEmail(auth.email)) {
+        await ctx.db.patch(auth._id, { email: normalizeEmployeeEmail(auth.email) });
+      }
+    }
+    const scheduled = !page.isDone && round + 1 < 20;
+    if (scheduled) await ctx.scheduler.runAfter(0, internal.migrations.normalizeEmployeeEmails, {
+      cursor: page.continueCursor, round: round + 1, updated, collisions,
+    });
+    console.info("Employee email normalization batch", { round, updated, collisions, isDone: page.isDone, cursor: page.continueCursor });
+    return { updated, collisions, isDone: page.isDone, continueCursor: page.continueCursor, scheduled };
   },
 });

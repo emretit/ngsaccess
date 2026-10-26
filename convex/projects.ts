@@ -119,10 +119,11 @@ export const remove = authedMutation({
     if (deletionError) throw new ConvexError(deletionError);
 
     for (const table of projectDeletionCleanupTables) {
-      // invites küçük bir tablo ve proje index'i yok; yalnız eşleşen davetler silinir.
-      const rows = projectDeletionCleanupQuery(ctx, table, args.id);
+      // Her tablo sınırlı okunur; limit aşımında tüm işlem geri alınır.
+      const rows = await projectDeletionCleanupQuery(ctx, table, args.id).take(501);
+      if (rows.length > 500) throw new ConvexError("Proje temizleme sınırı aşıldı; önce bağlı kayıtları azaltın veya projeyi pasife alın");
       // Sohbet mesajları chatConversations satırının içinde tutulur.
-      for await (const row of rows) await ctx.db.delete(row._id);
+      for (const row of rows) await ctx.db.delete(row._id);
     }
     // auditLog geçmişi korunur.
     await ctx.db.delete(args.id);

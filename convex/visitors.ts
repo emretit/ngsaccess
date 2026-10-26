@@ -447,8 +447,11 @@ export const update = authedMutation({
         visitor.visitorStatus === "preRegistered" && visitor.cardNumber.startsWith("PRE:") && !visitor.accessRuleId)) {
       throw new Error("Ziyaretçi bölgesi yalnız mobil ön kayıt aktivasyonunda atanabilir");
     }
-    await validateVisitorAccessRelations(ctx, visitor.projectId, args.presetRuleId ?? visitor.accessRuleId,
-      args.hostEmployeeId === undefined ? visitor.hostEmployeeId : args.hostEmployeeId ?? undefined);
+    // A deleted historical host is absent; explicitly assigning a host still validates it.
+    const existingHost = visitor.hostEmployeeId ? await ctx.db.get(visitor.hostEmployeeId) : null;
+    const effectiveHostId = args.hostEmployeeId === undefined
+      ? existingHost?._id : args.hostEmployeeId ?? undefined;
+    await validateVisitorAccessRelations(ctx, visitor.projectId, args.presetRuleId ?? visitor.accessRuleId, effectiveHostId);
 
     const effective = { ...visitor, ...toPatch(args) };
     // İade edilmiş pasif kayıt kişisel bilgi düzenlemesine açık kalır.
@@ -498,6 +501,7 @@ export const update = authedMutation({
     if (args.visitorPhone !== undefined) patch.visitorPhone = toPatch({ visitorPhone: args.visitorPhone?.trim() || null }).visitorPhone;
     if (args.visitorCompany !== undefined) patch.visitorCompany = toPatch({ visitorCompany: args.visitorCompany?.trim() || null }).visitorCompany;
     if (args.visitPurpose !== undefined) patch.visitPurpose = toPatch({ visitPurpose: args.visitPurpose?.trim() || null }).visitPurpose;
+    if (args.hostEmployeeId === undefined && visitor.hostEmployeeId && !existingHost) patch.hostEmployeeId = undefined;
     if (args.hostEmployeeId !== undefined) patch.hostEmployeeId = toPatch({ hostEmployeeId: args.hostEmployeeId }).hostEmployeeId;
     if (args.notes !== undefined) patch.notes = toPatch({ notes: args.notes?.trim() || null }).notes;
     if (args.accessExpiresAt !== undefined && args.accessExpiresAt !== visitor.accessExpiresAt) {

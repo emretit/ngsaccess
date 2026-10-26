@@ -104,6 +104,13 @@ describe("importChunk", () => {
     expect(await f.actor.mutation(api.employeeImport.importChunk, { projectId: f.projectId, rows: [incoming], dryRun: false })).toMatchObject([{ status: "skippedDuplicate" }]);
     expect((await f.snapshot()).employees).toHaveLength(1);
   });
+  it("stores a lower-case email and matches existing addresses case-insensitively", async () => {
+    const f = await fixture();
+    expect(await f.actor.mutation(api.employeeImport.importChunk, { projectId: f.projectId, rows: [row({ email: "Ada@Example.COM" })], dryRun: false })).toMatchObject([{ status: "created" }]);
+    expect((await f.snapshot()).employees[0]?.email).toBe("ada@example.com");
+    const again = row({ rowNumber: 3, email: "ADA@example.com", cardNumber: "A-2" });
+    expect(await f.actor.mutation(api.employeeImport.importChunk, { projectId: f.projectId, rows: [again], dryRun: false })).toMatchObject([{ status: "skippedDuplicate" }]);
+  });
   it("skips identifiers already used in another project", async () => {
     const f = await fixture(); const incoming = row({ tcNo: "10000000146" });
     await f.employee(f.otherProjectId, { email: incoming.email, tcNo: incoming.tcNo, cardNumber: incoming.cardNumber });
@@ -166,11 +173,25 @@ describe("importChunk", () => {
     expect(result.map(item => item.status)).toEqual(["created", "skippedDuplicate", "error"]);
     const state = await f.snapshot();
     expect(state.employees.find(item => item.email === "ada@example.com")).toMatchObject(relations);
-    expect(state.scheduled).toEqual([]);
+    expect(state.scheduled).toHaveLength(2);
     expect(state.audit).toHaveLength(1);
     expect(state.audit[0]).toMatchObject({ userId: f.userId, projectId: f.projectId, action: "create", targetTable: "employees", targetId: String(f.projectId), note: "Excel içe aktarma", newValue: { imported: 1, skipped: 1, errors: 1 }, searchText: expect.any(String) });
     expect(state.audit[0]?.searchText?.length).toBeGreaterThan(0);
     expect(JSON.stringify(state.audit)).not.toContain("ada@example.com");
+  });
+  it("K-10: schedules the same Hik and IDE internal senders for each created import row only", async () => {
+    const f = await fixture();
+    const args = { projectId: f.projectId, rows: [row(), row({ rowNumber: 3, email: "b@example.com", cardNumber: "B-2" })], dryRun: false };
+    await f.actor.mutation(api.employeeImport.importChunk, args);
+    const state = await f.snapshot();
+    expect(state.scheduled).toHaveLength(4);
+    for (const employee of state.employees) {
+      const jobs = state.scheduled.filter(call => call[2]?.employeeId === employee._id);
+      expect(jobs.map(call => getFunctionName(call[1]))).toEqual(["actions/hikvisionSync:syncEmployeeToDevicesInternal", "actions/ideGatewayDevice:syncEmployeeToIdePanels"]);
+    }
+    await f.actor.mutation(api.employeeImport.importChunk, args);
+    await f.actor.mutation(api.employeeImport.importChunk, { ...args, rows: [row({ rowNumber: 4, email: "", cardNumber: "" })] });
+    expect((await f.snapshot()).scheduled).toHaveLength(4);
   });
 });
 
