@@ -119,7 +119,7 @@ export function useDeviceCommands(
       title: deviceLabels.backfillEvents,
       description: "Cihazdan geçmiş olaylar alınacak; işlem zaman alabilir.",
       run: async () => {
-        const result = await backfillEvents({ deviceId: device._id });
+        const result = await backfillEvents({ deviceId: device._id, startTime: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() });
         return result.ok
           ? { ok: true }
           : { ok: false, error: result.error ?? "Geçmiş olaylar alınamadı" };

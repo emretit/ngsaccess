@@ -6,6 +6,7 @@ import { findDuplicateImportRows, normalizeEmployeeImportName, validateEmployeeI
 import { writeAudit } from "./lib/audit";
 import type { Id } from "./_generated/dataModel";
 import { scheduleEmployeeCardChange } from "./lib/employeeCardChange";
+import { cardConflictMessage, cardNumericKey, findDuplicateCard, NUMERIC_CARD_CONFLICT } from "./lib/cardIdentity";
 
 const rowValidator = v.object({
   rowNumber: v.number(), firstName: v.string(), lastName: v.string(), email: v.string(),
@@ -30,6 +31,15 @@ export const importChunk = authedMutation({
     if (!isProjectAllowed(allowed, args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
     await requirePermission(ctx, ctx.user, args.projectId, "employees.manage");
     const inFileDuplicates = findDuplicateImportRows(args.rows);
+    const numericCards = new Map<string, string>();
+    for (const row of args.rows) {
+      const card = row.cardNumber.trim();
+      const key = cardNumericKey(card);
+      if (key === null) continue;
+      const previous = numericCards.get(key);
+      if (previous !== undefined && previous !== card) inFileDuplicates.set(row.rowNumber, NUMERIC_CARD_CONFLICT);
+      else numericCards.set(key, card);
+    }
     const results: { rowNumber: number; status: "created" | "skippedDuplicate" | "error"; message: string }[] = [];
     const departments = await ctx.db.query("departments").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(500);
     const positions = await ctx.db.query("positions").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(500);
@@ -52,7 +62,12 @@ export const importChunk = authedMutation({
       let duplicateMessage: string | undefined;
       for (const [field, value] of [["tcNo", row.tcNo?.trim()], ["email", row.email], ["cardNumber", row.cardNumber.trim()]] as const) {
         if (!value) continue;
-        const matches = ctx.db.query("employees").withIndex(field === "tcNo" ? "by_tc" : field === "email" ? "by_email" : "by_card", q => q.eq(field, value));
+        if (field === "cardNumber") {
+          const duplicate = await findDuplicateCard(ctx, value);
+          if (duplicate) duplicateMessage = cardConflictMessage(value, duplicate, duplicateMessages.cardNumber);
+          break;
+        }
+        const matches = ctx.db.query("employees").withIndex(field === "tcNo" ? "by_tc" : "by_email", q => q.eq(field, value));
         // Other projects may share identifiers; a global take(20) can hide this project's match.
         for await (const _employee of matches) {
           // employees.create tekillik kontrolü projeden bağımsızdır; import da aynı global kapsamı kullanır.
@@ -92,7 +107,7 @@ export const importChunk = authedMutation({
 export const assignCards = authedMutation({
   args: { assignments: v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string() })) },
   handler: async (ctx, args) => {
-    if (args.assignments.length > 200) throw new Error("Bir çağrıda en fazla 200 kart atanabilir");
+    if (args.assignments.length > 100) throw new Error("Bir çağrıda en fazla 100 kart atanabilir; atamaları bölerek yeniden deneyin");
     const allowed = await getProjectIdsForUser(ctx);
     const results: { employeeId: string; status: "assigned" | "error"; message: string }[] = [];
     const projectIds = new Set<Id<"projects">>();
@@ -113,13 +128,9 @@ export const assignCards = authedMutation({
         results.push({ employeeId: assignment.employeeId, status: "error", message: "Kart numarası biçimi geçersiz" });
         continue;
       }
-      const matches = ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", cardNumber));
-      let conflict = false;
-      for await (const candidate of matches) {
-        if (candidate._id !== employee._id) { conflict = true; break; }
-      }
+      const conflict = await findDuplicateCard(ctx, cardNumber, employee._id);
       if (conflict) {
-        results.push({ employeeId: assignment.employeeId, status: "error", message: "Kart numarası başka bir kişide kullanılıyor" });
+        results.push({ employeeId: assignment.employeeId, status: "error", message: cardConflictMessage(cardNumber, conflict, "Kart numarası başka bir kişide kullanılıyor") });
         continue;
       }
       const previousCardNumber = employee.cardNumber;

@@ -25,6 +25,20 @@ import {
 } from "./employees";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeAudit } from "./lib/audit";
+import { cardConflictMessage } from "./lib/cardIdentity";
+import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
+
+/** Freeze the old credential and targets before checkout, release or badge reuse. */
+async function scheduleVisitorCardRemoval(ctx: MutationCtx, visitor: Doc<"employees">) {
+  const snapshot = await snapshotEmployeeHikDevices(ctx, visitor);
+  const deviceIds = await resolveEmployeeIdeDeviceIds(ctx, visitor._id, visitor.projectId);
+  await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
+    employeeId: visitor._id, snapshot,
+  });
+  if (deviceIds.length) await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.deleteIdeUserFromPanels, {
+    employeeId: visitor._id, cardNumber: visitor.cardNumber, deviceIds, projectId: visitor.projectId,
+  });
+}
 
 /** Aktif `visitor_kvkk` rızası var mı? */
 async function activeKvkkConsentId(ctx: QueryCtx | MutationCtx, employeeId: Id<"employees">) {
@@ -313,14 +327,18 @@ export const create = authedMutation({
       if (
         dupCard.isVisitor === true &&
         dupCard.isActive === false &&
+        dupCard.cardNumber === cardNumber &&
         inAllowed(dupCard.projectId)
       ) {
+        const other = await findDuplicateEmployee(ctx, "cardNumber", cardNumber, dupCard._id);
+        if (other) throw new Error(cardConflictMessage(cardNumber, other, DUPLICATE_MESSAGES.cardNumber));
+        await scheduleVisitorCardRemoval(ctx, dupCard);
         await ctx.db.patch(dupCard._id, {
           cardNumber: `IADE:${cardNumber}:${dupCard._id}`,
           updatedAt: new Date().toISOString(),
         });
       } else {
-        throw new Error(DUPLICATE_MESSAGES.cardNumber);
+        throw new Error(cardConflictMessage(cardNumber, dupCard, DUPLICATE_MESSAGES.cardNumber));
       }
     }
 
@@ -427,8 +445,11 @@ export const update = authedMutation({
     const cardChanged = newCard !== undefined && newCard !== visitor.cardNumber;
     if (cardChanged) {
       if (!newCard) throw new Error("Kart numarası zorunludur");
-      const dup = await findDuplicateEmployee(ctx, "cardNumber", newCard, args.visitorId);
-      if (dup) throw new Error(DUPLICATE_MESSAGES.cardNumber);
+    }
+    if (cardChanged || args.isActive === true || assigningPreset) {
+      const card = newCard ?? visitor.cardNumber;
+      const dup = await findDuplicateEmployee(ctx, "cardNumber", card, args.visitorId);
+      if (dup) throw new Error(cardConflictMessage(card, dup, DUPLICATE_MESSAGES.cardNumber));
     }
     if (cardChanged || args.isActive === true || assigningPreset) {
       await validateVisitorPresetCard(ctx, visitor.projectId, args.presetRuleId ?? visitor.accessRuleId,
@@ -447,6 +468,7 @@ export const update = authedMutation({
     if (cardChanged || deactivating) {
       ideRemovalPanels = await resolveEmployeeIdeDeviceIds(ctx, args.visitorId, visitor.projectId);
     }
+    const previousHikSnapshot = cardChanged || deactivating ? await snapshotEmployeeHikDevices(ctx, visitor) : undefined;
 
     const now = new Date().toISOString();
     const patch: Record<string, unknown> = { updatedAt: now };
@@ -477,10 +499,14 @@ export const update = authedMutation({
       await ctx.scheduler.runAfter(
         0,
         internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
-        { cardNumber: visitor.cardNumber, deviceIds: ideRemovalPanels, projectId: visitor.projectId },
+        { employeeId: visitor._id, cardNumber: visitor.cardNumber, deviceIds: ideRemovalPanels, projectId: visitor.projectId },
       );
     }
-    if (cardChanged || activeChanged) {
+    if (previousHikSnapshot?.devices.length) {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
+        employeeId: visitor._id, snapshot: previousHikSnapshot, syncAfter: cardChanged && !deactivating,
+      });
+    } else if (cardChanged || activeChanged) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId: args.visitorId,
       });
@@ -511,30 +537,18 @@ export const checkOut = authedMutation({
     await requirePermission(ctx, ctx.user, visitor.projectId, "visitors.manage");
     if (visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
     if (visitor.isActive === false) return args.visitorId;
-    // Deaktivasyondan ÖNCE bağlı IDE panellerini çöz; patch sonrası kartı FİZİKSEL sök.
-    // syncEmployeeToIdePanels tek başına status=0 yazıp kart kaydını panelde bırakırdı.
-    const idePanels = await resolveEmployeeIdeDeviceIds(ctx, args.visitorId, visitor.projectId);
+    await scheduleVisitorCardRemoval(ctx, visitor);
     await ctx.db.patch(args.visitorId, {
       isActive: false,
       visitorStatus: "checkedOut",
       updatedAt: new Date().toISOString(),
     });
-    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
-      employeeId: args.visitorId,
-    });
-    if (idePanels.length > 0) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
-        { cardNumber: visitor.cardNumber, deviceIds: idePanels, projectId: visitor.projectId },
-      );
-    }
     return args.visitorId;
   },
   returns: v.id("employees"),
 });
 
-/** Pasif ziyaretçinin kartını elle serbest bırak (rozet iadesi). Saf DB — cihaz işlemi yok. */
+/** Pasif ziyaretçinin kartını eski cihaz kimliğini koruyarak serbest bırak. */
 export const releaseCard = authedMutation({
   args: { visitorId: v.id("employees") },
   handler: async (ctx, args) => {
@@ -545,6 +559,7 @@ export const releaseCard = authedMutation({
       throw new Error("Önce ziyaretçiyi çıkış yaptırın");
     }
     if (visitor.cardNumber.startsWith("IADE:")) return args.visitorId; // zaten serbest
+    await scheduleVisitorCardRemoval(ctx, visitor);
     await ctx.db.patch(args.visitorId, {
       cardNumber: `IADE:${visitor.cardNumber}:${args.visitorId}`,
       updatedAt: new Date().toISOString(),
@@ -570,24 +585,12 @@ export const expireVisitorAccess = internalMutation({
       .paginate({ numItems: 50, cursor: args.cursor ?? null });
     const expired = batch.page.filter(visitor => visitorTime(visitor.accessExpiresAt) <= nowMs);
     for (const vz of expired) {
-      // Deaktivasyondan ÖNCE IDE panellerini çöz; patch sonrası kartı FİZİKSEL sök
-      // (status=0 upsert kart kaydını panelde bırakırdı).
-      const idePanels = await resolveEmployeeIdeDeviceIds(ctx, vz._id, vz.projectId);
+      await scheduleVisitorCardRemoval(ctx, vz);
       await ctx.db.patch(vz._id, {
         isActive: false,
         visitorStatus: "expired",
         updatedAt: now,
       });
-      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
-        employeeId: vz._id,
-      });
-      if (idePanels.length > 0) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
-          { cardNumber: vz.cardNumber, deviceIds: idePanels, projectId: vz.projectId },
-        );
-      }
     }
     if (!batch.isDone) {
       await ctx.scheduler.runAfter(0, internal.visitors.expireVisitorAccess, { cursor: batch.continueCursor });

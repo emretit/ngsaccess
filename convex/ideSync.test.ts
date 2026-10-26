@@ -57,17 +57,17 @@ describe("ideSync – buildIdePermissionRecord", () => {
       schedule: { start: 480, end: 1080, week_days: [1, 2] },
     });
   });
-  it("io boşsa [0]'a düşer, saat boşsa 7/24", () => {
+  it("io boşsa boş kalır, saat boşsa 7/24", () => {
     const rec = buildIdePermissionRecord(3, [], {});
-    expect(rec.io).toEqual([0]);
+    expect(rec.io).toEqual([]);
     expect(rec.schedule).toEqual({ start: 0, end: 1439, week_days: [0, 1, 2, 3, 4, 5, 6] });
   });
-  it("io 0–7 dışını eler, 8 öğeye kırpar; hepsi geçersizse [0]", () => {
+  it("io 0–7 dışını eler, 8 öğeye kırpar; hepsi geçersizse boş", () => {
     // 8 ve -1 elenir; kalan [0..7] 8 öğe.
     expect(buildIdePermissionRecord(1, [0, 1, 2, 3, 4, 5, 6, 7, 8, -1], {}).io).toEqual([
       0, 1, 2, 3, 4, 5, 6, 7,
     ]);
-    expect(buildIdePermissionRecord(1, [99, -3], {}).io).toEqual([0]);
+    expect(buildIdePermissionRecord(1, [99, -3], {}).io).toEqual([]);
   });
 });
 

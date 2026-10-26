@@ -59,12 +59,15 @@ describe("KVKK inceleme düzeltmeleri", () => {
   it("retry adayından sonra kapı kapanırsa parmak izi dış cihaza gönderilmez", async () => {
     const candidate = { _id: "op-a", operation: "addFingerprint", payload: { employeeId: "employee-a", fingerPrintID: 1 },
       device: { _id: "device-a", hikDevIndex: "dev" }, employee: { cardNumber: "123" }, fingerprint: { fingerData: "data" } };
-    const runQuery = vi.fn().mockResolvedValueOnce([candidate]).mockRejectedValueOnce(new Error("Kapalı"));
-    const runMutation = vi.fn();
-    const result = await handler<ActionCtx>(processHikQueue)({ runQuery, runMutation } as unknown as ActionCtx, {});
+    const runQuery = vi.fn().mockRejectedValueOnce(new Error("Kapalı"));
+    const runMutation = vi.fn().mockResolvedValueOnce([candidate]);
+    const runAction = vi.fn();
+    const result = await handler<ActionCtx>(processHikQueue)({ runQuery, runMutation, runAction } as unknown as ActionCtx, {});
     expect(result).toEqual({ retried: 1, ok: 0, failed: 1 });
-    expect(getFunctionName(runQuery.mock.calls[1][0])).toBe("hikvisionSync:assertBiometricSyncAllowed");
-    expect(runQuery.mock.calls[1][1]).toEqual({ employeeId: "employee-a", deviceId: "device-a" });
+    expect(getFunctionName(runMutation.mock.calls[0][0])).toBe("hikvisionSync:listRetryCandidates");
+    expect(getFunctionName(runQuery.mock.calls[0][0])).toBe("hikvisionSync:assertBiometricSyncAllowed");
+    expect(runQuery.mock.calls[0][1]).toEqual({ employeeId: "employee-a", deviceId: "device-a" });
+    expect(runAction).not.toHaveBeenCalled();
     expect(mocks.fingerprint).not.toHaveBeenCalled();
   });
   it("bridge kapalı biyometri eklemesini temizlik eşiğinde failed yapar; silme devam eder", async () => {

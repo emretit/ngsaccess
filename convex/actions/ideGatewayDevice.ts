@@ -154,6 +154,7 @@ export const syncEmployeeToIdePanels = internalAction({
     const opIds: Id<"idePendingOperations">[] = [];
     let queued = 0;
     let overflow = false;
+    let unresolvedDoor = false;
 
     for (const [deviceId, rules] of byPanel) {
       const panel = await ctx.runQuery(internal.devices.getByIdInternal, { id: deviceId });
@@ -173,6 +174,10 @@ export const syncEmployeeToIdePanels = internalAction({
           ruleId: dr.rule._id,
           deviceId,
         });
+        if (plan.segments.length > 0 && !ioIds.length) {
+          unresolvedDoor = true;
+          skipped.push(`${panel.name}: door_io_unresolved — kapı aktüatörünü düzeltin`);
+        }
         const droppedIo = outOfRangeIoIds(ioIds);
         if (droppedIo.length > 0) {
           skipped.push(`${panel.name}: spec-dışı io ${droppedIo.join(",")} atlandı (0–7 beklenir)`);
@@ -210,7 +215,7 @@ export const syncEmployeeToIdePanels = internalAction({
       opIds.push(userOpId);
       queued++;
     }
-    return { ok: !overflow, queued, skipped, opIds, ...(overflow ? { error: "IDE izin sınırı (16) aşıldı; güvenli kırpma uygulandı" } : {}) };
+    return { ok: !overflow && !unresolvedDoor, queued, skipped, opIds, ...(unresolvedDoor ? { error: "door_io_unresolved: Kapı aktüatörünü düzeltin" } : overflow ? { error: "IDE izin sınırı (16) aşıldı; güvenli kırpma uygulandı" } : {}) };
   },
 });
 
@@ -335,6 +340,7 @@ export const syncPermissionToIdePanels = internalAction({
         ruleId: args.accessRuleId,
         deviceId: device._id,
       });
+      if (plan.segments.length > 0 && !ioIds.length) errors.push(`${panel.name}: door_io_unresolved — kapı aktüatörünü düzeltin`);
       const droppedIo = outOfRangeIoIds(ioIds);
       if (droppedIo.length > 0) {
         skipped.push(`${panel.name}: spec-dışı io ${droppedIo.join(",")} atlandı (0–7 beklenir)`);
@@ -410,7 +416,8 @@ export const openIdeDoor = authedAction({
         deviceId: device._id,
         projectId: device.projectId,
         opType: "openDoor",
-        payload: { ioId: door.ioId, keep },
+        payload: { ioId: door.ioId, keep, expiresAt: Date.now() + 30_000 },
+        maxAttempts: 1,
       });
       return { ok: true, queued: true };
     });

@@ -192,22 +192,22 @@ describe("assignCards", () => {
     await expect(f.actor.mutation(api.employeeImport.assignCards, { assignments: [{ employeeId, cardNumber: "NEW" }] })).rejects.toThrow("yetkiniz yok");
     expect((await f.snapshot()).audit).toEqual([]);
   });
-  it("rejects more than 200 assignments before any writes", async () => {
+  it("rejects more than 100 assignments before any writes", async () => {
     const f = await fixture(); const employeeId = await f.employee();
-    await expect(f.actor.mutation(api.employeeImport.assignCards, { assignments: Array.from({ length: 201 }, () => ({ employeeId, cardNumber: "NEW" })) })).rejects.toThrow("en fazla 200");
+    await expect(f.actor.mutation(api.employeeImport.assignCards, { assignments: Array.from({ length: 101 }, () => ({ employeeId, cardNumber: "NEW" })) })).rejects.toThrow("en fazla 100");
     expect((await f.t.run(ctx => ctx.db.get(employeeId)))?.cardNumber).toBe("EXISTING");
     expect((await f.snapshot()).audit).toEqual([]);
   });
-  it("accepts exactly 200 assignments and writes one summary", async () => {
+  it("accepts exactly 100 assignments and writes one summary", async () => {
     const f = await fixture();
     const assignments = [];
-    for (let i = 0; i < 200; i++) assignments.push({ employeeId: await f.employee(f.projectId, { email: `employee${i}@example.com`, cardNumber: `OLD-${i}` }), cardNumber: `NEW-${i}` });
+    for (let i = 0; i < 100; i++) assignments.push({ employeeId: await f.employee(f.projectId, { email: `employee${i}@example.com`, cardNumber: `OLD-${i}` }), cardNumber: `NEW-${i}` });
     const results = await f.actor.mutation(api.employeeImport.assignCards, { assignments });
-    expect(results).toHaveLength(200);
+    expect(results).toHaveLength(100);
     expect(results.every(result => result.status === "assigned")).toBe(true);
     const state = await f.snapshot();
     expect(state.audit).toHaveLength(1);
-    expect(state.audit[0]?.newValue).toEqual({ assigned: 200, errors: 0 });
+    expect(state.audit[0]?.newValue).toEqual({ assigned: 100, errors: 0 });
   });
   it("finds a conflicting card after 20 other-project matches", async () => {
     const f = await fixture(); const employeeId = await f.employee();

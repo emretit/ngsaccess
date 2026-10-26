@@ -106,6 +106,7 @@ it("expiry cron includes legacy TR and UTC records at the same instant without e
       const bounds = { eq: () => bounds, lte: (_field: string, value: string) => { upperBound = value; return bounds; } };
       const chain = { withIndex: (_index: string, apply: (q: typeof bounds) => unknown) => { apply(bounds); return chain; },
         collect: async () => [],
+        take: async () => [],
         paginate: async () => ({ page: table === "employees" ? rows.filter(row => row.accessExpiresAt <= upperBound) : [], isDone: true, continueCursor: "done" }),
       };
       return chain;

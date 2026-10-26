@@ -21,6 +21,7 @@ import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeEmployeePassword } from "./lib/employeeAuth";
 import { visitorSensitiveFields } from "./lib/visitorStatus";
+import { cardConflictMessage, findDuplicateCard } from "./lib/cardIdentity";
 
 function assertEmployeeRecord(emp: Doc<"employees">) {
   if (emp.isVisitor === true) throw new ConvexError({
@@ -46,10 +47,11 @@ export async function findDuplicateEmployee(
   value: string,
   excludeId?: Id<"employees">
 ): Promise<Doc<"employees"> | null> {
+  if (field === "cardNumber") return findDuplicateCard(ctx, value, excludeId);
   const indexName =
-    field === "cardNumber" ? "by_card" : field === "email" ? "by_email" : "by_tc";
+    field === "email" ? "by_email" : "by_tc";
   const fieldName =
-    field === "cardNumber" ? "cardNumber" : field === "email" ? "email" : "tcNo";
+    field === "email" ? "email" : "tcNo";
 
   const existing = await ctx.db
     .query("employees")
@@ -224,7 +226,7 @@ export const create = authedMutation({
       const value = args[field];
       if (!value) continue;
       const dup = await findDuplicateEmployee(ctx, field, value);
-      if (dup) throw new Error(DUPLICATE_MESSAGES[field]);
+      if (dup) throw new Error(field === "cardNumber" ? cardConflictMessage(value, dup, DUPLICATE_MESSAGES[field]) : DUPLICATE_MESSAGES[field]);
     }
 
     if (args.photoUrl && !args.photoStorageId) throw new Error("Fotoğrafı yeniden yükleyin");
@@ -326,7 +328,7 @@ export const update = authedMutation({
       const newValue = updates[field];
       if (newValue != null && newValue !== emp[field]) {
         const dup = await findDuplicateEmployee(ctx, field, newValue, employeeId);
-        if (dup) throw new Error(DUPLICATE_MESSAGES[field]);
+        if (dup) throw new Error(field === "cardNumber" ? cardConflictMessage(newValue, dup, DUPLICATE_MESSAGES[field]) : DUPLICATE_MESSAGES[field]);
       }
     }
 

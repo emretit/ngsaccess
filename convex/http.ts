@@ -399,11 +399,11 @@ http.route({
     if (unauth) return unauth;
     const { opId, msxId } = (await request.json()) as { opId?: string; msxId?: number };
     if (!opId || typeof msxId !== "number") return jsonResponse({ ok: false, error: "opId+msxId gerekli" }, 400);
-    await ctx.runMutation(internal.ideSync.markSent, {
+    const accepted = await ctx.runMutation(internal.ideSync.markSent, {
       opId: opId as Id<"idePendingOperations">,
       msxId,
     });
-    return jsonResponse({ ok: true });
+    return accepted ? jsonResponse({ ok: true }) : jsonResponse({ ok: false, error: "Komut teslim edilemez" }, 409);
   }),
 });
 

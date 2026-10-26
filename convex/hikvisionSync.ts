@@ -787,43 +787,56 @@ export const dismissSyncIssue = authedMutation({
  * device.hikLastSeenAt son N ms içinde güncellenmiş, ihtiyaç duyulan ilişkili
  * kayıtlar (employee/accessRule/fingerprint) ile birlikte denormalize.
  */
-export const listRetryCandidates = internalQuery({
+export const listRetryCandidates = internalMutation({
   args: {
     limit: v.number(),
     maxAttempts: v.number(),
     onlineWindowMs: v.number(),
+    issueId: v.optional(v.id("hikPendingOperations")),
   },
   handler: async (ctx, args) => {
-    const failed = await ctx.db
-      .query("hikPendingOperations")
-      .withIndex("by_status_created", (q) => q.eq("status", "failed"))
-      .order("desc")
-      .take(args.limit * 3);
-
     const now = Date.now();
+    const limit = Math.min(100, Math.max(1, Math.floor(args.limit)));
+    // One bounded page per transaction. Ineligible entries are moved out of the
+    // due window, so even a backlog larger than this page progresses each tick.
+    const selected = args.issueId ? await ctx.db.get(args.issueId) : null;
+    const failed = args.issueId ? (selected ? [selected] : []) : (await ctx.db
+      .query("hikPendingOperations")
+      .withIndex("by_status_nextRetry", (q) => q.eq("status", "failed").lte("nextRetryAt", now))
+      .order("asc")
+      .paginate({ numItems: 200, cursor: null })).page;
+
     const onlineCutoff = now - args.onlineWindowMs;
 
     const enriched = await Promise.all(
-      failed
-        .filter((f) => f.attemptCount < args.maxAttempts && mobileOperationId(f.payload) === undefined && (!(f.operation === "deletePerson" || f.operation === "deleteCard") || f.dismissedAt === undefined))
-        .slice(0, args.limit * 2)
-        .map(async (f) => {
-          const device = await ctx.db.get(f.deviceId);
-          if (!device || device.brand !== "hikvision" || device.hikTransport === "localBridge" || ((f.operation === "deletePerson" || f.operation === "deleteCard") && device.projectId !== f.projectId) || !device.hikDevIndex) {
+      failed.map(async (f) => {
+          if (f.status !== "failed" || (f.nextRetryAt ?? 0) > now) return null;
+          if (f.attemptCount >= args.maxAttempts || mobileOperationId(f.payload) !== undefined || f.dismissedAt !== undefined) {
+            await ctx.db.patch(f._id, { nextRetryAt: Number.MAX_SAFE_INTEGER });
             return null;
           }
-          if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, device.projectId))) return null;
+          // Terminal eligibility failures stay visible; enqueue/manual retry reopens them.
+          // Dismissed jobs intentionally leave automatic retry, regardless of operation.
+          const defer = async (permanent = false) => {
+            await ctx.db.patch(f._id, { nextRetryAt: permanent ? Number.MAX_SAFE_INTEGER : now + 3 * 60 * 1000 });
+            return null;
+          };
+          const device = await ctx.db.get(f.deviceId);
+          if (!device || device.brand !== "hikvision" || device.hikTransport === "localBridge" || ((f.operation === "deletePerson" || f.operation === "deleteCard") && device.projectId !== f.projectId) || !device.hikDevIndex) {
+            return await defer(true);
+          }
+          if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, device.projectId))) return await defer(true);
           // Online değil → bu tick'te atla, bir sonraki tick'te kontrol edilecek.
           // Gateway cihazında hikLastSeenAt yalnız bağlanma anında yazılır; taze ISUP durumu esas alınır.
           const online = hasFreshIsupStatus(device, now)
             ? device.hikIsupOnline === true
             : device.hikLastSeenAt !== undefined && device.hikLastSeenAt >= onlineCutoff;
-          if (!online) return null;
+          if (!online) return await defer();
 
           const payload = (f.payload ?? {}) as Record<string, unknown>;
           const employeeId = payload.employeeId as Id<"employees"> | undefined;
           const employee = employeeId ? await ctx.db.get(employeeId) : null;
-          if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, employee?.projectId))) return null;
+          if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, employee?.projectId))) return await defer(true);
 
           let accessRule: (Doc<"accessRules"> & { scheduleTemplate: ScheduleTemplate | null }) | null = null;
           const accessRuleId = payload.accessRuleId as Id<"accessRules"> | undefined;
@@ -861,7 +874,9 @@ export const listRetryCandidates = internalQuery({
 
     return enriched
       .filter((e): e is NonNullable<typeof e> => e !== null)
-      .slice(0, args.limit);
+      // Keep due order within each class, with access revocations first.
+      .sort((a, b) => Number(["deletePerson", "deleteCard"].includes(b.operation)) - Number(["deletePerson", "deleteCard"].includes(a.operation)))
+      .slice(0, limit);
   },
 });
 
@@ -1083,9 +1098,9 @@ export const retrySyncIssue = authedMutation({
       await supersedeDeletion(ctx, op._id);
       return { queued: false };
     }
-    if (device?.brand === "hikvision" && device.hikTransport !== "localBridge" && op.operation === "deletePerson") {
-      await ctx.db.patch(op._id, { status: "failed", attemptCount: 0, dismissedAt: undefined, dismissedBy: undefined });
-      await ctx.scheduler.runAfter(0, internal.actions.hikQueueWorker.processHikQueue, {});
+    if (device?.brand === "hikvision" && device.hikTransport !== "localBridge") {
+      await ctx.db.patch(op._id, { status: "failed", nextRetryAt: Date.now(), attemptCount: 0, dismissedAt: undefined, dismissedBy: undefined });
+      await ctx.scheduler.runAfter(0, internal.actions.hikQueueWorker.processHikOperation, { issueId: op._id });
       return { queued: true };
     }
     if (!device || device.brand !== "hikvision" || device.hikTransport !== "localBridge") throw new Error("Bu cihaz için tek işlem yeniden denemesi desteklenmiyor; cihaz sayfasını kullanın");

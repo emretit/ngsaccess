@@ -1,4 +1,131 @@
+import { mkdirSync, readFileSync, writeFileSync, renameSync, appendFileSync, openSync, fsyncSync, closeSync } from "node:fs";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { responseUuid, matchesResponse, boundEvent } from "./ide-mqtt-policy.mjs";
+
+const retryDelay = attempts => Math.min(60_000, 1000 * 2 ** Math.min(Math.max(0, attempts - 1), 6));
+
+/** A bounded, durable FIFO. Persist before HTTP so process restarts also replay lost responses. */
+export function createEventSpool({
+  directory = process.env.IDE_BRIDGE_SPOOL_DIR || "./ide-bridge-spool",
+  convexPost, log = () => {}, now = Date.now, maxEntries = 10_000,
+}) {
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const path = join(directory, "events.jsonl");
+  let rows = [];
+  let draining = false;
+  const syncFile = file => {
+    const fd = openSync(file, "r");
+    try { fsyncSync(fd); } finally { closeSync(fd); }
+  };
+  const persist = (nextRows) => {
+    const temporary = `${path}.tmp`;
+    writeFileSync(temporary, nextRows.map(row => JSON.stringify(row) + "\n").join(""), { mode: 0o600 });
+    syncFile(temporary);
+    renameSync(temporary, path);
+    syncFile(directory);
+  };
+  const archive = (suffix, contents) => {
+    const file = `${path}.${suffix}`;
+    appendFileSync(file, contents + "\n", { mode: 0o600 });
+    syncFile(file);
+    syncFile(directory);
+  };
+  let contents = "";
+  try { contents = readFileSync(path, "utf8"); } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  const corrupt = [];
+  for (const line of contents.split("\n").filter(Boolean)) {
+    try {
+      const row = JSON.parse(line);
+      if (typeof row?.id !== "string" || typeof row?.body?.topic !== "string" || typeof row?.body?.body !== "string" || !Number.isFinite(row.nextRetryAt) || !Number.isFinite(row.attempts)) {
+        throw new Error("Invalid event spool record");
+      }
+      rows.push(row);
+    } catch { corrupt.push(line); }
+  }
+  if (corrupt.length) {
+    archive("corrupt", corrupt.join("\n"));
+    persist(rows);
+    log(`WARNING: IDE event spool quarantined ${corrupt.length} corrupt record(s) in ${path}.corrupt; inspect the file`);
+  } else if (contents && !contents.endsWith("\n")) {
+    // Keep a valid last record separate from the next append after an interrupted write.
+    persist(rows);
+  }
+  if (rows.length >= maxEntries) log(`WARNING: IDE event spool limit reached (${rows.length}/${maxEntries})`);
+  async function drain() {
+    if (draining) return;
+    draining = true;
+    try {
+      for (let count = 0; count < 100; count++) {
+        const row = rows[0];
+        if (!row || row.nextRetryAt > now()) return;
+        const result = await convexPost("/ide-bridge/event", row.body).catch(() => ({ ok: false }));
+        const attempts = row.attempts + 1;
+        const rejected = !result.ok && result.status >= 400 && result.status < 500 && ![408, 429].includes(result.status);
+        if (rejected) archive("rejected", JSON.stringify({ ...row, attempts, status: result.status }));
+        const nextRows = result.ok || rejected ? rows.slice(1)
+          : [{ ...row, attempts, nextRetryAt: now() + retryDelay(attempts) }, ...rows.slice(1)];
+        persist(nextRows);
+        rows = nextRows;
+        if (rejected) log(`WARNING: IDE event HTTP ${result.status}; moved to ${path}.rejected; inspect the file`);
+        else if (!result.ok) {
+          log(`event forward FAIL; retained in spool (${rows.length})`);
+          return;
+        }
+      }
+    } finally { draining = false; }
+  }
+  return {
+    size: () => rows.length,
+    drain,
+    async forward(body) {
+      if (rows.length >= maxEntries) {
+        log(`WARNING: IDE event spool FULL (${maxEntries}); incoming event rejected`);
+        return false;
+      }
+      const row = { id: randomUUID(), body, attempts: 0, nextRetryAt: now() };
+      appendFileSync(path, JSON.stringify(row) + "\n", { mode: 0o600 });
+      syncFile(path);
+      syncFile(directory);
+      rows.push(row);
+      await drain();
+      return true;
+    },
+  };
+}
+
+/** Retain the correlation entry until Convex confirms the exact same ACK body. */
+export async function deliverAck(msxId, body, { pending, convexPost, log = () => {}, now = Date.now }) {
+  const entry = pending.get(msxId);
+  if (!entry) return;
+  if (!entry.ackBody) {
+    clearTimeout(entry.timer);
+    entry.ackBody = body;
+  }
+  if (entry.ackInFlight || (entry.ackNextRetryAt ?? 0) > now()) return;
+  entry.ackInFlight = true;
+  try {
+    const response = await convexPost("/ide-bridge/ack", entry.ackBody).catch(() => ({ ok: false }));
+    if (response.ok) pending.delete(msxId);
+    else {
+      entry.ackAttempts = (entry.ackAttempts ?? 0) + 1;
+      entry.ackNextRetryAt = now() + retryDelay(entry.ackAttempts);
+    }
+    log(`ack opId=${entry.opId} result=${entry.ackBody.result} → convex ${response.ok ? "OK" : "FAIL (retained)"}`);
+  } finally { entry.ackInFlight = false; }
+}
+
+export async function retryPendingAcks(deps) {
+  for (const [msxId, entry] of deps.pending) {
+    if (entry.ackBody) await deliverAck(msxId, entry.ackBody, deps);
+  }
+}
+
+export function commandExpired(op, now = Date.now()) {
+  return op.opType === "openDoor" && typeof op.expiresAt === "number" && op.expiresAt <= now;
+}
 
 // Forward diagnostic meaning without forwarding panel credentials or card identities.
 function maskedPanelText(value) {
@@ -27,7 +154,7 @@ function panelRejection(payload) {
 
 /** Incoming bridge boundary. Dependencies are explicit so provenance has offline regressions. */
 export async function routeMqttMessage(topic, buf, {
-  pending, loginWaiters, tokenCache, convexPost,
+  pending, loginWaiters, tokenCache, convexPost, eventSpool, now = Date.now,
   legacyEvents = false, log = () => {}, dbg = () => {},
 }) {
   const raw = buf.toString("utf8");
@@ -68,9 +195,7 @@ export async function routeMqttMessage(topic, buf, {
         log(`ack DROP: msx=${msxId} topic uuid=${topicUuid} beklenen=${entry.deviceUuid} (sahte response?)`);
         return;
       }
-      const { opId, timer } = entry;
-      clearTimeout(timer);
-      pending.delete(msxId);
+      const { opId } = entry;
       // Auth/token hatası → token cache'i temizle ki bir sonraki retry yeniden login yapsın.
       if (result !== "success" && /level|token|forbidden|unauthor/i.test(String(message))) {
         tokenCache.delete(entry.deviceUuid);
@@ -82,8 +207,7 @@ export async function routeMqttMessage(topic, buf, {
         result: result === "success" ? "success" : "fail",
         ...(result === "success" ? { message: "panel accepted command" } : panelRejection(parsed?.payload)),
       };
-      const r = await convexPost("/ide-bridge/ack", ackBody).catch((e) => ({ ok: false, text: e.message }));
-      log(`ack opId=${opId} result=${ackBody.result} → convex ${r.ok ? "OK" : "FAIL"}`);
+      await deliverAck(msxId, ackBody, { pending, convexPost, log, now });
     }
     return;
   }
@@ -96,6 +220,10 @@ export async function routeMqttMessage(topic, buf, {
   if (type === "event/heartbeat") dbg(`heartbeat ${parsed?.transaction?.["src-id"]}`);
   else log(`event ${topic} type=${type}`);
 
+  if (eventSpool) {
+    await eventSpool.forward({ topic: event.topic, body: raw });
+    return;
+  }
   const r = await convexPost("/ide-bridge/event", { topic: event.topic, body: raw }).catch((e) => ({ ok: false, text: e.message }));
   if (!r.ok) log(`event forward FAIL topic=${topic}: ${r.status}`);
 }

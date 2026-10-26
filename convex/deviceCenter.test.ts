@@ -49,7 +49,7 @@ async function fixture(role: "project_user" | "project_admin" | "super_admin" = 
     ...(enqueueFails ? { "./ideSync.ts": async () => ({
       ...await import("./ideSync"),
       enqueueIdeOp: internalMutation({
-        args: { deviceId: v.id("devices"), projectId: v.optional(v.id("projects")), opType: v.literal("openDoor"), payload: v.object({ ioId: v.number(), keep: v.number() }) },
+        args: { deviceId: v.id("devices"), projectId: v.optional(v.id("projects")), opType: v.literal("openDoor"), payload: v.object({ ioId: v.number(), keep: v.number(), expiresAt: v.number() }), maxAttempts: v.optional(v.number()) },
         handler: async () => { throw new Error("Asıl kuyruk istisnası 123456789"); },
       }),
     }) } : {}),

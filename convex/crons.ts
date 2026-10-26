@@ -52,14 +52,12 @@ crons.daily(
 // op'ları geri "pending"e al veya maxAttempts dolduysa "failed" yap. Bridge'in kendi
 // timeout'unu (CMD_ACK_TIMEOUT_MS) kaçırdığı durumlar için güvenlik ağı.
 //
-// GEÇİCİ DEVRE DIŞI (2026-06-20, function-call kotası tasarrufu): IDE daemon durdurulduğu
-// sürece bekleyen IDE op'u oluşmaz → bu cron boş iş yapar. Daemon geri açıldığında bu
-// bloğun yorumunu kaldır.
-// crons.interval(
-//   "requeue-ide-timeouts",
-//   { minutes: 3 },
-//   internal.ideSync.requeueTimedOut,
-// );
+// 10 dakikada bir: yaklaşık 4.320 çağrı/30 gün; boş kuyrukta tek indeks sorgusu.
+crons.interval(
+  "requeue-ide-timeouts",
+  { minutes: 10 },
+  internal.ideSync.requeueTimedOut,
+);
 
 // Ziyaretçi geçici erişimi: süresi dolan (accessExpiresAt<=now) aktif ziyaretçileri pasife çek
 // → mevcut isActive=false desync yolu cihazdan söker.

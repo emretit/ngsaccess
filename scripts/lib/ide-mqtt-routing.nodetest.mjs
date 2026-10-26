@@ -1,6 +1,9 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { routeMqttMessage } from "./ide-mqtt-routing.mjs";
+import { routeMqttMessage, createEventSpool, retryPendingAcks, deliverAck, commandExpired } from "./ide-mqtt-routing.mjs";
 function fixture() {
   const requests = [];
   return { requests, pending: new Map(), loginWaiters: new Map(), tokenCache: new Map(),
@@ -68,4 +71,187 @@ test("explicit panel code takes priority over contradictory diagnostic text", as
   await routeMqttMessage("device/publish/9001", Buffer.from(JSON.stringify({ transaction: { "src-id": 9001, "msx-id": 42 },
     payload: { result: "fail", code: "not_found", message: "already exists in previous command" } })), f);
   assert.equal(f.requests[0]?.body.errorCode, "not_found");
+});
+
+
+test("failed card POST survives restart in JSONL and succeeds once backoff elapses", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  let time = 1000;
+  const f = fixture();
+  f.convexPost = async (path, body) => { f.requests.push({ path, body }); throw new Error("offline"); };
+  f.eventSpool = createEventSpool({ directory, convexPost: f.convexPost, now: () => time });
+  await routeMqttMessage("event/9001/access/online", message(9001), f);
+  assert.equal(f.eventSpool.size(), 1);
+  const disk = readFileSync(join(directory, "events.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+  assert.equal(disk.length, 1);
+  assert.equal(disk[0].body.topic, "event/access/online");
+  assert.equal(disk[0].attempts, 1);
+  const delivered = [];
+  const restarted = createEventSpool({ directory, now: () => time,
+    convexPost: async (path, body) => { delivered.push({ path, body }); return { ok: true }; } });
+  await restarted.drain();
+  assert.equal(delivered.length, 0);
+  time += 1000;
+  await restarted.drain();
+  assert.deepEqual(delivered, [f.requests[0]]);
+  assert.equal(restarted.size(), 0);
+  assert.equal(readFileSync(join(directory, "events.jsonl"), "utf8"), "");
+});
+
+test("event spool retains FIFO, bounds size and warns instead of growing indefinitely", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const logs = [];
+  let time = 0;
+  const spool = createEventSpool({ directory, maxEntries: 2, now: () => time,
+    log: value => logs.push(value), convexPost: async () => ({ ok: false }) });
+  await spool.forward({ topic: "event/access/online", body: "one" });
+  await spool.forward({ topic: "event/access/online", body: "two" });
+  assert.equal(await spool.forward({ topic: "event/access/online", body: "three" }), false);
+  assert.equal(spool.size(), 2);
+  assert.ok(logs.some(line => line.includes("FULL")));
+  time = 1000;
+  await spool.drain();
+  const disk = readFileSync(join(directory, "events.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+  assert.equal(disk[0].attempts, 2);
+  assert.equal(disk[0].nextRetryAt, 3000);
+  assert.deepEqual(disk.map(row => row.body.body), ["one", "two"]);
+});
+
+test("ACK HTTP failure retains pending, retries identical payload with exponential backoff", async () => {
+  const f = fixture();
+  let time = 0, ok = false;
+  f.now = () => time;
+  f.convexPost = async (path, body) => { f.requests.push({ path, body }); return { ok }; };
+  f.pending.set(42, { opId: "operation-a", deviceUuid: "9001" });
+  await routeMqttMessage("device/publish/9001", message(9001), f);
+  assert.equal(f.pending.has(42), true);
+  await retryPendingAcks(f);
+  assert.equal(f.requests.length, 1);
+  time = 1000;
+  await retryPendingAcks(f);
+  assert.equal(f.requests.length, 2);
+  assert.equal(f.pending.get(42).ackNextRetryAt, 3000);
+  ok = true;
+  time = 3000;
+  await retryPendingAcks(f);
+  assert.equal(f.pending.has(42), false);
+  assert.deepEqual(f.requests, Array(3).fill(f.requests[0]));
+});
+
+test("timeout/login_failed ACKs also stay pending on HTTP errors and do not change on duplicate responses", async () => {
+  for (const errorCode of ["login_failed", "ack_timeout"]) {
+    const f = fixture();
+    let time = 0;
+    f.now = () => time;
+    f.pending.set(42, { opId: "operation-a", deviceUuid: "9001" });
+    f.convexPost = async (path, body) => { f.requests.push({ path, body }); if (!time) throw new Error("offline"); return { ok: true }; };
+    const ack = { opId: "operation-a", msxId: 42, result: "fail", errorCode };
+    await deliverAck(42, ack, f);
+    await routeMqttMessage("device/publish/9001", message(9001), f);
+    assert.equal(f.pending.has(42), true);
+    time = 1000;
+    await retryPendingAcks(f);
+    assert.equal(f.pending.has(42), false);
+    assert.deepEqual(f.requests.map(row => row.body), [ack, ack]);
+  }
+});
+
+test("bridge blocks expired door commands at the delivery boundary", () => {
+  assert.equal(commandExpired({ opType: "openDoor", expiresAt: 100 }, 100), true);
+  assert.equal(commandExpired({ opType: "openDoor", expiresAt: 101 }, 100), false);
+  assert.equal(commandExpired({ opType: "triggerSync", expiresAt: 10 }, 100), false);
+});
+
+test("startup quarantines malformed, invalid and truncated rows and replays valid neighbors", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, "events.jsonl");
+  const row = id => ({ id, body: { topic: "event/access/online", body: id }, attempts: 0, nextRetryAt: 0 });
+  const corrupt = ["bad-json", "null", JSON.stringify({ id: "invalid" }), '{"id":"truncated'];
+  writeFileSync(path, [JSON.stringify(row("one")), ...corrupt.slice(0, 3), JSON.stringify(row("two")), corrupt[3]].join("\n"));
+  const delivered = [], logs = [];
+  const options = { directory, now: () => 0, log: line => logs.push(line),
+    convexPost: async (_, body) => { delivered.push(body.body); return { ok: true }; } };
+  const spool = createEventSpool(options);
+  assert.equal(spool.size(), 2);
+  assert.equal(readFileSync(`${path}.corrupt`, "utf8"), corrupt.join("\n") + "\n");
+  assert.ok(logs.some(line => line.includes("WARNING") && line.includes("4 corrupt")));
+  assert.equal(createEventSpool(options).size(), 2);
+  assert.equal(readFileSync(`${path}.corrupt`, "utf8"), corrupt.join("\n") + "\n");
+  await spool.drain();
+  assert.deepEqual(delivered, ["one", "two"]);
+});
+
+test("startup terminates a valid final JSONL row before appending another event", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, "events.jsonl");
+  writeFileSync(path, JSON.stringify({ id: "one", body: { topic: "event/access/online", body: "one" }, attempts: 0, nextRetryAt: 1000 }));
+  const options = { directory, now: () => 0, convexPost: async () => ({ ok: true }) };
+  const spool = createEventSpool(options);
+  await spool.forward({ topic: "event/access/online", body: "two" });
+  assert.equal(createEventSpool(options).size(), 2);
+  assert.equal(existsSync(`${path}.corrupt`), false);
+});
+
+test("permanent 4xx events are archived before advancing FIFO to the healthy event", async t => {
+  for (const status of [400, 401, 403, 404, 422]) {
+    const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    let time = 0;
+    const requests = [], logs = [];
+    const spool = createEventSpool({ directory, now: () => time, log: line => logs.push(line),
+      convexPost: async (_, body) => {
+        requests.push(body.body);
+        return !time ? { ok: false, status: 503 } : body.body === "bad" ? { ok: false, status } : { ok: true };
+      } });
+    await spool.forward({ topic: "event/access/online", body: "bad" });
+    await spool.forward({ topic: "event/access/online", body: "good" });
+    time = 1000;
+    await spool.drain();
+    assert.deepEqual(requests, ["bad", "bad", "good"]);
+    assert.equal(spool.size(), 0);
+    const rejected = JSON.parse(readFileSync(join(directory, "events.jsonl.rejected"), "utf8"));
+    assert.equal(rejected.status, status);
+    assert.equal(rejected.body.body, "bad");
+    assert.equal(rejected.attempts, 2);
+    assert.ok(logs.some(line => line.includes("WARNING") && line.includes(".rejected")));
+    assert.equal(readFileSync(join(directory, "events.jsonl"), "utf8"), "");
+  }
+});
+
+test("5xx, timeout, rate limiting and network failures retry the head without reordering", async t => {
+  for (const status of [500, 503, 408, 429, undefined]) {
+    const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    let time = 0, healthy = false;
+    const requests = [];
+    const spool = createEventSpool({ directory, now: () => time,
+      convexPost: async (_, body) => {
+        requests.push(body.body);
+        if (healthy) return { ok: true };
+        if (status === undefined) throw new Error("network timeout");
+        return { ok: false, status };
+      } });
+    await spool.forward({ topic: "event/access/online", body: "one" });
+    await spool.forward({ topic: "event/access/online", body: "two" });
+    time = 1000;
+    await spool.drain();
+    assert.equal(spool.size(), 2);
+    assert.deepEqual(requests, ["one", "one"]);
+    const disk = readFileSync(join(directory, "events.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    assert.deepEqual(disk.map(row => row.body.body), ["one", "two"]);
+    assert.equal(disk[0].nextRetryAt, 3000);
+    assert.equal(existsSync(join(directory, "events.jsonl.rejected")), false);
+    healthy = true;
+    time = 2999;
+    await spool.drain();
+    assert.deepEqual(requests, ["one", "one"]);
+    time = 3000;
+    await spool.drain();
+    assert.deepEqual(requests, ["one", "one", "one", "two"]);
+    assert.equal(spool.size(), 0);
+  }
 });

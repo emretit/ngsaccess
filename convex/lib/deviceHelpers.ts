@@ -6,6 +6,7 @@
  * createIdePanel, createHikDevice, claimAdminDeviceCore) ve adminDevices.ts'ten çağrılır.
  * Güvenlik-hassas sır-gate / cross-tenant pin mantığı devices.ts'te KALIR (burada değil).
  */
+import { internal } from "../_generated/api";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { isProjectAllowed } from "./auth";
@@ -61,7 +62,16 @@ export async function purgeDeviceCascade(
     .collect();
   await Promise.all(pendingOps.map((op) => ctx.db.delete(op._id)));
 
+  await purgeIdeOperationsPage(ctx, deviceId);
   await ctx.db.delete(deviceId);
+}
+
+/** Each transaction deletes at most 100 rows; continuation also works after device deletion. */
+export async function purgeIdeOperationsPage(ctx: MutationCtx, deviceId: Id<"devices">): Promise<void> {
+  const rows = await ctx.db.query("idePendingOperations")
+    .withIndex("by_device_status", q => q.eq("deviceId", deviceId)).take(100);
+  for (const row of rows) await ctx.db.delete(row._id);
+  if (rows.length === 100) await ctx.scheduler.runAfter(0, internal.ideSync.purgeDeviceOperations, { deviceId });
 }
 
 /** IDE Smart kapı varsayılan adı: tüm aktüatörler "Kapı N" (1-indeksli). */

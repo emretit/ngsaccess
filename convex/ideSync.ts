@@ -1,3 +1,4 @@
+import { purgeIdeOperationsPage } from "./lib/deviceHelpers";
 import { requirePermission, getProjectIdsWithPermission } from "./lib/permissions";
 import { grantStatusForOperation } from "./lib/grantStatus";
 import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule, type ScheduleTemplate } from "./lib/accessSchedule";
@@ -90,7 +91,7 @@ export function buildIdePermissionRecord(
     .slice(0, MAX_IO_PER_PERMISSION);
   return {
     id: idePermissionNo,
-    io: io.length > 0 ? io : [0],
+    io,
     schedule: { start, end, week_days: daysToIdeWeekDays(rule.days) },
   };
 }
@@ -193,6 +194,9 @@ async function removePanelUser(
 
 export type IdeOpType = Doc<"idePendingOperations">["opType"];
 
+// Context identity scopes this cache to one mutation, including bulk enqueue callers.
+const enqueueRuleIoCache = new WeakMap<MutationCtx, Map<string, number[]>>();
+
 /** opType'a göre op'un hedef varlığını tanımlayan idempotency parçası. */
 function targetKey(opType: IdeOpType, payload: Record<string, unknown>): string {
   switch (opType) {
@@ -253,7 +257,40 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
       throw new Error("IDE sync kuyruğuna sadece IDE Smart panel işleri yazılabilir");
     }
 
-    const payload = (args.payload ?? {}) as Record<string, unknown>;
+    let payload = (args.payload ?? {}) as Record<string, unknown>;
+    // Fail closed centrally, including template dispatch callers outside the actions.
+    let doorError = false;
+    if (args.opType === "upsertPermission") {
+      const record = payload.permissionRecord;
+      const io = record && typeof record === "object" ? (record as Record<string, unknown>).io : undefined;
+      doorError = Array.isArray(io) && !io.some(n => typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 7);
+    }
+    if (args.opType === "upsertUser" && Array.isArray(payload.ruleIds)) {
+      const user = payload.userRecord && typeof payload.userRecord === "object" ? payload.userRecord as Record<string, unknown> : undefined;
+      const permissions = user?.permissions;
+      // Disabling a user or removing every permission must remain deliverable (K=0).
+      if (user?.status !== 0 && Array.isArray(permissions) && permissions.length > 0) {
+        for (const rawRuleId of payload.ruleIds) {
+          const ruleId = typeof rawRuleId === "string" ? ctx.db.normalizeId("accessRules", rawRuleId) : null;
+          const rule = ruleId ? await ctx.db.get(ruleId) : null;
+          if (!rule || ![rule.idePermissionNo, ...(rule.ideExtraPermissionNos ?? [])].some(no => no !== undefined && permissions.includes(no))) continue;
+          let ioCache = enqueueRuleIoCache.get(ctx);
+          if (!ioCache) {
+            ioCache = new Map();
+            enqueueRuleIoCache.set(ctx, ioCache);
+          }
+          const key = `${rule._id}:${args.deviceId}`;
+          let ioIds = ioCache.get(key);
+          if (ioIds === undefined) {
+            ioIds = await ruleIoIdsForPanel(ctx, { ruleId: rule._id, deviceId: args.deviceId });
+            ioCache.set(key, ioIds);
+          }
+          if (!ioIds.length) doorError = true;
+        }
+      }
+    }
+    const lastError = doorError ? "Kapı aktüatörü çözülemedi; kuralın kapı seçimini ve ioId değerlerini düzeltin" : undefined;
+    if (doorError) payload = { ...payload, errorCode: "door_io_unresolved" };
     const idempotencyKey = `${args.deviceId}:${args.opType}:${targetKey(args.opType, payload)}${args.runId ? `:${args.runId}` : ""}`;
     const now = Date.now();
 
@@ -267,13 +304,13 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
       const open = existing.find((o) => o.status === "pending" || o.status === "sent");
       if (open) {
         await ctx.db.patch(open._id, {
-          payload: args.payload,
-          status: "pending",
+          payload,
+          status: doorError ? "failed" : "pending",
           msxId: undefined,
           nextRetryAt: now,
-          lastError: undefined,
+          lastError,
         });
-        if (args.opType === "upsertUser" || args.opType === "deleteUser") await grantStatusForOperation(ctx, { ...args, _id: open._id }, "pending");
+        if (args.opType === "upsertUser" || args.opType === "deleteUser") await grantStatusForOperation(ctx, { ...args, payload, _id: open._id }, doorError ? "failed" : "pending", lastError);
         return open._id;
       }
     }
@@ -283,22 +320,43 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
       deviceId: args.deviceId,
       runId: args.runId,
       opType: args.opType,
-      payload: args.payload,
-      status: "pending",
+      payload,
+      status: doorError ? "failed" : "pending",
+      lastError,
       idempotencyKey,
       attempts: 0,
       maxAttempts: args.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       nextRetryAt: now,
       createdAt: now,
     });
-    if (args.opType === "upsertUser" || args.opType === "deleteUser") await grantStatusForOperation(ctx, { ...args, _id: opId }, "pending");
+    if (args.opType === "upsertUser" || args.opType === "deleteUser") await grantStatusForOperation(ctx, { ...args, payload, _id: opId }, doorError ? "failed" : "pending", lastError);
     return opId;
+}
+
+export const purgeDeviceOperations = internalMutation({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args) => { await purgeIdeOperationsPage(ctx, args.deviceId); },
+});
+
+function doorCommandExpired(op: Doc<"idePendingOperations">, now = Date.now()): boolean {
+  if (op.opType !== "openDoor") return false;
+  const payload: unknown = op.payload;
+  const expiresAt = payload && typeof payload === "object" ? (payload as Record<string, unknown>).expiresAt : undefined;
+  return (typeof expiresAt === "number" ? expiresAt : op.createdAt + 30_000) <= now;
+}
+
+async function undeliverableReason(ctx: QueryCtx, op: Doc<"idePendingOperations">): Promise<string | undefined> {
+  const device = await ctx.db.get(op.deviceId);
+  if (!device || device.brand !== "ide_smart" || !device.ideUuid) return "Cihaz bulunamadı";
+  if (doorCommandExpired(op)) return "Komut süresi doldu";
+  if (!(await mobileQueueAllowed(ctx, op))) return "MOBILE_COMMAND_NOT_DELIVERABLE";
+  return undefined;
 }
 
 /** Bridge'in çekeceği pending op'lar (nextRetryAt geçmiş). materialize edilmiş alanlarla. */
 async function pendingForBridge(ctx: QueryCtx, max?: number) {
     const now = Date.now();
-    const limit = Math.min(max ?? 10, 50);
+    const limit = Math.max(1, Math.min(Math.floor(max ?? 10), 50));
     const candidates = await ctx.db
       .query("idePendingOperations")
       .withIndex("by_status_nextRetry", (q) =>
@@ -308,7 +366,7 @@ async function pendingForBridge(ctx: QueryCtx, max?: number) {
 
     const ops = [];
     for (const op of candidates) {
-      if (!(await mobileQueueAllowed(ctx, op))) continue;
+      if (await undeliverableReason(ctx, op)) continue;
       const device = await ctx.db.get(op.deviceId);
       if (!device || device.brand !== "ide_smart" || !device.ideUuid) continue;
       const payload = (op.payload ?? {}) as Record<string, unknown>;
@@ -324,6 +382,7 @@ async function pendingForBridge(ctx: QueryCtx, max?: number) {
           ? { ideUser: device.ideUser, idePassword: device.idePassword }
           : {}),
         ...payload,
+        ...(op.opType === "openDoor" ? { expiresAt: typeof payload.expiresAt === "number" ? payload.expiresAt : op.createdAt + 30_000 } : {}),
       });
     }
     return { ops };
@@ -341,16 +400,18 @@ export const pollForBridge = internalMutation({
     const candidates = await ctx.db.query("idePendingOperations")
       .withIndex("by_status_nextRetry", q => q.eq("status", "pending").lte("nextRetryAt", Date.now())).take(50);
     for (const op of candidates) {
-      if (mobileOperationId(op.payload) !== undefined && !(await mobileQueueAllowed(ctx, op))) {
-        await ctx.db.patch(op._id, { status: "failed", lastError: "MOBILE_COMMAND_NOT_DELIVERABLE" });
+      const reason = await undeliverableReason(ctx, op);
+      if (reason) {
+        await ctx.db.patch(op._id, { status: "failed", lastError: reason });
+        await grantStatusForOperation(ctx, op, "failed", reason);
       }
     }
     const result = await pendingForBridge(ctx, args.max);
-    // Reserve mobile commands before returning them. Lost poll responses remain
+    // Reserve one-shot door commands before returning them. Lost poll responses remain
     // uncertain and cannot make a second bridge publish the same operation.
     for (const op of result.ops) {
-      if (mobileOperationId(op) !== undefined) {
-        await ctx.db.patch(op.opId, { status: "sent", sentAt: Date.now(), attempts: 1 });
+      if (op.opType === "openDoor" || mobileOperationId(op) !== undefined) {
+        await ctx.db.patch(op.opId, { status: "sent", sentAt: Date.now(), nextRetryAt: Date.now() + DEFAULT_ACK_TIMEOUT_MS, attempts: 1 });
       }
     }
     return result;
@@ -360,20 +421,26 @@ export const pollForBridge = internalMutation({
 /** Bridge "sent" bildirdi: msxId yaz, ack bekle. */
 export const markSent = internalMutation({
   args: { opId: v.id("idePendingOperations"), msxId: v.number() },
-  handler: async (ctx, args): Promise<void> => {
+  handler: async (ctx, args): Promise<boolean> => {
     const op = await ctx.db.get(args.opId);
     const mobile = op && mobileOperationId(op.payload) !== undefined;
-    const reserved = mobile && op.status === "sent" && op.msxId === undefined;
+    const reserved = op && (mobile || op.opType === "openDoor") && op.status === "sent" && op.msxId === undefined;
     if (mobile && (!Number.isSafeInteger(args.msxId) || (op.status !== "pending" && !reserved) || !(await mobileQueueAllowed(ctx, op)))) {
       throw accessError("MOBILE_COMMAND_NOT_DELIVERABLE");
     }
-    if (!op || (op.status !== "pending" && !reserved)) return;
+    if (!op || (op.status !== "pending" && !reserved)) return false;
+    if (doorCommandExpired(op)) {
+      await ctx.db.patch(op._id, { status: "failed", lastError: "Komut süresi doldu" });
+      return false;
+    }
     await ctx.db.patch(args.opId, {
       status: "sent",
       msxId: args.msxId,
       sentAt: Date.now(),
+      nextRetryAt: Date.now() + DEFAULT_ACK_TIMEOUT_MS,
       attempts: reserved ? op.attempts : op.attempts + 1,
     });
+    return true;
   },
 });
 
@@ -500,7 +567,7 @@ export const markAck = internalMutation({
     }
     if (op.opType === "upsertUser" || op.opType === "deleteUser") await grantStatusForOperation(ctx, op, "failed", args.message ?? args.result);
     // fail / timeout → retry veya terminal failed
-    const maxAttempts = mobileOperationId(op.payload) !== undefined ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+    const maxAttempts = (op.opType === "openDoor" || mobileOperationId(op.payload) !== undefined) ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     if (op.attempts >= maxAttempts) {
       await ctx.db.patch(args.opId, {
         status: "failed",
@@ -525,16 +592,17 @@ export const requeueTimedOut = internalMutation({
   args: {},
   handler: async (ctx): Promise<number> => {
     const now = Date.now();
-    // "sent" op'larda nextRetryAt set olmaz → by_status_nextRetry'da status eşitliğiyle tara.
+    // sent için nextRetryAt ACK son tarihidir; eski undefined kayıtlar da indekse dahildir.
     const stuck = await ctx.db
       .query("idePendingOperations")
-      .withIndex("by_status_nextRetry", (q) => q.eq("status", "sent"))
-      .collect();
+      .withIndex("by_status_nextRetry", (q) => q.eq("status", "sent").lte("nextRetryAt", now))
+      .take(100);
     let n = 0;
     for (const op of stuck) {
       const timeout = DEFAULT_ACK_TIMEOUT_MS;
-      if (op.sentAt && op.sentAt + timeout < now) {
-        const maxAttempts = mobileOperationId(op.payload) !== undefined ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+      const deadline = (op.sentAt ?? op.createdAt) + timeout;
+      if (deadline <= now) {
+        const maxAttempts = (op.opType === "openDoor" || mobileOperationId(op.payload) !== undefined) ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
         if (op.attempts >= maxAttempts) {
           await ctx.db.patch(op._id, { status: "failed", lastError: "ack timeout (cron)" });
           if (op.opType === "upsertUser" || op.opType === "deleteUser") await grantStatusForOperation(ctx, op, "failed", "ack timeout (cron)");
@@ -547,6 +615,8 @@ export const requeueTimedOut = internalMutation({
           });
         }
         n++;
+      } else if (op.nextRetryAt !== deadline) {
+        await ctx.db.patch(op._id, { nextRetryAt: deadline });
       }
     }
     return n;
@@ -642,12 +712,14 @@ export async function ruleIoIdsForPanel(ctx: QueryCtx, args: { ruleId: Id<"acces
       .take(201);
     boundedScheduleRows(groupDoors, 200);
     const ioIds = new Set<number>();
+    let explicitSelection = false;
     for (const gd of groupDoors) {
       const door = await ctx.db.get(gd.doorId);
+      if (gd.deviceId === args.deviceId || door?.deviceId === args.deviceId || (!door && !gd.deviceId)) explicitSelection = true;
       if (!door || door.deviceId !== args.deviceId) continue;
-      if (typeof door.ioId === "number") ioIds.add(door.ioId);
+      if (typeof door.ioId === "number" && Number.isInteger(door.ioId) && door.ioId >= 0 && door.ioId <= 7) ioIds.add(door.ioId);
     }
-    if (ioIds.size > 0) return Array.from(ioIds).sort((a, b) => a - b);
+    if (explicitSelection) return Array.from(ioIds).sort((a, b) => a - b);
 
     // Fallback: kuralın bu panel için kapı seçimi yok → panelin tüm kapıları.
     const doors = await ctx.db
@@ -656,7 +728,7 @@ export async function ruleIoIdsForPanel(ctx: QueryCtx, args: { ruleId: Id<"acces
       .take(201);
     boundedScheduleRows(doors, 200);
     for (const d of doors) {
-      if (typeof d.ioId === "number") ioIds.add(d.ioId);
+      if (typeof d.ioId === "number" && Number.isInteger(d.ioId) && d.ioId >= 0 && d.ioId <= 7) ioIds.add(d.ioId);
     }
     return Array.from(ioIds).sort((a, b) => a - b);
 }
@@ -755,7 +827,11 @@ export const retrySyncIssue = authedMutation({
     if (!op) throw new Error("İşlem bulunamadı");
     const device = await assertSyncScope(ctx, projectIds, op);
     await requirePermission(ctx, ctx.user, op.projectId ?? device?.projectId, "devices.manage");
-    if (mobileOperationId(op.payload) !== undefined) return { queued: false };
+    if (op.opType === "openDoor" || mobileOperationId(op.payload) !== undefined) return { queued: false };
+    const payload: unknown = op.payload;
+    if (payload && typeof payload === "object" && (payload as Record<string, unknown>).errorCode === "door_io_unresolved") {
+      throw new Error("Kapı aktüatörünü düzeltip kuralı yeniden gönderin");
+    }
     if (!canRetrySync(op.status)) return { queued: false };
     if (!device || device.brand !== "ide_smart") throw new Error("Cihaz bulunamadı veya IDE Smart değil");
     await ctx.db.patch(op._id, {

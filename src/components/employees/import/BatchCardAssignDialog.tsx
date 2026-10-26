@@ -66,8 +66,8 @@ export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees
     try {
       const candidates = rows.filter((row) => row.cardNumber.trim());
       const resultRows = [...rows];
-      for (let index = 0; index < candidates.length; index += 200) {
-        const response: AssignResult[] = await assignCards({ assignments: candidates.slice(index, index + 200).map((row) => ({ employeeId: row.employeeId as Id<"employees">, cardNumber: row.cardNumber.trim() })) });
+      for (let index = 0; index < candidates.length; index += 100) {
+        const response: AssignResult[] = await assignCards({ assignments: candidates.slice(index, index + 100).map((row) => ({ employeeId: row.employeeId as Id<"employees">, cardNumber: row.cardNumber.trim() })) });
         const merged = mergeAssignmentResults(resultRows, response);
         resultRows.splice(0, resultRows.length, ...merged);
       }

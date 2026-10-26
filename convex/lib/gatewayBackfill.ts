@@ -7,6 +7,20 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { searchAcsEventsOnDevice } from "./hikGateway";
 import { auditDeviceCommand } from "./gatewayCommand";
 
+type BackfillContinuation = {
+  deviceId: Id<"devices">;
+  devIndex: string;
+  searchID: string;
+  position: number;
+  startedAt: number;
+  maxPages: number;
+  startTime?: string;
+  lastEventAt?: number;
+  maxSerialNo?: number;
+  observedSerialNo?: number;
+  hop?: number;
+};
+
 async function _runBackfill(
   ctx: ActionCtx,
   opts: {
@@ -14,6 +28,8 @@ async function _runBackfill(
     devIndex: string;
     startTime?: string;
     maxPages?: number;
+    continuation?: BackfillContinuation;
+    progressAt?: number;
   },
 ): Promise<{
   ok: boolean;
@@ -21,17 +37,27 @@ async function _runBackfill(
   inserted: number;
   skipped: number;
   cursor?: number;
+  partial?: boolean;
   error?: string;
 }> {
-  const maxPages = opts.maxPages ?? DEFAULT_BACKFILL_MAX_PAGES;
-  const searchID = `backfill-${opts.deviceId}-${Date.now()}`;
+  const requestedPages = opts.maxPages ?? DEFAULT_BACKFILL_MAX_PAGES;
+  const maxPages = Number.isFinite(requestedPages)
+    ? Math.min(DEFAULT_BACKFILL_MAX_PAGES, Math.max(1, Math.floor(requestedPages)))
+    : DEFAULT_BACKFILL_MAX_PAGES;
+  const startedAt = opts.continuation?.startedAt ?? Date.now();
+  const searchID = opts.continuation?.searchID ?? `backfill-${opts.deviceId}-${startedAt}`;
 
-  let position = 0;
+  const hop = opts.continuation?.hop ?? 1;
+  let observedSerialNo = opts.continuation?.observedSerialNo;
+  let stoppedReason: string | undefined;
+  let position = opts.continuation?.position ?? 0;
   let scanned = 0;
   let inserted = 0;
   let skipped = 0;
-  let maxSerialNo: number | undefined = undefined;
+  let maxSerialNo: number | undefined = opts.continuation?.maxSerialNo;
+  let lastEventAt = opts.continuation?.lastEventAt;
   let pageCount = 0;
+  let hasMore = false;
 
   while (pageCount < maxPages) {
     const page = await searchAcsEventsOnDevice(opts.devIndex, {
@@ -39,11 +65,27 @@ async function _runBackfill(
       position,
       maxResults: 30,
       ...(opts.startTime ? { startTime: opts.startTime } : {}),
+      endTime: new Date(startedAt).toISOString(),
     });
 
     if (!page.ok) {
       return { ok: false, scanned, inserted, skipped, error: page.error };
     }
+
+    const pageSerialNo = page.events.reduce<number | undefined>((max, event) =>
+      max === undefined ? event.serialNo : Math.max(max, event.serialNo), undefined);
+    const pageEventAt = page.events.reduce<number | undefined>((max, event) => {
+      const at = Date.parse(event.time);
+      return Number.isFinite(at) ? Math.max(max ?? at, at) : max;
+    }, undefined);
+    if (page.hasMore && (page.nextPosition <= position ||
+        (observedSerialNo !== undefined && pageSerialNo !== undefined && pageSerialNo <= observedSerialNo &&
+          (pageEventAt === undefined || (lastEventAt !== undefined && pageEventAt <= lastEventAt))))) {
+      hasMore = true;
+      stoppedReason = "Cihazın olay imleci ilerlemediği için tarama durduruldu. Cihazı kontrol edip taramayı yeniden başlatın.";
+      break;
+    }
+    if (pageSerialNo !== undefined) observedSerialNo = Math.max(observedSerialNo ?? pageSerialNo, pageSerialNo);
 
     for (const event of page.events) {
       scanned++;
@@ -52,6 +94,8 @@ async function _runBackfill(
         internal.cardReadings.backfillHikEventRow,
         { deviceId: opts.deviceId, event },
       );
+      const eventAt = Date.parse(event.time);
+      if (Number.isFinite(eventAt)) lastEventAt = Math.max(lastEventAt ?? eventAt, eventAt);
       if (result.inserted) {
         inserted++;
         if (maxSerialNo === undefined || event.serialNo > maxSerialNo) {
@@ -63,6 +107,7 @@ async function _runBackfill(
     }
 
     pageCount++;
+    hasMore = page.hasMore && page.numMatches > 0;
 
     // hasMore=false → cihaz "daha yok" dedi (responseStatusStrg!=="MORE" ve tam-dolu sayfa değil)
     // numMatches===0 → boş sayfa (döngü sonu guard)
@@ -72,23 +117,55 @@ async function _runBackfill(
     position = page.nextPosition;
   }
 
-  if (pageCount >= maxPages) {
-    console.warn(
-      `[hik-backfill] maxPages=${maxPages} aşıldı, device=${opts.deviceId}, position=${position}`,
-    );
+  if (hasMore) {
+    const canContinue = stoppedReason === undefined && hop < MAX_BACKFILL_CHAIN_RUNS;
+    const error = stoppedReason ?? (canContinue
+      ? "Olay taraması kısmen tamamlandı; kalan olaylar için devam işi planlandı. Cihazın tarama durumunu kontrol edin."
+      : "Olay taraması kısmen tamamlandı; toplam tarama sınırına ulaşıldı. Kalan olaylar için daha dar bir tarih aralığıyla yeniden tarayın.");
+    console.warn(`[hik-backfill] ${error} device=${opts.deviceId}, position=${position}`);
+    // The continuation keeps the exact search and position, including when many
+    // events share one timestamp. Never stamp an unfinished window with now.
+    if (lastEventAt !== undefined) {
+      await ctx.runMutation(internal.devices.setHikBackfillProgress, {
+        deviceId: opts.deviceId, cursor: maxSerialNo, at: Math.max(opts.progressAt ?? lastEventAt, lastEventAt),
+      });
+    }
+    if (canContinue) await ctx.scheduler.runAfter(0, internal.actions.hikQueueWorker.continueHikBackfill, {
+      deviceId: opts.deviceId, devIndex: opts.devIndex, searchID, position,
+      startedAt, maxPages, hop: hop + 1,
+      ...(observedSerialNo !== undefined ? { observedSerialNo } : {}),
+      ...(opts.startTime ? { startTime: opts.startTime } : {}),
+      ...(lastEventAt !== undefined ? { lastEventAt } : {}),
+      ...(maxSerialNo !== undefined ? { maxSerialNo } : {}),
+    });
+    return { ok: false, partial: true, scanned, inserted, skipped, cursor: maxSerialNo, error };
   }
 
-  // Cursor güncelle
   await ctx.runMutation(internal.devices.setHikBackfillProgress, {
     deviceId: opts.deviceId,
     cursor: maxSerialNo,
-    at: Date.now(),
+    at: Math.max(opts.progressAt ?? startedAt, startedAt),
   });
 
   return { ok: true, scanned, inserted, skipped, cursor: maxSerialNo };
 }
 
+/** Only the internal scheduler can supply an exact continuation position. */
+export async function runBackfillContinuation(ctx: ActionCtx, args: BackfillContinuation): Promise<void> {
+  const device = await ctx.runQuery(internal.devices.getByIdInternal, { id: args.deviceId });
+  if (!device || device.brand !== "hikvision" || device.hikTransport === "localBridge" || device.hikDevIndex !== args.devIndex) {
+    throw new Error("Tarama sürdürülemedi: cihazın gateway bağlantısı değişti. Cihaz sayfasından olay taramasını yeniden başlatın.");
+  }
+  if ((args.hop ?? 1) > MAX_BACKFILL_CHAIN_RUNS) {
+    console.warn("[hik-backfill] Toplam tarama sınırı aşıldı; cihaz sayfasından taramayı yeniden başlatın.");
+    return;
+  }
+  const result = await _runBackfill(ctx, { ...args, continuation: args, progressAt: device.hikLastBackfillAt });
+  if (!result.ok && !result.partial) throw new Error(result.error ?? "Olay taraması sürdürülemedi; cihaz bağlantısını kontrol edin.");
+}
+
 const DEFAULT_BACKFILL_MAX_PAGES = 50;
+const MAX_BACKFILL_CHAIN_RUNS = 10;
 
 export async function runBackfillDeviceFromGroups(
   ctx: ActionCtx,
@@ -167,7 +244,8 @@ export async function runBackfillDeviceEvents(
     return await _runBackfill(ctx, {
       deviceId: args.deviceId,
       devIndex: devIndex,
-      startTime: args.startTime,
+      startTime: args.startTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      progressAt: device.hikLastBackfillAt,
       maxPages: args.maxPages,
     });
   });
@@ -196,6 +274,7 @@ export async function runBackfillAllDevicesEvents(
         deviceId: dev._id,
         devIndex: dev.hikDevIndex,
         startTime,
+        progressAt: dev.hikLastBackfillAt,
         maxPages: DEFAULT_BACKFILL_MAX_PAGES,
       });
       if (!result.ok) {

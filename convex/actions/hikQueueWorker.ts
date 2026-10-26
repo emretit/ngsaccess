@@ -1,5 +1,7 @@
 "use node";
 
+import { v } from "convex/values";
+import { runBackfillContinuation } from "../lib/gatewayBackfill";
 import { internalAction, type ActionCtx } from "../_generated/server";
 import { sendStoredDoorStatusPlan, sendStoredVerifyPlan } from "../lib/gatewayCommand";
 import { internal } from "../_generated/api";
@@ -23,28 +25,38 @@ import { defaultRuleSchedule } from "../lib/hikSync";
 /**
  * Failed sync ops için retry worker.
  *
- * Her 1 dakikada bir çalışır:
+ * Her 3 dakikada bir çalışır:
  * 1. status=failed olan ops'ları çek (attemptCount<5, deviceId online).
  * 2. Operation tipine göre uygun gateway helper'ını çağır.
  * 3. Başarı → status=done; başarısızlık → attemptCount++ + lastError güncelle,
  *    attemptCount>=5 ise terminal failed bırak.
  *
  * "Online" tanımı: device.hikLastSeenAt son 5 dakikada güncellenmiş.
- * Offline cihazlara hiç deneme yapılmaz — bir sonraki tick'te kontrol edilir.
+ * Offline cihazlar sonraki retry penceresine ertelenir.
  *
- * Phase 5 backfill (AcsEvent history) bu worker'a sonra eklenecek.
  */
 
 const HIK_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 20;
 
+type QueueResult = { retried: number; ok: number; failed: number };
+
 export const processHikQueue = internalAction({
   args: {},
-  handler: async (ctx): Promise<{ retried: number; ok: number; failed: number }> => {
-    const candidates = await ctx.runQuery(
+  handler: async (ctx): Promise<QueueResult> => processQueue(ctx),
+});
+
+/** Manual retries address one operation and never enter the general scan. */
+export const processHikOperation = internalAction({
+  args: { issueId: v.id("hikPendingOperations") },
+  handler: async (ctx, args): Promise<QueueResult> => processQueue(ctx, args.issueId),
+});
+
+async function processQueue(ctx: ActionCtx, issueId?: Id<"hikPendingOperations">): Promise<QueueResult> {
+    const candidates = await ctx.runMutation(
       internal.hikvisionSync.listRetryCandidates,
-      { limit: BATCH_SIZE, maxAttempts: MAX_ATTEMPTS, onlineWindowMs: HIK_ONLINE_WINDOW_MS },
+      { limit: issueId ? 1 : BATCH_SIZE, maxAttempts: MAX_ATTEMPTS, onlineWindowMs: HIK_ONLINE_WINDOW_MS, ...(issueId ? { issueId } : {}) },
     );
 
     if (candidates.length === 0) {
@@ -81,8 +93,7 @@ export const processHikQueue = internalAction({
     }
     await Promise.all(writes);
     return { retried: candidates.length, ok: okCount, failed: failedCount };
-  },
-});
+}
 
 type Candidate = FunctionReturnType<typeof internal.hikvisionSync.listRetryCandidates>[number];
 type OpResult = { ok: boolean; error?: string; superseded?: boolean };
@@ -232,3 +243,17 @@ async function executeOperation(
   }
 }
 
+
+/** Continue the same bounded AcsEvent search without re-reading its first pages. */
+export const continueHikBackfill = internalAction({
+  args: {
+    deviceId: v.id("devices"), devIndex: v.string(), searchID: v.string(),
+    position: v.number(), startedAt: v.number(), maxPages: v.number(),
+    startTime: v.optional(v.string()), lastEventAt: v.optional(v.number()),
+    maxSerialNo: v.optional(v.number()), observedSerialNo: v.optional(v.number()),
+    hop: v.optional(v.number()),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    await runBackfillContinuation(ctx, args);
+  },
+});

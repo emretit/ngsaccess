@@ -101,9 +101,14 @@ export async function grantStatusForOperation(ctx: MutationCtx, op: {
   if (deletion) {
     const employee = await ctx.db.get(employeeId);
     const credential = payload.ideUserId ?? payload.cardNumber ?? payload.employeeNo;
-    // Old-card cleanup is not a revocation of the employee's current credential.
+    // A returned visitor card retains the operation's old identity and owner.
+    // A genuinely new card must still be protected from delayed old-card cleanup.
+    const returnedSuffix = `:${employeeId}`;
+    const cardNumber = employee?.cardNumber;
+    const ownedCard = employee?.isVisitor && cardNumber?.startsWith("IADE:") && cardNumber.endsWith(returnedSuffix)
+      ? cardNumber.slice(5, -returnedSuffix.length) : cardNumber;
     const currentCredential = typeof payload.ideUserId === "number"
-      ? Number(employee?.cardNumber) : employee?.cardNumber;
+      ? Number(ownedCard) : ownedCard;
     if (employee && credential !== undefined && String(credential) !== String(currentCredential)) return;
   }
   if (state !== "pending" && op._id) {

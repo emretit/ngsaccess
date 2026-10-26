@@ -6,10 +6,10 @@ import { processHikQueue } from "./hikQueueWorker";
 describe("fingerprint retry replay", () => {
   it.each([true, false])("awaits actual scoped push result: %s", async ok => {
     const candidate = { _id: "op-a", operation: "addFingerprint", payload: { employeeId: "employee-a", fingerPrintID: 2 }, device: { _id: "device-a", hikDevIndex: "dev" } };
-    const runQuery = vi.fn(async (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref).endsWith(":listRetryCandidates") ? [candidate] : null);
+    const runQuery = vi.fn(async () => null);
     const runAction = vi.fn(async () => ({ ok }));
     const runAfter = vi.fn(async () => null);
-    const runMutation = vi.fn(async () => null);
+    const runMutation = vi.fn(async (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref).endsWith(":listRetryCandidates") ? [candidate] : null);
     const ctx = { runQuery, runMutation, runAction, scheduler: { runAfter } } as unknown as ActionCtx;
     const handler = (processHikQueue as unknown as { _handler: (ctx: ActionCtx, input: object) => Promise<unknown> })._handler;
     await expect(handler(ctx, {})).resolves.toEqual({ retried: 1, ok: ok ? 1 : 0, failed: ok ? 0 : 1 });

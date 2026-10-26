@@ -19,10 +19,11 @@
  *   IDE_BRIDGE_SECRET        <Convex /ide-bridge/* Bearer secret>
  *   POLL_INTERVAL_MS         2000
  *   CMD_ACK_TIMEOUT_MS       12000
+ *   IDE_BRIDGE_SPOOL_DIR      ./ide-bridge-spool (durable event JSONL, max 10,000)
  *   BRIDGE_DEBUG             0|1
  */
 import mqtt from "mqtt";
-import { routeMqttMessage } from "./lib/ide-mqtt-routing.mjs";
+import { routeMqttMessage, createEventSpool, deliverAck, retryPendingAcks, commandExpired } from "./lib/ide-mqtt-routing.mjs";
 import { panelUuid, panelTopics, bridgeSubscriptions, assertSecureBrokerTransport } from "./lib/ide-mqtt-policy.mjs";
 import { secretFromEnv } from "./lib/ide-mqtt-credentials.mjs";
 import { readFileSync } from "node:fs";
@@ -141,6 +142,7 @@ async function convexPost(path, body) {
       Authorization: `Bearer ${BRIDGE_SECRET}`,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
   });
   const text = await res.text();
   let json = null;
@@ -151,6 +153,14 @@ async function convexPost(path, body) {
   }
   return { status: res.status, ok: res.status >= 200 && res.status < 300, json, text };
 }
+
+const eventSpool = createEventSpool({ convexPost, log });
+const ackDeps = { pending, convexPost, log };
+// This loop remains active when MQTT is disconnected or command polling is disabled.
+const retryTimer = setInterval(() => {
+  void eventSpool.drain().catch(() => log("WARNING: event spool retry failed"));
+  void retryPendingAcks(ackDeps).catch(() => log("WARNING: ACK retry failed"));
+}, 1000);
 
 // ── MQTT envelope (panelin beklediği SF formatı) ────────────────────
 function buildEnvelope(type, payload, { dstId, token, msxId }) {
@@ -221,7 +231,7 @@ client.on("close", () => dbg("MQTT kapandı"));
 // ── Gelen mesaj yönlendirme ─────────────────────────────────────────
 client.on("message", (topic, buf) => {
   void routeMqttMessage(topic, buf, {
-    pending, loginWaiters, tokenCache, convexPost, legacyEvents: LEGACY_EVENTS, log, dbg,
+    pending, loginWaiters, tokenCache, convexPost, eventSpool, legacyEvents: LEGACY_EVENTS, log, dbg,
   }).catch(() => log("MQTT message processing failed"));
 });
 
@@ -242,49 +252,55 @@ async function pollCommands() {
       // Reject malformed/wildcard destinations before login, sent-mark or publish.
       let uuid;
       try { uuid = panelUuid(op.dstId); } catch { log("invalid command target dropped"); continue; }
+      // A retained ACK must never trigger another MQTT publication of this operation.
+      if ([...pending.values()].some(entry => entry.opId === op.opId)) continue;
       const msxId = nextMsx();
-      // Level-1 op'lar (create_data/delete_data/sync) panelde login token'ı ister; yoksa
-      // panel "forbidden: requires level 1, you are 0" döner. Token'ı MQTT login ile al/cache'le.
+      // Reserve before login as well: login failures consume the server's attempt budget.
+      const sentRes = await convexPost("/ide-bridge/sent", { opId: op.opId, msxId }).catch(() => ({ ok: false }));
+      if (!sentRes.ok) {
+        log(`opId=${op.opId} sent-mark FAIL → publish atlandı`);
+        continue;
+      }
+      pending.set(msxId, { opId: op.opId, deviceUuid: op.dstId });
+      const fail = (message, errorCode) => deliverAck(msxId, { opId: op.opId, msxId, result: "fail", message, errorCode }, ackDeps);
+      if (commandExpired(op)) {
+        await fail("Komut süresi doldu", "command_expired");
+        continue;
+      }
       let token;
       if (LEVEL1_OPS.has(op.opType)) {
         token = await ensureToken(op.dstId, op.ideUser, op.idePassword);
         if (!token) {
-          log(`opId=${op.opId} type=${op.opType} → token alınamadı; op pending kalır, sonraki poll'da yeniden denenir`);
-          continue; // markSent yapılmadı → op pending; bir sonraki poll login'i tekrar dener.
+          await fail("Panel oturumu açılamadı; kimlik bilgilerini ve bağlantıyı kontrol edin", "login_failed");
+          continue;
         }
       }
       const envelope = envelopeForOp(op, msxId, token);
       if (!envelope) {
-        log(`bilinmeyen opType=${op.opType} opId=${op.opId} — atlanıyor`);
-        await convexPost("/ide-bridge/ack", { opId: op.opId, msxId, result: "fail", message: "unknown opType" }).catch(() => {});
+        await fail("Bilinmeyen komut türü", "unknown_operation");
+        continue;
+      }
+      // The poll/sent HTTP round trip may have consumed the remaining validity window.
+      if (commandExpired(op)) {
+        await fail("Komut süresi doldu", "command_expired");
+        continue;
+      }
+      if (!client.connected) {
+        await fail("Broker bağlantısı kesildi; komut yayınlanamadı", "publish_failed");
         continue;
       }
       const cmdTopic = panelTopics(uuid).command;
-      // ÖNCE Convex'e "sent" yaz (op'u pending→sent + msxId + attempts++). Bu başarısız
-      // olursa PUBLISH ETME: op "pending" kalır, bir sonraki poll'da tekrar çekilir.
-      // Aksi halde publish edip "sent" yazamazsak op "pending" kalır ve her poll'da
-      // YENİDEN publish edilir (openDoor idempotent değil → kapı tekrar tekrar açılır).
-      const sentRes = await convexPost("/ide-bridge/sent", { opId: op.opId, msxId }).catch(
-        (e) => ({ ok: false, text: e.message }),
-      );
-      if (!sentRes.ok) {
-        log(`opId=${op.opId} sent-mark FAIL  → publish atlandı, sonraki poll'da yeniden denenecek`);
-        continue;
-      }
-      // Timeout: panel response'u gelmezse retry'a düşür.
-      const timer = setTimeout(async () => {
-        pending.delete(msxId);
+      const timer = setTimeout(() => {
         log(`opId=${op.opId} msx=${msxId} ACK TIMEOUT → retry`);
-        await convexPost("/ide-bridge/ack", { opId: op.opId, msxId, result: "timeout", message: "no response" }).catch(() => {});
+        void deliverAck(msxId, { opId: op.opId, msxId, result: "timeout", message: "no response" }, ackDeps);
       }, CMD_ACK_TIMEOUT_MS);
-      pending.set(msxId, { opId: op.opId, deviceUuid: op.dstId, timer });
+      pending.get(msxId).timer = timer;
       client.publish(cmdTopic, envelope, { qos: 1 }, (err) => {
         if (err) {
           // Publish broker'a gitmedi → timeout beklemeden hemen retry'a düşür.
           log(`publish HATA ${cmdTopic}: ${err.message} → hemen retry`);
           clearTimeout(timer);
-          pending.delete(msxId);
-          void convexPost("/ide-bridge/ack", { opId: op.opId, msxId, result: "fail", message: `publish error: ${err.message}` }).catch(() => {});
+          void fail("Komut yayınlanamadı; broker bağlantısını kontrol edin", "publish_failed");
         } else {
           log(`komut publish opId=${op.opId} type=${op.opType} → ${cmdTopic} (msx=${msxId})`);
         }
@@ -324,6 +340,7 @@ if (POLL_INTERVAL_MS > 0) {
 function shutdown() {
   log("kapanıyor...");
   clearTimeout(pollTimer);
+  clearInterval(retryTimer);
   for (const { timer } of pending.values()) clearTimeout(timer);
   client.end(true, () => process.exit(0));
   setTimeout(() => process.exit(0), 2000);
