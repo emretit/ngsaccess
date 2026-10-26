@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import { scheduleFingerprintPurge } from "./employeeCardChange";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -23,6 +24,26 @@ export async function cascadeRemoveEmployeePII(
   readingsAnonymized: number;
 }> {
   const employee = await ctx.db.get(employeeId);
+
+  // Her iki okuma da sınırlıdır; taşmada silme işleminin tamamı geri alınır.
+  const requestLimit = 1000;
+  const corrections = await ctx.db.query("attendanceCorrections")
+    .withIndex("by_employee", q => q.eq("employeeId", employeeId)).take(requestLimit + 1);
+  const leaves = await ctx.db.query("leaves")
+    .withIndex("by_employee", q => q.eq("employeeId", employeeId)).take(requestLimit + 1);
+  if (corrections.length > requestLimit || leaves.length > requestLimit) {
+    throw new ConvexError({ code: "EMPLOYEE_REQUEST_CASCADE_LIMIT", message: "Kişinin talep geçmişi silme sınırını aşıyor. Talepleri arşivlemek için yöneticinizle iletişime geçin." });
+  }
+  const decidedAt = new Date().toISOString();
+  for (const correction of corrections) {
+    if (correction.status === "pending") await ctx.db.patch(correction._id, {
+      status: "withdrawn", decisionNote: "Kişi kaydı silindi", decidedAt,
+      decidedBy: undefined, updatedAt: decidedAt,
+    });
+  }
+  for (const leave of leaves) {
+    if (leave.source === "employee" && leave.status === "pending") await ctx.db.delete(leave._id);
+  }
 
   // 1) employeeFaces — DB + storage
   const faces = await ctx.db

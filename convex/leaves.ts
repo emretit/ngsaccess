@@ -240,16 +240,26 @@ export const update = authedMutation({
 
 export const listForRange = authedQuery({
   args: { startDate: v.string(), endDate: v.string(), projectId: v.optional(v.id("projects")) },
+  returns: v.array(v.object({
+    _id: v.id("leaves"), employeeId: v.id("employees"), startDate: v.string(), endDate: v.string(),
+    leaveType: leaveTypeValidator, status: statusValidator,
+    notes: v.optional(v.string()), decisionNote: v.optional(v.string()),
+  })),
   handler: async (ctx, args) => {
     const projectIds = await resolveProjectScope(ctx, args.projectId);
     calendarDays(args.startDate, args.endDate);
-    const results: Doc<"leaves">[] = [];
+    const results: Pick<Doc<"leaves">, "_id" | "employeeId" | "startDate" | "endDate" | "leaveType" | "status" | "notes" | "decisionNote">[] = [];
     for (const projectId of projectIds) {
       const candidates = await ctx.db.query("leaves")
         .withIndex("by_project_end", q => q.eq("projectId", projectId).gte("endDate", args.startDate))
         .take(LEAVE_SCAN_LIMIT + 1);
       if (candidates.length > LEAVE_SCAN_LIMIT) return leaveError("LEAVE_SCAN_LIMIT");
-      results.push(...candidates.filter(leave => leave.status === "approved" && overlaps(leave.startDate, leave.endDate, args.startDate, args.endDate)));
+      const manage = await canManageLeaves(ctx, ctx.user, projectId);
+      results.push(...candidates.filter(leave => leave.status === "approved" && overlaps(leave.startDate, leave.endDate, args.startDate, args.endDate))
+        .map(leave => ({ _id: leave._id, employeeId: leave.employeeId, startDate: leave.startDate, endDate: leave.endDate,
+          leaveType: leave.leaveType, status: leave.status,
+          ...(manage ? { notes: leave.notes, decisionNote: leave.decisionNote } : {}) })));
+
     }
     return results;
   },

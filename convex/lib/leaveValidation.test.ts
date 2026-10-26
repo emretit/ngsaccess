@@ -237,7 +237,7 @@ describe("bounded leave queries", () => {
     expect(page.page.map(row => row._id)).toEqual(["crossing", leaveId]);
     expect(page.page[1].calendarDays).toBeGreaterThan(366);
     expect(await invoke(summary, f.ctx, { ...filters, paginationOpts })).toMatchObject({ page: [{ recordCount: 2, employeeIds: [employeeId, employeeId] }], isDone: true });
-    expect(await invoke(listForRange, f.ctx, { projectId, startDate: filters.rangeStart, endDate: filters.rangeEnd })).toEqual([long, f.tables.leaves[1]]);
+    expect(await invoke(listForRange, f.ctx, { projectId, startDate: filters.rangeStart, endDate: filters.rangeEnd })).toMatchObject([long, f.tables.leaves[1]].map(row => ({ _id: row._id, employeeId: row.employeeId, startDate: row.startDate, endDate: row.endDate })));
     expect(f.indexes.some(index => index.name === "by_project_end")).toBe(true);
   });
   it("deduplicates employee and department loads and returns explicit fields", async () => {
@@ -309,14 +309,15 @@ describe("bounded leave queries", () => {
     await expect(invoke(listForRange, f.ctx, { startDate: filters.rangeStart, endDate: filters.rangeEnd }))
       .rejects.toMatchObject(errorData("LEAVE_SCAN_LIMIT"));
   });
-  it.each(["project_user", "project_admin", "super_admin"])("masks only paginated notes for %s", async role => {
+  it.each(["project_user", "project_admin", "super_admin"])("masks page and calendar notes for %s", async role => {
     const f = fixture([savedLeave()]);
     f.ctx.user.role = role;
     const page = await invoke<FunctionReturnType<typeof api.leaves.listPage>>(listPage, f.ctx, { ...filters, paginationOpts });
     expect(page.page[0].notesHidden).toBe(role === "project_user");
     expect(page.page[0].notes).toBe(role === "project_user" ? undefined : "Eski not");
-    expect(await invoke(listForRange, f.ctx, { projectId, startDate: filters.rangeStart, endDate: filters.rangeEnd }))
-      .toMatchObject([{ notes: "Eski not" }]);
+    const calendar = await invoke<FunctionReturnType<typeof api.leaves.listForRange>>(listForRange, f.ctx, { projectId, startDate: filters.rangeStart, endDate: filters.rangeEnd });
+    expect(calendar[0].notes).toBe(role === "project_user" ? undefined : "Eski not");
+    expect(calendar[0]).not.toHaveProperty("createdAt");
   });
   it("rejects inaccessible query scopes, invalid dates and invalid page sizes", async () => {
     const f = fixture();

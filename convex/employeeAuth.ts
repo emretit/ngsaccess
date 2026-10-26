@@ -1,6 +1,10 @@
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { components, internal } from "./_generated/api";
+import { RateLimiter } from "@convex-dev/rate-limiter";
+import { getCurrentUser } from "./lib/auth";
+import { requirePermission } from "./lib/permissions";
+import { writeAudit } from "./lib/audit";
 import { employeeAuthedMutation, employeeAuthedQuery } from "./lib/customFunctions";
 import { hashEmployeePassword, verifyEmployeePassword, writeEmployeePassword } from "./lib/employeeAuth";
 import { mobileErrorData } from "./lib/mobileErrors";
@@ -27,6 +31,50 @@ async function employeeDepartment(ctx: QueryCtx, employee: Doc<"employees">): Pr
   const department = await ctx.db.get(employee.departmentId);
   return department?.projectId === employee.projectId ? department : null;
 }
+
+// Capacity one makes token issuance atomic and enforces a full minute between requests.
+const setupLimiter = new RateLimiter(components.rateLimiter, {
+  employeeSetupEmail: { kind: "token bucket", rate: 1, period: 60_000, capacity: 1 },
+});
+
+async function setupEmailTarget(ctx: QueryCtx, employeeId: Doc<"employees">["_id"]) {
+  const user = await getCurrentUser(ctx);
+  const employee = await ctx.db.get(employeeId);
+  if (!employee) throw new Error("Çalışan bulunamadı. Personel listesini yenileyin.");
+  await requirePermission(ctx, user, employee.projectId, "employees.manage");
+  if (employee.isVisitor === true) throw new Error("Ziyaretçilere mobil hesap kurulum e-postası gönderilemez.");
+  if (employee.isActive !== true || employmentEnded(employee, trTodayKey())) {
+    throw new Error("Pasif veya işten ayrılmış çalışana kurulum e-postası gönderilemez.");
+  }
+  if (!employee.email.trim()) throw new Error("Önce çalışanın e-posta adresini kaydedin.");
+  return { user, employee };
+}
+
+export const getSetupEmailTarget = internalQuery({
+  args: { employeeId: v.id("employees") },
+  handler: async (ctx, { employeeId }) => (await setupEmailTarget(ctx, employeeId)).employee,
+});
+
+/** Yetki, hedef kayıt, kota, token ve audit aynı transaction içinde doğrulanır/yazılır. */
+export const issueSetupEmailToken = internalMutation({
+  args: { employeeId: v.id("employees"), setupToken: v.string() },
+  handler: async (ctx, { employeeId, setupToken }) => {
+    const { user, employee } = await setupEmailTarget(ctx, employeeId);
+    const limit = await setupLimiter.limit(ctx, "employeeSetupEmail", { key: employeeId });
+    if (!limit.ok) throw new Error("Bu çalışana az önce kurulum bağlantısı üretildi. 60 saniye sonra tekrar deneyin.");
+    const now = new Date().toISOString();
+    const existing = await ctx.db.query("employeeAuth").withIndex("by_employee", q => q.eq("employeeId", employeeId)).first();
+    const values = { email: employee.email, projectId: employee.projectId, setupToken,
+      tokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), updatedAt: now };
+    if (existing) await ctx.db.patch(existing._id, values);
+    else await ctx.db.insert("employeeAuth", { employeeId, ...values, createdAt: now });
+    const [local, domain] = employee.email.split("@");
+    const maskedEmail = `${local.slice(0, 1)}***@${domain ?? "***"}`;
+    await writeAudit(ctx, { user, projectId: employee.projectId, action: "update", targetTable: "employeeAuth", targetId: employeeId,
+      newValue: { employeeId, email: maskedEmail }, note: "Mobil hesap kurulum bağlantısı üretildi" });
+    return { email: employee.email, firstName: employee.firstName, lastName: employee.lastName };
+  },
+});
 
 export const getByEmployee = internalQuery({
   args: { employeeId: v.id("employees") },

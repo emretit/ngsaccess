@@ -39,6 +39,7 @@ const commonLabels: Record<string, string> = {
   fullName: "Ad soyad",
   firstName: "Ad",
   lastName: "Soyad",
+  email: "E-posta",
   employeeId: "Çalışan kimliği",
   employeeIds: "Çalışan kimlikleri",
   accessStartsAt: "Erişim başlangıcı",

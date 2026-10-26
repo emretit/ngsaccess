@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import { assertUploadOwner } from "./lib/peopleScope";
 import { v } from "convex/values";
 import { authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { requirePermission } from "./lib/permissions";
 
 const PENDING_CLEANUP_BATCH = 200;
 
@@ -59,8 +59,7 @@ export const getUploadUrl = authedMutation({
   handler: async (ctx, args) => {
     const employee = await ctx.db.query("employees").withIndex("by_photo_storage", q => q.eq("photoStorageId", args.storageId)).first();
     if (employee) {
-      const allowed = await getProjectIdsForUser(ctx);
-      if (!employee.projectId || !allowed.includes(employee.projectId)) throw new Error("Bu fotoğrafın projesine erişim yetkiniz yok");
+      await requirePermission(ctx, ctx.user, employee.projectId, "employees.manage");
     } else {
       const pending = await findPendingUpload(ctx, args.storageId);
       assertUploadOwner(pending?.userId, ctx.user._id);

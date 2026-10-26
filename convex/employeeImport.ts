@@ -1,5 +1,5 @@
 import { requirePermission } from "./lib/permissions";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { findDuplicateImportRows, normalizeEmployeeImportName, validateEmployeeImportRow } from "./lib/employeeImportValidation";
@@ -104,6 +104,10 @@ export const assignCards = authedMutation({
         continue;
       }
       await requirePermission(ctx, ctx.user, employee.projectId, "employees.manage");
+      if (employee.isVisitor === true) throw new ConvexError({
+        code: "VISITOR_USE_VISITOR_SCREEN",
+        message: "Ziyaretçi kayıtları Ziyaretçiler ekranından yönetilir.",
+      });
       if (employee.projectId) projectIds.add(employee.projectId);
       if (!cardNumber || cardNumber.length > 128 || !/^[\w-]+$/.test(cardNumber)) {
         results.push({ employeeId: assignment.employeeId, status: "error", message: "Kart numarası biçimi geçersiz" });

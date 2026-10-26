@@ -141,53 +141,20 @@ function renderEmailTemplate(p: EmailTemplateParams): string {
 export const sendEmployeeSetupEmail = authedAction({
   args: {
     employeeId: v.id("employees"),
-    email: v.string(),
-    firstName: v.string(),
-    lastName: v.string(),
-    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
-    // Yetki: caller, hedef employee'nin projesine erişebilmeli. employees.getById
-    // authedQuery'dir ve erişilemeyen projede hata fırlatır → yetkisiz çağrı burada durur.
-    // Bu olmadan anonim/yabancı bir caller setup token'ını kendi e-postasına yazıp
-    // çalışan mobil hesabını ele geçirebilir (authorization_bypass).
-    const employee = await ctx.runQuery(api.employees.getById, {
-      employeeId: args.employeeId,
-    });
-    if (!employee) {
-      return { success: false, error: "Çalışan bulunamadı veya erişim yetkiniz yok" };
-    }
-
     const setupToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const existing = await ctx.runQuery(internal.employeeAuth.getByEmployee, {
+    const employee = await ctx.runMutation(internal.employeeAuth.issueSetupEmailToken, {
       employeeId: args.employeeId,
+      setupToken,
     });
-
-    if (existing) {
-      await ctx.runMutation(internal.employeeAuth.update, {
-        authId: existing._id,
-        email: args.email,
-        setupToken,
-        tokenExpiresAt: expiresAt,
-      });
-    } else {
-      await ctx.runMutation(internal.employeeAuth.create, {
-        employeeId: args.employeeId,
-        projectId: args.projectId,
-        email: args.email,
-        setupToken,
-        tokenExpiresAt: expiresAt,
-      });
-    }
 
     const baseUrl = process.env.SITE_URL ?? "https://ngsplus.app";
     const setupUrl = `${baseUrl}/employee-setup?token=${setupToken}`;
 
     const html = renderEmailTemplate({
       title: "NGS+ — Hesap Aktivasyonu",
-      heading: `Merhaba ${escapeHtml(args.firstName)} ${escapeHtml(args.lastName)} 👋`,
+      heading: `Merhaba ${escapeHtml(employee.firstName)} ${escapeHtml(employee.lastName)} 👋`,
       body: "NGS+ mobil uygulaması için şifrenizi belirleyin. Aşağıdaki butona tıklayarak hesabınızı aktif edebilirsiniz.",
       ctaUrl: setupUrl,
       ctaLabel: "Hesabı Aktif Et",
@@ -195,7 +162,7 @@ export const sendEmployeeSetupEmail = authedAction({
     });
 
     return await sendResendEmail({
-      to: args.email,
+      to: employee.email,
       subject: "NGS+ — Hesap Aktivasyonu",
       html,
     });

@@ -75,6 +75,7 @@ describe("denetim sorgusu", () => {
       "cardReadings",
       "departmentShiftAssignments",
       "deviceEvents",
+      "employeeAuth",
       "employeeConsents",
       "employees",
       "generalSettings",

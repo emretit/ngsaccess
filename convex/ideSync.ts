@@ -407,6 +407,7 @@ export const markAck = internalMutation({
     msxId: v.optional(v.number()),
     result: v.union(v.literal("success"), v.literal("fail"), v.literal("timeout")),
     message: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<void> => {
     const op = await ctx.db.get(args.opId);
@@ -459,7 +460,7 @@ export const markAck = internalMutation({
     if (
       args.result === "fail" &&
       (op.opType === "upsertUser" || op.opType === "upsertPermission") &&
-      /already exists/i.test(args.message ?? "")
+      (args.errorCode !== undefined ? args.errorCode === "already_exists" : /already exists/i.test(args.message ?? ""))
     ) {
       const payload = (op.payload ?? {}) as Record<string, unknown>;
       if (payload.mode !== "update") {
@@ -479,7 +480,7 @@ export const markAck = internalMutation({
     if (
       args.result === "fail" &&
       (op.opType === "deleteUser" || op.opType === "deletePermission") &&
-      isAlreadyGoneError(args.message)
+      (args.errorCode !== undefined ? args.errorCode === "not_found" : isAlreadyGoneError(args.message))
     ) {
       await ctx.db.patch(args.opId, {
         status: "acked",

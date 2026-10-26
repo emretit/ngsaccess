@@ -414,11 +414,12 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const unauth = checkBridgeAuth(request);
     if (unauth) return unauth;
-    const { opId, msxId, result, message } = (await request.json()) as {
+    const { opId, msxId, result, message, errorCode } = (await request.json()) as {
       opId?: string;
       msxId?: number;
       result?: string;
       message?: string;
+      errorCode?: string;
     };
     if (!opId) return jsonResponse({ ok: false, error: "opId gerekli" }, 400);
     const normalized: "success" | "fail" | "timeout" =
@@ -428,6 +429,7 @@ http.route({
       msxId: typeof msxId === "number" ? msxId : undefined,
       result: normalized,
       message,
+      errorCode: typeof errorCode === "string" ? errorCode : undefined,
     });
     return jsonResponse({ ok: true });
   }),

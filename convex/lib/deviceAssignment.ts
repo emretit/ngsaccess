@@ -10,6 +10,24 @@ import { purgeDeviceCascade } from "./deviceHelpers";
 import { getProjectIdsForUser, isProjectAllowed } from "./auth";
 import { requirePermission } from "./permissions";
 import { claimAdminDeviceCore } from "./devicePool";
+import { assertIdeRosterMovable, assertIdeUuidAvailable } from "./deviceProvision";
+import { deviceIdentityError } from "./deviceIdentity";
+
+async function assertIdeAssignmentAllowed(
+  ctx: MutationCtx,
+  adminDevice: Doc<"adminDevices">,
+  projectId: Id<"projects"> | undefined,
+) {
+  if (adminDevice.ideUuid === undefined) return;
+  const ideUuid = adminDevice.ideUuid.trim();
+  const error = deviceIdentityError(ideUuid, adminDevice.brand);
+  if (error) throw new ConvexError(error);
+  await assertIdeUuidAvailable(ctx, ideUuid, {
+    exceptAdminDeviceId: adminDevice._id,
+    exceptDeviceId: adminDevice.assignedDeviceId,
+  });
+  await assertIdeRosterMovable(ctx, ideUuid, projectId);
+}
 
 export type ClaimDeviceArgs = {
   adminDeviceId: Id<"adminDevices">;
@@ -51,12 +69,13 @@ export async function claimDeviceCore(
       message: "Hikvision cihazının projesi değiştirilemez. Cihazı bu projeden silip hedef projede yeniden ekleyin; eklerken cihazdaki eski kişiler temizlenir.",
     });
   }
+  await assertIdeAssignmentAllowed(ctx, adminDevice, args.projectId);
   if (adminDevice.assignedDeviceId) {
     throw new Error("Bu cihaz zaten bir projeye atanmış");
   }
 
   return await claimAdminDeviceCore(ctx, {
-    adminDevice,
+    adminDevice: { ...adminDevice, ideUuid: adminDevice.ideUuid?.trim() },
     projectId: args.projectId,
     allowedProjectIds,
     zoneId: args.zoneId,
@@ -117,6 +136,8 @@ export async function reassignDeviceCore(
     });
   }
 
+  await assertIdeAssignmentAllowed(ctx, adminDevice, args.projectId);
+
   const now = new Date().toISOString();
   const newName = args.name?.trim();
   if (newName && newName !== adminDevice.name) {
@@ -161,7 +182,7 @@ export async function reassignDeviceCore(
     const fresh = await ctx.db.get(args.adminDeviceId);
     if (!fresh) throw new Error("Cihaz bulunamadı");
     await claimAdminDeviceCore(ctx, {
-      adminDevice: fresh,
+      adminDevice: { ...fresh, ideUuid: fresh.ideUuid?.trim() },
       projectId: args.projectId,
       allowedProjectIds,
       name: newName ?? fresh.name,

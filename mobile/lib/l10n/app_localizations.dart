@@ -2839,6 +2839,54 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Talep geri çekilmiş olabilir; listeyi kontrol edin.'**
   String get requestsWithdrawUncertain;
+
+  /// No description provided for @errorSummaryTooLarge.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu dönem için özet oluşturulamıyor. Tarih aralığını küçültün.'**
+  String get errorSummaryTooLarge;
+
+  /// No description provided for @errorInvalidCursor.
+  ///
+  /// In tr, this message translates to:
+  /// **'Geçmiş sayfası artık geçerli değil. Listeyi yenileyin.'**
+  String get errorInvalidCursor;
+
+  /// No description provided for @errorDeviceNotFound.
+  ///
+  /// In tr, this message translates to:
+  /// **'Cihaz bu projede bulunamadı. Cihaz seçimini yenileyin veya yöneticinize başvurun.'**
+  String get errorDeviceNotFound;
+
+  /// No description provided for @errorSummaryInvalidData.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıt zamanları doğrulanamadı. Kayıtların kontrolü için yöneticinize başvurun.'**
+  String get errorSummaryInvalidData;
+
+  /// No description provided for @errorVisitorInvalid.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ziyaretçi bilgileri veya liste sayfası geçersiz. Bilgileri ve tarihleri kontrol edin; gerekirse listeyi yenileyin.'**
+  String get errorVisitorInvalid;
+
+  /// No description provided for @errorVisitorLocked.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu davet artık düzenlenemiyor. Daveti yenileyin veya operatöre başvurun.'**
+  String get errorVisitorLocked;
+
+  /// No description provided for @errorVisitorNoticeChanged.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ziyaretçi aydınlatma metni değişti. Davet formunu yenileyip güncel metni okuyun ve tekrar onaylayın.'**
+  String get errorVisitorNoticeChanged;
+
+  /// No description provided for @errorRequestConflict.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin.'**
+  String get errorRequestConflict;
 }
 
 class _AppLocalizationsDelegate

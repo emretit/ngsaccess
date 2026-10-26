@@ -1532,4 +1532,36 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get requestsWithdrawUncertain =>
       'The request may have been withdrawn; check the list.';
+
+  @override
+  String get errorSummaryTooLarge =>
+      'This period is too large to summarize. Select a shorter date range.';
+
+  @override
+  String get errorInvalidCursor =>
+      'This history page is no longer valid. Refresh the list.';
+
+  @override
+  String get errorDeviceNotFound =>
+      'The device could not be found in this project. Refresh your device selection or contact your administrator.';
+
+  @override
+  String get errorSummaryInvalidData =>
+      'Record times could not be verified. Contact your administrator to check the records.';
+
+  @override
+  String get errorVisitorInvalid =>
+      'Visitor details or the list page are invalid. Check the details and dates; refresh the list if needed.';
+
+  @override
+  String get errorVisitorLocked =>
+      'This invitation can no longer be edited. Refresh the invitation or contact the operator.';
+
+  @override
+  String get errorVisitorNoticeChanged =>
+      'The visitor privacy notice has changed. Refresh the invitation form, read the updated notice and confirm again.';
+
+  @override
+  String get errorRequestConflict =>
+      'This request was already saved with different visitor details. Refresh the visitor list and check the existing invitation.';
 }

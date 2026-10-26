@@ -622,5 +622,13 @@
   "requestsLeavePaternity": "Babalık izni",
   "requestsLeaveLactation": "Süt izni",
   "requestsLeaveCompensatory": "Telafi izni",
-  "requestsWithdrawUncertain": "Talep geri çekilmiş olabilir; listeyi kontrol edin."
+  "requestsWithdrawUncertain": "Talep geri çekilmiş olabilir; listeyi kontrol edin.",
+  "errorSummaryTooLarge": "Bu dönem için özet oluşturulamıyor. Tarih aralığını küçültün.",
+  "errorInvalidCursor": "Geçmiş sayfası artık geçerli değil. Listeyi yenileyin.",
+  "errorDeviceNotFound": "Cihaz bu projede bulunamadı. Cihaz seçimini yenileyin veya yöneticinize başvurun.",
+  "errorSummaryInvalidData": "Kayıt zamanları doğrulanamadı. Kayıtların kontrolü için yöneticinize başvurun.",
+  "errorVisitorInvalid": "Ziyaretçi bilgileri veya liste sayfası geçersiz. Bilgileri ve tarihleri kontrol edin; gerekirse listeyi yenileyin.",
+  "errorVisitorLocked": "Bu davet artık düzenlenemiyor. Daveti yenileyin veya operatöre başvurun.",
+  "errorVisitorNoticeChanged": "Ziyaretçi aydınlatma metni değişti. Davet formunu yenileyip güncel metni okuyun ve tekrar onaylayın.",
+  "errorRequestConflict": "Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin."
 }

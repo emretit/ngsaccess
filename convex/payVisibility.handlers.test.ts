@@ -46,6 +46,8 @@ const departments = [
 function fixture(role: typeof roles[number], overrides: Doc<"employees">[] = employees) {
   const tables: Record<string, Record<string, unknown>[]> = {
     employees: overrides, cardReadings: readings, departments,
+    shifts: [{ _id: "dated-pay-shift", projectId, name: "Plan", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" }],
+    shiftAssignments: overrides.map(employee => ({ _id: `assignment-${employee._id}`, employeeId: employee._id, projectId, shiftId: "dated-pay-shift", startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" })),
     projects: [{ _id: projectId, name: "Test Projesi" }],
     userProjects: [{ _id: "membership", userId: "user", projectId }],
     // Exercise nonzero payable overtime so masking assertions stay meaningful.
@@ -88,6 +90,11 @@ describe.each(roles)("%s public pay responses", (role) => {
     const ctx = fixture(role);
     for (const emp of employees) {
       const row = await invoke<FunctionReturnType<typeof api.employees.getById>>(getById, ctx, { employeeId: emp._id });
+      if (emp.isVisitor && role === "project_user") {
+        // K-03: a viewer cannot read visitors through the generic employee endpoint.
+        expect(row).toBeNull();
+        continue;
+      }
       expect(row).toMatchObject({ _id: emp._id });
       expect(row?.hourlyRate).toBe(visible ? emp.hourlyRate : null);
       expect(row?.monthlySalary).toBe(visible ? emp.monthlySalary : null);

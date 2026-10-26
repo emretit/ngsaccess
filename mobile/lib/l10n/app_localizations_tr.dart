@@ -1516,4 +1516,36 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get requestsWithdrawUncertain =>
       'Talep geri çekilmiş olabilir; listeyi kontrol edin.';
+
+  @override
+  String get errorSummaryTooLarge =>
+      'Bu dönem için özet oluşturulamıyor. Tarih aralığını küçültün.';
+
+  @override
+  String get errorInvalidCursor =>
+      'Geçmiş sayfası artık geçerli değil. Listeyi yenileyin.';
+
+  @override
+  String get errorDeviceNotFound =>
+      'Cihaz bu projede bulunamadı. Cihaz seçimini yenileyin veya yöneticinize başvurun.';
+
+  @override
+  String get errorSummaryInvalidData =>
+      'Kayıt zamanları doğrulanamadı. Kayıtların kontrolü için yöneticinize başvurun.';
+
+  @override
+  String get errorVisitorInvalid =>
+      'Ziyaretçi bilgileri veya liste sayfası geçersiz. Bilgileri ve tarihleri kontrol edin; gerekirse listeyi yenileyin.';
+
+  @override
+  String get errorVisitorLocked =>
+      'Bu davet artık düzenlenemiyor. Daveti yenileyin veya operatöre başvurun.';
+
+  @override
+  String get errorVisitorNoticeChanged =>
+      'Ziyaretçi aydınlatma metni değişti. Davet formunu yenileyip güncel metni okuyun ve tekrar onaylayın.';
+
+  @override
+  String get errorRequestConflict =>
+      'Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin.';
 }

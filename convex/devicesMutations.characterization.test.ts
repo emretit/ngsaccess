@@ -60,7 +60,7 @@ async function noExtraEffects(f: Fixture) {
 }
 async function pool(f: Fixture, projectId?: Id<"projects">) {
   return await f.t.run(async ctx => {
-    const adminDeviceId = await ctx.db.insert("adminDevices", { name: "Pool", brand: "ide_smart", ideUuid: "uuid", ideUser: "user", idePassword: "pass", ideDoorCount: 1, ...timestamps });
+    const adminDeviceId = await ctx.db.insert("adminDevices", { name: "Pool", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "user", idePassword: "pass", ideDoorCount: 1, ...timestamps });
     if (!projectId) return { adminDeviceId };
     const deviceId = await ctx.db.insert("devices", { name: "Pool", projectId, adminDeviceId, brand: "ide_smart", isActive: true, status: "active", lastSeen: now, ...timestamps });
     await ctx.db.patch(adminDeviceId, { assignedDeviceId: deviceId, assignedProjectId: projectId });
@@ -139,11 +139,11 @@ describe("devices mutation HEAD characterization", () => {
   it.each([false, true])("IDE create defaults and full topology, pool=%s", async orphan => {
     const f = await fixture(orphan ? "super_admin" : "admin");
     const scope = orphan ? {} : { projectId: f.projectId };
-    const result = await f.as.mutation(api.devices.createIdePanel, { name: "Panel", ...scope, newZoneName: "Zone", ideUuid: "uuid", ideDoorCount: 2 });
+    const result = await f.as.mutation(api.devices.createIdePanel, { name: "Panel", ...scope, newZoneName: "Zone", ideUuid: "123456789012345", ideDoorCount: 2 });
     const s = await topology(f, result, orphan ? undefined : f.projectId);
     expect(result).toEqual({ deviceId: s.devices[0]._id, zoneId: s.zones[0]._id, doorIds: s.doors.map(d => d._id) });
-    expect(s.devices.map(payload)).toEqual([{ name: "Panel", ...scope, brand: "ide_smart", deviceType: "Erişim Paneli", ideUuid: "uuid", ideUser: "admin", idePassword: "admin12345", ideHttpPort: 80, ideDoorCount: 2, isActive: true, status: "active", zoneId: result.zoneId, adminDeviceId: s.adminDevices[0]._id, ...timestamps }]);
-    expect(s.adminDevices.map(payload)).toEqual([{ name: "Panel", brand: "ide_smart", ideUuid: "uuid", ideUser: "admin", idePassword: "admin12345", ideHttpPort: 80, ideDoorCount: 2, assignedDeviceId: result.deviceId, ...(orphan ? {} : { assignedProjectId: f.projectId }), createdFromDevice: true, ...timestamps }]);
+    expect(s.devices.map(payload)).toEqual([{ name: "Panel", ...scope, brand: "ide_smart", deviceType: "Erişim Paneli", ideUuid: "123456789012345", ideUser: "admin", idePassword: "admin12345", ideHttpPort: 80, ideDoorCount: 2, isActive: true, status: "active", zoneId: result.zoneId, adminDeviceId: s.adminDevices[0]._id, ...timestamps }]);
+    expect(s.adminDevices.map(payload)).toEqual([{ name: "Panel", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "admin", idePassword: "admin12345", ideHttpPort: 80, ideDoorCount: 2, assignedDeviceId: result.deviceId, ...(orphan ? {} : { assignedProjectId: f.projectId }), createdFromDevice: true, ...timestamps }]);
   });
   it.each([false, true])("Hik create full fields and topology, pool=%s", async orphan => {
     const f = await fixture(orphan ? "super_admin" : "admin");
@@ -161,8 +161,8 @@ describe("devices mutation HEAD characterization", () => {
     const result = await f.as.mutation(api.devices.claimDevice, { adminDeviceId, projectId: f.projectId, expectedAssignedProjectId: null, newZoneName: "Zone", name: " Claimed ", ideUser: " custom ", idePassword: " password " });
     const s = await topology(f, result, f.projectId);
     expect(result).toEqual({ deviceId: s.devices[0]._id, zoneId: s.zones[0]._id, doorIds: s.doors.map(d => d._id) });
-    expect(s.devices.map(payload)).toEqual([{ name: "Claimed", projectId: f.projectId, brand: "ide_smart", deviceType: "Erişim Paneli", ideUuid: "uuid", ideUser: "custom", idePassword: "password", ideHttpPort: 80, ideDoorCount: 1, isActive: true, status: "active", adminDeviceId, zoneId: result.zoneId, ...timestamps }]);
-    expect(s.adminDevices.map(payload)).toEqual([{ name: "Pool", brand: "ide_smart", ideUuid: "uuid", ideUser: "custom", idePassword: "password", ideDoorCount: 1, assignedDeviceId: result.deviceId, assignedProjectId: f.projectId, ...timestamps }]);
+    expect(s.devices.map(payload)).toEqual([{ name: "Claimed", projectId: f.projectId, brand: "ide_smart", deviceType: "Erişim Paneli", ideUuid: "123456789012345", ideUser: "custom", idePassword: "password", ideHttpPort: 80, ideDoorCount: 1, isActive: true, status: "active", adminDeviceId, zoneId: result.zoneId, ...timestamps }]);
+    expect(s.adminDevices.map(payload)).toEqual([{ name: "Pool", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "custom", idePassword: "password", ideDoorCount: 1, assignedDeviceId: result.deviceId, assignedProjectId: f.projectId, ...timestamps }]);
   });
   it.each(["claimDevice", "reassignDevice"] as const)("%s preserves stale assignment error payload", async mutation => {
     const f = await fixture("super_admin");
@@ -186,8 +186,8 @@ describe("devices mutation HEAD characterization", () => {
     const s = await noExtraEffects(f);
     const result = { deviceId: s.devices[0]._id, zoneId: s.zones[0]._id, doorIds: s.doors.map(d => d._id) };
     expect(s.zones.map(payload)).toEqual([{ name: "Renamed", projectId: f.projectId, ...timestamps }]);
-    expect(s.devices.map(payload)).toEqual([{ name: "Renamed", projectId: f.projectId, adminDeviceId, brand: "ide_smart", deviceType: "Erişim Paneli", ideUuid: "uuid", ideUser: "user", idePassword: "pass", ideHttpPort: 80, ideDoorCount: 1, isActive: true, status: "active", zoneId: result.zoneId, ...timestamps }]);
-    expect(s.adminDevices.map(payload)).toEqual([{ name: "Renamed", brand: "ide_smart", ideUuid: "uuid", ideUser: "user", idePassword: "pass", ideDoorCount: 1, assignedDeviceId: result.deviceId, assignedProjectId: f.projectId, ...timestamps }]);
+    expect(s.devices.map(payload)).toEqual([{ name: "Renamed", projectId: f.projectId, adminDeviceId, brand: "ide_smart", deviceType: "Erişim Paneli", ideUuid: "123456789012345", ideUser: "user", idePassword: "pass", ideHttpPort: 80, ideDoorCount: 1, isActive: true, status: "active", zoneId: result.zoneId, ...timestamps }]);
+    expect(s.adminDevices.map(payload)).toEqual([{ name: "Renamed", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "user", idePassword: "pass", ideDoorCount: 1, assignedDeviceId: result.deviceId, assignedProjectId: f.projectId, ...timestamps }]);
     expect(s.doors.map(payload)).toEqual([{ name: "Kapı 1", projectId: f.projectId, deviceId: result.deviceId, zoneId: result.zoneId, ioId: 0, status: "active", ...timestamps }]);
     expect(s.readers.map(payload)).toEqual([{ name: "Kapı 1", projectId: f.projectId, deviceId: result.deviceId, zoneId: result.zoneId, doorId: result.doorIds[0], ioId: 0, direction: "entry", status: "active", ...timestamps }]);
   });
@@ -197,7 +197,7 @@ describe("devices mutation HEAD characterization", () => {
     expect(await f.as.mutation(api.devices.reassignDevice, { adminDeviceId, name: " Pool again " })).toBeNull();
     const s = await noExtraEffects(f);
     expect(s.devices).toEqual([]); expect(s.zones).toEqual([]); expect(s.doors).toEqual([]); expect(s.readers).toEqual([]);
-    expect(s.adminDevices.map(payload)).toEqual([{ name: "Pool again", brand: "ide_smart", ideUuid: "uuid", ideUser: "user", idePassword: "pass", ideDoorCount: 1, ...timestamps }]);
+    expect(s.adminDevices.map(payload)).toEqual([{ name: "Pool again", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "user", idePassword: "pass", ideDoorCount: 1, ...timestamps }]);
   });
   it("super-admin rename unassigned pool entry returns null", async () => {
     const f = await fixture("super_admin");
@@ -205,7 +205,7 @@ describe("devices mutation HEAD characterization", () => {
     expect(await f.as.mutation(api.devices.reassignDevice, { adminDeviceId, name: " Renamed " })).toBeNull();
     const s = await noExtraEffects(f);
     expect(s.devices).toEqual([]);
-    expect(s.adminDevices.map(payload)).toEqual([{ name: "Renamed", brand: "ide_smart", ideUuid: "uuid", ideUser: "user", idePassword: "pass", ideDoorCount: 1, ...timestamps }]);
+    expect(s.adminDevices.map(payload)).toEqual([{ name: "Renamed", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "user", idePassword: "pass", ideDoorCount: 1, ...timestamps }]);
   });
   it.each([false, true])("release exact pool cleanup, createdFromDevice=%s", async createdFromDevice => {
     const f = await fixture();
@@ -223,7 +223,7 @@ describe("devices mutation HEAD characterization", () => {
     const s = await noExtraEffects(f);
     expect(s.devices).toEqual([]); expect(s.doors).toEqual([]);
     expect(s.zones).toEqual(before.zones); expect(s.readers).toEqual([]);
-    expect(s.adminDevices.map(payload)).toEqual(createdFromDevice ? [] : [{ name: "Pool", brand: "ide_smart", ideUuid: "uuid", ideUser: "user", idePassword: "pass", ideDoorCount: 1, lastSeen: now, ...timestamps }]);
+    expect(s.adminDevices.map(payload)).toEqual(createdFromDevice ? [] : [{ name: "Pool", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "user", idePassword: "pass", ideDoorCount: 1, lastSeen: now, ...timestamps }]);
   });
   it("super-admin releases an orphan device with its doors and readers", async () => {
     const f = await fixture("super_admin");

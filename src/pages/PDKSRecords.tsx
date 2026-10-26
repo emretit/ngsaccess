@@ -22,6 +22,8 @@ import { PdksRecordsResults } from "@/components/pdks/records/PdksRecordsResults
 import { PdksAssistantSheet } from "@/components/pdks/records/PdksAssistantSheet";
 import { PdksWarningsSheet } from "@/components/pdks/records/PdksWarningsSheet";
 import { PdksDatesSheet } from "@/components/pdks/records/PdksDatesSheet";
+import { CorrectionRequestsEntry, CorrectionRequestsPanel } from "@/components/pdks/CorrectionRequestsPanel";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 const DEFAULT_FILTERS: FilterValues = {
   dateRange: { from: undefined, to: undefined },
   reportType: "daily",
@@ -52,7 +54,10 @@ function PDKSContent({
   const [createShiftOpen, setCreateShiftOpen] = useState(false);
   const { setOpen: setPlanOpen } = useShiftPlanOpen();
   const view = usePdksRecordsView(filters, setFilters);
-  const canSettings = usePermissions().can("schedule.manage");
+  const { can } = usePermissions();
+  const canSettings = can("schedule.manage");
+  const canApprove = can("attendance.approve");
+  const [correctionsOpen, setCorrectionsOpen] = useState(false);
   const {
     projectId, activeProject, canManage, setImport, setWarningsOpen, setAi,
     exportRows, dateRangeLabel, selectedDate, filterSummary, selectedIds,
@@ -82,6 +87,7 @@ function PDKSContent({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {exportMenu}
+                  {canApprove && projectId && <CorrectionRequestsEntry projectId={projectId} onSelect={() => setCorrectionsOpen(true)} />}
                   {canManage && <DropdownMenuItem onClick={() => setImport(true)}>İçe aktar</DropdownMenuItem>}
                   <DropdownMenuItem onClick={() => setWarningsOpen(true)}>
                     Uyarılar
@@ -141,6 +147,17 @@ function PDKSContent({
           <PdksRecordsResults view={view} />
         </div>
       </div>
+      {canApprove && projectId && <Dialog open={correctionsOpen} onOpenChange={setCorrectionsOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>Düzeltme talepleri</DialogTitle>
+            <DialogDescription>Seçili projenin bekleyen PDKS düzeltme taleplerini değerlendirin.</DialogDescription>
+          </DialogHeader>
+          <QuerySectionBoundary resetKey={projectId} title="Düzeltme talepleri yüklenemedi." description="Bağlantınızı kontrol edip yeniden deneyin.">
+            {correctionsOpen && <CorrectionRequestsPanel projectId={projectId} />}
+          </QuerySectionBoundary>
+        </DialogContent>
+      </Dialog>}
       <ShiftPlanSheet onCreateShift={() => setCreateShiftOpen(true)} />
       <PDKSEmployeeDetailDrawer
         returnFocusTo={detailTrigger}

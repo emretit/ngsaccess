@@ -1,4 +1,5 @@
 import { resolveProjectScope } from "./projectScope";
+import { accessBlockReason } from "./accountAccess";
 import { getCurrentUser } from "./auth";
 import { getProjectIdsWithPermission, requirePermission } from "./permissions";
 import { hasVersionedPdksPolicy, loadPdksPolicies, type PdksProjectPolicies } from "./pdksRules";
@@ -71,7 +72,7 @@ export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects
 }
 
 export function selectScheduleProjectIds(user: Doc<"users"> | null, allowed: Id<"projects">[], projectId?: Id<"projects">) {
-  if (!user || user.verified === false) return null;
+  if (!user || user.verified === false || accessBlockReason(user, Date.now()) !== null) return null;
   if (projectId && !allowed.includes(projectId)) return null;
   const projectIds = selectProjectScope(allowed, projectId);
   return projectIds.length ? projectIds : null;
@@ -80,7 +81,7 @@ export function selectScheduleProjectIds(user: Doc<"users"> | null, allowed: Id<
 /** Cron'da oturum yoktur: kayıt sahibinin güncel rolü ve üyelikleri DB'den doğrulanır. */
 export async function resolveScheduleScope(ctx: QueryCtx, schedule: Doc<"reportScheduleSettings">) {
   const user = await ctx.db.get(schedule.userId);
-  if (!user || user.verified === false) return null;
+  if (!user || user.verified === false || accessBlockReason(user, Date.now()) !== null) return null;
   const allowed = await getProjectIdsWithPermission({ ...ctx, user }, user, "reports.view");
   const projectIds = selectScheduleProjectIds(user, allowed, schedule.projectId);
   if (!projectIds) return null;

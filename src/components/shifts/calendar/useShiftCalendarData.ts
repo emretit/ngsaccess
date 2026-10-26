@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import type { Leave } from "../lib/calendarOverlays";
 import { offsetDay, visibleRange, type Employee, type Period } from "../lib/planning";
 
 // Keep definitions outside the plan boundary and range queries inside it.
@@ -35,7 +36,7 @@ export function useShiftCalendarData({ projectId, employees, day, effectivePerio
   });
   const departmentAssignments = useQuery(api.shiftPlans.listDepartmentAssignments, { projectId });
   const departments = useQuery(api.departments.list, { projectId });
-  const leaves = useQuery(api.leaves.listForRange, {
+  const leaves: Leave[] | undefined = useQuery(api.leaves.listForRange, {
     projectId,
     startDate: range.rangeStart,
     endDate: range.rangeEnd,

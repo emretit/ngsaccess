@@ -1,5 +1,30 @@
 import { responseUuid, matchesResponse, boundEvent } from "./ide-mqtt-policy.mjs";
 
+// Forward diagnostic meaning without forwarding panel credentials or card identities.
+function maskedPanelText(value) {
+  if (typeof value !== "string" && typeof value !== "number") return "";
+  return String(value)
+    .replace(/(bearer\s+)[^\s,;]+/gi, "$1[redacted]")
+    .replace(/(["']?(?:password|passwd|pwd|pass|(?:access[_-]?)?token|authorization|card(?:[_ -]?(?:number|no|id))?|user[_ -]?id)["']?\s*[:=]\s*)(?:"[^"\n]*"|'[^'\n]*'|[^,;\n}]*)/gi, "$1[redacted]")
+    .replace(/\b[A-Za-z0-9_+/=-]{24,}\b/g, "[redacted]")
+    .replace(/\d+/g, "[redacted]")
+    .replace(/[\r\n\t]+/g, " ");
+}
+
+function panelRejection(payload) {
+  const rawMessage = typeof payload?.message === "string" ? payload.message : payload?.message?.message;
+  const rawCode = payload?.errorCode ?? payload?.error_code ?? payload?.code ?? payload?.message?.code;
+  const classify = value => typeof value !== "string" ? undefined
+    : /already[ _-]+exists/i.test(value) ? "already_exists"
+    : /not[ _-]+found|does ?n'?t exist|no such|not exist/i.test(value) ? "not_found" : undefined;
+  const errorCode = classify(rawCode) ?? classify(rawMessage);
+  const detail = [maskedPanelText(rawCode), maskedPanelText(rawMessage)].filter(Boolean).join(": ");
+  return {
+    message: (detail || "panel rejected command").slice(0, 200),
+    ...(errorCode ? { errorCode } : {}),
+  };
+}
+
 /** Incoming bridge boundary. Dependencies are explicit so provenance has offline regressions. */
 export async function routeMqttMessage(topic, buf, {
   pending, loginWaiters, tokenCache, convexPost,
@@ -55,7 +80,7 @@ export async function routeMqttMessage(topic, buf, {
         opId,
         msxId,
         result: result === "success" ? "success" : "fail",
-        message: result === "success" ? "panel accepted command" : "panel rejected command",
+        ...(result === "success" ? { message: "panel accepted command" } : panelRejection(parsed?.payload)),
       };
       const r = await convexPost("/ide-bridge/ack", ackBody).catch((e) => ({ ok: false, text: e.message }));
       log(`ack opId=${opId} result=${ackBody.result} → convex ${r.ok ? "OK" : "FAIL"}`);

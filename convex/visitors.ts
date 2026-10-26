@@ -21,6 +21,7 @@ import {
   findDuplicateEmployee,
   DUPLICATE_MESSAGES,
   upsertGroupMembership,
+  removeEmployeeRecord,
 } from "./employees";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeAudit } from "./lib/audit";
@@ -256,6 +257,21 @@ export const getDetail = authedQuery({
         .sort((a, b) => b.accessTime.localeCompare(a.accessTime)).slice(0, 10)
         .map(reading => ({ _id: reading._id, accessTime: reading.accessTime, accessStatus: reading.accessStatus ?? null, direction: reading.direction ?? null, deviceId: reading.deviceId ?? null })),
     };
+  },
+});
+
+/** Ziyaretçi silme: kişi silmeyle aynı cihaz ve KVKK temizliği zinciri. */
+export const removeVisitor = authedMutation({
+  args: { visitorId: v.id("employees") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const visitor = await ctx.db.get(args.visitorId);
+    if (!visitor || visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
+    await requirePermission(ctx, ctx.user, visitor.projectId, "visitors.manage");
+    const allowed = await resolveProjectScope(ctx, visitor.projectId);
+    if (!visitor.projectId || !allowed.includes(visitor.projectId)) throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
+    await removeEmployeeRecord(ctx, visitor, ctx.user);
+    return null;
   },
 });
 

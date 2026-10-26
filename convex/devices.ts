@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { listMobileTargets } from "./lib/mobileAccess";
 import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
   authedQuery,
@@ -20,7 +20,8 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { validateDeviceDoor, deviceActive } from "./lib/deviceUx";
 import { claimDeviceCore, reassignDeviceCore, releaseDeviceCore } from "./lib/deviceAssignment";
-import { assertEhomeIdAvailable, createCore, createIdePanelCore, createHikDeviceCore } from "./lib/deviceProvision";
+import { deviceIdentityError } from "./lib/deviceIdentity";
+import { assertIdeUuidAvailable, assertEhomeIdAvailable, createCore, createIdePanelCore, createHikDeviceCore } from "./lib/deviceProvision";
 import {
   resolveAuthorizedEmployeeIds,
   rosterCardNumbersWithBiometric,
@@ -243,6 +244,20 @@ export const update = authedMutation({
         await assertEhomeIdAvailable(ctx, ehomeID, deviceId);
       }
       clean.ehomeID = ehomeID;
+    }
+    if (typeof clean.ideUuid === "string") {
+      const ideUuid = clean.ideUuid.trim();
+      const error = deviceIdentityError(ideUuid, args.brand ?? device.brand);
+      if (error) throw new ConvexError(error);
+      await assertIdeUuidAvailable(ctx, ideUuid, { exceptDeviceId: deviceId });
+      clean.ideUuid = ideUuid;
+      // Keep the linked pool identity consistent for release and later claims.
+      if (device.adminDeviceId) {
+        const poolDevice = await ctx.db.get(device.adminDeviceId);
+        if (poolDevice?.assignedDeviceId === deviceId) {
+          await ctx.db.patch(poolDevice._id, { ideUuid, updatedAt: new Date().toISOString() });
+        }
+      }
     }
     if (args.status !== undefined || args.isActive !== undefined) {
       const active = deviceActive(args.status, args.isActive ?? device.isActive);
@@ -480,8 +495,20 @@ export const getByIdeUuid = internalQuery({
 export const setIdeUuid = internalMutation({
   args: { deviceId: v.id("devices"), ideUuid: v.string() },
   handler: async (ctx, args) => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    const ideUuid = args.ideUuid.trim();
+    const error = deviceIdentityError(ideUuid);
+    if (error) throw new ConvexError(error);
+    await assertIdeUuidAvailable(ctx, ideUuid, { exceptDeviceId: args.deviceId });
+    if (device.adminDeviceId) {
+      const poolDevice = await ctx.db.get(device.adminDeviceId);
+      if (poolDevice?.assignedDeviceId === device._id) {
+        await ctx.db.patch(poolDevice._id, { ideUuid, updatedAt: new Date().toISOString() });
+      }
+    }
     await ctx.db.patch(args.deviceId, {
-      ideUuid: args.ideUuid,
+      ideUuid,
       updatedAt: new Date().toISOString(),
     });
   },

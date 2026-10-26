@@ -11,7 +11,7 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { assertSameProject, validatePay, employeeDependentTables, assertEmployeeBulkDeleteLimit } from "./lib/employeeUx";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -20,6 +20,14 @@ import { MutationCtx, QueryCtx } from "./_generated/server";
 import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeEmployeePassword } from "./lib/employeeAuth";
+import { visitorSensitiveFields } from "./lib/visitorStatus";
+
+function assertEmployeeRecord(emp: Doc<"employees">) {
+  if (emp.isVisitor === true) throw new ConvexError({
+    code: "VISITOR_USE_VISITOR_SCREEN",
+    message: "Ziyaretçi kayıtları Ziyaretçiler ekranından yönetilir.",
+  });
+}
 
 /** Employee form dates are stored at the inclusive start of their Turkey calendar day. */
 export function normalizeEmployeeAccessStart(value: string | null | undefined): string | undefined {
@@ -159,9 +167,16 @@ export const getById = authedQuery({
     if (!emp.projectId && ctx.user.role !== "super_admin") {
       return null;
     }
+    const canManageVisitor = emp.isVisitor === true
+      ? await hasPermission(ctx, ctx.user, emp.projectId, "visitors.manage")
+      : false;
+    if (emp.isVisitor === true && !canManageVisitor) return null;
     await requirePermission(ctx, ctx.user, emp.projectId, "employees.view");
+    const visitorFields = emp.isVisitor === true ? visitorSensitiveFields(emp, canManageVisitor) : undefined;
     return {
       ...emp,
+      ...visitorFields,
+      tcNo: visitorFields?.tcNo ?? emp.tcNo,
       terminationReason: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminationReason : undefined,
       sgkExitCode: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.sgkExitCode : undefined,
       terminatedBy: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminatedBy : undefined,
@@ -196,6 +211,7 @@ export const create = authedMutation({
   },
   handler: async (ctx, args) => {
     await requirePermission(ctx, ctx.user, args.projectId, "employees.manage");
+    if (args.accessRuleId !== undefined) await requirePermission(ctx, ctx.user, args.projectId, "accessRules.manage");
     if (args.hourlyRate !== undefined || args.monthlySalary !== undefined) await requirePermission(ctx, ctx.user, args.projectId, "pay.view");
     if (args.projectId) {
       const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -279,7 +295,12 @@ export const update = authedMutation({
       throw new Error("Bu çalışana erişim yetkiniz yok");
     }
     await requirePermission(ctx, ctx.user, emp.projectId, "employees.manage");
-    if (updates.accessStartsAt !== undefined && emp.isVisitor) throw new Error("Ziyaretçi erişim başlangıcı ziyaretçi akışından yönetilir");
+    assertEmployeeRecord(emp);
+    if (updates.projectId !== undefined && updates.projectId !== emp.projectId) throw new ConvexError({
+      code: "EMPLOYEE_PROJECT_MOVE_UNSUPPORTED",
+      message: "Kişi başka projeye taşınamaz. Yeni projede yeni kayıt açın, eski kaydı işten çıkarın.",
+    });
+    if (updates.accessRuleId !== undefined) await requirePermission(ctx, ctx.user, emp.projectId, "accessRules.manage");
     const accessStartsAt = updates.accessStartsAt === undefined ? emp.accessStartsAt : normalizeEmployeeAccessStart(updates.accessStartsAt);
     const accessStartChanged = accessStartsAt !== emp.accessStartsAt;
     if (updates.accessStartsAt !== undefined) updates.accessStartsAt = accessStartsAt ?? null;
@@ -361,7 +382,7 @@ export const update = authedMutation({
   returns: v.id("employees"),
 });
 
-async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"users"> }, emp: Doc<"employees">) {
+export async function removeEmployeeRecord(ctx: MutationCtx, emp: Doc<"employees">, actor: Doc<"users">) {
     const snapshot = await snapshotEmployeeHikDevices(ctx, emp);
     await ctx.scheduler.runAfter(
       0,
@@ -400,7 +421,7 @@ async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"us
     }
 
     // KVKK cascade: biyometrik veri sil, rıza iptal, cardReadings PII anonimleştir
-    await cascadeRemoveEmployeePII(ctx, emp._id);
+    await cascadeRemoveEmployeePII({ ...ctx, user: actor }, emp._id);
 
     await ctx.db.delete(emp._id);
 }
@@ -418,7 +439,8 @@ export const remove = authedMutation({
     ) {
       throw new Error("Bu çalışana erişim yetkiniz yok");
     }
-    await removeEmployeeWithDependencies(ctx, emp);
+    assertEmployeeRecord(emp);
+    await removeEmployeeRecord(ctx, emp, ctx.user);
   },
   returns: v.null(),
 });
@@ -436,9 +458,10 @@ export const bulkDelete = authedMutation({
       if (emp && ((!emp.projectId && ctx.user.role !== "super_admin") || (emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)))) {
         throw new Error(`Çalışan ${emp.firstName} ${emp.lastName} için erişim yetkiniz yok`);
       }
+      if (emp) assertEmployeeRecord(emp);
     }
     for (const emp of employees.filter((p): p is NonNullable<typeof p> => p !== null)) {
-      await removeEmployeeWithDependencies(ctx, emp);
+      await removeEmployeeRecord(ctx, emp, ctx.user);
     }
   },
   returns: v.null(),

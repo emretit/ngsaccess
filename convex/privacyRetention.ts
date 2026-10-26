@@ -1,10 +1,10 @@
-import { requirePermission } from "./lib/permissions";
+import { hasPermission, requirePermission } from "./lib/permissions";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getCurrentUser, getProjectIdsForUser } from "./lib/auth";
 import { getPrivacyRow, getPrivacySettings, upsertPrivacySettings } from "./lib/privacySettings";
 import { writeAudit } from "./lib/audit";
 import { RETENTION_BATCH_SIZE, retentionBatchPlan, retentionCutoff, validRetentionDays } from "./lib/cardReadingRetention";
@@ -61,8 +61,10 @@ export const getAssistantPrivacy = internalQuery({
 export const getAssistantContext = internalQuery({
   args: { projectId: v.id("projects"), forceMaskNames: v.optional(v.boolean()) },
   handler: async (ctx, { projectId, forceMaskNames }): Promise<string> => {
-    await requireProject(ctx, projectId);
-    const aiMaskNames = forceMaskNames === true || (await getPrivacySettings(ctx, projectId)).aiMaskNames;
+    const user = await getCurrentUser(ctx);
+    await requirePermission(ctx, user, projectId, "reports.view", "Bu projeye erişim yetkiniz yok.");
+    const aiMaskNames = forceMaskNames === true || !(await hasPermission(ctx, user, projectId, "employees.view"))
+      || (await getPrivacySettings(ctx, projectId)).aiMaskNames;
     const rows = await ctx.db.query("cardReadings").withIndex("by_project_access_time", q => q.eq("projectId", projectId)).order("desc").take(21);
     const readings = filterPdksReadings(rows.slice(0, 20), projectId);
     const sample = maskChatNames(readings.slice(0, 5).map(row => ({ employeeId: row.employeeId, employeeName: row.employeeName, time: row.accessTime, status: row.accessStatus })), aiMaskNames)

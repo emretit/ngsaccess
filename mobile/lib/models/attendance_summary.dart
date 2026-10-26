@@ -176,7 +176,8 @@ class AttendanceSummary {
             days.fold<int>(0, (sum, day) => sum + day.deniedCount) ||
         totals.unknownCount !=
             days.fold<int>(0, (sum, day) => sum + day.unknownCount) ||
-        totals.presentDays != days.where((day) => day.entryCount > 0).length) {
+        // Presence follows server rules and can include manual days without punches.
+        totals.presentDays > days.length) {
       throw const FormatException('Inconsistent attendance summary');
     }
     return AttendanceSummary(

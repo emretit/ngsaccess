@@ -48,9 +48,6 @@ export function EmployeePasswordResetDialog({
     try {
       const result = await sendSetupEmail({
         employeeId: employee._id,
-        email,
-        firstName,
-        lastName,
       });
       if (!result.success) {
         throw new Error(result.error ?? "Mail gönderilemedi");

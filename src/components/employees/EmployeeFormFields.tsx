@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError } from "@/components/shared/FormFieldWrapper";
 import type { EmployeeFormData } from "./hooks/useEmployeeFormData";
+import { usePermissions } from "@/hooks/usePermissions";
 interface Option {
   id: string;
   name: string;
@@ -51,6 +52,8 @@ export default function EmployeeFormFields({
   originalDepartmentId = null,
   memberships,
 }: Props) {
+  const { can } = usePermissions();
+  const canManageAccessRules = can("accessRules.manage");
   const [otherOpen, setOtherOpen] = useState(false);
   useEffect(() => {
     if (errors.hourlyRate || errors.monthlySalary) setOtherOpen(true);
@@ -132,7 +135,11 @@ export default function EmployeeFormFields({
         id={`employee-${key}`}
         name={key}
         className="mt-1 h-9 max-sm:min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
-        aria-describedby={options.length === 0 ? `employee-${key}-empty` : undefined}
+        disabled={key === "accessRuleId" && !canManageAccessRules}
+        aria-describedby={[
+          options.length === 0 && `employee-${key}-empty`,
+          key === "accessRuleId" && !canManageAccessRules && "employee-accessRuleId-permission",
+        ].filter(Boolean).join(" ") || undefined}
         value={formData[key] ?? ""}
         onChange={(e) =>
           update(key, (e.target.value || null) as EmployeeFormData[typeof key])
@@ -147,6 +154,11 @@ export default function EmployeeFormFields({
           </option>
         ))}
       </select>
+      {key === "accessRuleId" && !canManageAccessRules && (
+        <p id="employee-accessRuleId-permission" className="mt-1 text-xs text-muted-foreground">
+          Kural eklemek için erişim kurallarını yönetme yetkisi gerekir.
+        </p>
+      )}
       {options.length === 0 && (
         <p id={`employee-${key}-empty`} className="mt-1 text-xs text-muted-foreground">
           {{
@@ -187,6 +199,15 @@ export default function EmployeeFormFields({
       {section(
         "Organizasyon",
         <>
+          {isEditing && (
+            <div>
+              <Label htmlFor="employee-projectId">Proje</Label>
+              <Input id="employee-projectId" value="Mevcut proje" disabled aria-describedby="employee-projectId-hint" />
+              <p id="employee-projectId-hint" className="mt-1 text-xs text-muted-foreground">
+                Kişi başka projeye taşınamaz. Yeni projede yeni kayıt açın, eski kaydı işten çıkarın.
+              </p>
+            </div>
+          )}
           <div className="grid gap-x-4 gap-y-3 sm:grid-cols-3">
             {select("companyId", "Şirket", companies)}
             {select("departmentId", "Departman", departments)}

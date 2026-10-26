@@ -105,7 +105,7 @@ it("D-1: HR without pay.view cannot create or update salary, but ordinary edits 
   await hr.as.mutation(api.employees.update, { employeeId, notes: "safe" });
   expect(await f.t.run(ctx => ctx.db.get(employeeId))).toMatchObject({ notes: "safe", monthlySalary: 50000 });
 });
-it("F1-D1: moving a paid employee needs pay.view in the source project", async () => {
+it("F1-D1: moving an employee to another project is rejected (sistem audit K-02)", async () => {
   const f = await setup();
   const hr = await f.member("hr");
   const otherProjectId = await f.t.run(async ctx => {
@@ -115,11 +115,11 @@ it("F1-D1: moving a paid employee needs pay.view in the source project", async (
     return id;
   });
   const paid = await f.t.run(ctx => ctx.db.insert("employees", { projectId: f.projectId, firstName: "A", lastName: "B", email: "", cardNumber: "", monthlySalary: 50000 }));
-  await expect(hr.as.mutation(api.employees.update, { employeeId: paid, projectId: otherProjectId })).rejects.toThrow("Bu işlem için yetkiniz yok");
+  await expect(hr.as.mutation(api.employees.update, { employeeId: paid, projectId: otherProjectId })).rejects.toThrow("EMPLOYEE_PROJECT_MOVE_UNSUPPORTED");
   expect(await f.t.run(ctx => ctx.db.get(paid))).toMatchObject({ projectId: f.projectId });
   const unpaid = await f.t.run(ctx => ctx.db.insert("employees", { projectId: f.projectId, firstName: "C", lastName: "D", email: "", cardNumber: "" }));
-  await hr.as.mutation(api.employees.update, { employeeId: unpaid, projectId: otherProjectId });
-  expect(await f.t.run(ctx => ctx.db.get(unpaid))).toMatchObject({ projectId: otherProjectId });
+  await expect(hr.as.mutation(api.employees.update, { employeeId: unpaid, projectId: otherProjectId })).rejects.toThrow("EMPLOYEE_PROJECT_MOVE_UNSUPPORTED");
+  expect(await f.t.run(ctx => ctx.db.get(unpaid))).toMatchObject({ projectId: f.projectId });
 });
 it("F1-D3: attendance detail pay follows pay.view in the employee's project", async () => {
   const f = await setup();

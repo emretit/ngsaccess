@@ -329,7 +329,7 @@ describe("Hik revocation fix regressions", () => {
     expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "failed" });
   });
 
-  it("card and project change captures old project before patch and synchronizes new project", async () => {
+  it("K-02: card and project change is rejected before old identity or device targets change", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {
       await ctx.db.insert("userProjects", { userId: f.ids.userId, projectId: f.ids.otherProjectId });
@@ -337,10 +337,14 @@ describe("Hik revocation fix regressions", () => {
       await ctx.db.insert("groupMembers", { projectId: f.ids.otherProjectId, groupId, employeeId: f.ids.employeeId, createdAt: "" });
       await ctx.db.insert("groupDevices", { projectId: f.ids.otherProjectId, groupId, deviceId: f.ids.foreignDeviceId, createdAt: "" });
     });
-    await f.admin.mutation(api.employees.update, { employeeId: f.ids.employeeId, projectId: f.ids.otherProjectId, cardNumber: "NEW" });
+    const snapshot = await f.snapshot();
+    await expect(f.admin.mutation(api.employees.update, { employeeId: f.ids.employeeId, projectId: f.ids.otherProjectId, cardNumber: "NEW" })).rejects.toThrow("EMPLOYEE_PROJECT_MOVE_UNSUPPORTED");
+    expect(await f.t.run(ctx => ctx.db.get(f.ids.employeeId))).toMatchObject({ projectId: f.ids.projectId, cardNumber: "OLD" });
+    expect(await f.snapshot()).toEqual(snapshot);
+    expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
     await f.drain();
-    expect(wire.remove).toHaveBeenCalledExactlyOnceWith("local-index", "OLD");
-    expect(wire.send).toHaveBeenCalledWith("foreign-index", expect.objectContaining({ employeeNo: "NEW" }));
+    expect(wire.remove).not.toHaveBeenCalled();
+    expect(wire.send).not.toHaveBeenCalled();
   });
 
   it.each(["device", "identity", "moved", "gateway"] as const)("unresolvable %s deletion needs super admin, reason and audit", async missing => {

@@ -1,8 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import EmployeeFormFields, { DepartmentShiftWarning } from "./EmployeeFormFields";
 import type { EmployeeFormData } from "./hooks/useEmployeeFormData";
+const permission = vi.hoisted(() => ({ accessRules: true }));
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => permission.accessRules }) }));
+afterEach(() => { permission.accessRules = true; });
 const formData: EmployeeFormData = { firstName: "", lastName: "", email: "", tcNo: "", cardNumber: "", payrollCode: "", companyId: null, departmentId: null, positionId: null, accessRuleId: null, shift: null, shiftId: null, photoUrl: null, notes: "", isActive: true, hourlyRate: null, monthlySalary: null };
 function render(autoFocusFirstName: boolean) { return renderToStaticMarkup(<EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} autoFocusFirstName={autoFocusFirstName} />); }
 it("02-O8: gives access its own fieldset and unambiguous empty option", () => {
@@ -78,4 +81,20 @@ it("taslaktan değişmiş departmanla yeniden açılışta özgün çalışan de
   expect(renderDraft()).toContain("Departman vardiya planı geçmiş günlere de uygulanır");
   expect(renderDraft()).toContain("Departman vardiya planı geçmiş günlere de uygulanır");
   expect(renderToStaticMarkup(<MemoryRouter><EmployeeFormFields {...props} formData={{ ...props.formData, departmentId: original }} /></MemoryRouter>)).not.toContain("Departman vardiya planı geçmiş günlere de uygulanır");
+});
+
+it("K-01: erişim kuralı seçimi yetki yoksa pasiftir ve nedeni açıklanır", () => {
+  permission.accessRules = false;
+  const denied = render(false);
+  expect(denied).toMatch(/<select[^>]*id="employee-accessRuleId"[^>]*disabled=""[^>]*aria-describedby="[^"]*employee-accessRuleId-permission/);
+  expect(denied).toContain("Kural eklemek için erişim kurallarını yönetme yetkisi gerekir.");
+  permission.accessRules = true;
+  expect(render(false)).not.toMatch(/<select[^>]*id="employee-accessRuleId"[^>]*disabled/);
+});
+
+it("K-02: düzenlemede proje alanı pasiftir ve güvenli yeniden kayıt yolunu açıklar", () => {
+  const html = renderToStaticMarkup(<MemoryRouter><EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} isEditing /></MemoryRouter>);
+  expect(html).toMatch(/<input[^>]*id="employee-projectId"[^>]*disabled=""/);
+  expect(html).toContain("Kişi başka projeye taşınamaz. Yeni projede yeni kayıt açın, eski kaydı işten çıkarın.");
+  expect(render(false)).not.toContain('id="employee-projectId"');
 });

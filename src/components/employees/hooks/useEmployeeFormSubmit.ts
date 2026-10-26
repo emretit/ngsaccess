@@ -139,10 +139,6 @@ export const useEmployeeFormSubmit = (
         try {
           const result = await sendSetupEmail({
             employeeId: savedId,
-            email: sharedPayload.email,
-            firstName: sharedPayload.firstName,
-            lastName: sharedPayload.lastName,
-            projectId: formData.projectId,
           });
           append(
             result.success

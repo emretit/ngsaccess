@@ -36,7 +36,11 @@ describe("kart okuma saklama planı", () => {
 });
 
 const auth = vi.hoisted(() => ({ allowed: ["project-a"] }));
-vi.mock("./auth", () => ({ getProjectIdsForUser: async () => auth.allowed }));
+vi.mock("./auth", () => ({
+  getProjectIdsForUser: async () => auth.allowed,
+  // Bağlamda kullanıcı yoksa (sunucu bağlamı testleri) super_admin: izin kontrolü DB okumadan geçer.
+  getCurrentUser: async (ctx: { user?: unknown }) => ctx.user ?? { _id: "admin", role: "super_admin" },
+}));
 vi.mock("./customFunctions", () => ({
   authedMutation: (definition: { handler: unknown }) => ({ _handler: definition.handler }),
   authedQuery: (definition: { handler: unknown }) => ({ _handler: definition.handler }),

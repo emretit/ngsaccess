@@ -18,6 +18,7 @@ export const AUDIT_TARGET_LABELS: Record<string, string> = {
   generalSettings: "Genel ayarlar",
   overtimeRates: "Mesai oranı",
   employees: "Çalışan",
+  employeeAuth: "Çalışan mobil hesabı",
   employeeConsents: "Çalışan izni / Ziyaretçi onayı",
   deviceEvents: "Cihaz olayı / Alarm",
   attendanceCorrections: "PDKS düzeltme talebi",

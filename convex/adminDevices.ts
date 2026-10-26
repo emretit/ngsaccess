@@ -6,6 +6,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { adminDeviceRow, adminPaginationOptions, adminSearch } from "./lib/adminLists";
 import { deviceConnection } from "./lib/deviceConnection";
 import { deviceIdentityError } from "./lib/deviceIdentity";
+import { assertIdeUuidAvailable } from "./lib/deviceProvision";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { superAdminQuery, superAdminMutation, authedQuery } from "./lib/customFunctions";
@@ -84,17 +85,7 @@ export const register = superAdminMutation({
     const identityError = deviceIdentityError(ideUuid, args.brand);
     if (identityError) throw new Error(identityError);
 
-    const existing = await ctx.db
-      .query("adminDevices")
-      .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
-      .first();
-    if (existing) throw new Error("Bu UUID zaten kayıtlı");
-
-    const existingDevice = await ctx.db
-      .query("devices")
-      .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
-      .first();
-    if (existingDevice) throw new Error("Bu UUID zaten bir projeye atanmış cihazda kayıtlı");
+    await assertIdeUuidAvailable(ctx, ideUuid);
 
     const defaults = await ctx.db.query("ideDefaults").first();
     const ideUser = defaults?.ideUser ?? "admin";

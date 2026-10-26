@@ -91,7 +91,7 @@ describe("assertEhomeIdAvailable", () => {
   it("preserves IDE and other creation without an ehomeID", async () => {
     const f = await fixture();
     await create(f, "hik", "NGS0001");
-    await f.as.mutation(api.devices.createIdePanel, { name: "IDE", projectId: f.projectId, ideUuid: "ide-unique" });
+    await f.as.mutation(api.devices.createIdePanel, { name: "IDE", projectId: f.projectId, ideUuid: "123456789012345" });
     await f.as.mutation(api.devices.create, { name: "Other", projectId: f.projectId, brand: "other" });
     const state = await snapshot(f);
     expect(state.devices.map((device) => device.brand)).toEqual(["hikvision", "ide_smart", "other"]);

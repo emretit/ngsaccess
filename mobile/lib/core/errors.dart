@@ -106,6 +106,22 @@ class BusinessError extends AppError {
   String get userMessage => isAccessDenied
       ? 'Erişim reddedildi.'
       : switch (safeCode) {
+          'SUMMARY_TOO_LARGE' =>
+            "Bu dönem için özet oluşturulamıyor. Tarih aralığını küçültün.",
+          'INVALID_CURSOR' =>
+            "Geçmiş sayfası artık geçerli değil. Listeyi yenileyin.",
+          'DEVICE_NOT_FOUND' =>
+            "Cihaz bu projede bulunamadı. Cihaz seçimini yenileyin veya yöneticinize başvurun.",
+          'SUMMARY_INVALID_DATA' =>
+            "Kayıt zamanları doğrulanamadı. Kayıtların kontrolü için yöneticinize başvurun.",
+          'VISITOR_INVALID' =>
+            "Ziyaretçi bilgileri veya liste sayfası geçersiz. Bilgileri ve tarihleri kontrol edin; gerekirse listeyi yenileyin.",
+          'VISITOR_LOCKED' =>
+            "Bu davet artık düzenlenemiyor. Daveti yenileyin veya operatöre başvurun.",
+          'VISITOR_NOTICE_CHANGED' =>
+            "Ziyaretçi aydınlatma metni değişti. Davet formunu yenileyip güncel metni okuyun ve tekrar onaylayın.",
+          'REQUEST_CONFLICT' =>
+            "Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin.",
           'REQUEST_PROJECT_MISSING' => "Çalışanın proje bilgisi bulunamadı",
           'REQUEST_NOTE_TOO_LONG' => "Not en fazla 500 karakter olabilir",
           'REQUEST_DATE_INVALID' => "Geçerli bir tarih girin (YYYY-MM-DD)",
@@ -187,6 +203,14 @@ String? normalizeBusinessCode(String? code) => switch (code) {
   'RATE_LIMITED' ||
   'TOO_MANY_ATTEMPTS' ||
   'AUTH_RATE_LIMITED' => 'RATE_LIMITED',
+  'SUMMARY_TOO_LARGE' ||
+  'INVALID_CURSOR' ||
+  'DEVICE_NOT_FOUND' ||
+  'SUMMARY_INVALID_DATA' ||
+  'VISITOR_INVALID' ||
+  'VISITOR_LOCKED' ||
+  'VISITOR_NOTICE_CHANGED' ||
+  'REQUEST_CONFLICT' ||
   'PROTOCOL_ERROR' ||
   'CONFIGURATION_ERROR' ||
   'SESSION_CHANGED' ||

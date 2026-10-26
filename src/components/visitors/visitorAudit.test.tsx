@@ -13,11 +13,13 @@ import { VisitorDetailView } from "./VisitorSlideOverPanel";
 import type { VisitorDetail } from "@/types/visitor";
 import type { VisitorFormData } from "./hooks/useVisitorFormData";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { getFunctionName, type FunctionReference } from "convex/server";
 
 const notice = vi.hoisted(() => ({ value: { url: null, version: null } as { url: string | null; version: string | null } }));
 const pageData = vi.hoisted(() => ({ value: { page: [] as VisitorDetail[], isDone: true, continueCursor: "done" } }));
+const mutationNames = vi.hoisted(() => [] as string[]);
 vi.mock("@/hooks/useVisitors", () => ({ useVisitors: () => ({ page: pageData.value }) }));
-vi.mock("convex/react", () => ({ useQuery: () => notice.value, useMutation: () => vi.fn() }));
+vi.mock("convex/react", () => ({ useQuery: () => notice.value, useMutation: (ref: FunctionReference<"mutation">) => { mutationNames.push(getFunctionName(ref)); return vi.fn(); } }));
 vi.mock("./VisitorCardCapture", () => ({ default: () => <div>Kart okuyucusu</div> }));
 const noop = () => undefined;
 const form: VisitorFormData = {
@@ -34,6 +36,12 @@ const detail: VisitorDetail = {
 };
 
 describe("visitor audit fixes", () => {
+  it("K-06: uses the visitor deletion endpoint for the security role's delete action", () => {
+    mutationNames.length = 0;
+    renderToStaticMarkup(<VisitorDetailView now={0} detail={detail} canManage onEdit={noop} onDeleted={noop} />);
+    expect(mutationNames).toContain("visitors:removeVisitor");
+    expect(mutationNames).not.toContain("employees:remove");
+  });
   it("schedules no idle polling, one wakeup at the nearest expiry, and caps distant timers", () => {
     expect(visitorExpiryDelay(null, 1000)).toBeNull();
     expect(visitorExpiryDelay(1500, 1000)).toBe(501);

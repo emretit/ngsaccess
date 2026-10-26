@@ -622,5 +622,13 @@
   "requestsLeavePaternity": "Paternity leave",
   "requestsLeaveLactation": "Lactation leave",
   "requestsLeaveCompensatory": "Compensatory leave",
-  "requestsWithdrawUncertain": "The request may have been withdrawn; check the list."
+  "requestsWithdrawUncertain": "The request may have been withdrawn; check the list.",
+  "errorSummaryTooLarge": "This period is too large to summarize. Select a shorter date range.",
+  "errorInvalidCursor": "This history page is no longer valid. Refresh the list.",
+  "errorDeviceNotFound": "The device could not be found in this project. Refresh your device selection or contact your administrator.",
+  "errorSummaryInvalidData": "Record times could not be verified. Contact your administrator to check the records.",
+  "errorVisitorInvalid": "Visitor details or the list page are invalid. Check the details and dates; refresh the list if needed.",
+  "errorVisitorLocked": "This invitation can no longer be edited. Refresh the invitation or contact the operator.",
+  "errorVisitorNoticeChanged": "The visitor privacy notice has changed. Refresh the invitation form, read the updated notice and confirm again.",
+  "errorRequestConflict": "This request was already saved with different visitor details. Refresh the visitor list and check the existing invitation."
 }

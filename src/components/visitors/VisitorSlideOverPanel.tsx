@@ -56,7 +56,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
   const [confirmation, setConfirmation] = useState<"checkout" | "release" | "delete" | null>(null);
   const checkOut = useMutation(api.visitors.checkOut);
   const releaseCard = useMutation(api.visitors.releaseCard);
-  const remove = useMutation(api.employees.remove);
+  const remove = useMutation(api.visitors.removeVisitor);
   const status = visitorStatusInfo[displayVisitorStatus(detail, now)];
   const needsCard = detail.cardNumber.startsWith("PRE:");
   const name = `${detail.firstName} ${detail.lastName}`;
@@ -93,7 +93,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
       confirmLabel={confirmation === "delete" ? "Kaydı sil" : confirmation === "release" ? "Kartı serbest bırak" : "Ziyareti sonlandır"}
       effects={confirmation === "delete" ? ["Ziyaretçi kaydı ve bölge üyelikleri kalıcı olarak silinir.", "Cihazlardan kaldırma işlemi başlatılır; bağlı kişisel veriler temizlenir."] : confirmation === "release" ? ["Fiziksel kartı teslim aldığınızı doğrulayın. Kart numarası başka ziyaretçiye verilebilir."] : ["Erişim pasife alınır; cihazlardan kaldırma işlemi başlatılır.", "Fiziksel çıkış okuması oluşmaz; kart iadesi ayrıdır."]}
       onConfirm={async () => {
-        if (confirmation === "delete") { await remove({ employeeId: detail._id }); notify.success("Ziyaretçi kaydı silindi"); onDeleted(); }
+        if (confirmation === "delete") { await remove({ visitorId: detail._id }); notify.success("Ziyaretçi kaydı silindi"); onDeleted(); }
         else if (confirmation === "release") { await releaseCard({ visitorId: detail._id }); notify.success("Kart serbest bırakıldı"); }
         else if (confirmation === "checkout") { await checkOut({ visitorId: detail._id }); notify.success("Ziyaret sonlandırıldı", "Cihaz işlemleri arka planda yürütülüyor."); }
       }} />

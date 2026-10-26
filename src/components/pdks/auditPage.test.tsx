@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import PDKSRecords from "@/pages/PDKSRecords";
 import type { FilterValues } from "./dashboard/PDKSFilterBar";
 const state = vi.hoisted(() => ({ admin: false, reportType: "daily" as FilterValues["reportType"] }));
-vi.mock("convex/react", () => ({ useQuery: () => ({ leaves: 0, corrections: 0, capped: false }), useMutation: () => vi.fn() }));
+vi.mock("convex/react", () => ({ useQuery: () => ({ count: 2, capped: false }), useMutation: () => vi.fn() }));
 vi.mock("@/components/shifts/ShiftTree", () => ({ ShiftTree: () => <div>Vardiya ağacı</div> }));
 vi.mock("@/components/shifts/ShiftPlanSheet", () => ({ ShiftPlanSheet: () => null, useShiftPlanOpen: () => ({ setOpen: vi.fn() }) }));
 vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn(), Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a> }));
@@ -47,7 +47,8 @@ describe("PDKS sayfa davranışları", () => {
     const html = renderToStaticMarkup(<PDKSRecords />);
     expect(html).toContain("İçe aktar");
     expect(html).toContain("Puantaj tablosu");
-    expect(html).not.toContain("Düzeltme talepleri");
+    expect(html).toContain("Düzeltme talepleri");
+    expect(html).toContain("Bekleyen düzeltme sayısı");
   });
   it("Ayarlar düğmesi yalnız vardiya yöneticisine görünür ve ayrı ayar sayfasına gider", () => {
     state.reportType = "daily"; state.admin = false;

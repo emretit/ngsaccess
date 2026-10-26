@@ -34,3 +34,38 @@ test("actual bridge drops common events, malformed payload and foreign source th
   await routeMqttMessage("event/9001/access/online", body, f);
   assert.deepEqual(f.requests, [{ path: "/ide-bridge/event", body: { topic: "event/access/online", body: body.toString("utf8") } }]);
 });
+
+test("panel rejection preserves already_exists contract and masks credentials/card numbers", async () => {
+  const f = fixture();
+  f.pending.set(42, { opId: "operation-a", deviceUuid: "9001" });
+  const body = Buffer.from(JSON.stringify({ transaction: { "src-id": 9001, "msx-id": 42 },
+    payload: { result: "fail", code: "already_exists", message: 'already exists: cardNumber=12345678; password="secret phrase"; token=abc-def; record 87654321' } }));
+  await routeMqttMessage("device/publish/9001", body, f);
+  assert.deepEqual(f.requests, [{ path: "/ide-bridge/ack", body: { opId: "operation-a", msxId: 42,
+    result: "fail", errorCode: "already_exists", message: 'already_exists: already exists: cardNumber=[redacted]; password=[redacted]; token=[redacted]; record [redacted]' } }]);
+});
+
+test("message-only not found, nested message, sensitive objects, and long diagnostics are bounded", async () => {
+  for (const payload of [
+    { message: "record not found" },
+    { message: { code: "not_found", message: "record missing", password: "never forward" } },
+    { code: "E42", message: "failure " + "diagnostic ".repeat(100) + " token=secret" },
+    { message: { password: "never forward" } },
+  ]) {
+    const f = fixture(); f.pending.set(42, { opId: "operation-a", deviceUuid: "9001" });
+    await routeMqttMessage("device/publish/9001", Buffer.from(JSON.stringify({
+      transaction: { "src-id": 9001, "msx-id": 42 }, payload: { ...payload, result: "fail" },
+    })), f);
+    const ack = f.requests[0]?.body;
+    assert.ok(ack.message.length <= 200);
+    assert.doesNotMatch(ack.message, /never forward|secret|42/);
+    if (payload.message === "record not found" || payload.message?.code === "not_found") assert.equal(ack.errorCode, "not_found");
+  }
+});
+
+test("explicit panel code takes priority over contradictory diagnostic text", async () => {
+  const f = fixture(); f.pending.set(42, { opId: "operation-a", deviceUuid: "9001" });
+  await routeMqttMessage("device/publish/9001", Buffer.from(JSON.stringify({ transaction: { "src-id": 9001, "msx-id": 42 },
+    payload: { result: "fail", code: "not_found", message: "already exists in previous command" } })), f);
+  assert.equal(f.requests[0]?.body.errorCode, "not_found");
+});

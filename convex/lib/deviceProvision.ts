@@ -11,6 +11,7 @@ import {
   resolveOrCreateZone,
 } from "./deviceHelpers";
 import { deviceActive } from "./deviceUx";
+import { deviceIdentityError } from "./deviceIdentity";
 
 /** Global physical identity: includes inactive devices and devices in other projects. */
 export async function assertEhomeIdAvailable(
@@ -30,6 +31,51 @@ export async function assertEhomeIdAvailable(
       code: "HIK_EHOME_ID_IN_USE",
       message: "Bu Device ID (ehomeID) başka bir cihaz kaydında kullanılıyor. Önce eski kaydı silin, sonra tekrar ekleyin.",
     });
+  }
+}
+
+/** UUID ownership spans the pool and project devices, including inactive records. */
+export async function assertIdeUuidAvailable(
+  ctx: MutationCtx,
+  ideUuid: string | undefined,
+  except: { exceptDeviceId?: Id<"devices">; exceptAdminDeviceId?: Id<"adminDevices"> } = {},
+) {
+  const normalized = ideUuid?.trim();
+  if (!normalized) return;
+  const devices = await ctx.db.query("devices")
+    .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", normalized)).take(2);
+  const adminDevices = await ctx.db.query("adminDevices")
+    .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", normalized)).take(2);
+  const ownDevice = except.exceptDeviceId ? await ctx.db.get(except.exceptDeviceId) : null;
+  const ownAdminId = except.exceptAdminDeviceId ?? ownDevice?.adminDeviceId ??
+    adminDevices.find((device) => except.exceptDeviceId && device.assignedDeviceId === except.exceptDeviceId)?._id;
+  if (devices.some((device) => device._id !== except.exceptDeviceId) ||
+      adminDevices.some((device) => device._id !== ownAdminId)) {
+    throw new ConvexError({
+      code: "IDE_UUID_IN_USE",
+      message: "Bu IDE panel UUID'si başka bir cihaz kaydında kullanılıyor.",
+    });
+  }
+}
+
+/** Roster ownership survives release/removal of the project device. */
+export async function assertIdeRosterMovable(
+  ctx: MutationCtx,
+  ideUuid: string | undefined,
+  targetProjectId: Id<"projects"> | undefined,
+) {
+  const normalized = ideUuid?.trim();
+  if (!normalized || !targetProjectId) return;
+  const roster = ctx.db.query("idePanelUsers")
+    .withIndex("by_uuid", (q) => q.eq("ideUuid", normalized));
+  for await (const row of roster) {
+    const projectId = row.projectId ?? (await ctx.db.get(row.deviceId))?.projectId;
+    if (projectId !== targetProjectId) {
+      throw new ConvexError({
+        code: "IDE_DEVICE_MOVE_UNSUPPORTED",
+        message: "IDE paneli başka projeye taşınamaz; önce paneldeki kişiler silinmeli (yakında). Destek ile iletişime geçin.",
+      });
+    }
   }
 }
 
@@ -79,6 +125,13 @@ export async function createCore(
   }
   const now = new Date().toISOString();
   const { newZoneName, ...deviceArgs } = args;
+  const ideUuid = args.ideUuid?.trim();
+  if (ideUuid !== undefined) {
+    const error = deviceIdentityError(ideUuid, args.brand);
+    if (error) throw new ConvexError(error);
+    await assertIdeUuidAvailable(ctx, ideUuid);
+    await assertIdeRosterMovable(ctx, ideUuid, args.projectId);
+  }
   const ehomeID = args.ehomeID?.trim();
   await assertEhomeIdAvailable(ctx, ehomeID);
   const zoneId =
@@ -95,6 +148,7 @@ export async function createCore(
       : undefined;
   const deviceId = await ctx.db.insert("devices", {
     ...deviceArgs,
+    ideUuid,
     ehomeID,
     zoneId,
     isActive: deviceActive(args.status, args.isActive),
@@ -105,7 +159,7 @@ export async function createCore(
   const adminDeviceId = await ctx.db.insert("adminDevices", {
     name: args.name,
     brand: args.brand,
-    ideUuid: args.ideUuid,
+    ideUuid,
     deviceSerial: args.deviceSerial,
     ideUser: args.ideUser,
     idePassword: args.idePassword,
@@ -150,18 +204,12 @@ export async function createIdePanelCore(
   if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
     throw new ConvexError("Bu projeye erişim yetkiniz yok");
   }
-  const ideUuid = args.ideUuid;
-  if (ideUuid) {
-    const existingDevice = await ctx.db
-      .query("devices")
-      .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
-      .first();
-    if (existingDevice) throw new Error("Bu UUID zaten bir cihaza kayıtlı");
-    const existingAdmin = await ctx.db
-      .query("adminDevices")
-      .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
-      .first();
-    if (existingAdmin) throw new Error("Bu UUID zaten havuzda kayıtlı");
+  const ideUuid = args.ideUuid?.trim();
+  if (ideUuid !== undefined) {
+    const error = deviceIdentityError(ideUuid);
+    if (error) throw new ConvexError(error);
+    await assertIdeUuidAvailable(ctx, ideUuid);
+    await assertIdeRosterMovable(ctx, ideUuid, args.projectId);
   }
   const now = new Date().toISOString();
   const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? 4, 8));
@@ -173,7 +221,7 @@ export async function createIdePanelCore(
     brand: "ide_smart",
     deviceType: "Erişim Paneli",
     deviceIp: args.deviceIp,
-    ideUuid: args.ideUuid,
+    ideUuid,
     // Panel MQTT login token'ı bu kimlikle alınır → ikisi de garanti edilir
     // (frontend zorunlu kılar; doğrudan/script çağrıları için backend default'u).
     ideUser: args.ideUser ?? "admin",
@@ -204,7 +252,7 @@ export async function createIdePanelCore(
   const adminDeviceId = await ctx.db.insert("adminDevices", {
     name: args.name,
     brand: "ide_smart",
-    ideUuid: args.ideUuid,
+    ideUuid,
     ideUser: args.ideUser ?? "admin",
     idePassword: args.idePassword ?? "admin12345",
     ideHttpPort: args.ideHttpPort ?? 80,
