@@ -16,7 +16,7 @@ import {
   type EffectiveWorkSettings,
 } from "./pdksHelpers";
 import type { OvertimeSegment } from "./overtimeCalc";
-import { addWorkDate, isOvernightShift, manualPdksTimes } from "./pdksWorkDay";
+import { addWorkDate, exitMayCrossMidnight, isOvernightShift, manualPdksTimes } from "./pdksWorkDay";
 
 import { pairPdksPunches, pdksPairReadings, pdksPunchSegments } from "./pdksPunchPairs";
 
@@ -355,7 +355,7 @@ export function computePdksDay(params: {
     isEarlyExit: earlyExitMinutes > 0,
     earlyExitMinutes,
     exitNextDay: exit !== undefined && exit >= 1440,
-    isOvernightShift: isOvernightShift(shift),
+    isOvernightShift: exitMayCrossMidnight(shift),
     hasAttendance: absentByFixedRule || fixedEvidence?.outsideWindow ? false : evidence ? evidence.attendanceCredit : !!firstISO || !!lastISO,
     attendanceDecision,
     durationMeasured: evidence?.durationMeasured ?? (!!firstISO && !!lastISO),

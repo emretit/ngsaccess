@@ -47,3 +47,14 @@ it("R3B-D7: CSV accepts a reversed pair only for that employee's assigned night 
   expect(result.rows[1]?.error).toContain("Gece vardiyası atanmamış");
   expect(result.summary.errors).toBe(1);
 });
+
+it("P-06: CSV accepts a reversed pair for a daytime shift whose exit window ends the next day", async () => {
+  // previewManualShifts returns only shifts whose exit may cross midnight; a 09-18 shift qualifies via its window.
+  const runQuery = vi.fn().mockResolvedValueOnce([{ _id: "employee", tcNo: "123", firstName: "Ada", lastName: "Test" }])
+    .mockResolvedValueOnce([{ key: "employee__2026-10-19", startTime: "09:00", endTime: "18:00" }]);
+  const text = "tcNo,tarih,giriş,çıkış\n123,2026-10-19,09:00,01:00\n123,2026-10-19,09:00,09:00";
+  const result = await call<{ rows: { employeeId?: string; error?: string }[]; summary: { errors: number } }>(previewPdksCsv, { runQuery }, { csvText: text, projectId: "active" });
+  expect(result.rows[0]?.error).toBeUndefined();
+  expect(result.rows[1]?.error).toContain("Gece vardiyası atanmamış");
+  expect(result.summary.errors).toBe(1);
+});

@@ -15,7 +15,8 @@ import { computePayrollCell } from "./pdksPayroll";
 import { DEFAULT_WORK_SETTINGS, DEFAULT_OVERTIME_RATES } from "./pdksHelpers";
 import { DEFAULT_FLEXIBLE } from "./pdksFlexible";
 import { LEGACY_PDKS_POLICY, type PdksDayPolicy } from "./pdksRules";
-import { groupPdksWorkDays, manualPdksTimes } from "./pdksWorkDay";
+import { exitMayCrossMidnight, groupPdksWorkDays, isOvernightShift, manualPdksTimes, pdksWorkDay } from "./pdksWorkDay";
+import { validateManualPdksInput } from "./pdksManual";
 import { validateShift } from "./shiftUx";
 
 const date = "2026-06-22";
@@ -198,4 +199,97 @@ it("half-day holidays retain holiday treatment without scaling fixed absence thr
   const holiday = { date, isHalfDay: true } as Doc<"holidays">;
   expect(day({ minWorkMinutes: 1000, absentAfterLateMinutes: 0 }, { holiday, readings: [reading("09:30", "entry"), reading("17:00", "exit")] }))
     .toMatchObject({ classification: "halfDayHoliday", hasAttendance: true, attendanceDecision: undefined });
+});
+
+describe("daytime fixed shifts with a next-day exit window", () => {
+  const next = "2026-06-23";
+  const employeeId = "employee" as Id<"employees">;
+  const extended = { ...shift, endTime: "18:00", validWindow: { ...window, checkOutStart: "17:00", checkOutEnd: "02:00", checkOutEndDayOffset: 1 as const } };
+
+  it.each(["exit", undefined] as const)("attributes a 01:00 %s punch to the preceding work day", direction => {
+    validateShift(extended);
+    const readings = [reading("09:00", "entry"), reading("01:00", direction, next)];
+    const grouped = groupPdksWorkDays(readings, employeeId, () => extended);
+    expect([...grouped.keys()]).toEqual([date]);
+    expect(day(extended, { readings: grouped.get(date) ?? [] })).toMatchObject({
+      rawTotalMinutes: 960, durationMeasured: true, attendanceDecision: "present", exitNextDay: true, isOvernightShift: true,
+    });
+    const detail = computeAttendanceDetailDay({ date, dayShift: extended, dayReadings: grouped.get(date) ?? [],
+      availableDateKeys: new Set([date]), firstRecordDate: date, manualDay: undefined, leaves: [], holiday: null, workingDays, workSettings: DEFAULT_WORK_SETTINGS });
+    expect(detail).toMatchObject({ firstEntry: "09:00", lastExit: "01:00", rawTotalMinutes: 960, exitNextDay: true });
+  });
+
+  it.each([["02:00", date], ["02:01", next], ["03:00", next]] as const)("checks the inclusive exit window at %s", (time, expected) => {
+    expect(pdksWorkDay(reading(time, "exit", next).accessTime, employeeId, () => extended, "exit")).toBe(expected);
+  });
+
+  it("keeps explicit entries on their calendar day even inside the previous exit window", () => {
+    expect(pdksWorkDay(reading("01:00", "entry", next).accessTime, employeeId, () => extended, "entry")).toBe(next);
+  });
+
+  it("preserves consecutive undirected morning entries and the previous directed exit", () => {
+    const readings = [reading("09:00", "entry"), reading("01:00", "exit", next), reading("09:00", undefined, next)];
+    const grouped = groupPdksWorkDays(readings, employeeId, () => extended);
+    expect(grouped.get(date)).toEqual(readings.slice(0, 2));
+    expect(grouped.get(next)).toEqual(readings.slice(2));
+  });
+
+  it.each([undefined, "unknown"])("prioritizes an overlapping current entry window for direction %s", direction => {
+    const overlapping = { ...extended, validWindow: { ...extended.validWindow, checkOutEnd: "10:00" } };
+    const resolve = (_id: Id<"employees">, workDate: string) => workDate === date ? overlapping : extended;
+    const accessTime = reading("09:00", undefined, next).accessTime;
+    expect(pdksWorkDay(accessTime, employeeId, resolve, direction)).toBe(next);
+    expect(pdksWorkDay(accessTime, employeeId, resolve, "exit")).toBe(date);
+  });
+
+  it("uses the current scheduled start when no entry window exists", () => {
+    const current = { ...shift, startTime: "01:00", validWindow: undefined };
+    const resolve = (_id: Id<"employees">, workDate: string) => workDate === date ? extended : current;
+    expect(pdksWorkDay(reading("00:59", undefined, next).accessTime, employeeId, resolve)).toBe(date);
+    expect(pdksWorkDay(reading("01:00", undefined, next).accessTime, employeeId, resolve)).toBe(next);
+  });
+
+  it("retains an undirected exit when there is no current shift", () => {
+    expect(pdksWorkDay(reading("01:00", undefined, next).accessTime, employeeId, (_id, workDate) => workDate === date ? extended : null)).toBe(date);
+  });
+
+  it("leaves daytime offset-zero exits on their own calendar day", () => {
+    const sameDay = { ...extended, validWindow: { ...extended.validWindow, checkOutEnd: "19:00", checkOutEndDayOffset: 0 as const } };
+    expect(pdksWorkDay(reading("01:00", "exit", next).accessTime, employeeId, () => sameDay, "exit")).toBe(next);
+    expect(exitMayCrossMidnight(sameDay)).toBe(false);
+  });
+
+  it("allows manual next-day exits while keeping the planned end on the same day", () => {
+    const manual = { date, entryTime: "09:00", exitTime: "01:00", note: "Kart unutuldu" };
+    expect(validateManualPdksInput(manual, extended)).toMatchObject({ entryTime: "09:00", exitTime: "01:00" });
+    expect(manualPdksTimes(date, manual, extended)).toMatchObject({ exitNextDay: true, exitISO: `${next}T01:00:00.000+03:00` });
+    const record: Doc<"pdksRecords"> = { ...manual, _id: "manual" as Id<"pdksRecords">, _creationTime: 0, employeeId,
+      employeeFirstName: "Ada", employeeLastName: "Test", status: "present", manualEntry: true, createdAt: "", updatedAt: "" };
+    expect(day(extended, { readings: [], manual: record })).toMatchObject({ rawTotalMinutes: 960, exitNextDay: true });
+    expect(day(extended, { readings: [reading("09:00", "entry"), reading("19:00", "exit")] }).overtimeMinutes).toBeGreaterThan(0);
+    expect(isOvernightShift(extended)).toBe(false);
+    expect(exitMayCrossMidnight(extended)).toBe(true);
+    expect(() => validateManualPdksInput(manual, { ...extended, validWindow: window })).toThrow("Çıkış saati giriş saatinden sonra olmalı");
+  });
+
+  it("does not turn equal daytime manual hours into a full-day shift", () => {
+    const manual = { date, entryTime: "09:00", exitTime: "09:00", note: "Kart unutuldu" };
+    expect(() => validateManualPdksInput(manual, extended)).toThrow("Çıkış saati giriş saatinden sonra olmalı");
+    expect(manualPdksTimes(date, manual, extended).exitNextDay).toBe(false);
+  });
+
+  it.each([0, 1] as const)("discovers a preceding daytime assignment only with next-day offset %s", async checkOutEndDayOffset => {
+    const t = convexTest(schema, import.meta.glob("../**/*.ts"));
+    const projectId = await t.run(async ctx => {
+      const projectId = await ctx.db.insert("projects", { name: "Gündüz çıkışı" });
+      const { _id: _shiftId, _creationTime: _created, ...fields } = extended;
+      const shiftId = await ctx.db.insert("shifts", { ...fields, projectId, validWindow: { ...extended.validWindow,
+        checkOutEnd: checkOutEndDayOffset === 1 ? "02:00" : "19:00", checkOutEndDayOffset } });
+      const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "day@example.test", cardNumber: "1" });
+      await ctx.db.insert("shiftAssignments", { projectId, shiftId, employeeId, startDate: date, endDate: date, createdAt: "", updatedAt: "" });
+      return projectId;
+    });
+    expect(await t.run(async ctx => [...await flexibleReportProjects(ctx, [projectId], next, next, undefined, hasFixedShiftRules)]))
+      .toEqual(checkOutEndDayOffset === 1 ? [projectId] : []);
+  });
 });

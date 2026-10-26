@@ -1,4 +1,4 @@
-import { isOvernightShift, type PdksShift } from "./pdksWorkDay";
+import { exitMayCrossMidnight, type PdksShift } from "./pdksWorkDay";
 import { ConvexError } from "convex/values";
 
 export function validateManualPdksNote(value?: string) {
@@ -10,7 +10,7 @@ export function validateManualPdksNote(value?: string) {
 export function isManualPdksTimeOrderValid(entryTime: string | undefined, exitTime: string | undefined, shift?: PdksShift | null): boolean {
   if (!entryTime || !exitTime) return true;
   if (entryTime === exitTime) return !!shift && shift.startTime === shift.endTime;
-  return entryTime < exitTime || isOvernightShift(shift);
+  return entryTime < exitTime || exitMayCrossMidnight(shift);
 }
 
 /** Shared, side-effect-free validation; note stays optional at transport level for old callers. */

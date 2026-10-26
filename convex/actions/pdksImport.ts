@@ -129,7 +129,10 @@ export const previewPdksCsv = action({
         result.error = "Geçersiz çıkış saati";
         return result;
       }
-      if (!isManualPdksTimeOrderValid(r.entryTime, r.exitTime, overnight.get(`${emp._id}__${r.date}`))) {
+      // Önizleme yalnız çıkışı ertesi güne düşebilen vardiyaları döner (gece ya da ertesi gün
+      // çıkış pencereli gündüz); bu günlerde ters sıra geçerli, eşit saat kuralı aynen kalır.
+      const crossesMidnight = overnight.get(`${emp._id}__${r.date}`);
+      if (!(crossesMidnight && r.entryTime !== r.exitTime) && !isManualPdksTimeOrderValid(r.entryTime, r.exitTime, crossesMidnight)) {
         result.error = "Çıkış saati girişten sonra olmalı. Gece vardiyası atanmamış.";
         return result;
       }

@@ -22,6 +22,10 @@ export function isOvernightShift(shift: PdksShift | null | undefined): boolean {
   return flex ? flex.checkOutEndDayOffset === 1 : !!shift && parseHHMM(shift.endTime) <= parseHHMM(shift.startTime);
 }
 
+export function exitMayCrossMidnight(shift: PdksShift | null | undefined): boolean {
+  return isOvernightShift(shift) || (shift?.scheduleType !== "flexible" && shift?.validWindow?.checkOutEndDayOffset === 1);
+}
+
 /** Resolve against the assigned previous and current shifts, never global work hours.
  * The gap midpoint separates a previous night's late exit from today's early entry;
  * a following daytime shift starts its own work day from its scheduled start. */
@@ -37,8 +41,16 @@ export function pdksWorkDay(
   const previous = resolveLast(employeeId, previousDate);
   const flex = flexibleSchedule(previous);
   if (flex) return direction === "exit" && validFlexibleExit(flex, relativeMinute(previousDate, accessTime)) ? previousDate : date;
-  if (!previous || !isOvernightShift(previous)) return date;
+  if (!previous || !exitMayCrossMidnight(previous)) return date;
   const current = resolve(employeeId, date);
+  if (!isOvernightShift(previous)) {
+    if (direction === "entry" || !previous.validWindow || !validFixedPunch(previous.validWindow, previousDate, accessTime, "exit")) return date;
+    const undirected = direction !== "exit";
+    const canOpenCurrent = current && (current.validWindow
+      ? validFixedPunch(current.validWindow, date, accessTime, "entry")
+      : isoTimeToTRMinutes(accessTime) >= parseHHMM(current.startTime));
+    return undirected && canOpenCurrent ? date : previousDate;
+  }
   const end = parseHHMM(previous.endTime);
   const nextStart = current
     ? parseHHMM(current.startTime)
@@ -175,7 +187,7 @@ export function manualPdksTimes(
   const entryTime = manual?.entryTime ?? (shift?.scheduleType !== "flexible" && (shift?.validWindow || shift?.missingCheckInLateMinutes !== undefined) ? shift?.startTime : undefined);
   const nextDay = flex
     ? flex.checkOutEndDayOffset === 1 && !!manual?.entryTime && !!manual.exitTime && manual.exitTime <= manual.entryTime
-    : isOvernightShift(shift) &&
+    : exitMayCrossMidnight(shift) &&
     !!entryTime &&
     !!manual?.exitTime &&
     (manual.exitTime < entryTime ||

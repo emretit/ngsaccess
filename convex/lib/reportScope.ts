@@ -4,7 +4,7 @@ import { getCurrentUser } from "./auth";
 import { getProjectIdsWithPermission, requirePermission } from "./permissions";
 import { hasVersionedPdksPolicy, loadPdksPolicies, type PdksProjectPolicies } from "./pdksRules";
 import { buildBoundedShiftResolver } from "./shiftResolver";
-import { buildPdksWorkDateResolver, addWorkDate, isOvernightShift } from "./pdksWorkDay";
+import { buildPdksWorkDateResolver, addWorkDate, exitMayCrossMidnight } from "./pdksWorkDay";
 import { trDateKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
@@ -140,7 +140,7 @@ export async function flexibleReportProjects(
       // Fail-safe: a truncated assignment list cannot prove non-use, so take the flexible path.
       if (assignments.length > 1000 || assignments.some(assignment => (assignment.projectId === projectId || assignment.projectId === undefined)
           && employeeIds.has(assignment.employeeId) && assignment.startDate <= endDate
-          && assignment.endDate >= ((shift.scheduleType === "flexible" ? shift.flexible?.checkOutEndDayOffset === 1 : isOvernightShift(shift)) ? dayBefore : startDate))) {
+          && assignment.endDate >= ((shift.scheduleType === "flexible" ? shift.flexible?.checkOutEndDayOffset === 1 : exitMayCrossMidnight(shift)) ? dayBefore : startDate))) {
         projects.add(projectId);
         break;
       }

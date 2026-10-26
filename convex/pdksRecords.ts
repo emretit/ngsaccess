@@ -5,7 +5,7 @@ import { validateManualPdksInput, validateManualPdksNote } from "./lib/pdksManua
 import { findManualPdksRecord, manualValidationShift, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
 import { buildShiftResolver } from "./lib/shiftResolver";
 import { resolveProjectScope } from "./lib/projectScope";
-import { isOvernightShift } from "./lib/pdksWorkDay";
+import { exitMayCrossMidnight } from "./lib/pdksWorkDay";
 import { writeAudit } from "./lib/audit";
 
 export const upsertManual = authedMutation({
@@ -152,7 +152,7 @@ export const previewManualShifts = authedQuery({
       const employee = employees.find(employee => employee._id === row.employeeId);
       if (!employee) return [];
       const shift = manualValidationShift(resolver, employee, row.date);
-      return shift?.projectId === args.projectId && isOvernightShift(shift)
+      return shift?.projectId === args.projectId && exitMayCrossMidnight(shift)
         ? [{ key: `${row.employeeId}__${row.date}`, startTime: shift.startTime, endTime: shift.endTime }] : [];
     });
   },
