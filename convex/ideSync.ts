@@ -1,5 +1,6 @@
 import { purgeIdeOperationsPage } from "./lib/deviceHelpers";
 import { requirePermission, getProjectIdsWithPermission } from "./lib/permissions";
+import { employeeTransfer, transferBlocksAddition, TRANSFER_INVALID_OPERATION, transferOperationFailed } from "./lib/transferGuard";
 import { employeeGrantGraph, grantStatusForOperation } from "./lib/grantStatus";
 import { cardNumericKey } from "./lib/cardIdentity";
 import { accessEndsAtMs } from "./lib/accessEnd";
@@ -279,7 +280,7 @@ export const enqueueIdeOp = internalMutation({
 });
 export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
   deviceId: Id<"devices">; runId?: Id<"deviceSyncRuns">; projectId?: Id<"projects">;
-  opType: IdeOpType; payload: unknown; maxAttempts?: number;
+  opType: IdeOpType; payload: unknown; maxAttempts?: number; forceNew?: boolean;
 }): Promise<Id<"idePendingOperations">> {
     const device = await ctx.db.get(args.deviceId);
     if (!device || device.brand !== "ide_smart") {
@@ -314,7 +315,7 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
     const now = Date.now();
 
     // openDoor dışı op'lar için açık pending/sent dedupe.
-    if (args.opType !== "openDoor") {
+    if (args.opType !== "openDoor" && !args.forceNew) {
       const existing = await ctx.db
         .query("idePendingOperations")
         .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", idempotencyKey))
@@ -324,6 +325,7 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
       if (open) {
         await ctx.db.patch(open._id, {
           payload,
+          maxAttempts: args.maxAttempts ?? open.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
           status: doorError ? "failed" : "pending",
           msxId: undefined,
           nextRetryAt: now,
@@ -415,6 +417,7 @@ async function currentCredentialProtected(ctx: QueryCtx, op: Doc<"idePendingOper
 }
 
 async function supersedeDeletion(ctx: MutationCtx, op: Doc<"idePendingOperations">) {
+  await transferOperationFailed(ctx, op, "Kart aktif bir kişinin güncel kimliği; silme atlandı", "superseded");
   // Schema's existing terminal state; this is NOT a panel deletion acknowledgement.
   await ctx.db.patch(op._id, { status: "acked", ackedAt: Date.now(), responseMessage: "superseded: Kart aktif bir kişinin güncel kimliği; silme atlandı", lastError: undefined });
 }
@@ -440,6 +443,7 @@ async function pendingForBridge(ctx: QueryCtx, max?: number) {
 
     const ops = [];
     for (const op of candidates) {
+      if (await transferBlocksAddition(ctx, op)) continue;
       if (await currentCredentialProtected(ctx, op)) continue;
       if (await undeliverableReason(ctx, op)) continue;
       const device = await ctx.db.get(op.deviceId);
@@ -472,9 +476,20 @@ export const listPendingForBridge = internalQuery({
 export const pollForBridge = internalMutation({
   args: { max: v.optional(v.number()) },
   handler: async (ctx, args) => {
+    // A login-less old bridge never calls /sent. Recover only expired reservations;
+    // the status/deadline index reads zero documents when there are none.
+    const expired = await ctx.db.query("idePendingOperations")
+      .withIndex("by_status_nextRetry", q => q.eq("status", "sent").lte("nextRetryAt", Date.now())).take(100);
+    for (const op of expired) if (op.opType === "upsertUser" && op.msxId === undefined) {
+      await ctx.db.patch(op._id, { status: "pending", sentAt: undefined, nextRetryAt: Date.now() });
+    }
     const candidates = await ctx.db.query("idePendingOperations")
       .withIndex("by_status_nextRetry", q => q.eq("status", "pending").lte("nextRetryAt", Date.now())).take(50);
     for (const op of candidates) {
+      if (await transferBlocksAddition(ctx, op)) {
+        await ctx.db.patch(op._id, { status: "acked", ackedAt: Date.now(), lastError: TRANSFER_INVALID_OPERATION });
+        continue;
+      }
       if (await currentCredentialProtected(ctx, op)) {
         await supersedeDeletion(ctx, op);
         continue;
@@ -482,15 +497,18 @@ export const pollForBridge = internalMutation({
       const reason = await undeliverableReason(ctx, op);
       if (reason) {
         await ctx.db.patch(op._id, { status: "failed", lastError: reason });
+        if (op.opType === "deleteUser") await transferOperationFailed(ctx, op, reason);
         await grantStatusForOperation(ctx, op, "failed", reason);
       }
     }
     const result = await pendingForBridge(ctx, args.max);
-    // Reserve one-shot door commands before returning them. Lost poll responses remain
-    // uncertain and cannot make a second bridge publish the same operation.
+    // Reserve user additions and one-shot commands before returning them so a
+    // concurrent transfer cannot begin after a bridge has taken its delivery.
     for (const op of result.ops) {
-      if (op.opType === "openDoor" || mobileOperationId(op) !== undefined) {
-        await ctx.db.patch(op.opId, { status: "sent", sentAt: Date.now(), nextRetryAt: Date.now() + DEFAULT_ACK_TIMEOUT_MS, attempts: 1 });
+      if (op.opType === "upsertUser" || op.opType === "openDoor" || mobileOperationId(op) !== undefined) {
+        const queued = await ctx.db.get(op.opId);
+        if (!queued) continue;
+        await ctx.db.patch(op.opId, { status: "sent", msxId: undefined, sentAt: Date.now(), nextRetryAt: Date.now() + DEFAULT_ACK_TIMEOUT_MS, attempts: queued.attempts + (op.opType === "upsertUser" ? 0 : 1) });
       }
     }
     return result;
@@ -503,11 +521,15 @@ export const markSent = internalMutation({
   handler: async (ctx, args): Promise<boolean> => {
     const op = await ctx.db.get(args.opId);
     const mobile = op && mobileOperationId(op.payload) !== undefined;
-    const reserved = op && (mobile || op.opType === "openDoor") && op.status === "sent" && op.msxId === undefined;
+    const reserved = op && (mobile || op.opType === "upsertUser" || op.opType === "openDoor") && op.status === "sent" && op.msxId === undefined;
     if (mobile && (!Number.isSafeInteger(args.msxId) || (op.status !== "pending" && !reserved) || !(await mobileQueueAllowed(ctx, op)))) {
       throw accessError("MOBILE_COMMAND_NOT_DELIVERABLE");
     }
     if (!op || (op.status !== "pending" && !reserved)) return false;
+    if (await transferBlocksAddition(ctx, op)) {
+      await ctx.db.patch(op._id, { status: "acked", ackedAt: Date.now(), lastError: TRANSFER_INVALID_OPERATION });
+      return false;
+    }
     if (await currentCredentialProtected(ctx, op)) {
       await supersedeDeletion(ctx, op);
       return false;
@@ -521,7 +543,7 @@ export const markSent = internalMutation({
       msxId: args.msxId,
       sentAt: Date.now(),
       nextRetryAt: Date.now() + DEFAULT_ACK_TIMEOUT_MS,
-      attempts: reserved ? op.attempts : op.attempts + 1,
+      attempts: reserved && op.opType !== "upsertUser" ? op.attempts : op.attempts + 1,
     });
     return true;
   },
@@ -562,10 +584,18 @@ export const markAck = internalMutation({
   handler: async (ctx, args): Promise<void> => {
     const op = await ctx.db.get(args.opId);
     if (!op) return;
-    // Yalnızca "sent" (panele iletilmiş, ack bekleyen) op ack'lenebilir. pending/acked/
-    // failed op'a gelen ack reddedilir — aksi halde panele HİÇ gitmemiş bir komut
-    // (henüz pending) sahte/erken success ile "acked" sayılabilirdi.
-    if (op.status !== "sent") return;
+    // Normal işler yalnız sent iken onaylanır. Devir silmesinde son gönderimin
+    // msxId'sini taşıyan geç başarı, terminal failed sonrasında da silme kanıtıdır.
+    const lateTransferSuccess = op.status === "failed" && op.opType === "deleteUser" &&
+      (args.result === "success" || (args.result === "fail" && (args.errorCode === "not_found" || (args.errorCode === undefined && isAlreadyGoneError(args.message))))) &&
+      op.msxId !== undefined && args.msxId === op.msxId;
+    if (op.status !== "sent") {
+      if (!lateTransferSuccess) return;
+      const payload = op.payload && typeof op.payload === "object" ? op.payload as Record<string, unknown> : {};
+      const employeeId = typeof payload.employeeId === "string" ? ctx.db.normalizeId("employees", payload.employeeId) : null;
+      const transfer = employeeId ? await employeeTransfer(ctx, employeeId) : null;
+      if (!transfer || transfer.employeeId !== employeeId) return;
+    }
     if (mobileOperationId(op.payload) !== undefined &&
         (op.msxId === undefined || args.msxId === undefined || op.msxId !== args.msxId)) return;
     // Eski/yinelenen ack'i ele: beklenen msxId ile eşleşmeli (markSent her zaman msxId yazar).
@@ -657,6 +687,7 @@ export const markAck = internalMutation({
     // fail / timeout → retry veya terminal failed
     const maxAttempts = (op.opType === "openDoor" || mobileOperationId(op.payload) !== undefined) ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     if (op.attempts >= maxAttempts) {
+      if (op.opType === "deleteUser") await transferOperationFailed(ctx, op, args.message ?? args.result);
       await ctx.db.patch(args.opId, {
         status: "failed",
         lastError: args.message ?? args.result,
@@ -691,8 +722,9 @@ export const requeueTimedOut = internalMutation({
       const deadline = (op.sentAt ?? op.createdAt) + timeout;
       if (deadline <= now) {
         const maxAttempts = (op.opType === "openDoor" || mobileOperationId(op.payload) !== undefined) ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-        if (op.attempts >= maxAttempts) {
+        if (!(op.opType === "upsertUser" && op.msxId === undefined) && op.attempts >= maxAttempts) {
           await ctx.db.patch(op._id, { status: "failed", lastError: "ack timeout (cron)" });
+          if (op.opType === "deleteUser") await transferOperationFailed(ctx, op, "ack timeout (cron)");
           if (op.opType === "upsertUser" || op.opType === "deleteUser") await grantStatusForOperation(ctx, op, "failed", "ack timeout (cron)");
         } else {
           await ctx.db.patch(op._id, {

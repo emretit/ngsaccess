@@ -1,12 +1,12 @@
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => permissionState.allowed === null || permissionState.allowed.includes(permission), loading: permissionState.loading }) }));
-import type { ReactNode } from "react";
+import type { ReactNode, EffectCallback, DependencyList } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import Employees from "@/pages/Employees";
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p", isAdmin: true }) }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ activeProject: { name: "Proje" } }) }));
-vi.mock("@/hooks/useEmployees", () => ({ useEmployees: () => ({ employees: [{ _id: "e", firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", departmentId: "d", isActive: true }], isLoading: false, hasProjectAccess: true }) }));
+vi.mock("@/hooks/useEmployees", () => ({ useEmployees: () => ({ employees: [{ _id: "e", firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", departmentId: "d", isActive: true }], isLoading: navigation.loading, hasProjectAccess: true }) }));
 vi.mock("@/components/departments/DepartmentTree", () => ({ default: () => null }));
 vi.mock("./SlideOverPanel", () => ({ default: () => null }));
 vi.mock("./EmployeeTable", () => ({ default: () => null }));
@@ -51,4 +51,38 @@ it.each([
   expect(html.includes("İçe aktar")).toBe(manage);
   expect(html.includes("Dışa aktar")).toBe(reports);
   expect(html.includes("Personel ekle")).toBe(manage);
+});
+
+const navigation = vi.hoisted(() => ({
+  effects: [] as { callback: EffectCallback; deps: DependencyList | undefined }[],
+  writes: [] as unknown[], navigate: vi.fn(), loading: false,
+}));
+vi.mock("react", async original => {
+  const actual = await original<typeof import("react")>();
+  return { ...actual,
+    useEffect: (callback: EffectCallback, deps?: DependencyList) => { navigation.effects.push({ callback, deps }); },
+    useState: <T,>(initial: T | (() => T)) => {
+      const [value] = actual.useState(initial);
+      return [value, (next: unknown) => navigation.writes.push(next)];
+    },
+  };
+});
+vi.mock("react-router-dom", async original => ({ ...await original<typeof import("react-router-dom")>(), useNavigate: () => navigation.navigate }));
+it.each([
+  ["p", "e", false, true],
+  ["other-project", "e", false, false],
+  ["p", "e", true, false],
+  ["p", "missing", false, false],
+])("taşıma bağlantısı yalnız doğru proje ve yüklenen kayıtta drawer açar: %s / %s / %s", (projectId, employeeId, loading, opens) => {
+  navigation.effects = []; navigation.writes = []; navigation.navigate.mockClear(); navigation.loading = loading;
+  const incoming = { transferEmployeeId: employeeId, transferProjectId: projectId };
+  renderToStaticMarkup(<MemoryRouter initialEntries={[{ pathname: "/employees", state: incoming }]}><Employees /></MemoryRouter>);
+  const effect = navigation.effects.find(item => item.deps?.includes(incoming));
+  expect(effect).toBeDefined(); effect?.callback();
+  expect(navigation.writes.some(value => value === true)).toBe(opens);
+  if (opens) expect(navigation.writes).toContainEqual(expect.objectContaining({ _id: "e" }));
+  if (projectId === "p" && !loading) {
+    expect(navigation.navigate).toHaveBeenCalledWith({ pathname: "/employees", search: "" }, { replace: true, state: null });
+  } else expect(navigation.navigate).not.toHaveBeenCalled();
+  navigation.loading = false;
 });

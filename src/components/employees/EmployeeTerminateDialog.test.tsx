@@ -54,6 +54,7 @@ it("renders active/legacy inactive and past/future termination badges", () => {
   expect(badge({ isActive: false })).toContain("Pasif");
   expect(badge({ employmentEndDate: "2000-10-15" })).toContain("Ayrıldı · 15.10.2000");
   expect(badge({ employmentEndDate: "2099-10-31" })).toContain("Ayrılacak · 31.10.2099");
+  expect(badge({ employmentEndDate: "2099-10-31", terminationType: "transfer" })).toContain("Taşındı · 31.10.2099");
 });
 
 it("guards double submission and closes only after a successful mutation", async () => {

@@ -11,6 +11,7 @@ import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { isProjectAllowed } from "./auth";
 import { deleteReadersForDoor } from "../readers";
+import { transferDeviceRemoved } from "./accessTransfer";
 
 /** Kapı silinmeden önce tüm kural bağlarını, proje alanından bağımsız temizler. */
 export async function deleteGroupDoorsForDoor(ctx: MutationCtx, doorId: Id<"doors">): Promise<void> {
@@ -34,6 +35,7 @@ export async function purgeDeviceCascade(
   deviceId: Id<"devices">,
   projectId: Id<"projects"> | undefined,
 ) {
+  await transferDeviceRemoved(ctx, deviceId, projectId);
   // Kart okuma geçmişi ve deviceId referansı denetim için korunur.
   const groupDevices = await ctx.db
     .query("groupDevices")

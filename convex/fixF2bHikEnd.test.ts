@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import schema from "./schema";
+import { addCardToDevice, setWeekPlanOnDevice } from "./lib/hikGateway";
 import { buildPersonPayload, type PersonRecord } from "./lib/gateway/persons";
 
 const wire = vi.hoisted(() => ({ person: vi.fn(async (_dev: string, _person: PersonRecord) => ({ ok: true })) }));
@@ -69,4 +70,16 @@ describe("F2b Hik access end propagation", () => {
     expect(ops.find(op => op.operation === "addPerson")?.payload).toMatchObject({ endTime: expected });
     expect(wire.person).not.toHaveBeenCalled();
   });
+});
+
+it("re-reads the employee after plan HTTP and skips person/card additions when transfer started", async () => {
+  const f = await fixture({});
+  vi.mocked(setWeekPlanOnDevice).mockImplementationOnce(async () => {
+    await f.t.run(ctx => ctx.db.patch(f.employeeId, { isActive: false, terminationType: "transfer" }));
+    return { ok: true };
+  });
+  expect(await f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId })).toMatchObject({ synced: 0, failed: 0 });
+  expect(wire.person).not.toHaveBeenCalled();
+  expect(addCardToDevice).not.toHaveBeenCalled();
+  expect((await f.t.run(ctx => ctx.db.query("accessGrantStatus").collect())).some(row => row.state === "effective")).toBe(false);
 });

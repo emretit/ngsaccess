@@ -128,6 +128,9 @@ async function executeOperation(
   c: Candidate,
 ): Promise<OpResult> {
   if (["deletePerson", "deleteCard"].includes(c.operation) && await ctx.runMutation(internal.hikvisionSync.protectQueuedDeletion, { id: c._id })) return { ok: true };
+  // Candidate selection also checks the active source transfer and reserves additions
+  // in the same transaction; keep this delivery check before both person retry paths.
+  if (["addPerson", "updatePerson", "addCard", "addFace", "addFingerprint"].includes(c.operation) && c.employee?.terminationType === "transfer") return { ok: true, superseded: true };
   const devIndex = c.device.hikDevIndex;
   if (!devIndex) return { ok: false, error: "Cihaz gateway'e kayıtlı değil" };
 

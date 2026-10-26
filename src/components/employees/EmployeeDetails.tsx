@@ -3,9 +3,10 @@ import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { EmploymentEmployee as Employee } from "./lib/employment";
 import type { Employee as FormEmployee } from "@/types/employee";
-import { terminationLabels } from "./lib/employment";
+import { terminationLabels, transferLabel } from "./lib/employment";
 import { EmployeeEmploymentBadge } from "./EmployeeEmploymentBadge";
 import { EmployeeEmploymentActions } from "./EmployeeEmploymentActions";
+import { EmployeeTransferStatus } from "./EmployeeTransferStatus";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -75,12 +76,15 @@ export default function EmployeeDetails({
           <p className="mt-0.5 text-xs text-muted-foreground">
             {current.payrollCode || "Bordro kodu yok"}
           </p>
-          {current.employmentEndDate && <p className="mt-1 text-xs text-muted-foreground">{current.terminationType ? terminationLabels[current.terminationType] : "Ayrılış"}{current.terminationReason ? ` · ${current.terminationReason}` : ""}</p>}
+          {current.employmentEndDate && <p className="mt-1 text-xs text-muted-foreground">{current.terminationType === "transfer" ? transferLabel : current.terminationType ? terminationLabels[current.terminationType] : "Ayrılış"}{current.terminationReason ? ` · ${current.terminationReason}` : ""}</p>}
         </div>
         {canManage && (
           <div className="flex flex-wrap gap-2"><EmployeeEmploymentActions key={current._id} employee={current} /></div>
         )}
       </div>
+      <EmployeeActivityBoundary employeeId={employee._id} projectId={projectId} title="Proje taşıma durumu" description="Taşıma durumu yüklenemedi.">
+        <EmployeeTransferStatus employee={current} />
+      </EmployeeActivityBoundary>
       <section className="border-t pt-4">
         {/* Düzenleme formunun kendi bölüm başlıkları var; üst başlık yalnız salt-okunurda. */}
         {editing ? (

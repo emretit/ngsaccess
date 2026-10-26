@@ -1,4 +1,5 @@
 import { asKeyPart } from "./lib/hikKeyPart";
+import { employeeTransfer, isTransferAddition, transferBlocksAddition, TRANSFER_INVALID_OPERATION, transferOperationFailed, deletionMatchesTransfer } from "./lib/transferGuard";
 import { requirePermission, getProjectIdsWithPermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { internal } from "./_generated/api";
@@ -79,6 +80,15 @@ type RuleScopeCache = Map<string, Promise<EmployeeDeviceRule[]>>;
 export const getEmployeeWithDevices = internalQuery({
   args: { employeeId: v.id("employees") },
   handler: (ctx, args) => employeeWithDevices(ctx, args.employeeId),
+});
+
+/** One employee document; avoid rebuilding the access graph before every HTTP send. */
+export const getEmployeeDeliveryState = internalQuery({
+  args: { employeeId: v.id("employees") },
+  handler: async (ctx, { employeeId }) => {
+    const employee = await ctx.db.get(employeeId);
+    return employee ? { isActive: employee.isActive, terminationType: employee.terminationType, projectId: employee.projectId, cardNumber: employee.cardNumber } : null;
+  },
 });
 
 export const getEmployeesWithDevices = internalQuery({
@@ -407,18 +417,21 @@ export const recordSyncFailure = internalMutation({
 /** Persist identity before network I/O; even a crashed action remains retryable. */
 export const beginPersonDeletion = internalMutation({
   args: { deviceId: v.id("devices"), employeeId: v.id("employees"), projectId: v.id("projects"), cardNumber: v.string(), runId: v.optional(v.id("deviceSyncRuns")) },
-  handler: async (ctx, args) => {
+  handler: beginPersonDeletionInTransaction,
+});
+export async function beginPersonDeletionInTransaction(ctx: MutationCtx, args: {
+  deviceId: Id<"devices">; employeeId: Id<"employees">; projectId: Id<"projects">; cardNumber: string; runId?: Id<"deviceSyncRuns">; transferId?: Id<"accessTransfers">;
+}): Promise<Id<"hikPendingOperations">> {
     const device = await ctx.db.get(args.deviceId);
     if (!device || device.projectId !== args.projectId || device.brand !== "hikvision") throw new Error("Silme hedefi proje dışında");
     const id = await ctx.db.insert("hikPendingOperations", {
       deviceId: args.deviceId, projectId: args.projectId, runId: args.runId, operation: "deletePerson",
-      payload: { employeeId: args.employeeId, employeeNo: args.cardNumber, cardNumber: args.cardNumber },
+      payload: { employeeId: args.employeeId, employeeNo: args.cardNumber, cardNumber: args.cardNumber, ...(args.transferId ? { transferId: args.transferId } : {}) },
       status: "failed", attemptCount: 0, createdAt: Date.now(), lastError: "Silme onayı bekleniyor — cihazda kalmış olabilir",
     });
     await grantStatusForOperation(ctx, { ...args, _id: id, operation: "deletePerson", payload: { employeeId: args.employeeId, cardNumber: args.cardNumber } }, "pending");
     return id;
-  },
-});
+}
 
 export const enqueueLocalBridgeOperation = internalMutation({
   args: {
@@ -432,7 +445,7 @@ export const enqueueLocalBridgeOperation = internalMutation({
 });
 export async function enqueueLocalBridgeOperationInTransaction(ctx: MutationCtx, args: {
   deviceId: Id<"devices">; runId?: Id<"deviceSyncRuns">; projectId?: Id<"projects">;
-  operation: Doc<"hikPendingOperations">["operation"]; payload: unknown;
+  operation: Doc<"hikPendingOperations">["operation"]; payload: unknown; forceNew?: boolean;
 }) {
     const device = await ctx.db.get(args.deviceId);
     if (!device || device.brand !== "hikvision") {
@@ -458,7 +471,7 @@ export async function enqueueLocalBridgeOperationInTransaction(ctx: MutationCtx,
           q.eq("deviceId", args.deviceId).eq("status", status),
         )
         .take(HIK_BRIDGE_DEDUPE_SCAN);
-      const existing = existingRows.find(
+      const existing = args.forceNew ? undefined : existingRows.find(
         (op) =>
           mobileOperationId(op.payload) === undefined &&
           op.runId === args.runId &&
@@ -581,6 +594,10 @@ export const claimLocalBridgeOperations = internalMutation({
     const biometricEnabled = await isBiometricEnabled(ctx, device.projectId);
     const due: typeof pending = [];
     for (const op of pending) {
+      if (await transferBlocksAddition(ctx, op)) {
+        await ctx.db.patch(op._id, { status: "done", completedAt: now, lastError: TRANSFER_INVALID_OPERATION });
+        continue;
+      }
       if ((op.nextRetryAt ?? 0) > now) continue;
       if (!(await mobileQueueAllowed(ctx, op))) {
         await ctx.db.patch(op._id, { status: "failed", lastError: "MOBILE_COMMAND_NOT_DELIVERABLE" });
@@ -642,6 +659,9 @@ async function resolveAcknowledgedDeletion(ctx: MutationCtx, op: Doc<"hikPending
   const cardNumber = payload.employeeNo ?? payload.cardNumber;
   const employeeId = typeof payload.employeeId === "string" ? ctx.db.normalizeId("employees", payload.employeeId) : null;
   if (!employeeId || typeof cardNumber !== "string") return;
+  const transfer = await employeeTransfer(ctx, employeeId);
+  // A late ACK from before the transfer must not silently close its fresh deletion.
+  if (transfer?.employeeId === employeeId && !deletionMatchesTransfer(op, transfer)) return;
   await ctx.runMutation(internal.hikvisionSync.resolveTargetFailures, {
     deviceId: op.deviceId, operations: ["deletePerson", "deleteCard"], employeeId, cardNumber,
   });
@@ -799,6 +819,14 @@ export const listRetryCandidates = internalMutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const limit = Math.min(100, Math.max(1, Math.floor(args.limit)));
+    // Recover a gateway worker that exited after reserving an addition. Local bridge
+    // reservations retain their existing timeout/ack policy.
+    const processing = await ctx.db.query("hikPendingOperations").withIndex("by_status_created", q => q.eq("status", "processing")).take(200);
+    for (const op of processing) {
+      if (!isTransferAddition(op) || (op.processingStartedAt ?? op.createdAt) >= now - HIK_BRIDGE_PROCESSING_TIMEOUT_MS) continue;
+      const device = await ctx.db.get(op.deviceId);
+      if (device?.hikTransport !== "localBridge") await ctx.db.patch(op._id, { status: "failed", nextRetryAt: now, lastError: "İşlem zaman aşımına uğradı; yeniden denenecek" });
+    }
     // One bounded page per transaction. Ineligible entries are moved out of the
     // due window, so even a backlog larger than this page progresses each tick.
     const selected = args.issueId ? await ctx.db.get(args.issueId) : null;
@@ -812,7 +840,12 @@ export const listRetryCandidates = internalMutation({
 
     const enriched = await Promise.all(
       failed.map(async (f) => {
-          if (f.status !== "failed" || (f.nextRetryAt ?? 0) > now) return null;
+          if (f.status !== "failed") return null;
+          if (await transferBlocksAddition(ctx, f)) {
+            await ctx.db.patch(f._id, { status: "done", completedAt: now, lastError: TRANSFER_INVALID_OPERATION });
+            return null;
+          }
+          if ((f.nextRetryAt ?? 0) > now) return null;
           if (f.attemptCount >= args.maxAttempts || mobileOperationId(f.payload) !== undefined || f.dismissedAt !== undefined) {
             await ctx.db.patch(f._id, { nextRetryAt: Number.MAX_SAFE_INTEGER });
             return null;
@@ -863,6 +896,7 @@ export const listRetryCandidates = internalMutation({
             },
             employee: employee
               ? {
+                  terminationType: employee.terminationType,
                   cardNumber: employee.cardNumber,
                   firstName: employee.firstName,
                   lastName: employee.lastName,
@@ -876,11 +910,13 @@ export const listRetryCandidates = internalMutation({
         }),
     );
 
-    return enriched
+    const candidates = enriched
       .filter((e): e is NonNullable<typeof e> => e !== null)
       // Keep due order within each class, with access revocations first.
       .sort((a, b) => Number(["deletePerson", "deleteCard"].includes(b.operation)) - Number(["deletePerson", "deleteCard"].includes(a.operation)))
       .slice(0, limit);
+    for (const candidate of candidates) if (isTransferAddition(candidate)) await ctx.db.patch(candidate._id, { status: "processing", processingStartedAt: now });
+    return candidates;
   },
 });
 
@@ -889,7 +925,8 @@ export const markOpSuperseded = internalMutation({
   args: { id: v.id("hikPendingOperations"), reason: v.string() },
   handler: async (ctx, args) => {
     const op = await ctx.db.get(args.id);
-    if (!op || op.status !== "failed") return;
+    if (!op || (op.status !== "failed" && !(op.status === "processing" && isTransferAddition(op)))) return;
+    if (op.operation === "deletePerson" || op.operation === "deleteCard") await transferOperationFailed(ctx, op, args.reason, "superseded");
     await ctx.db.patch(args.id, { status: "done", completedAt: Date.now(), lastError: args.reason });
   },
 });
@@ -1152,6 +1189,8 @@ function deletionUnresolvableReason(op: Doc<"hikPendingOperations">, device: Doc
 }
 
 async function supersedeDeletion(ctx: MutationCtx, id: Id<"hikPendingOperations">) {
+  const op = await ctx.db.get(id);
+  if (op) await transferOperationFailed(ctx, op, SUPERSEDED_DELETION, "superseded");
   await ctx.db.patch(id, { status: "done", completedAt: Date.now(), lastError: SUPERSEDED_DELETION });
 }
 

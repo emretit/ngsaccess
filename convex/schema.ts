@@ -106,12 +106,15 @@ export default defineSchema({
     employmentEndDate: v.optional(v.string()),
     terminationType: v.optional(v.union(
       v.literal("resignation"), v.literal("employerTermination"),
-      v.literal("retirement"), v.literal("contractEnd"), v.literal("other"),
+      v.literal("retirement"), v.literal("contractEnd"), v.literal("other"), v.literal("transfer"),
     )),
     terminationReason: v.optional(v.string()),
     sgkExitCode: v.optional(v.string()),
     terminatedAt: v.optional(v.string()),
     terminatedBy: v.optional(v.id("users")),
+    transferredFromEmployeeId: v.optional(v.id("employees")),
+    transferredToEmployeeId: v.optional(v.id("employees")),
+    transferredCardNumber: v.optional(v.string()),
     notes: v.optional(v.string()),
     shift: v.optional(v.string()),
     hourlyRate: v.optional(v.number()),
@@ -503,6 +506,30 @@ export default defineSchema({
     version: v.number(), pendingSyncJobId: v.optional(v.id("_scheduled_functions")),
     isArchived: v.optional(v.boolean()), createdAt: v.string(), updatedAt: v.string(),
   }).index("by_project", ["projectId"]).index("by_project_name", ["projectId", "name"]),
+  accessTransfers: defineTable({
+    kind: v.union(v.literal("employee"), v.literal("ide_panel")),
+    status: v.union(v.literal("requested"), v.literal("revoking"), v.literal("revoked"), v.literal("provisioning"), v.literal("done"), v.literal("stuck"), v.literal("cancelled")),
+    sourceProjectId: v.id("projects"), targetProjectId: v.id("projects"),
+    employeeId: v.id("employees"), targetEmployeeId: v.id("employees"), cardNumber: v.string(),
+    targetPlan: v.object({ accessRuleIds: v.array(v.id("accessRules")), departmentId: v.optional(v.id("departments")) }),
+    // İptalde A'nın silinen üyeliklerini aynı transaction içinde geri kurmak için.
+    sourceAccessRuleIds: v.array(v.id("accessRules")),
+    requestedBy: v.id("users"), requestedAt: v.number(), deadlineAt: v.number(),
+    completedAt: v.optional(v.number()), stuckReason: v.optional(v.string()), lastError: v.optional(v.string()),
+  }).index("by_status_deadline", ["status", "deadlineAt"])
+    .index("by_employee_status", ["employeeId", "status"])
+    .index("by_target_employee_status", ["targetEmployeeId", "status"])
+    .index("by_source_project_requested_at", ["sourceProjectId", "requestedAt"]),
+
+  accessTransferTargets: defineTable({
+    transferId: v.id("accessTransfers"), employeeId: v.id("employees"), deviceId: v.id("devices"),
+    brand: v.union(v.literal("hikvision"), v.literal("ide_smart")),
+    state: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("failed"), v.literal("superseded"), v.literal("deviceRemoved")),
+    lastError: v.optional(v.string()), confirmedAt: v.optional(v.number()), updatedAt: v.number(),
+  }).index("by_transfer_state", ["transferId", "state"])
+    .index("by_device_state", ["deviceId", "state"])
+    .index("by_employee_device", ["employeeId", "deviceId"]),
+
   accessGrantStatus: defineTable({
     projectId: v.id("projects"), employeeId: v.id("employees"), deviceId: v.id("devices"),
     departmentId: v.optional(v.id("departments")),

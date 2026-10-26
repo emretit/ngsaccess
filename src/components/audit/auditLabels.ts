@@ -87,6 +87,8 @@ const commonLabels: Record<string, string> = {
   passwordReset: "Şifre sıfırlandı",
 };
 const tableLabels: Record<string, Record<string, string>> = {
+  accessTransfers: { employeeId: "Kaynak kişi", targetEmployeeId: "Hedef kişi", sourceProjectId: "Kaynak proje", targetProjectId: "Hedef proje", targetDeviceCount: "Silme beklenen cihaz sayısı", deviceId: "Cihaz", state: "Hedef durumu", status: "Taşıma durumu" },
+  accessTransferTargets: { transferId: "Taşıma", deviceId: "Cihaz", state: "Silme durumu", lastError: "Son hata" },
   hikPendingOperations: { dismissedAt: "Uyarının kapatılma zamanı" },
   userProjects: { role: "Proje rolü" },
   projectRolePermissions: { permissions: "Rol yetkileri", default: "Varsayılan yetkiler" },

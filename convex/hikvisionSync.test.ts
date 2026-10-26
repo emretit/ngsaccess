@@ -247,7 +247,7 @@ describe("central fingerprint sync hook", () => {
   });
 });
 
-it.each([false, true])("sync hook uses one employee query across devices; templates present: %s", async hasTemplates => {
+it.each([false, true])("sync hook shares the graph query and rechecks the person once before HTTP delivery; templates present: %s", async hasTemplates => {
   const f = await fixture();
   await f.t.run(async ctx => {
     await ctx.db.patch(f.r2, { isActive: false });
@@ -257,13 +257,15 @@ it.each([false, true])("sync hook uses one employee query across devices; templa
   });
   const data = await f.t.query(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: f.employeeId });
   expect(data?.hasFingerprintTemplates).toBe(hasTemplates);
-  const runQuery = vi.fn(async () => data);
+  const runQuery = vi.fn(async (reference: unknown) => getFunctionName(reference as typeof internal.hikvisionSync.getEmployeeWithDevices) === "hikvisionSync:getEmployeeDeliveryState" ? data?.employee : data);
   const runMutation = vi.fn(async () => null);
   const runAfter = vi.fn(async () => null);
   const { syncEmployeeToDevicesInternal } = await import("./actions/hikvisionSync");
   const handler = (syncEmployeeToDevicesInternal as unknown as { _handler: (ctx: unknown, input: object) => Promise<unknown> })._handler;
   await handler({ runQuery, runMutation, scheduler: { runAfter } }, { employeeId: f.employeeId });
-  expect(runQuery).toHaveBeenCalledTimes(1);
+  expect(runQuery).toHaveBeenCalledTimes(2);
+  expect(runQuery.mock.calls.filter(([ref]) => getFunctionName(ref as typeof internal.hikvisionSync.getEmployeeWithDevices) === "hikvisionSync:getEmployeeWithDevices")).toHaveLength(1);
+  expect(runQuery.mock.calls.filter(([ref]) => getFunctionName(ref as typeof internal.hikvisionSync.getEmployeeWithDevices) === "hikvisionSync:getEmployeeDeliveryState")).toHaveLength(1);
   expect(runAfter).toHaveBeenCalledTimes(hasTemplates ? 2 : 0);
 });
 

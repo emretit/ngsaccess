@@ -267,6 +267,12 @@ export const signIn = mutation({
       employee = await ctx.db.query("employees")
         .withIndex("by_email", q => q.eq("email", rawEmail)).first();
     }
+    // Historical transferred sources retain their email; follow the latest live record.
+    if (employee?.terminationType === "transfer") {
+      const transferredEmail = employee.email;
+      const candidates = await ctx.db.query("employees").withIndex("by_email", q => q.eq("email", transferredEmail)).order("desc").take(101);
+      employee = candidates.find(row => row.isActive === true && row.terminationType !== "transfer") ?? candidates.find(row => row.terminationType !== "transfer") ?? employee;
+    }
 
     // İşten ayrılan (cron isActive'i kapatmış olsa da) EMPLOYMENT_ENDED alır, ama yalnız şifre
     // doğruysa: yanlış şifre genel hata kalır, hesabın durumu dışarı sızmaz.

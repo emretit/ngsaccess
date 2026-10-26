@@ -2,6 +2,7 @@ import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
 
 const crons = cronJobs();
+crons.interval("expire-access-transfers", { minutes: 15 }, internal.employeeTermination.expireTransfers, {});
 
 // Her ayın 1'i saat 09:00 UTC'de zamanlanmış raporları gönder
 crons.monthly(

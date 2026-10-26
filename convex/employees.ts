@@ -22,6 +22,7 @@ import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeEmployeePassword } from "./lib/employeeAuth";
 import { visitorSensitiveFields } from "./lib/visitorStatus";
 import { cardConflictMessage, findDuplicateCard } from "./lib/cardIdentity";
+import { assertNoEmployeeTransfer } from "./lib/transferGuard";
 
 import { normalizeEmployeeEmail } from "./lib/employeeEmail";
 export { normalizeEmployeeEmail };
@@ -310,9 +311,12 @@ export const update = authedMutation({
     }
     await requirePermission(ctx, ctx.user, emp.projectId, "employees.manage");
     assertEmployeeRecord(emp);
+    if ((updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber) ||
+        (updates.projectId !== undefined && updates.projectId !== emp.projectId) ||
+        (updates.isActive !== undefined && updates.isActive !== emp.isActive)) await assertNoEmployeeTransfer(ctx, employeeId);
     if (updates.projectId !== undefined && updates.projectId !== emp.projectId) throw new ConvexError({
       code: "EMPLOYEE_PROJECT_MOVE_UNSUPPORTED",
-      message: "Kişi başka projeye taşınamaz. Yeni projede yeni kayıt açın, eski kaydı işten çıkarın.",
+      message: "Projeyi değiştirmek için Kişi Ayrıntıları → Başka projeye taşı yolunu kullanın.",
     });
     if (updates.accessRuleId !== undefined) await requirePermission(ctx, ctx.user, emp.projectId, "accessRules.manage");
     const accessStartsAt = updates.accessStartsAt === undefined ? emp.accessStartsAt : normalizeEmployeeAccessStart(updates.accessStartsAt);
@@ -402,6 +406,7 @@ export const update = authedMutation({
 });
 
 export async function removeEmployeeRecord(ctx: MutationCtx, emp: Doc<"employees">, actor: Doc<"users">) {
+    await assertNoEmployeeTransfer(ctx, emp._id);
     const snapshot = await snapshotEmployeeHikDevices(ctx, emp);
     await ctx.scheduler.runAfter(
       0,
@@ -510,10 +515,11 @@ export const bulkUpdateDepartment = authedMutation({
 export const getByEmailInternal = internalQuery({
   args: { email: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("employees")
-      .withIndex("by_email", (q) => q.eq("email", normalizeEmployeeEmail(args.email) ?? ""))
-      .first();
+    const email = normalizeEmployeeEmail(args.email) ?? "";
+    const employee = await ctx.db.query("employees").withIndex("by_email", q => q.eq("email", email)).first();
+    if (employee?.terminationType !== "transfer") return employee;
+    const candidates = await ctx.db.query("employees").withIndex("by_email", q => q.eq("email", email)).order("desc").take(101);
+    return candidates.find(row => row.isActive === true && row.terminationType !== "transfer") ?? candidates.find(row => row.terminationType !== "transfer") ?? employee;
   },
 });
 
@@ -570,6 +576,7 @@ export const setProjectId = internalMutation({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
+    await assertNoEmployeeTransfer(ctx, args.employeeId);
     await ctx.db.patch(args.employeeId, {
       projectId: args.projectId,
       updatedAt: new Date().toISOString(),

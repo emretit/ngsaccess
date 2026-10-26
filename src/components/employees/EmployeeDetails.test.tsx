@@ -15,6 +15,7 @@ vi.mock("./EmployeeEmploymentActions", () => ({ EmployeeEmploymentActions: () =>
 vi.mock("./EmployeeFingerprintCard", () => ({ EmployeeFingerprintCard: () => null }));
 vi.mock("convex/react", () => ({ useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
   const name = getFunctionName(ref);
+  if (name === "employeeTermination:getEmployeeTransfer") return null;
   if (name === "employees:list") return scope.deleted ? [] : [employee];
   if (name === "employees:getById") return scope.recordDeleted ? null : employee;
   return [];

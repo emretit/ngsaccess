@@ -194,6 +194,7 @@ export async function syncEmployeeDevices(
     rule.hikWeekPlanNo ?? newlyAssigned.get(rule._id);
 
   const deviceWarnings = new Map<Id<"devices">, string>();
+  let deliveryState: Promise<FunctionReturnType<typeof internal.hikvisionSync.getEmployeeDeliveryState>> | undefined;
   const results = await Promise.all(
     tasks.map(async (t) => {
       if (t.kind === "skip") {
@@ -265,6 +266,12 @@ export async function syncEmployeeDevices(
         return { ok: true as const, device: t.device };
       }
       if (!t.device.hikDevIndex) return { ok: false, device: t.device, operation: "addPerson" as const, error: "gateway'e kayıtlı değil" };
+      // Planning may await network I/O. Re-read once per sync before the first person write (function-call quota).
+      deliveryState ??= ctx.runQuery(internal.hikvisionSync.getEmployeeDeliveryState, { employeeId: args.employeeId });
+      const current = await deliveryState;
+      if (!current || current.terminationType === "transfer" || current.isActive === false || current.projectId !== employee.projectId || current.cardNumber !== employee.cardNumber) {
+        return { skipped: true as const, ok: false as const, device: t.device, operation: "addPerson" as const };
+      }
       const personResult = await upsertPersonToDevice(t.device.hikDevIndex, {
         employeeNo: employee.cardNumber,
         name: `${employee.firstName} ${employee.lastName}`,
@@ -312,6 +319,7 @@ export async function syncEmployeeDevices(
   const failureWrites: Promise<unknown>[] = [];
   const successDeviceIds: Id<"devices">[] = [];
   for (const r of results) {
+    if ("skipped" in r && r.skipped) continue;
     if (r.ok) {
       synced++;
       const warning = deviceWarnings.get(r.device._id);
@@ -355,7 +363,7 @@ export async function syncEmployeeDevices(
   for (const { device, rule } of hikRules) rulesByDevice.set(device._id, [...rulesByDevice.get(device._id) ?? [], rule._id]);
   const grantResults: GrantResult[] = [...grantDevices.values()].flatMap(device => {
     const result = resultByDeviceKey.get(bridgeDedupeKey(device) ?? device._id);
-    if (!result || isLocalBridgeDevice(device) || !device.projectId || !isAllowed(device.projectId)) return [];
+    if (!result || ("skipped" in result && result.skipped) || isLocalBridgeDevice(device) || !device.projectId || !isAllowed(device.projectId)) return [];
     return [{ projectId: device.projectId, employeeId: args.employeeId, deviceId: device._id,
       state: result.grantRemoved ? "removed" as const : result.ok && !result.grantError ? "effective" as const : "failed" as const,
       ruleIds: rulesByDevice.get(device._id) ?? [],

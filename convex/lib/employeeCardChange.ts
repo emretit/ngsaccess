@@ -3,6 +3,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { resolveEmployeeIdeDeviceIds } from "./accessGraph";
+import { assertNoEmployeeTransfer } from "./transferGuard";
 
 /** employees.ts update kart değişimi bloğunun (302-351) ortaklaştırılmış akışıdır. */
 export async function scheduleEmployeeCardChange(
@@ -12,6 +13,7 @@ export async function scheduleEmployeeCardChange(
   previousCardNumber: string,
   previousHikSnapshot?: HikSnapshot,
 ): Promise<void> {
+  await assertNoEmployeeTransfer(ctx, employeeId);
   await scheduleFingerprintPurge(ctx, employeeId, previousCardNumber, { deleteTemplates: false });
   const ideDeviceIds = await resolveEmployeeIdeDeviceIds(ctx, employeeId, projectId);
   if (ideDeviceIds.length > 0) {

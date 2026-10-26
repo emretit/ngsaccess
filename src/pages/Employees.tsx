@@ -2,7 +2,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import type { Id } from "../../convex/_generated/dataModel";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
@@ -53,6 +53,8 @@ function EmployeePage() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const { employees, isLoading, refetch, hasProjectAccess } = useEmployees();
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [privateQuery, setPrivateQuery] = useState<string | null>(null);
   const q = privateQuery ?? safeSearchParam(params.get("q") ?? "");
   const department = params.get("department") ?? "";
@@ -76,6 +78,13 @@ function EmployeePage() {
     const saved = employees.find(item => item._id === continuingEmployeeId);
     if (saved) { setEditingEmployee(saved); setContinuingEmployeeId(null); }
   }, [employees, continuingEmployeeId]);
+  useEffect(() => {
+    const state: unknown = location.state;
+    if (!state || typeof state !== "object" || !("transferEmployeeId" in state) || !("transferProjectId" in state) || state.transferProjectId !== projectId || isLoading) return;
+    const target = employees.find(item => item._id === state.transferEmployeeId);
+    if (target) { setEditingEmployee(target); setIsPanelOpen(true); }
+    navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
+  }, [location.state, location.pathname, location.search, projectId, isLoading, employees, navigate]);
   const previousProject = useRef(projectId);
   const filtered = useMemo(
     () => filterAndSortEmployees(employees, q, department, status, sort),
