@@ -55,7 +55,7 @@ async function fixture() {
 }
 
 describe("grant status writes in existing queue transactions", () => {
-  it("IDE enqueue pending, dedupe, success effective, delete success removed", async () => {
+  it("IDE enqueue pending, dedupe, success effective, inactive employee delete success removed", async () => {
     const { t, ids, status } = await fixture();
     const enqueue = () => t.mutation(internal.ideSync.enqueueIdeOp, { projectId: ids.projectId, deviceId: ids.ideId, opType: "upsertUser", payload: { employeeId: ids.employeeId, ruleIds: [ids.ruleId], userRecord: { id: 123, permissions: [5] } } });
     const opId = await enqueue();
@@ -64,6 +64,7 @@ describe("grant status writes in existing queue transactions", () => {
     await t.mutation(internal.ideSync.markSent, { opId, msxId: 1 });
     await t.mutation(internal.ideSync.markAck, { opId, result: "success", msxId: 1 });
     expect(await status()).toMatchObject({ state: "effective", appliedAt: Date.now() });
+    await t.run(ctx => ctx.db.patch(ids.employeeId, { isActive: false }));
     const del = await t.mutation(internal.ideSync.enqueueIdeOp, { projectId: ids.projectId, deviceId: ids.ideId, opType: "deleteUser", payload: { employeeId: ids.employeeId, ideUserId: 123 } });
     await t.mutation(internal.ideSync.markSent, { opId: del, msxId: 2 });
     await t.mutation(internal.ideSync.markAck, { opId: del, result: "success", msxId: 2 });
@@ -508,9 +509,9 @@ describe("W4.2a audit regressions", () => {
   }, 30000);
 });
 
-it("current numeric IDE credential with leading zeros still records removal", async () => {
+it("inactive numeric IDE credential with leading zeros still records removal", async () => {
   const { t, ids, status } = await fixture();
-  await t.run(ctx => ctx.db.patch(ids.employeeId, { cardNumber: "00123" }));
+  await t.run(ctx => ctx.db.patch(ids.employeeId, { cardNumber: "00123", isActive: false }));
   const opId = await t.mutation(internal.ideSync.enqueueIdeOp, { deviceId: ids.ideId, opType: "deleteUser", payload: { employeeId: ids.employeeId, ideUserId: 123 } });
   await t.mutation(internal.ideSync.markSent, { opId, msxId: 1 });
   await t.mutation(internal.ideSync.markAck, { opId, result: "success", msxId: 1 });

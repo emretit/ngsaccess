@@ -10,7 +10,7 @@ import { ideTimeToISO, resolveDirection, resolveActiveMatchingRuleIds, type Acce
 import { isVirtualReader, READER_TOKEN_PATTERN, type ReaderScanDenial } from "./virtualReader";
 import { getEffectiveWorkSettings, isoTimeToTRMinutes } from "./pdksHelpers";
 import { buildShiftResolver, thresholdsForShift } from "./shiftResolver";
-import { trDateKey } from "./trDate";
+import { toUtcISO, trDateKey } from "./trDate";
 
 export interface ProcessCardReadingArgs {
   cardNo: string;
@@ -169,6 +169,34 @@ async function persistHikvisionReading(
   state: ReadingState,
 ): Promise<{ granted: boolean }> {
   const { accessTime, projectForRow, hikFields, findDeviceCardEmployee } = state;
+  const deviceTime = args.hikDateTime ? toUtcISO(args.hikDateTime) : undefined;
+  const deviceMs = deviceTime ? Date.parse(deviceTime) : NaN;
+  const receivedMs = Date.parse(accessTime);
+  const hikAccessTime = deviceTime && deviceMs >= receivedMs - 7 * 24 * 60 * 60 * 1000 &&
+    deviceMs <= receivedMs + 5 * 60 * 1000 ? deviceTime : accessTime;
+  // A reset can reuse serials. Match content as well, including later rows for
+  // that serial so a retry after a reset still has no side effects.
+  if (args.hikSerialNo !== undefined) {
+    const candidates = ctx.db.query("cardReadings")
+      .withIndex("by_device_hik_serial", q =>
+        q.eq("deviceId", device._id).eq("hikSerialNo", args.hikSerialNo));
+    let serialReused = false;
+    for await (const existing of candidates) {
+      const sameDeviceTime = deviceTime !== undefined && existing.hikDateTime !== undefined &&
+        toUtcISO(existing.hikDateTime) === deviceTime;
+      const closeAccessTime = Math.abs(Date.parse(existing.accessTime) - Date.parse(hikAccessTime)) <= 10 * 60 * 1000;
+      if (existing.cardNo === args.cardNo && (sameDeviceTime || closeAccessTime)) {
+        return { granted: existing.accessStatus === "izin_verildi" };
+      }
+      serialReused = true;
+    }
+    if (serialReused) {
+      console.warn(`[hik-serial-reset] device=${device.name} serial=${args.hikSerialNo} eventTime=${hikAccessTime}`);
+    }
+  }
+  if (Number.isFinite(deviceMs) && Math.abs(deviceMs - receivedMs) > 10 * 60 * 1000) {
+    console.warn(`[hik-clock-skew] device=${device.name} deviceTime=${deviceTime} receivedTime=${accessTime}`);
+  }
   const inferred = inferAccessStatus(
     args.hikMajorEventType,
     args.hikSubEventType,
@@ -186,7 +214,7 @@ async function persistHikvisionReading(
     ? await resolveDirection(ctx, {
         device,
         employeeId: employee._id,
-        nowISO: accessTime,
+        nowISO: hikAccessTime,
       })
     : undefined;
 
@@ -217,7 +245,7 @@ async function persistHikvisionReading(
     employeeName: employee
       ? `${employee.firstName} ${employee.lastName}`
       : undefined,
-    accessTime,
+    accessTime: hikAccessTime,
     accessStatus,
     direction,
     rawData: args.rawBody,
@@ -244,7 +272,21 @@ async function persistIdeReading(
 
   // Panel olay zamanı (payload.time, panel TZ = UTC+3) → UTC ISO. Offline kuyruktan
   // toplu push edilen event'lerde gerçek okutma anı korunur (sunucu alış anı değil).
-  const ideAccessTime = ideTimeToISO(args.ideTime) ?? accessTime;
+  const panelTime = ideTimeToISO(args.ideTime);
+  if (!panelTime) {
+    console.warn(`[ide-event-no-time] device=${device.name} io=${args.ideIoId} ideTime=${args.ideTime}`);
+  }
+  if (panelTime) {
+    const candidates = ctx.db.query("cardReadings")
+      .withIndex("by_device_io_time", q => q.eq("deviceId", device._id)
+        .eq("ideIoId", args.ideIoId).eq("accessTime", panelTime));
+    // One panel second may contain multiple cards; all three index fields alone
+    // are not an event identity. Stop as soon as this card is found.
+    for await (const existing of candidates) {
+      if (existing.cardNo === args.cardNo) return { granted: existing.accessStatus === "izin_verildi" };
+    }
+  }
+  const ideAccessTime = panelTime ?? accessTime;
 
   const employee = await findDeviceCardEmployee(ctx, args.cardNo, device?.projectId);
 

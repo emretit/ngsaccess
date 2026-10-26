@@ -117,7 +117,8 @@ it("expiry cron includes legacy TR and UTC records at the same instant without e
     expect(await handler({ db: { query, patch }, scheduler: { runAfter } } as unknown as MutationCtx, {})).toEqual({ expired: 2 });
     expect(upperBound).toBe("2026-10-17T10:00:00.000Z");
     expect(patch.mock.calls.map(([id]) => id)).toEqual(["legacy", "iso"]);
-    expect(runAfter).toHaveBeenCalledTimes(2);
+    // Mock'ta Hik cihazı da IDE paneli de yok → silme planlanmaz (boş snapshot için action çağrısı yok, F2-C NOT 4).
+    expect(runAfter).not.toHaveBeenCalled();
   } finally { vi.useRealTimers(); }
 });
 

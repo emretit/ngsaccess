@@ -4,7 +4,7 @@ import { hikSnapshotValidator } from "./lib/peopleHikSnapshot";
 import { templateRules, scheduleRuleDevices, boundedScheduleRows, ideScheduleImpact } from "./accessScheduleTemplates";
 import { effectiveSchedule, toHikWeekSchedule } from "./lib/accessSchedule";
 import { pendingPersonDeletions, enqueueLocalBridgeOperationInTransaction } from "./hikvisionSync";
-import { allocateIdePermissionNos, ideRuleSegments, ruleIoIdsForPanel, buildIdePermissionRecord, enqueueIdeOpInTransaction, capPermissionNos, ideUserStartFromAccessStart } from "./ideSync";
+import { allocateIdePermissionNos, ideRuleSegments, ruleIoIdsForPanel, buildIdePermissionRecord, enqueueIdeOpInTransaction, capPermissionNos, ideUserAccessWindow } from "./ideSync";
 import { resolvePanelAuthorizedCards } from "./lib/accessGraph";
 import { normalizeIdeCard } from "./ideSync";
 import { ConvexError, v } from "convex/values";
@@ -735,7 +735,7 @@ export const enqueueTemplateTarget = internalMutation({
         continue;
       }
       await enqueueIdeOpInTransaction(ctx, { deviceId: device._id, projectId: run.projectId, runId: run._id, opType: "upsertUser",
-        payload: { employeeId, ruleIds, mode: "create", userRecord: { id: card, status: 1, start: ideUserStartFromAccessStart(employee.accessStartsAt, Date.now()), permissions: capPermissionNos(nos) } } });
+        payload: { employeeId, ruleIds, mode: "create", userRecord: { id: card, status: 1, ...ideUserAccessWindow(employee, Date.now()), permissions: capPermissionNos(nos) } } });
     }
     if (failures.length) await ctx.db.patch(target._id, { status: "failed", dispatchFinished: true, reason: failures.join("; ").slice(0, 2000), updatedAt: Date.now() });
   },

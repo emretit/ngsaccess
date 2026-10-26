@@ -193,7 +193,8 @@ describe("panel-authoritative audit paths", () => {
     const sub = kind === "denied" ? 9 : kind === "unclassified" ? 999999 : 1;
     const known = cardNo === "CARD";
     const granted = !["denied", "unclassified"].includes(kind);
-    await run(f, args({ cardNo, hikSubEventType: sub }), granted, [reading(f, { cardNo, hikSubEventType: sub, employeeId: known ? f.employeeId : undefined, employeeName: known ? "Ada Test" : undefined, direction: known ? "entry" : undefined, accessStatus: granted ? "izin_verildi" : "reddedildi", hikDenialReason: kind === "denied" ? "Kart tanımlı değil" : undefined })]);
+    // Canlı Hik kaydı artık doğrulanmış cihaz anını kullanır; oluşturma anı sunucu saatidir.
+    await run(f, args({ cardNo, hikSubEventType: sub }), granted, [reading(f, { accessTime: "2026-10-19T08:59:00.000Z", cardNo, hikSubEventType: sub, employeeId: known ? f.employeeId : undefined, employeeName: known ? "Ada Test" : undefined, direction: known ? "entry" : undefined, accessStatus: granted ? "izin_verildi" : "reddedildi", hikDenialReason: kind === "denied" ? "Kart tanımlı değil" : undefined })]);
     expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.hikLastSerialNo).toBe(12);
     expect(warning.mock.calls).toEqual(kind === "gap" ? [["[hik-event-gap] device=Reader expected front=9 got=11 current=12"]] : []);
   });
@@ -206,8 +207,10 @@ describe("panel-authoritative audit paths", () => {
   });
   it.each(["missing", "FOREIGN"])("IDE unknown/foreign %s can be panel-granted; invalid time falls back", async cardNo => {
     const f = await fixture();
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
     await f.t.run(ctx => ctx.db.patch(f.deviceId, { brand: "ide_smart" }));
     await run(f, args({ cardNo, ideResult: 1, ideIoId: 0, ideTime: "invalid" }), true, [{ projectId: f.projectId, deviceId: f.deviceId, cardNo, accessTime: now, accessStatus: "izin_verildi", direction: "entry", ideIoId: 0, rawData: "raw-event", createdAt: now, updatedAt: now }]);
+    expect(warning.mock.calls).toEqual([["[ide-event-no-time] device=Reader io=0 ideTime=invalid"]]);
   });
 });
 

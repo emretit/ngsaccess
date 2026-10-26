@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDoorPlans, buildPersonPayload, hikValidBeginFromAccessStart } from "./persons";
+import { buildDoorPlans, buildPersonPayload, hikValidBeginFromAccessStart, hikValidEndFromAccessEnd } from "./persons";
 import { parseHikJsonStatus } from "./core";
 
 const person = { employeeNo: "123", name: "Employee", beginTime: "2026-01-01T00:00:00" };
@@ -58,5 +58,24 @@ describe("Hik access start validity", () => {
     expect(hikValidBeginFromAccessStart(accessStartsAt, now)).toBeUndefined();
     expect(buildPersonPayload({ employeeNo: "123", name: "Test", doorCount: 1, planTemplateNo: 4, beginTime: hikValidBeginFromAccessStart(accessStartsAt, now) }).Valid.beginTime)
       .toMatch(/^\d{4}-\d{2}-\d{2}T00:00:00$/);
+  });
+});
+
+
+describe("Hik access end validity", () => {
+  it("keeps the default end when access is unlimited", () => {
+    expect(hikValidEndFromAccessEnd(undefined)).toBeUndefined();
+    expect(buildPersonPayload({ ...person, planTemplateNo: 4, doorCount: 1 }).Valid.endTime).toBe("2037-12-31T23:59:59");
+  });
+  it("formats Turkey wall time without offset or fractional seconds", () => {
+    expect(hikValidEndFromAccessEnd(Date.parse("2026-10-26T15:00:00.999Z"))).toBe("2026-10-26T18:00:00");
+    expect(hikValidEndFromAccessEnd(Date.parse("2026-10-31T20:59:59.999Z"))).toBe("2026-10-31T23:59:59");
+  });
+  it.each([undefined, "2026-01-01T00:00:00", "2026-01-02T00:00:00"])("moves begin %s one minute before an expired or equal end", beginTime => {
+    const valid = buildPersonPayload({ ...person, beginTime, endTime: "2026-01-01T00:00:00", planTemplateNo: 4, doorCount: 1 }).Valid;
+    expect(valid).toMatchObject({ beginTime: "2025-12-31T23:59:00", endTime: "2026-01-01T00:00:00" });
+  });
+  it("preserves an explicit begin earlier than end", () => {
+    expect(buildPersonPayload({ ...person, endTime: "2026-01-02T00:00:00", planTemplateNo: 4, doorCount: 1 }).Valid.beginTime).toBe(person.beginTime);
   });
 });

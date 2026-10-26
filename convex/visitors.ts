@@ -25,18 +25,36 @@ import {
 } from "./employees";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeAudit } from "./lib/audit";
-import { cardConflictMessage } from "./lib/cardIdentity";
+import { cardConflictMessage, cardNumericKey } from "./lib/cardIdentity";
 import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
 
 /** Freeze the old credential and targets before checkout, release or badge reuse. */
 async function scheduleVisitorCardRemoval(ctx: MutationCtx, visitor: Doc<"employees">) {
   const snapshot = await snapshotEmployeeHikDevices(ctx, visitor);
   const deviceIds = await resolveEmployeeIdeDeviceIds(ctx, visitor._id, visitor.projectId);
-  await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
+  if (snapshot.devices.length) await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
     employeeId: visitor._id, snapshot,
   });
-  if (deviceIds.length) await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.deleteIdeUserFromPanels, {
-    employeeId: visitor._id, cardNumber: visitor.cardNumber, deviceIds, projectId: visitor.projectId,
+  const alreadyEnded = visitor.isActive === false && (visitor.visitorStatus === "checkedOut" || visitor.visitorStatus === "expired");
+  const cardKey = alreadyEnded ? cardNumericKey(visitor.cardNumber) : null;
+  const removalDeviceIds: Id<"devices">[] = [];
+  for (const deviceId of deviceIds) {
+    let deletionExists = false;
+    if (cardKey !== null) {
+      // enqueueIdeOp idempotency anahtarı (ideSync targetKey): `${deviceId}:deleteUser:user:${Number(kart)}`, run'lı işler `:<runId>` ekler.
+      // Cihazın tüm iş geçmişini taramak yerine yalnız bu kartın silme işleri okunur. superseded ACK panel silmesi değildir.
+      const key = `${deviceId}:deleteUser:user:${cardKey}`;
+      const ops = [
+        ...await ctx.db.query("idePendingOperations").withIndex("by_idempotency", q => q.eq("idempotencyKey", key)).take(50),
+        ...await ctx.db.query("idePendingOperations").withIndex("by_idempotency", q => q.gte("idempotencyKey", `${key}:`).lt("idempotencyKey", `${key};`)).take(50),
+      ];
+      deletionExists = ops.some(op => op.projectId === visitor.projectId &&
+        (op.status === "pending" || op.status === "sent" || (op.status === "acked" && !op.responseMessage?.startsWith("superseded"))));
+    }
+    if (!deletionExists) removalDeviceIds.push(deviceId);
+  }
+  if (removalDeviceIds.length) await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.deleteIdeUserFromPanels, {
+    employeeId: visitor._id, cardNumber: visitor.cardNumber, deviceIds: removalDeviceIds, projectId: visitor.projectId,
   });
 }
 
@@ -395,7 +413,8 @@ export const create = authedMutation({
 /**
  * Ziyaretçi güncelle. Bölge (preset kural) v1'de değiştirilemez — gerekirse sil + yeniden
  * oluştur. Kart değişiminde eski kart IDE panellerinden sökülür (employees.update deseni).
- * accessExpiresAt değişimi cihaz sync gerektirmez (süre dolumu cron işidir).
+ * accessExpiresAt değişimi aktif ziyaretçinin cihaz erişim bitişini Hik ve IDE sync ile günceller;
+ * süre dolumu ayrıca cron ile erişimi geri alır.
  */
 export const update = authedMutation({
   args: {
@@ -456,7 +475,9 @@ export const update = authedMutation({
         newCard ?? visitor.cardNumber, visitor._id);
     }
     const activeChanged = args.isActive !== undefined && args.isActive !== visitor.isActive;
+    const expiryChanged = args.accessExpiresAt !== undefined && args.accessExpiresAt !== visitor.accessExpiresAt;
     const deactivating = activeChanged && args.isActive === false;
+    const needsDeviceSync = cardChanged || activeChanged || (expiryChanged && effective.isActive !== false);
 
     // IDE panellerini patch'ten ÖNCE çöz (capture-before-mutation): kart değişiminde ESKİ
     // kartı, deaktivasyonda paneldeki kartı FİZİKSEL sökmek için kullanılır. Deaktivasyonda
@@ -506,7 +527,7 @@ export const update = authedMutation({
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
         employeeId: visitor._id, snapshot: previousHikSnapshot, syncAfter: cardChanged && !deactivating,
       });
-    } else if (cardChanged || activeChanged) {
+    } else if (needsDeviceSync) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId: args.visitorId,
       });
@@ -514,7 +535,7 @@ export const update = authedMutation({
     // IDE push yalnız kart panelde AKTİF durmalıysa (kart değişimi → yeni kartı yaz, ya da
     // aktivasyon). Deaktivasyonda push YAPMA: yukarıdaki fiziksel sökmeyi status=0 upsert ile
     // geri alırdı.
-    if ((cardChanged || activeChanged) && !deactivating) {
+    if (needsDeviceSync && !deactivating) {
       await ctx.scheduler.runAfter(
         0,
         internal.actions.ideGatewayDevice.syncEmployeeToIdePanels,

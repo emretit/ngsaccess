@@ -1,5 +1,6 @@
 "use node";
 
+import { accessEndsAtMs } from "../lib/accessEnd";
 import { v } from "convex/values";
 import { runBackfillContinuation } from "../lib/gatewayBackfill";
 import { internalAction, type ActionCtx } from "../_generated/server";
@@ -19,7 +20,7 @@ import {
   setDoorParam,
   openDoor,
 } from "../lib/hikGateway";
-import { hikValidBeginFromAccessStart } from "../lib/gateway/persons";
+import { hikValidBeginFromAccessStart, hikValidEndFromAccessEnd } from "../lib/gateway/persons";
 import { defaultRuleSchedule } from "../lib/hikSync";
 
 /**
@@ -145,6 +146,7 @@ async function executeOperation(
         planTemplateNo,
         doorCount: c.device.hikDoorCount,
         beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt, Date.now()),
+        endTime: hikValidEndFromAccessEnd(accessEndsAtMs(employee)),
       });
       if (result.ok) {
         try {

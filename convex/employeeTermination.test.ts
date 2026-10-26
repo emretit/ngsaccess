@@ -64,7 +64,9 @@ describe("employeeTermination", () => {
     const f = await fixture();
     await f.caller.mutation(api.employeeTermination.terminate, { employeeId: f.employeeId, ...termination, employmentEndDate });
     expect((await f.t.run(ctx => ctx.db.get(f.employeeId)))?.isActive).toBe(true);
-    expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
+    const jobs = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs.map(job => job.name)).toEqual(["actions/hikvisionSync:syncEmployeeToDevicesInternal", "actions/ideGatewayDevice:syncEmployeeToIdePanels"]);
+    expect(jobs.map(job => job.args)).toEqual([[{ employeeId: f.employeeId }], [{ employeeId: f.employeeId }]]);
     expect(await f.t.mutation(internal.employeeTermination.closeEndedEmployments, {})).toEqual({ closed: 0 });
   });
   it("cron excludes undefined dates/today/future/inactive/visitors and closes at TR midnight", async () => {

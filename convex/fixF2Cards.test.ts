@@ -184,13 +184,14 @@ describe("A6-6/A6-7: preserve visitor revocation identity and grant owner", () =
       q => q.eq("employeeId", f.visitorId).eq("deviceId", deviceId)).unique())).toMatchObject({ state: "effective" });
   });
 
-  it("checkout followed immediately by release preserves old Hik/IDE identity on both removal jobs", async () => {
+  it("checkout followed immediately by release preserves old Hik/IDE identity on all removal jobs", async () => {
     const f = await fixture();
     await f.caller.mutation(api.visitors.checkOut, { visitorId: f.visitorId });
     await f.caller.mutation(api.visitors.releaseCard, { visitorId: f.visitorId });
     expect((await f.t.run(ctx => ctx.db.get(f.visitorId)))?.cardNumber).toBe(`IADE:789:${f.visitorId}`);
     const jobs = await f.jobs();
-    expect(jobs).toHaveLength(4);
+    expect(jobs).toHaveLength(4); // No queue job exists yet: release gives IDE removal another chance.
+    expect(jobs.filter(job => job.name.includes("ideGatewayDevice"))).toHaveLength(2);
     for (const job of jobs.filter(job => job.name.includes("hikvisionSync"))) expect(job.args).toMatchObject([{
       employeeId: f.visitorId, snapshot: { cardNumber: "789", projectId: f.projectId, devices: [{ _id: f.hikId }] },
     }]);

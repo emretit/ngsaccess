@@ -70,7 +70,12 @@ export const terminate = authedMutation({
     const { employeeId, ...details } = args;
     const updates = { ...details, terminatedAt: now, terminatedBy: ctx.user._id, updatedAt: now };
     await ctx.db.patch(employeeId, updates);
-    if (args.employmentEndDate < today) await closeAccess(ctx, employee, now);
+    if (args.employmentEndDate < today) {
+      await closeAccess(ctx, employee, now);
+    } else {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
+    }
     await writeAudit(ctx, { user: ctx.user, projectId: employee.projectId, action: "update", targetTable: "employees", targetId: employeeId, oldValue: employee, newValue: { ...updates, isActive: args.employmentEndDate < today ? false : employee.isActive }, note: "İşten ayrılma" });
     return null;
   },

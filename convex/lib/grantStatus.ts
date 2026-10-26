@@ -1,3 +1,4 @@
+import { effectiveSchedule, toIdePermissionSegments } from "./accessSchedule";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -23,13 +24,17 @@ export async function grantRuleScope(ctx: QueryCtx, rule: Doc<"accessRules">) {
   bounded(links, 200); bounded(selections, 200);
   const deviceIds = new Set(links.map(link => link.deviceId));
   const selected = new Map<Id<"devices">, Doc<"doors">[]>();
+  let orphanSelection = false;
   for (const link of selections) {
     const door = await ctx.db.get(link.doorId);
+    if (!door && !link.deviceId) orphanSelection = true;
     if (link.deviceId && link.deviceId !== door?.deviceId && !selected.has(link.deviceId)) selected.set(link.deviceId, []);
     if (!door?.deviceId || door.projectId !== rule.projectId) continue;
     deviceIds.add(door.deviceId);
     selected.set(door.deviceId, [...selected.get(door.deviceId) ?? [], door]);
   }
+  const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
+  const hasSegments = toIdePermissionSegments(effectiveSchedule(rule, template)).length > 0;
   const scopes = [];
   for (const deviceId of deviceIds) {
     const device = await ctx.db.get(deviceId);
@@ -38,15 +43,15 @@ export async function grantRuleScope(ctx: QueryCtx, rule: Doc<"accessRules">) {
     const doors = bounded(await ctx.db.query("doors").withIndex("by_device", q => q.eq("deviceId", deviceId)).take(201), 200)
       .filter(door => door.projectId === rule.projectId);
     const chosen = selected.get(deviceId);
-    // IDE ruleIoIdsForPanel falls back when no numeric selected IO exists.
-    const ideCandidates = chosen?.some(door => typeof door.ioId === "number") ? chosen : doors;
-    const ioIds = new Set(ideCandidates.flatMap(door => typeof door.ioId === "number" && door.ioId >= 0 && door.ioId <= 7 ? [door.ioId] : []));
-    if (!ioIds.size) ioIds.add(0); // buildIdePermissionRecord's safe fallback.
+    // Match ruleIoIdsForPanel: an explicit selection never widens to other doors.
+    const ideCandidates = chosen ?? (orphanSelection ? [] : doors);
+    const ioIds = new Set(ideCandidates.flatMap(door => typeof door.ioId === "number" && Number.isInteger(door.ioId) && door.ioId >= 0 && door.ioId <= 7 ? [door.ioId] : []));
     const effectiveDoors = device.brand === "ide_smart"
       ? doors.filter(door => door.ioId !== undefined && ioIds.has(door.ioId))
       : chosen === undefined ? doors : chosen.filter(door => Number.isInteger(door.hikDoorNo) && (door.hikDoorNo ?? 0) >= 1 && (door.hikDoorNo ?? 0) <= Math.max(1, device.hikDoorCount ?? (device.hikTransport === "localBridge" ? 4 : 1)));
     if (device.brand === "hikvision" && chosen !== undefined && effectiveDoors.length === 0) continue;
-    scopes.push({ device, doors: effectiveDoors });
+    const errorCode = device.brand === "ide_smart" && hasSegments && !ioIds.size ? "door_io_unresolved" as const : undefined;
+    scopes.push({ device, doors: effectiveDoors, errorCode });
   }
   return scopes;
 }

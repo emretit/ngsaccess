@@ -13,6 +13,7 @@ export function createEventSpool({
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const path = join(directory, "events.jsonl");
   let rows = [];
+  let head = 0;
   let draining = false;
   const syncFile = file => {
     const fd = openSync(file, "r");
@@ -30,6 +31,14 @@ export function createEventSpool({
     appendFileSync(file, contents + "\n", { mode: 0o600 });
     syncFile(file);
     syncFile(directory);
+  };
+  // A crash before compaction replays acknowledged rows; it never discards an
+  // unacknowledged event. The server deduplicates those at-least-once deliveries.
+  const compact = () => {
+    const remaining = rows.slice(head);
+    persist(remaining);
+    rows = remaining;
+    head = 0;
   };
   let contents = "";
   try { contents = readFileSync(path, "utf8"); } catch (error) {
@@ -59,29 +68,32 @@ export function createEventSpool({
     draining = true;
     try {
       for (let count = 0; count < 100; count++) {
-        const row = rows[0];
+        const row = rows[head];
         if (!row || row.nextRetryAt > now()) return;
         const result = await convexPost("/ide-bridge/event", row.body).catch(() => ({ ok: false }));
         const attempts = row.attempts + 1;
         const rejected = !result.ok && result.status >= 400 && result.status < 500 && ![408, 429].includes(result.status);
         if (rejected) archive("rejected", JSON.stringify({ ...row, attempts, status: result.status }));
-        const nextRows = result.ok || rejected ? rows.slice(1)
-          : [{ ...row, attempts, nextRetryAt: now() + retryDelay(attempts) }, ...rows.slice(1)];
-        persist(nextRows);
-        rows = nextRows;
+        if (result.ok || rejected) {
+          head++;
+          if (head >= 100 || head === rows.length) compact();
+        } else {
+          rows[head] = { ...row, attempts, nextRetryAt: now() + retryDelay(attempts) };
+          compact();
+        }
         if (rejected) log(`WARNING: IDE event HTTP ${result.status}; moved to ${path}.rejected; inspect the file`);
         else if (!result.ok) {
-          log(`event forward FAIL; retained in spool (${rows.length})`);
+          log(`event forward FAIL; retained in spool (${rows.length - head})`);
           return;
         }
       }
     } finally { draining = false; }
   }
   return {
-    size: () => rows.length,
+    size: () => rows.length - head,
     drain,
     async forward(body) {
-      if (rows.length >= maxEntries) {
+      if (rows.length - head >= maxEntries) {
         log(`WARNING: IDE event spool FULL (${maxEntries}); incoming event rejected`);
         return false;
       }
@@ -220,7 +232,7 @@ export async function routeMqttMessage(topic, buf, {
   if (type === "event/heartbeat") dbg(`heartbeat ${parsed?.transaction?.["src-id"]}`);
   else log(`event ${topic} type=${type}`);
 
-  if (eventSpool) {
+  if (eventSpool && type !== "event/heartbeat") {
     await eventSpool.forward({ topic: event.topic, body: raw });
     return;
   }

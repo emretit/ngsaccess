@@ -1,6 +1,8 @@
 import { purgeIdeOperationsPage } from "./lib/deviceHelpers";
 import { requirePermission, getProjectIdsWithPermission } from "./lib/permissions";
-import { grantStatusForOperation } from "./lib/grantStatus";
+import { employeeGrantGraph, grantStatusForOperation } from "./lib/grantStatus";
+import { cardNumericKey } from "./lib/cardIdentity";
+import { accessEndsAtMs } from "./lib/accessEnd";
 import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule, type ScheduleTemplate } from "./lib/accessSchedule";
 import { boundedScheduleRows, scheduleRuleDevices } from "./accessScheduleTemplates";
 import { mobileOperationId, mobileQueueAllowed, accessError } from "./lib/mobileAccess";
@@ -125,6 +127,17 @@ export function ideUserStartFromAccessStart(accessStartsAt: string | undefined, 
   return ms > now ? Math.floor(ms / 1000) : 0;
 }
 
+/** IDE user.end is UTC epoch seconds; zero clears an existing restriction. */
+export function ideUserEndFromAccessEnd(endMs: number | undefined): number {
+  return endMs === undefined ? 0 : Math.floor(endMs / 1000);
+}
+
+export function ideUserAccessWindow(employee: { accessStartsAt?: string; accessExpiresAt?: string; employmentEndDate?: string }, now: number) {
+  const end = ideUserEndFromAccessEnd(accessEndsAtMs(employee));
+  const start = ideUserStartFromAccessStart(employee.accessStartsAt, now);
+  return { start: start > 0 && end > 0 && start >= end ? 0 : start, end };
+}
+
 /**
  * buildIdePermissionRecord'un sessizce eleyeceği (0–7 dışı) ioId'ler. Çağıran action
  * bunları görünür kılmak (skipped/uyarı) için kullanır — yanlış yapılandırılmış
@@ -195,7 +208,23 @@ async function removePanelUser(
 export type IdeOpType = Doc<"idePendingOperations">["opType"];
 
 // Context identity scopes this cache to one mutation, including bulk enqueue callers.
-const enqueueRuleIoCache = new WeakMap<MutationCtx, Map<string, number[]>>();
+const enqueueRuleIoCache = new WeakMap<QueryCtx, Map<string, number[]>>();
+
+/** One transaction-local IO resolver shared by enqueue validation and deletion protection. */
+async function cachedRuleIoIds(ctx: QueryCtx, ruleId: Id<"accessRules">, deviceId: Id<"devices">) {
+  let ioCache = enqueueRuleIoCache.get(ctx);
+  if (!ioCache) {
+    ioCache = new Map();
+    enqueueRuleIoCache.set(ctx, ioCache);
+  }
+  const key = `${ruleId}:${deviceId}`;
+  let ioIds = ioCache.get(key);
+  if (ioIds === undefined) {
+    ioIds = await ruleIoIdsForPanel(ctx, { ruleId, deviceId });
+    ioCache.set(key, ioIds);
+  }
+  return ioIds;
+}
 
 /** opType'a göre op'un hedef varlığını tanımlayan idempotency parçası. */
 function targetKey(opType: IdeOpType, payload: Record<string, unknown>): string {
@@ -274,17 +303,7 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
           const ruleId = typeof rawRuleId === "string" ? ctx.db.normalizeId("accessRules", rawRuleId) : null;
           const rule = ruleId ? await ctx.db.get(ruleId) : null;
           if (!rule || ![rule.idePermissionNo, ...(rule.ideExtraPermissionNos ?? [])].some(no => no !== undefined && permissions.includes(no))) continue;
-          let ioCache = enqueueRuleIoCache.get(ctx);
-          if (!ioCache) {
-            ioCache = new Map();
-            enqueueRuleIoCache.set(ctx, ioCache);
-          }
-          const key = `${rule._id}:${args.deviceId}`;
-          let ioIds = ioCache.get(key);
-          if (ioIds === undefined) {
-            ioIds = await ruleIoIdsForPanel(ctx, { ruleId: rule._id, deviceId: args.deviceId });
-            ioCache.set(key, ioIds);
-          }
+          const ioIds = await cachedRuleIoIds(ctx, rule._id, args.deviceId);
           if (!ioIds.length) doorError = true;
         }
       }
@@ -345,6 +364,61 @@ function doorCommandExpired(op: Doc<"idePendingOperations">, now = Date.now()): 
   return (typeof expiresAt === "number" ? expiresAt : op.createdAt + 30_000) <= now;
 }
 
+/** Old badge cleanup must never remove an active owner's writable current panel credential. */
+async function currentCredentialProtected(ctx: QueryCtx, op: Doc<"idePendingOperations">): Promise<boolean> {
+  if (op.opType !== "deleteUser") return false;
+  const payload = (op.payload ?? {}) as Record<string, unknown>;
+  const raw = payload.ideUserId;
+  if (typeof raw !== "number" && typeof raw !== "string") return false;
+  const key = cardNumericKey(String(raw));
+  if (key === null) return false;
+  const device = await ctx.db.get(op.deviceId);
+  if (!device?.isActive || device.brand !== "ide_smart") return false;
+  const variants = new Set([String(raw), key]);
+  for (let length = key.length; length <= 20; length++) variants.add(key.padStart(length, "0"));
+  for (const cardNumber of variants) {
+    const owners = await ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", cardNumber)).take(101);
+    if (owners.length > 100) throw new Error("Kart sahibi sınırı aşıldı; kart kayıtlarını denetleyin");
+    for (const employee of owners) {
+      if (employee.projectId !== device.projectId || employee.isActive === false || cardNumericKey(employee.cardNumber) !== key) continue;
+      const end = accessEndsAtMs(employee);
+      if (end !== undefined && end <= Date.now()) continue;
+      const scope = (await employeeGrantGraph(ctx, employee)).get(op.deviceId);
+      if (!scope?.doors.length) continue;
+      const upsertKey = `${op.deviceId}:upsertUser:user:${key}`;
+      const latestUnscoped = await ctx.db.query("idePendingOperations")
+        .withIndex("by_idempotency", q => q.eq("idempotencyKey", upsertKey)).order("desc").first();
+      // Template runs append runId to the same key; their failures also block protection.
+      const runUpserts = await ctx.db.query("idePendingOperations")
+        .withIndex("by_idempotency", q => q.gte("idempotencyKey", `${upsertKey}:`).lt("idempotencyKey", `${upsertKey};`)).take(1001);
+      if (runUpserts.length > 1000) throw new Error("IDE yazım geçmişi sınırı aşıldı; panel işlerini temizleyin");
+      const latestUpsert = runUpserts.reduce<Doc<"idePendingOperations"> | null>((latest, row) =>
+        !latest || row._creationTime > latest._creationTime ? row : latest, latestUnscoped);
+      if (latestUpsert?.status === "failed") continue;
+      let writable = false;
+      let unresolved = false;
+      for (const ruleId of scope.ruleIds) {
+        const rule = await ctx.db.get(ruleId);
+        if (!rule) continue;
+        const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
+        if (!ideRuleSegments(rule, template).length) continue;
+        if (!(await cachedRuleIoIds(ctx, ruleId, op.deviceId)).length) {
+          unresolved = true;
+          break;
+        }
+        writable = true;
+      }
+      if (writable && !unresolved) return true;
+    }
+  }
+  return false;
+}
+
+async function supersedeDeletion(ctx: MutationCtx, op: Doc<"idePendingOperations">) {
+  // Schema's existing terminal state; this is NOT a panel deletion acknowledgement.
+  await ctx.db.patch(op._id, { status: "acked", ackedAt: Date.now(), responseMessage: "superseded: Kart aktif bir kişinin güncel kimliği; silme atlandı", lastError: undefined });
+}
+
 async function undeliverableReason(ctx: QueryCtx, op: Doc<"idePendingOperations">): Promise<string | undefined> {
   const device = await ctx.db.get(op.deviceId);
   if (!device || device.brand !== "ide_smart" || !device.ideUuid) return "Cihaz bulunamadı";
@@ -366,6 +440,7 @@ async function pendingForBridge(ctx: QueryCtx, max?: number) {
 
     const ops = [];
     for (const op of candidates) {
+      if (await currentCredentialProtected(ctx, op)) continue;
       if (await undeliverableReason(ctx, op)) continue;
       const device = await ctx.db.get(op.deviceId);
       if (!device || device.brand !== "ide_smart" || !device.ideUuid) continue;
@@ -400,6 +475,10 @@ export const pollForBridge = internalMutation({
     const candidates = await ctx.db.query("idePendingOperations")
       .withIndex("by_status_nextRetry", q => q.eq("status", "pending").lte("nextRetryAt", Date.now())).take(50);
     for (const op of candidates) {
+      if (await currentCredentialProtected(ctx, op)) {
+        await supersedeDeletion(ctx, op);
+        continue;
+      }
       const reason = await undeliverableReason(ctx, op);
       if (reason) {
         await ctx.db.patch(op._id, { status: "failed", lastError: reason });
@@ -429,6 +508,10 @@ export const markSent = internalMutation({
       throw accessError("MOBILE_COMMAND_NOT_DELIVERABLE");
     }
     if (!op || (op.status !== "pending" && !reserved)) return false;
+    if (await currentCredentialProtected(ctx, op)) {
+      await supersedeDeletion(ctx, op);
+      return false;
+    }
     if (doorCommandExpired(op)) {
       await ctx.db.patch(op._id, { status: "failed", lastError: "Komut süresi doldu" });
       return false;
@@ -487,6 +570,11 @@ export const markAck = internalMutation({
         (op.msxId === undefined || args.msxId === undefined || op.msxId !== args.msxId)) return;
     // Eski/yinelenen ack'i ele: beklenen msxId ile eşleşmeli (markSent her zaman msxId yazar).
     if (args.msxId != null && op.msxId != null && op.msxId !== args.msxId) return;
+
+    if (await currentCredentialProtected(ctx, op)) {
+      await supersedeDeletion(ctx, op);
+      return;
+    }
 
     if (args.result === "success") {
       if (op.opType === "upsertUser" || op.opType === "deleteUser") await grantStatusForOperation(ctx, op, op.opType === "deleteUser" ? "removed" : "effective");

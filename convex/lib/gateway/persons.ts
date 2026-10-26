@@ -76,6 +76,12 @@ export function hikValidBeginFromAccessStart(accessStartsAt: string | undefined,
   return new Date(ms + 3 * 60 * 60 * 1000).toISOString().slice(0, 19);
 }
 
+/** Hik local validity uses Turkey wall-clock time, truncated to whole seconds. */
+export function hikValidEndFromAccessEnd(endMs: number | undefined): string | undefined {
+  if (endMs === undefined) return undefined;
+  return new Date(endMs + 3 * 60 * 60 * 1000).toISOString().slice(0, 19);
+}
+
 /** Bugünden başlayan geniş validity window — accessRule'da explicit tarih alanı yok. */
 function defaultValidBegin(): string {
   const d = new Date();
@@ -101,14 +107,20 @@ export function buildPersonPayload(p: PersonRecord) {
     if (!Number.isInteger(plan.doorNo) || plan.doorNo < 1 || !plan.planTemplateNos.length ||
         plan.planTemplateNos.some(no => !Number.isInteger(no) || no < 1)) throw new Error("Invalid door plan");
   }
+  const endTime = p.endTime ?? DEFAULT_VALID_END;
+  let beginTime = p.beginTime ?? defaultValidBegin();
+  // Expired people must remain expired; Hik rejects a reversed validity interval.
+  if (endTime <= beginTime) {
+    beginTime = new Date(Date.parse(`${endTime}Z`) - 60 * 1000).toISOString().slice(0, 19);
+  }
   return {
     employeeNo: p.employeeNo,
     name: p.name,
     userType: p.userType ?? "normal",
     Valid: {
       enable: p.validEnable ?? true,
-      beginTime: p.beginTime ?? defaultValidBegin(),
-      endTime: p.endTime ?? DEFAULT_VALID_END,
+      beginTime,
+      endTime,
       timeType: "local",
     },
     doorRight: doorPlans.map(p => p.doorNo).join(","),

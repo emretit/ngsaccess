@@ -164,6 +164,8 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
       projectId: employee.projectId,
       isActive: employee.isActive,
       accessStartsAt: employee.accessStartsAt,
+      accessExpiresAt: employee.accessExpiresAt,
+      employmentEndDate: employee.employmentEndDate,
     },
     deviceRules,
   };
@@ -865,6 +867,8 @@ export const listRetryCandidates = internalMutation({
                   firstName: employee.firstName,
                   lastName: employee.lastName,
                   accessStartsAt: employee.accessStartsAt,
+                  accessExpiresAt: employee.accessExpiresAt,
+                  employmentEndDate: employee.employmentEndDate,
                 }
               : null,
             accessRule,

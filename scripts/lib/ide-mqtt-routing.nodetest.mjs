@@ -1,4 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -254,4 +256,100 @@ test("5xx, timeout, rate limiting and network failures retry the head without re
     assert.deepEqual(requests, ["one", "one", "one", "two"]);
     assert.equal(spool.size(), 0);
   }
+});
+
+function seedEvents(directory, count) {
+  writeFileSync(join(directory, "events.jsonl"), Array.from({ length: count }, (_, i) => JSON.stringify({
+    id: String(i), body: { topic: "event/access/online", body: String(i) }, attempts: 0, nextRetryAt: 0,
+  }) + "\n").join(""));
+}
+
+test("1000 queued events compact the file only once per 100 acknowledged rows", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  seedEvents(directory, 1000);
+  const write = fs.writeFileSync;
+  const writes = t.mock.method(fs, "writeFileSync", (...args) => write(...args));
+  syncBuiltinESMExports();
+  t.after(() => { writes.mock.restore(); syncBuiltinESMExports(); });
+  const delivered = [];
+  const spool = createEventSpool({ directory, now: () => 0,
+    convexPost: async (_, body) => { delivered.push(body.body); return { ok: true }; } });
+  while (spool.size()) await spool.drain();
+  assert.deepEqual(delivered, Array.from({ length: 1000 }, (_, i) => String(i)));
+  assert.equal(writes.mock.callCount(), 10);
+  assert.equal(readFileSync(join(directory, "events.jsonl"), "utf8"), "");
+});
+
+test("a crash before batch compaction may replay successes but loses no undelivered event", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  seedEvents(directory, 250);
+  const delivered = [];
+  let reachedCrash;
+  const crash = new Promise(resolve => { reachedCrash = resolve; });
+  const spool = createEventSpool({ directory, now: () => 0, convexPost: async (_, body) => {
+    if (delivered.length === 137) {
+      reachedCrash();
+      // Model abrupt process death: this instance never receives another response
+      // or writes a retry checkpoint. Restart using only its durable file.
+      return new Promise(() => {});
+    }
+    delivered.push(body.body);
+    return { ok: true };
+  } });
+  await spool.drain(); // The first 100 successes are compacted.
+  void spool.drain();
+  await crash;
+  assert.equal(delivered.length, 137);
+  const replayed = [];
+  const restarted = createEventSpool({ directory, now: () => 0,
+    convexPost: async (_, body) => { replayed.push(body.body); return { ok: true }; } });
+  while (restarted.size()) await restarted.drain();
+  assert.deepEqual(replayed, Array.from({ length: 150 }, (_, i) => String(i + 100)));
+  assert.equal(new Set([...delivered, ...replayed]).size, 250);
+});
+
+test("heartbeat goes directly to HTTP even with a full spool; failures only log", async t => {
+  for (const status of [200, 503]) {
+    const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    seedEvents(directory, 1);
+    const before = readFileSync(join(directory, "events.jsonl"), "utf8");
+    const f = fixture(), logs = [];
+    f.log = line => logs.push(line);
+    f.convexPost = async (path, body) => { f.requests.push({ path, body }); return { ok: status === 200, status }; };
+    f.eventSpool = createEventSpool({ directory, maxEntries: 1, convexPost: f.convexPost });
+    await routeMqttMessage("event/9001/heartbeat", message(9001), f);
+    assert.deepEqual(f.requests, [{ path: "/ide-bridge/event", body: { topic: "event/heartbeat", body: message(9001).toString("utf8") } }]);
+    assert.equal(f.eventSpool.size(), 1);
+    assert.equal(readFileSync(join(directory, "events.jsonl"), "utf8"), before);
+    assert.equal(logs.some(line => line.includes("forward FAIL")), status !== 200);
+  }
+});
+
+test("a new event appended while a batch is in flight survives the next compaction", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "ide-spool-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  seedEvents(directory, 100);
+  let release;
+  const response = new Promise(resolve => { release = resolve; });
+  let calls = 0;
+  const delivered = [];
+  const spool = createEventSpool({ directory, now: () => 0, convexPost: async (_, body) => {
+    delivered.push(body.body);
+    if (++calls === 100) await response;
+    return { ok: true };
+  } });
+  const draining = spool.drain();
+  // Wait until HTTP has yielded in the middle of its 100th record.
+  while (calls < 100) await Promise.resolve();
+  await spool.forward({ topic: "event/access/online", body: "appended" });
+  release();
+  await draining;
+  assert.equal(spool.size(), 1);
+  assert.deepEqual(readFileSync(join(directory, "events.jsonl"), "utf8").trim().split("\n").map(JSON.parse).map(row => row.body.body), ["appended"]);
+  await spool.drain();
+  assert.equal(spool.size(), 0);
+  assert.equal(delivered.at(-1), "appended");
 });

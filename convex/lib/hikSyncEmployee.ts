@@ -2,9 +2,10 @@
 
 // Node-only sync implementation: import only from actions/hikvisionSync.ts.
 // Employee and week-plan sync share plan caches and deletion helpers here.
+import { accessEndsAtMs } from "./accessEnd";
 import type { GrantResult } from "./grantStatus";
 import type { FunctionReturnType } from "convex/server";
-import { buildDoorPlans, hikValidBeginFromAccessStart } from "./gateway/persons";
+import { buildDoorPlans, hikValidBeginFromAccessStart, hikValidEndFromAccessEnd } from "./gateway/persons";
 import { internal } from "../_generated/api";
 import { isProjectAllowed } from "./auth";
 import { filterHikvisionDevices, defaultRuleSchedule } from "./hikSync";
@@ -259,6 +260,7 @@ export async function syncEmployeeDevices(
           planTemplateNo: doorPlans[0]?.planTemplateNos[0], doorCount: doorCountFor(t.device),
           doorRights: doorPlans.map(p => p.doorNo),
           beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt, Date.now()),
+          endTime: hikValidEndFromAccessEnd(accessEndsAtMs(employee)),
         }, args.runId);
         return { ok: true as const, device: t.device };
       }
@@ -268,6 +270,7 @@ export async function syncEmployeeDevices(
         name: `${employee.firstName} ${employee.lastName}`,
         doorPlans,
         beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt, Date.now()),
+        endTime: hikValidEndFromAccessEnd(accessEndsAtMs(employee)),
       });
       if (!personResult.ok) {
         return {
