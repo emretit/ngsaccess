@@ -12,6 +12,10 @@ import { hasPermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { accessBlockReason } from "./lib/accountAccess";
 import { inviteRoleValidator, legacyRoleToProjectRole, projectRoleValidator } from "./lib/roleCatalog";
+import { normalizeAuthEmail } from "./lib/authEmail";
+
+/** Davet bağlantısı 7 gün, şifre sıfırlama bağlantısı 24 saat geçerli. */
+const INVITE_TTL_MS = { invite: 7 * 24 * 60 * 60 * 1000, reset: 24 * 60 * 60 * 1000 } as const;
 
 /** Kullanılmamış ve süresi dolmamış davet. */
 async function getOpenInvite(ctx: QueryCtx | MutationCtx, token: string) {
@@ -95,8 +99,10 @@ export const create = internalMutation({
       throw new Error("Bu projeye davet gönderme yetkin yok");
     }
 
-    if (args.type === "reset") {
-      await getResetAccount(ctx, args.email.toLowerCase(), args.projectId, true);
+    const email = normalizeAuthEmail(args.email);
+    const type = args.type ?? "invite";
+    if (type === "reset") {
+      await getResetAccount(ctx, email, args.projectId, true);
     }
 
     await limiter.limit(ctx, "inviteCreate", {
@@ -104,21 +110,20 @@ export const create = internalMutation({
       throws: true,
     });
 
-    // Aynı email için kullanılmamış TÜM davetleri iptal et (kayıtlar küçük harfle tutulur)
-    const email = args.email.toLowerCase();
+    // Aynı email için kullanılmamış TÜM davetleri iptal et (kayıtlar normalize tutulur)
     for await (const existing of ctx.db.query("invites").withIndex("by_email", (q) => q.eq("email", email))) {
       if (existing.used !== true) await ctx.db.patch(existing._id, { used: true });
     }
 
     const token = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 gün
+    const expiresAt = new Date(Date.now() + INVITE_TTL_MS[type]).toISOString();
 
     await ctx.db.insert("invites", {
-      email: args.email.toLowerCase(),
+      email,
       token,
       projectId: args.projectId,
       role: legacyRoleToProjectRole(args.role),
-      type: args.type ?? "invite",
+      type,
       createdBy: args.callerId,
       expiresAt,
       used: false,

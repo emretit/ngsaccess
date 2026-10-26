@@ -413,6 +413,7 @@ function createFixture(options: {
   owner?: Id<'users'>;
   memberships?: Id<'projects'>[];
   existingEmails?: string[];
+  resetAccount?: boolean;
 } = {}) {
   const callerId = attackerId;
   const caller = options.caller === null ? null : {
@@ -420,15 +421,24 @@ function createFixture(options: {
     ...options.caller,
   };
   const memberships: Record<string, unknown>[] = (options.memberships ?? []).map((membershipProjectId) => ({ userId: callerId, projectId: membershipProjectId }));
+  // Sıfırlanacak mevcut hesap: aynı projenin doğrulanmış password kullanıcısı.
+  const resetUser = { _id: userId, _creationTime: 1, email: 'new.user@example.test', role: 'project_user' as const, verified: true };
+  const accounts: Record<string, unknown>[] = options.resetAccount
+    ? [{ provider: 'password', providerAccountId: 'new.user@example.test', userId }]
+    : [];
+  if (options.resetAccount) memberships.push({ userId, projectId });
   const invites: Record<string, unknown>[] = (options.existingEmails ?? []).map((email, index) => ({
     _id: `old-${index}` as Id<'invites'>, email, used: false,
   }));
   const inserted: Record<string, unknown>[] = [];
   const patched: Record<string, unknown>[] = [];
   const project = { _id: projectId, _creationTime: 1, ownerId: options.owner ?? userId };
-  const query = (table: string) => makeQuery(table === 'userProjects' ? memberships : table === 'invites' ? invites : []);
+  const query = (table: string) => makeQuery(
+    table === 'userProjects' ? memberships : table === 'invites' ? invites : table === 'authAccounts' ? accounts : [],
+  );
   const ctx = { db: {
-    get: async (id: Id<'users'> | Id<'projects'>) => id === callerId ? caller : id === projectId ? project : null,
+    get: async (id: Id<'users'> | Id<'projects'>) =>
+      id === callerId ? caller : id === projectId ? project : id === userId && options.resetAccount ? resetUser : null,
     query,
     patch: async (id: Id<'invites'>, changes: Record<string, unknown>) => { patched.push({ id, ...changes }); },
     insert: async (_table: string, value: Record<string, unknown>) => { inserted.push(value); return 'new-invite'; },
@@ -475,6 +485,31 @@ describe('invites.create internal authorization', () => {
   it.each([{ caller: null }, { caller: { verified: false } }])('rejects absent or unverified caller: %j', async (options) => {
     const f = createFixture(options);
     await expect(createHandler(f.ctx, input(f.callerId))).rejects.toThrow('Giriş yapmanız gerekiyor');
+    expect(f.inserted).toHaveLength(0);
+  });
+  it('trims the email and keeps setup invitations valid for 7 days', async () => {
+    const f = createFixture();
+    const before = Date.now();
+    await createHandler(f.ctx, { ...input(f.callerId), email: '  New.User@example.test ' });
+    expect(f.inserted[0]).toMatchObject({ email: 'new.user@example.test', type: 'invite' });
+    const ttl = Date.parse(String(f.inserted[0].expiresAt)) - before;
+    expect(ttl).toBeGreaterThanOrEqual(7 * 24 * 60 * 60 * 1000 - 5_000);
+    expect(ttl).toBeLessThanOrEqual(7 * 24 * 60 * 60 * 1000 + 5_000);
+  });
+  it('keeps password reset links valid for 24 hours and matches the trimmed account email', async () => {
+    const f = createFixture({ resetAccount: true });
+    const before = Date.now();
+    await createHandler(f.ctx, { ...input(f.callerId), email: ' NEW.user@example.test', type: 'reset' });
+    expect(f.inserted[0]).toMatchObject({ email: 'new.user@example.test', type: 'reset' });
+    const ttl = Date.parse(String(f.inserted[0].expiresAt)) - before;
+    expect(ttl).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000 - 5_000);
+    expect(ttl).toBeLessThanOrEqual(24 * 60 * 60 * 1000 + 5_000);
+  });
+  it('rejects a reset link for an email without a project password account', async () => {
+    const f = createFixture();
+    await expect(createHandler(f.ctx, { ...input(f.callerId), type: 'reset' })).rejects.toMatchObject({
+      data: { code: 'INVITE_RESET_UNAVAILABLE' },
+    });
     expect(f.inserted).toHaveLength(0);
   });
   it('marks all previous unused invitations for the email as used', async () => {

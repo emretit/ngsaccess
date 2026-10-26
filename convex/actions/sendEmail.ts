@@ -6,6 +6,7 @@ import { v } from "convex/values";
 import { authedAction } from "../lib/customFunctions";
 import { escapeHtml } from "../lib/escapers";
 import { renderEmailTemplate } from "../lib/emailTemplate";
+import { normalizeAuthEmail } from "../lib/authEmail";
 import { ROLE_LABELS, inviteRoleValidator, legacyRoleToProjectRole } from "../lib/roleCatalog";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -97,8 +98,8 @@ export const sendEmployeeSetupEmail = authedAction({
  * Kullanıcıya pafta tarzı kart maili gider; link /user-setup?token=xxx üzerinden
  * şifre belirletir.
  *
- * type === "reset" parametresi gelecek için hazır (mevcut kullanıcıya şifre
- * sıfırlama maili) — şu an UI'dan tetiklenmiyor.
+ * type === "reset" → mevcut kullanıcıya şifre sıfırlama maili (Yönetim → kullanıcı
+ * listesi "Şifre sıfırlama bağlantısı gönder"); bağlantı 24 saat geçerli.
  */
 export const sendUserInviteEmail = authedAction({
   args: {
@@ -109,11 +110,13 @@ export const sendUserInviteEmail = authedAction({
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
     const inviteType = args.type ?? "invite";
+    // Davet kaydı ve hesap eşleşmesi normalize adresle yapılır; mail de aynı adrese gider.
+    const email = normalizeAuthEmail(args.email);
 
     // Internal mutation yetkiyi ve caller doğrulamasını yeniden denetler.
     const token: string = await ctx.runMutation(internal.invites.create, {
       callerId: ctx.user._id,
-      email: args.email,
+      email,
       projectId: args.projectId,
       role: args.role,
       type: inviteType,
@@ -146,11 +149,11 @@ export const sendUserInviteEmail = authedAction({
       body,
       ctaUrl: setupUrl,
       ctaLabel,
-      securityNote: "Bu link 7 gün geçerlidir. Eğer bu maili siz beklemiyorsanız yok sayabilirsiniz.",
+      securityNote: `Bu link ${isReset ? "24 saat" : "7 gün"} geçerlidir. Eğer bu maili siz beklemiyorsanız yok sayabilirsiniz.`,
     });
 
     return await sendResendEmail({
-      to: args.email,
+      to: email,
       subject,
       html,
     });
