@@ -168,17 +168,17 @@ it("gerçek giriş D politikasıyla açılır; yeni gün çıkış politikası g
   expect(adapter.days[0]).toMatchObject({ status: "present", totalMinutes: 450 });
 });
 
-it.each(["yok", "azami süre", "checkpoint", "biyometrik"] as const)("%s giriş erken sabah çıkışını önceki güne taşımaz", async kind => {
+it.each(["yok", "azami süre", "checkpoint", "biyometrik"] as const)("%s giriş için erken sabah çıkışının çalışma günü uygunluğa göre belirlenir", async kind => {
   const f = await fixture(true);
   await f.checkpointChange();
   if (kind !== "yok") await f.add(kind === "azami süre" ? "05:00" : "22:00", "entry", date,
     kind === "checkpoint" ? { deviceId: f.otherDeviceId } : kind === "biyometrik" ? { hikCurrentVerifyMode: "face" } : {});
-  const exitId = await f.add("06:30", "exit", nextDate, { deviceId: f.otherDeviceId });
+  const exitId = await f.add("06:30", "exit", nextDate, { deviceId: kind === "biyometrik" ? f.deviceId : f.otherDeviceId });
   const adapter = await f.adapter(date, nextDate);
   const exit = adapter.readings.find(reading => reading._id === exitId);
   expect(exit).toBeDefined();
-  if (exit) expect(exit.workDate).toBe(nextDate);
-  expect(adapter.days.find(day => day.date === date)?.totalMinutes).toBe(0);
+  if (exit) expect(exit.workDate).toBe(kind === "biyometrik" ? date : nextDate);
+  expect(adapter.days.find(day => day.date === date)?.totalMinutes).toBe(kind === "biyometrik" ? 450 : 0);
 });
 
 it("projectId'siz esnek tanımı keşif kapısından geçer; tablo/rapor/mobil aynı global vardiyayı kullanır", async () => {

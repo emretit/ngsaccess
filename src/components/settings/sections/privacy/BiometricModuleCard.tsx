@@ -15,7 +15,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { notify } from "@/lib/notify";
 import { useSettingsFormState } from "../../SettingsFormState";
 
-export const BIOMETRIC_WARNING = "Yüz ve parmak izi yalnız fiziksel erişim kontrolü içindir. Mesai/puantaj takibinde kullanılamaz; bu verilerden puantaj kaydı üretilmez (KVKK Kurulu 2026/921). Yasal danışmanınıza doğrulatın.";
+export const BIOMETRIC_WARNING = "Yüz ve parmak izi okutmaları fiziksel erişimin yanında PDKS/puantaj hesabına da girer. KVKK Kurulu 2026/921 kararı mesai takibinde biyometri kullanımını kısıtlar; yasal danışmanınıza doğrulatın.";
 
 export function validBiometricReason(enabled: boolean, reason: string): boolean {
   return (!enabled || reason.trim().length >= 3) && reason.trim().length <= 500;

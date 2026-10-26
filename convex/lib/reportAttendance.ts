@@ -9,7 +9,6 @@ import {
   classifyReadingSource,
   filterPdksReadings,
   type PdksReadingSource,
-  type PdksSourceReading,
 } from "./pdksSource";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
@@ -213,7 +212,7 @@ export function readingResult(status: Doc<"cardReadings">["accessStatus"]): Repo
   return "unknown";
 }
 
-/** Call only after splitting out biometric readings at the report query boundary. */
+/** Maps an enriched reading to a report row; biometric rows are included with their source label. */
 export function toReportTransactionRow(
   enriched: Awaited<ReturnType<typeof enrichReadingsForList>>[number],
 ): ReportTransactionRow {
@@ -236,19 +235,6 @@ export function toReportTransactionRow(
     source,
     sourceLabel: READING_SOURCE_LABELS[source],
   };
-}
-
-/** Raw report boundary: unknown is visible, only biometrics are hidden. */
-export function splitPdksEligible<T extends PdksSourceReading>(
-  rows: readonly T[],
-): { eligible: T[]; hiddenBiometricCount: number } {
-  const eligible: T[] = [];
-  let hiddenBiometricCount = 0;
-  for (const row of rows) {
-    if (classifyReadingSource(row) !== "biometric") eligible.push(row);
-    else hiddenBiometricCount += 1;
-  }
-  return { eligible, hiddenBiometricCount };
 }
 
 /** Versioned report adapter. Legacy report rows keep their existing aggregations. */

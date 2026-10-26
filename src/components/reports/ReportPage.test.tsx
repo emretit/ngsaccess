@@ -53,9 +53,9 @@ describe('generic report display', () => {
   it('keeps server-filtered transaction results and a concise export note', () => {
     const transactions = REPORTS.find(report => report.dataSource === 'transactions');
     if (!transactions) throw new Error('Missing transaction report');
-    mocks.query.mockReturnValue(transactionPage('reading', 12));
+    mocks.query.mockReturnValue(transactionPage('reading'));
     const html = renderToStaticMarkup(<ReportResults definition={transactions} projectId={'project-a' as Id<'projects'>} from="2026-10-01" to="2026-10-31" person="Mehmet" year={2026} month={10} />);
-    expect(html).toContain('12 biyometrik kayıt gizlendi.');
+    expect(html).not.toContain('biyometrik kayıt gizlendi');
     expect(html).toContain('Yalnız yüklenen kayıtlar dışa aktarılır.');
     expect(html).toContain('Ayşe Yılmaz');
     expect(html).not.toContain('filtreleri yüklenen');
@@ -64,14 +64,14 @@ describe('generic report display', () => {
     const report = REPORTS.find(item => item.slug === 'mobil-okutmalar');
     if (!report) throw new Error('Missing mobile report');
     for (const isDone of [false, true]) {
-      mocks.query.mockReturnValue({ ...transactionPage('empty', 12, isDone), page: [] });
+      mocks.query.mockReturnValue({ ...transactionPage('empty', isDone), page: [] });
       const html = renderToStaticMarkup(<ReportResults definition={report} projectId={'project-a' as Id<'projects'>} from="2026-10-01" to="2026-10-31" person="" year={2026} month={10} />);
       expect(html.includes('Kayıt bulunamadı')).toBe(isDone);
       expect(html.includes('Taranan kayıtlarda eşleşme yok.')).toBe(!isDone);
       expect(html.includes('>Daha fazla yükle</button>')).toBe(!isDone);
       expect(html).not.toContain('Tüm kayıtlar yüklendi');
-      expect(html).toContain('biyometrik kayıt gizlendi');
-      expect(html).toContain('Biyometrik doğrulamalı geçişler KVKK gereği');
+      expect(html).not.toContain('biyometrik kayıt gizlendi');
+      expect(html).not.toContain('Biyometrik doğrulamalı geçişler KVKK gereği');
     }
   });
   it('renders only 50 rows on the first page', () => {
@@ -102,7 +102,7 @@ describe('generic report display', () => {
     cell.detail.punches = [{ time: '08:58', direction: 'entry' }];
     mocks.query.mockReturnValue([dailySource([cell])]);
     const html = renderToStaticMarkup(<ReportResults definition={card} {...props} />);
-    expect(html).toContain('08:58 Giriş'); expect(html).toContain('whitespace-normal'); expect(html).toContain('Biyometrik doğrulamalı');
+    expect(html).toContain('08:58 Giriş'); expect(html).toContain('whitespace-normal'); expect(html).not.toContain('Biyometrik doğrulamalı');
     expect(mocks.query.mock.calls[1]?.[1]).toMatchObject({ viewMode: 'matrix', startDate: props.from, endDate: props.to, includePunches: true });
   });
 });

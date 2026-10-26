@@ -72,12 +72,13 @@ describe('report filters before pagination', () => {
     expect(result.page).toHaveLength(50);
     expect(result.isDone).toBe(false);
   });
-  it('does not count biometric rows toward the requested result page', async () => {
+  it('counts biometric rows toward the requested result page', async () => {
     const f = fixture();
     for (const row of f.rows.slice(1)) row.hikCurrentVerifyMode = 'face';
     const result = await invoke(f.ctx, args);
-    expect(result.page.map(row => row._id)).toEqual(['reading-0']);
-    expect(result.hiddenBiometricCount).toBe(100);
+    expect(result.page).toHaveLength(50);
+    expect(result.page.every(row => row.source === 'biometric')).toBe(true);
+    expect(result.isDone).toBe(false);
   });
   it('rejects departments and employees from another project', async () => {
     const f = fixture(); f.department.projectId = 'foreign';
@@ -90,7 +91,7 @@ describe('report filters before pagination', () => {
   });
 });
 
-it('R3B-D3: unknown is visible and filterable while only biometric rows increase the hidden count', async () => {
+it('R3B-D3: unknown remains visible and filterable alongside biometric rows', async () => {
   const f = fixture();
   for (const row of f.rows.slice(1)) row.hikCurrentVerifyMode = 'face';
   const unknown = f.rows[0];
@@ -101,5 +102,8 @@ it('R3B-D3: unknown is visible and filterable while only biometric rows increase
   const result = await invoke(f.ctx, { ...args, sources: ['unknown'] });
   expect(result.page).toHaveLength(1);
   expect(result.page[0]).toMatchObject({ source: 'unknown', sourceLabel: 'Belirsiz' });
-  expect(result.hiddenBiometricCount).toBe(100);
+  const biometric = await invoke(f.ctx, args);
+  expect(biometric.page).toHaveLength(50);
+  expect(biometric.page.every(row => row.source === 'biometric')).toBe(true);
+  expect(biometric.isDone).toBe(false);
 });

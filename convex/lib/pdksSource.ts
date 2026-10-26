@@ -70,10 +70,9 @@ export function classifyReadingSource(reading: PdksSourceReading): PdksReadingSo
   return reading.cardNo?.trim() ? "card" : "unknown";
 }
 
-/** Unproven events are excluded from attendance calculations. */
+/** Unproven events are excluded from attendance calculations; biometric verifications count (Emre 2026-10-26). */
 export function isPdksEligibleReading(reading: PdksSourceReading): boolean {
-  const source = classifyReadingSource(reading);
-  return source !== "biometric" && source !== "unknown";
+  return classifyReadingSource(reading) !== "unknown";
 }
 
 /** Shared source, tenant and checkpoint decision; no database access. */

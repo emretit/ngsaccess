@@ -893,7 +893,6 @@ export const listReportTransactions = authedQuery({
       });
     })();
     let scannedCount = 0;
-    let hiddenBiometricCount = 0;
     const employees = new Map<Id<"employees">, Doc<"employees"> | null>();
     const page = await indexed.order("desc").filterWith(async row => {
       scannedCount += 1;
@@ -906,7 +905,6 @@ export const listReportTransactions = authedQuery({
         const employee = employees.get(row.employeeId);
         if (employee?.projectId !== args.projectId || employee.departmentId !== args.departmentId) return false;
       }
-      if (classifyReadingSource(row) === "biometric") { hiddenBiometricCount += 1; return false; }
       return matchesReadingSources(classifyReadingSource(row), args.sources);
     }).paginate({ ...args.paginationOpts, numItems: Math.min(args.paginationOpts.numItems, 200), maximumRowsRead: 2000, maximumBytesRead: 2_000_000 });
     const enriched = await enrichReadingsForList(ctx, page.page);
@@ -914,7 +912,6 @@ export const listReportTransactions = authedQuery({
       ...page,
       page: enriched.map(toReportTransactionRow),
       scannedCount,
-      hiddenBiometricCount,
     };
   },
 });

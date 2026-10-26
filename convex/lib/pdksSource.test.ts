@@ -4,10 +4,10 @@ import { classifyReadingSource, countExcludedUnknownPdksReadings, countPdksReadi
 import { selectProjectScope } from "./projectScope";
 
 describe("PDKS source boundary", () => {
-  it.each(["face", "fingerPrint", "cardAndFace", "cardAndFingerPrint", "cardAndFp", "iris", "faceAndPin"])("%s dışlanır", hikCurrentVerifyMode => {
+  it.each(["face", "fingerPrint", "cardAndFace", "cardAndFingerPrint", "cardAndFp", "iris", "faceAndPin"])("%s biyometrik olarak PDKS'ye dahil edilir", hikCurrentVerifyMode => {
     const reading = { hikCurrentVerifyMode, cardNo: "123", hikMajorEventType: 5, hikSubEventType: 1 };
     expect(classifyReadingSource(reading)).toBe("biometric");
-    expect(isPdksEligibleReading(reading)).toBe(false);
+    expect(isPdksEligibleReading(reading)).toBe(true);
   });
   it.each(["cardOrFace", "cardOrFp", "faceOrFpOrCardOrPw"])("%s modunda kart olayı kart sayılır, kanıtsız olay biyometrik kalır", hikCurrentVerifyMode => {
     expect(classifyReadingSource({ hikCurrentVerifyMode, cardNo: "123", hikMajorEventType: 5, hikSubEventType: 1 })).toBe("card");
@@ -47,8 +47,8 @@ describe("PDKS source boundary", () => {
     const b = "b" as Id<"projects">;
     const scope = selectProjectScope([a, b], a);
     const raw = [{ projectId: a, cardNo: "1" }, { projectId: b, cardNo: "2" }, { cardNo: "3" }, { projectId: a, hikCurrentVerifyMode: "face" }];
-    expect(filterPdksReadings(raw, scope[0])).toEqual([raw[0]]);
-    expect(filterPdksReadings(raw)).toHaveLength(3);
+    expect(filterPdksReadings(raw, scope[0])).toEqual([raw[0], raw[3]]);
+    expect(filterPdksReadings(raw)).toHaveLength(4);
     expect(raw).toHaveLength(4);
     expect(() => selectProjectScope([a], b)).toThrow("erişim yetkiniz yok");
   });
@@ -67,5 +67,5 @@ it("dışlanan belirsiz okuma sayısı proje kapsamını korur; biyometrik ve iz
   expect(countExcludedUnknownPdksReadings(raw, projectId)).toBe(2);
   expect(countExcludedUnknownPdksReadings(raw)).toBe(4);
   expect(countExcludedUnknownPdksReadings([])).toBe(0);
-  expect(filterPdksReadings(raw, projectId)).toEqual([raw[3]]);
+  expect(filterPdksReadings(raw, projectId)).toEqual([raw[2], raw[3]]);
 });

@@ -82,11 +82,11 @@ async function invoke(fn: unknown, ctx: QueryCtx, args: object) {
 }
 
 describe("PDKS source filtering at loader/handler boundaries", () => {
-  it("rapor yükleyicisi biyometriyi dışlar, kartı korur ve bir kez süzer", async () => {
+  it("rapor yükleyicisi biyometriyi ve kartı koruyarak bir kez süzer", async () => {
     const card = { ...reportReadings[0], hikCurrentVerifyMode: "card" };
     const raw = [...reportReadings, card];
     const spy = vi.spyOn(pdksSource, "filterPdksReadings");
-    expect(await readReportReadings(readingContext(raw), [projectId], "2026-06-21T21:00:00.000Z", "2026-06-22T20:59:59.999Z")).toEqual([card]);
+    expect(await readReportReadings(readingContext(raw), [projectId], "2026-06-21T21:00:00.000Z", "2026-06-22T20:59:59.999Z")).toEqual(raw);
     expect(spy).toHaveBeenCalledTimes(1);
     expect(raw).toHaveLength(3);
   });
@@ -94,18 +94,25 @@ describe("PDKS source filtering at loader/handler boundaries", () => {
     ["table", getPdksTableData, { startDate: "2026-06-22", endDate: "2026-06-22", viewMode: "matrix" }],
     ["payroll", getMonthlyPayrollSheet, { year: 2026, month: 6 }],
     ["detail", getEmployeeAttendanceDetail, { employeeId, startDate: "2026-06-22", endDate: "2026-06-22" }],
-  ])("%s: biyometri devam/süre/mesai/hareket üretmez; tek süzme kartı korur", async (_name, fn, args) => {
+  ])("%s: biyometri kart gibi devam/süre/mesai/hareket üretir; tek süzme korunur", async (_name, fn, args) => {
     const empty = await invoke(fn, readingContext([]), args);
     const spy = vi.spyOn(pdksSource, "filterPdksReadings");
-    expect(await invoke(fn, readingContext(reportReadings), args)).toEqual(empty);
+    const biometricOnly = await invoke(fn, readingContext(reportReadings), args);
+    expect(biometricOnly).not.toEqual(empty);
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockClear();
     const cards = reportReadings.map(reading => ({ ...reading, hikCurrentVerifyMode: "card" }));
     const cardOnly = await invoke(fn, readingContext(cards), args);
     expect(cardOnly).not.toEqual(empty);
+    expect(biometricOnly).toEqual(cardOnly);
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockClear();
-    expect(await invoke(fn, readingContext([...reportReadings, ...cards]), args)).toEqual(cardOnly);
+    const mixed = [...reportReadings, ...cards];
+    const allCards = mixed.map(reading => ({ ...reading, hikCurrentVerifyMode: "card" }));
+    const mixedResult = await invoke(fn, readingContext(mixed), args);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockClear();
+    expect(mixedResult).toEqual(await invoke(fn, readingContext(allCards), args));
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });

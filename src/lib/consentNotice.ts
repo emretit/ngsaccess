@@ -6,7 +6,7 @@ Bu şablonu kullanmadan önce kurumunuza göre tamamlayın ve yasal danışmanı
 Veri sorumlusu: [Kurum unvanı, adresi ve iletişim bilgileri]
 İlgili kişi: [Ad soyad]
 
-Amaç: Yüz veya parmak izi verisi yalnız fiziksel erişim kontrolü için, [kritik alan adı ve erişim ihtiyacı] kapsamında kullanılır. Mesai ve puantaj takibinde kullanılmaz; bu verilerden puantaj kaydı üretilmez.
+Amaç: Yüz veya parmak izi verisi fiziksel erişim kontrolü ve personel devam (PDKS/puantaj) takibi için, [kritik alan adı ve erişim ihtiyacı] kapsamında kullanılır. Biyometrik okutmalardan puantaj kaydı üretilir.
 
 İşlenen veriler: [Yüz fotoğrafı / yüz şablonu / parmak izi şablonu; kullanılanları belirtin]. Veriler [toplama yöntemi] ile alınır ve [sistemler / cihazlar] üzerinde tutulur.
 

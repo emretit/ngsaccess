@@ -8,15 +8,13 @@ export function transactionReducer(state: TransactionSnapshots, action: Transact
   return { pages: { ...state.pages, [action.cursor ?? 'first']: action.page } };
 }
 export function transactionSnapshot(state: TransactionSnapshots, cursor: string | null, current?: TransactionPage): {
-  rows: TransactionPage['page']; hiddenBiometricCount: number; isDone: boolean; continueCursor: string | null;
+  rows: TransactionPage['page']; isDone: boolean; continueCursor: string | null;
 } {
   const pages = current ? transactionReducer(state, { type: 'page', cursor, page: current }).pages : state.pages;
   const unique = new Map<TransactionPage['page'][number]['_id'], TransactionPage['page'][number]>();
-  let hiddenBiometricCount = 0;
   for (const page of Object.values(pages)) {
-    hiddenBiometricCount += page.hiddenBiometricCount;
     for (const row of page.page) unique.set(row._id, row);
   }
   const latest = current ?? pages[cursor ?? 'first'];
-  return { rows: [...unique.values()], hiddenBiometricCount, isDone: latest?.isDone ?? false, continueCursor: latest?.continueCursor ?? null };
+  return { rows: [...unique.values()], isDone: latest?.isDone ?? false, continueCursor: latest?.continueCursor ?? null };
 }

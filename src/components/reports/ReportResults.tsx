@@ -50,7 +50,6 @@ function DailyResults(props: ReportResultsProps) {
   const rows = useMemo(() => props.definition.rowsMode === 'personMonth' ? buildPersonMonthRows(data ?? []) : dailyRowsForReport(data ?? [], props.definition.slug, props.violationsOnly), [data, props.definition.rowsMode, props.definition.slug, props.violationsOnly]);
   const days = useMemo(() => [...new Set((data ?? []).flatMap(row => row.days.map(cell => cell.date)))].sort(), [data]);
   return <ReportPage days={days} projectId={props.projectId} onClear={props.onClear} definition={props.definition} rows={rows} loading={data === undefined} meta={meta(props)}>
-    {props.definition.group === 'kayitlar' && <p className="text-xs text-muted-foreground">Biyometrik doğrulamalı geçişler KVKK gereği PDKS raporlarında gösterilmez.</p>}
     {snapshot && <p className="text-xs text-muted-foreground">Rapor açıldığı andaki verileri gösterir; yeni okutmalar için “Yeniden yükle”. Kalabalık projelerde departman seçerek raporu küçültün.</p>}
   </ReportPage>;
 }
@@ -73,7 +72,7 @@ function TransactionResults(props: ReportResultsProps) {
     setCursor(current.continueCursor);
   };
   return <ReportPage projectId={props.projectId} onClear={props.onClear} definition={props.definition} rows={rows} loading={current === undefined && cursor === null} hasMoreTransactions={!snapshot.isDone} loadedCount={snapshot.rows.length} meta={meta(props)}>
-    <p className="text-xs text-muted-foreground">Yalnız yüklenen kayıtlar dışa aktarılır. Biyometrik doğrulamalı geçişler KVKK gereği gösterilmez.{snapshot.hiddenBiometricCount > 0 ? ` ${snapshot.hiddenBiometricCount} biyometrik kayıt gizlendi.` : ''}</p>
+    <p className="text-xs text-muted-foreground">Yalnız yüklenen kayıtlar dışa aktarılır.</p>
     {!snapshot.isDone && <Button variant="outline" disabled={current === undefined} onClick={loadMore}>{current === undefined ? 'Yükleniyor…' : 'Daha fazla yükle'}</Button>}
   </ReportPage>;
 }

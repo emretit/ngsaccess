@@ -12,6 +12,6 @@ export function monthlySheet(employeeKey = 'employee-a'): MonthlySheet {
     cells: [{ date: '2026-10-19', status: 'present', payrollCode: 'N', totalMinutes: 535, rawTotalMinutes: 535, nightMinutes: 0, overtimeMinutes: 0, multiplier: 0, overtimePayTRY: null, isLate: false, isEarlyExit: false, isManual: false, classification: 'workday' }],
     totals: { totalMinutes: 535, overtimeMinutes: 0, overtimePayTRY: null, leaveDays: 0, absentDays: 0, lateDays: 0, exceedsDaily11h: [] } }] };
 }
-export function transactionPage(id = 'reading-a', hiddenBiometricCount = 0, isDone = false): TransactionPage {
-  return { page: [{ _id: id as Id<'cardReadings'>, accessTime: '2026-10-18T22:10:00Z', employeeId: null, employeeName: 'Ayşe Yılmaz', department: 'Üretim', cardNo: '123', deviceName: 'Turnike', doorName: null, direction: 'entry', result: 'granted', denialReason: null, source: 'card', sourceLabel: 'Kart' }], hiddenBiometricCount, scannedCount: 50, isDone, continueCursor: `${id}-next` };
+export function transactionPage(id = 'reading-a', isDone = false): TransactionPage {
+  return { page: [{ _id: id as Id<'cardReadings'>, accessTime: '2026-10-18T22:10:00Z', employeeId: null, employeeName: 'Ayşe Yılmaz', department: 'Üretim', cardNo: '123', deviceName: 'Turnike', doorName: null, direction: 'entry', result: 'granted', denialReason: null, source: 'card', sourceLabel: 'Kart' }], scannedCount: 50, isDone, continueCursor: `${id}-next` };
 }

@@ -2,7 +2,6 @@ import {
   matchesReadingSources,
   readingResult,
   READING_SOURCE_LABELS,
-  splitPdksEligible,
   toReportTransactionRow,
 } from "./reportAttendance";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -73,7 +72,7 @@ describe("rapor devam adaptörü / PDKS tablo tutarlılığı", () => {
 
 
 afterEach(() => vi.restoreAllMocks());
-it("biyometrik okuma zamanlanmış rapor yükleyicisinde bir kez süzülür", async () => {
+it("biyometrik okuma zamanlanmış raporda devam üretir ve bir kez süzülür", async () => {
   const projectId = "project" as Id<"projects">;
   const emp = { ...employee("bio"), projectId };
   const raw: Doc<"cardReadings">[] = [{ _id: "r" as Id<"cardReadings">, _creationTime: 0, employeeId: emp._id, projectId, cardNo: emp.cardNumber, accessStatus: "izin_verildi", accessTime: "2026-01-02T06:00:00Z", hikCurrentVerifyMode: "face" }];
@@ -87,11 +86,12 @@ it("biyometrik okuma zamanlanmış rapor yükleyicisinde bir kez süzülür", as
   const empty = await loadAttendanceReport(ctx([]), [projectId], 2026, 1);
   const spy = vi.spyOn(pdksSource, "filterPdksReadings");
   const result = await loadAttendanceReport(ctx(raw), [projectId], 2026, 1);
-  expect(result).toEqual(empty);
-  expect(result.rows[0]?.presentDays).toBe(0);
+  expect(result).not.toEqual(empty);
+  expect(result.rows[0]?.presentDays).toBe(1);
   expect(spy).toHaveBeenCalledTimes(1);
   const card = await loadAttendanceReport(ctx([{ ...raw[0], hikCurrentVerifyMode: "card" }]), [projectId], 2026, 1);
   expect(card.rows[0]?.presentDays).toBe(1);
+  expect(result).toEqual(card);
 });
 
 
@@ -126,33 +126,26 @@ describe("report transaction results", () => {
 
 describe("report biometric boundary", () => {
   it("preserves eligible sources and order without mutating the input", () => {
-    const eligible = [
-      { cardNo: "123", ideIoId: 0 },
-      { hikMajorEventType: 5, hikSubEventType: 0x65 },
-      { rawData: '{"source":"qr"}' },
-      { rawData: '{"source":"mobile"}' },
-      { rawData: '{"source":"manual"}' },
-      {},
-    ];
     const rows = Object.freeze([
-      eligible[0],
-      { hikMajorEventType: 5, hikSubEventType: 0x26, cardNo: "123" },
-      ...eligible.slice(1),
-      { hikMajorEventType: 5, hikSubEventType: 0x4b, hikCurrentVerifyMode: "card" },
+      { hikCurrentVerifyMode: "card" },
+      { hikCurrentVerifyMode: "face" },
+      { hikCurrentVerifyMode: "password" },
+      { hikCurrentVerifyMode: "unknown" },
+      { hikCurrentVerifyMode: "iris" },
     ]);
-    const result = splitPdksEligible(rows);
-    expect(result.eligible).toEqual(eligible);
-    expect(result.hiddenBiometricCount).toBe(2);
-    expect(rows).toHaveLength(8);
-    expect(result.eligible[0]).toBe(rows[0]);
+    const result = pdksSource.filterPdksReadings(rows);
+    expect(result).toEqual([rows[0], rows[1], rows[2], rows[4]]);
+    expect(rows).toHaveLength(5);
+    expect(result[0]).toBe(rows[0]);
   });
 
   it("handles empty and exclusively biometric pages", () => {
-    expect(splitPdksEligible([])).toEqual({ eligible: [], hiddenBiometricCount: 0 });
-    expect(splitPdksEligible([
+    expect(pdksSource.filterPdksReadings([])).toEqual([]);
+    const rows = [
       { hikCurrentVerifyMode: "cardAndFace" },
       { rawData: '<EventNotificationAlert><majorEventType>5</majorEventType><subEventType>75</subEventType></EventNotificationAlert>' },
-    ])).toEqual({ eligible: [], hiddenBiometricCount: 2 });
+    ];
+    expect(pdksSource.filterPdksReadings(rows)).toEqual(rows);
   });
 });
 
@@ -225,11 +218,12 @@ describe("matchesReadingSources", () => {
     expect(matchesReadingSources("qr", ["card", "qr"])).toBe(true);
     expect(matchesReadingSources("pin", ["card", "qr"])).toBe(false);
   });
-  it("preserves the hidden biometric count when filtering eligible rows", () => {
-    const split = splitPdksEligible([{ hikCurrentVerifyMode: "face" }, { hikCurrentVerifyMode: "card" }, { hikCurrentVerifyMode: "password" }]);
-    expect(split.eligible.filter(row => matchesReadingSources(pdksSource.classifyReadingSource(row), ["pin"])))
+  it("filters biometric and PIN sources independently among eligible rows", () => {
+    const eligible = pdksSource.filterPdksReadings([{ hikCurrentVerifyMode: "face" }, { hikCurrentVerifyMode: "card" }, { hikCurrentVerifyMode: "password" }]);
+    expect(eligible.filter(row => matchesReadingSources(pdksSource.classifyReadingSource(row), ["pin"])))
       .toEqual([{ hikCurrentVerifyMode: "password" }]);
-    expect(split.hiddenBiometricCount).toBe(1);
+    expect(eligible.filter(row => matchesReadingSources(pdksSource.classifyReadingSource(row), ["biometric"])))
+      .toEqual([{ hikCurrentVerifyMode: "face" }]);
   });
 });
 

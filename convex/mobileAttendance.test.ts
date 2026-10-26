@@ -213,7 +213,7 @@ describe("mobileAttendance independent raw movement summary", () => {
     });
   });
 
-  it("keeps denied, missing status/direction and ineligible source events out of participation", async () => {
+  it("counts biometric participation while excluding denied, missing status/direction and unknown source events", async () => {
     const f = await fixture();
     const entry = "2026-10-19T06:00:00.000Z";
     const exit = "2026-10-19T15:00:00.000Z";
@@ -228,7 +228,7 @@ describe("mobileAttendance independent raw movement summary", () => {
     await f.add({ employeeId: f.employeeB, projectId: f.projectB });
     const result = await f.t.query(summary, { sessionToken: f.sessionToken, startDate: "2026-10-19", endDate: "2026-10-19" });
     expect(result.days).toEqual([{
-      date: "2026-10-19", entryCount: 1, exitCount: 1, deniedCount: 1, unknownCount: 5,
+      date: "2026-10-19", entryCount: 2, exitCount: 1, deniedCount: 1, unknownCount: 4,
       firstEntry: entry, lastEntry: entry, lastExit: exit, lastDirection: "exit",
     }]);
     expect(result.totals.presentDays).toBe(1);

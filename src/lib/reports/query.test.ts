@@ -34,10 +34,10 @@ describe('server query identity', () => {
   });
   it('resets transaction pages for server person and department filters', () => {
     const report = definition('transactions');
-    const first = transactionPage('first', 2);
+    const first = transactionPage('first');
     first.page[0].employeeName = 'Mehmet';
     first.page[0].department = 'İdari';
-    const second = transactionPage('second', 3, true);
+    const second = transactionPage('second', true);
     const state = transactionReducer({ pages: {} }, { type: 'page', cursor: null, page: first });
     const snapshot = transactionSnapshot(state, first.continueCursor, second);
     const filtered = { ...filters, person: 'ayşe', departmentId: 'department-a' as Id<'departments'> };
@@ -48,7 +48,6 @@ describe('server query identity', () => {
     expect(reportQueryKey(report, employee, 0)).not.toBe(reportQueryKey(report, filters, 0));
     expect(buildTransactionRows(snapshot.rows).map(row => row.id)).toEqual(['first', 'second']);
     expect(buildTransactionRows(transactionSnapshot(state, first.continueCursor, second).rows).map(row => row.id)).toEqual(['first', 'second']);
-    expect(snapshot.hiddenBiometricCount).toBe(5);
   });
   it('keeps monthly query arguments and remount identity stable under client filters', () => {
     const changed = { ...filters, person: 'Mehmet', departmentId: 'department-a' as Id<'departments'>, from: 'unused', result: 'denied' as const };
