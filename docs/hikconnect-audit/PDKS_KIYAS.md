@@ -14,7 +14,7 @@
 - **Vardiya:** geçerli pencere, geç > X → devamsız, min. çalışma, tatilde çalışma zorunlu (`8f57a2d9`); departmana atama, gün/hafta döngüsü, günde ≤8 vardiya (`26e5570b`).
 - **Hafta sonu:** PDKS Ayarları › Çalışma günleri (`8f142ea8`).
 - **Kalan:** departman/grup düzeyinde kural, erken çıkış > X → devamsız, Flexible Period, çoklu mola, ay döngüsü, gruba atama, izin eki + otomatik onay, çalışana giriş hatırlatması, cihaz ekranı durum modu.
-- **Bizde fazlası:** kural sürümleme (geçerlilik tarihi, geçmiş değişmez), SGK eksik gün/XML, 270 saat yıllık limit, haftalık 45 saat bazı, gece çarpanı + gün modu, KVKK biyometrik PDKS dışı.
+- **Bizde fazlası:** kural sürümleme (geçerlilik tarihi, geçmiş değişmez), SGK eksik gün/XML, 270 saat yıllık limit, haftalık 45 saat bazı, gece çarpanı + gün modu.
 
 ## 2. Kıyas tablosu
 
