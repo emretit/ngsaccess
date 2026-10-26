@@ -77,23 +77,23 @@ describe("alarm delivery pipeline", () => {
     await f.t.finishAllScheduledFunctions(() => vi.runAllTimers());
     expect(await f.admin.query(api.alarms.getSettings, { projectId: f.projectId })).toMatchObject({ lastEmail: { status: "sent", test: true } });
   });
-  it("reclaims only a stale first sending attempt and never permits a third send", async () => {
+  it("recovers crashed attempts with a watchdog and stops after three claims", async () => {
     const f = await fixture();
     await f.t.run(ctx => ctx.db.patch(f.eventId, { alarmEmailStatus: "queued", alarmEmailAttempts: 0, alarmEmailRecipients: ["first@example.com"] }));
-    expect(await f.t.mutation(internal.alarms.claimEmail, { eventId: f.eventId, attempt: 1 })).not.toBeNull();
-    expect(await f.t.mutation(internal.alarms.claimEmail, { eventId: f.eventId, attempt: 1 })).toBeNull();
-    await vi.advanceTimersByTimeAsync(10 * 60_000);
-    expect(await f.t.mutation(internal.alarms.claimEmail, { eventId: f.eventId, attempt: 2 })).toBeNull();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(await f.t.mutation(internal.alarms.claimEmail, { eventId: f.eventId, attempt: 2 })).not.toBeNull();
-    // A late first action cannot overwrite the reclaimed second attempt.
+    for (const attempt of [1, 2, 3]) {
+      expect(await f.t.mutation(internal.alarms.claimEmail, { eventId: f.eventId, attempt })).not.toBeNull();
+      expect(await f.t.mutation(internal.alarms.claimEmail, { eventId: f.eventId, attempt })).toBeNull();
+      // Move the clock without running the delivery action, simulating an interrupted sender.
+      vi.setSystemTime(now + attempt * 10 * 60_000);
+      await f.t.mutation(internal.alarms.recoverEmail, { eventId: f.eventId, attempt });
+      if (attempt < 3) expect(await f.t.run(ctx => ctx.db.get(f.eventId))).toMatchObject({ alarmEmailStatus: "retryScheduled", alarmEmailAttempts: attempt });
+    }
     await f.t.mutation(internal.alarms.recordEmailResult, { eventId: f.eventId, attempt: 1, failedRecipients: [] });
-    expect(await f.t.run(ctx => ctx.db.get(f.eventId))).toMatchObject({ alarmEmailStatus: "sending", alarmEmailAttempts: 2 });
-    await vi.advanceTimersByTimeAsync(11 * 60_000);
-    for (const attempt of [1, 2, 3]) expect(await f.t.mutation(internal.alarms.claimEmail, { eventId: f.eventId, attempt })).toBeNull();
-    await f.t.mutation(internal.alarms.recordEmailResult, { eventId: f.eventId, attempt: 2, failedRecipients: ["first@example.com"], error: "E-posta gönderilemedi" });
-    expect(await f.t.run(ctx => ctx.db.get(f.eventId))).toMatchObject({ alarmEmailStatus: "failed", alarmEmailAttempts: 2 });
-    expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
+    expect(await f.t.run(ctx => ctx.db.get(f.eventId))).toMatchObject({ alarmEmailStatus: "failed", alarmEmailAttempts: 3 });
+    expect(await f.t.mutation(internal.alarms.claimEmail, { eventId: f.eventId, attempt: 4 })).toBeNull();
+    vi.stubGlobal("fetch", vi.fn());
+    await f.t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    expect(fetch).not.toHaveBeenCalled();
   });
   it("stops a queued delivery when alarm email is disabled", async () => {
     const f = await fixture(); const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);

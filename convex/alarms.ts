@@ -158,12 +158,9 @@ export const claimEmail = internalMutation({
   args: { eventId: v.id("deviceEvents"), attempt: v.number() },
   handler: async (ctx, args) => {
     const event = await ctx.db.get(args.eventId);
-    if (!event?.projectId || ![1, 2].includes(args.attempt) || args.attempt !== (event.alarmEmailAttempts ?? 0) + 1) return null;
-    // A crashed first action may be reclaimed only as the second and final attempt.
-    const interrupted = args.attempt === 2 && event.alarmEmailStatus === "sending"
-      && Date.now() - Date.parse(event.alarmEmailAttemptAt ?? "") > 10 * 60_000;
-    if (!interrupted && event.alarmEmailStatus !== (args.attempt === 1 ? "queued" : "retryScheduled")) return null;
-    if (args.attempt === 2 && Date.parse(event.alarmEmailRetryAt ?? "") > Date.now()) return null;
+    if (!event?.projectId || ![1, 2, 3].includes(args.attempt) || args.attempt !== (event.alarmEmailAttempts ?? 0) + 1) return null;
+    if (event.alarmEmailStatus !== (args.attempt === 1 ? "queued" : "retryScheduled")) return null;
+    if (Date.parse(event.alarmEmailRetryAt ?? "") > Date.now()) return null;
     const projectId = event.projectId;
     const settings = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", projectId)).unique();
     const recipients = (event.alarmEmailRecipients ?? []).filter(email => settings?.recipients.includes(email));
@@ -173,6 +170,7 @@ export const claimEmail = internalMutation({
       return null;
     }
     await ctx.db.patch(event._id, { alarmEmailStatus: "sending", alarmEmailAttempts: args.attempt, alarmEmailAttemptAt: now, alarmEmailRetryAt: undefined, updatedAt: now });
+    await ctx.scheduler.runAfter(10 * 60_000, internal.alarms.recoverEmail, { eventId: event._id, attempt: args.attempt });
     return { event, device: event.deviceId ? await ctx.db.get(event.deviceId) : null, recipients };
   },
 });
@@ -196,6 +194,23 @@ export const recordEmailResult = internalMutation({
       alarmEmailRetryAt: retryAt, alarmEmailRecipients: failed,
       ...(failed.length === 0 ? { alarmNotifiedAt: now } : {}), updatedAt: now,
     });
+    return null;
+  },
+});
+
+/** Reclaim only the still-current attempt; late actions and old watchdogs are harmless. */
+export const recoverEmail = internalMutation({
+  args: { eventId: v.id("deviceEvents"), attempt: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const event = await ctx.db.get(args.eventId);
+    if (!event || event.alarmEmailStatus !== "sending" || event.alarmEmailAttempts !== args.attempt) return null;
+    const startedAt = Date.parse(event.alarmEmailAttemptAt ?? "");
+    if (!Number.isFinite(startedAt) || Date.now() - startedAt < 10 * 60_000) return null;
+    const retry = args.attempt < 3;
+    const now = new Date().toISOString();
+    await ctx.db.patch(event._id, { alarmEmailStatus: retry ? "retryScheduled" : "failed", alarmEmailRetryAt: retry ? now : undefined, alarmEmailError: "E-posta gönderimi kesildi; yeniden deneme sınırını kontrol edin", updatedAt: now });
+    if (retry) await ctx.scheduler.runAfter(0, internal.actions.sendAlarmEmail.send, { eventId: event._id, attempt: args.attempt + 1 });
     return null;
   },
 });

@@ -14,6 +14,9 @@ describe('CheckIn presentation', () => {
     expect(html).toContain('Girişiniz kaydediliyor.');
     expect(html).not.toContain('Girişiniz kaydedildi.');
   });
+  it('shows neutral used status without personal data', () => {
+    expect(checkInPresentation({ success: true, status: 'used', employeeName: 'Private', accessTime: '2026-01-01' })).toEqual({ status: 'used' });
+  });
   it('uses backend success and location confirmation', () => {
     expect(checkInPresentation({ success: true, employeeName: 'Test', locationRecorded: true })).toEqual({
       status: 'success',

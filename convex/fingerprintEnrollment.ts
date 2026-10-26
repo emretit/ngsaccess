@@ -214,10 +214,11 @@ export const getPurgeDevice = internalQuery({
 export const remove = internalMutation({ args: { enrollmentId: v.id("deviceFingerprintEnrollments") }, returns: v.null(), handler: async (ctx, args) => { if (await ctx.db.get(args.enrollmentId)) await ctx.db.delete(args.enrollmentId); return null; } });
 export const removeAllForEmployee = internalMutation({
   args: { employeeId: v.id("employees"), employeeNo: v.string(), fingerNo: v.optional(v.number()) },
-  returns: v.null(),
+  returns: v.array(v.id("deviceFingerprintEnrollments")),
   handler: async (ctx, args) => {
     await scheduleFingerprintPurge(ctx, args.employeeId, args.employeeNo, { deleteTemplates: true, fingerNo: args.fingerNo });
-    return null;
+    const rows = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee", q => q.eq("employeeId", args.employeeId)).collect();
+    return rows.filter(row => row.deletionEmployeeNo !== undefined && row.deletionRequestedAt !== undefined && (args.fingerNo === undefined || row.fingerNo === args.fingerNo)).map(row => row._id);
   },
 });
 

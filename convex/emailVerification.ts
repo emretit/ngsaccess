@@ -105,26 +105,23 @@ export const verifyEmail = mutation({
  * Cron tarafından çağrılır (günlük).
  */
 export const cleanupExpiredTokens = internalMutation({
-  args: {},
+  args: { cursor: v.optional(v.string()), runAt: v.optional(v.string()), batch: v.optional(v.number()) },
   returns: v.null(),
-  handler: async (ctx) => {
-    const now = new Date().toISOString();
-    const expired = await ctx.db
-      .query("users")
-      .withIndex("by_setup_token")
-      .filter((q) =>
-        q.and(
-          q.neq(q.field("setupToken"), undefined),
-          q.lt(q.field("tokenExpiresAt"), now),
-        ),
-      )
-      .collect();
-
-    await Promise.all(
-      expired.map((u) =>
-        ctx.db.patch(u._id, { setupToken: undefined, tokenExpiresAt: undefined }),
-      ),
-    );
+  handler: async (ctx, args) => {
+    const runAt = args.runAt ?? new Date().toISOString();
+    const batch = args.batch ?? 0;
+    if (batch >= 20) return null;
+    const page = await ctx.db.query("users")
+      .withIndex("by_tokenExpiresAt", q => q.gt("tokenExpiresAt", "").lt("tokenExpiresAt", runAt))
+      .paginate({ numItems: 200, cursor: args.cursor ?? null });
+    for (const user of page.page) {
+      await ctx.db.patch(user._id, { setupToken: undefined, tokenExpiresAt: undefined });
+    }
+    if (!page.isDone && batch + 1 < 20) {
+      await ctx.scheduler.runAfter(0, internal.emailVerification.cleanupExpiredTokens, {
+        cursor: page.continueCursor, runAt, batch: batch + 1,
+      });
+    }
     return null;
   },
 });

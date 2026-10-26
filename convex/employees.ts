@@ -17,7 +17,7 @@ import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, QueryCtx } from "./_generated/server";
-import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
+import { cascadeRemoveEmployeePII, deleteUnusedEmployeePhoto } from "./lib/employeeCascade";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeEmployeePassword } from "./lib/employeeAuth";
 import { visitorSensitiveFields } from "./lib/visitorStatus";
@@ -104,6 +104,13 @@ export const list = authedQuery({
     await resolveProjectScope(ctx, args.projectId);
     const allowed = await getProjectIdsWithPermission(ctx, ctx.user, "employees.view");
     const projectIds = args.projectId ? allowed.filter(id => id === args.projectId) : allowed;
+    const permissionsByProject = new Map(await Promise.all(projectIds.map(async projectId => {
+      const [canManage, canSeePay] = await Promise.all([
+        hasPermission(ctx, ctx.user, projectId, "employees.manage"),
+        canSeePayInProject(ctx, ctx.user, projectId),
+      ]);
+      return [projectId, { canManage, canSeePay }] as const;
+    })));
     const results = await Promise.all(projectIds.map(projectId =>
       ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
     ));
@@ -112,6 +119,7 @@ export const list = authedQuery({
 
     return await Promise.all(
       employees.map(async (emp) => {
+        const permissions = emp.projectId ? permissionsByProject.get(emp.projectId) : undefined;
         const department = emp.departmentId
           ? await ctx.db.get(emp.departmentId) as Doc<"departments"> | null
           : null;
@@ -120,11 +128,11 @@ export const list = authedQuery({
           : null;
         return {
           ...emp,
-          terminationReason: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminationReason : undefined,
-          sgkExitCode: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.sgkExitCode : undefined,
-          terminatedBy: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminatedBy : undefined,
-          hourlyRate: maskPay(emp.hourlyRate, await canSeePayInProject(ctx, ctx.user, emp.projectId)),
-          monthlySalary: maskPay(emp.monthlySalary, await canSeePayInProject(ctx, ctx.user, emp.projectId)),
+          terminationReason: permissions?.canManage ? emp.terminationReason : undefined,
+          sgkExitCode: permissions?.canManage ? emp.sgkExitCode : undefined,
+          terminatedBy: permissions?.canManage ? emp.terminatedBy : undefined,
+          hourlyRate: maskPay(emp.hourlyRate, permissions?.canSeePay ?? false),
+          monthlySalary: maskPay(emp.monthlySalary, permissions?.canSeePay ?? false),
           departments: department
             ? { _id: department._id, name: department.name }
             : null,
@@ -343,6 +351,9 @@ export const update = authedMutation({
     const previousHikSnapshot = updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber
       ? await snapshotEmployeeHikDevices(ctx, emp) : undefined;
     await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, updatedAt: new Date().toISOString() });
+    if (emp.photoStorageId && (updates.photoStorageId !== undefined || updates.photoUrl === null)) {
+      await deleteUnusedEmployeePhoto(ctx, emp.photoStorageId);
+    }
 
     if (accessStartChanged) await writeAudit(ctx, {
       user: ctx.user, projectId: emp.projectId, action: "update", targetTable: "employees",

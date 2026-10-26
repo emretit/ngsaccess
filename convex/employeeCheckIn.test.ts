@@ -53,7 +53,7 @@ describe("reader-purpose token trust boundary using real wrappers", () => {
     expect(await t.query(api.employeeCheckIn.getMyCheckInTokenStatus, { sessionToken: "session-a", token: issued.token })).toMatchObject({ status: "expired" });
   });
 
-  it("consumes exactly once on an authenticated generic reader and replays only the original snapshot", async () => {
+  it("consumes exactly once and returns only used status to anonymous replays", async () => {
     const { t, deviceId, employeeId } = await fixture();
     const issued = await t.mutation(api.employeeCheckIn.createMyCheckInToken, { sessionToken: "session-a" });
     const readerArgs = { cardNo: issued.token, deviceSerial: "synthetic-serial-a", authedDeviceId: deviceId };
@@ -65,7 +65,7 @@ describe("reader-purpose token trust boundary using real wrappers", () => {
     expect(await t.query(api.employeeCheckIn.getMyCheckInTokenStatus, { sessionToken: "session-a", token: issued.token })).toMatchObject({ status: "consumed" });
     await t.run(ctx => ctx.db.delete(employeeId));
     vi.advanceTimersByTime(120_000);
-    expect(await t.mutation(api.employeeCheckIn.checkInWithToken, { token: issued.token, latitude: 99, longitude: 99 })).toEqual({ success: true, employeeName: "Synthetic A", accessTime: now, locationRecorded: false });
+    expect(await t.mutation(api.employeeCheckIn.checkInWithToken, { token: issued.token, latitude: 99, longitude: 99 })).toEqual({ success: true, status: "used" });
     expect(await t.run(ctx => ctx.db.query("cardReadings").take(20))).toHaveLength(1);
   });
 
@@ -97,10 +97,10 @@ describe("reader-purpose token trust boundary using real wrappers", () => {
     expect(await t.run(ctx => ctx.db.query("cardReadings").take(20))).toEqual([]);
   });
 
-  it("preserves completed legacy token snapshots but never creates new legacy movement", async () => {
+  it("hides completed legacy token snapshots and never creates new legacy movement", async () => {
     const { t, employeeId } = await fixture();
     await t.run(ctx => ctx.db.insert("checkInTokens", { employeeId, token: "synthetic-completed", expiresAt: "2020-01-01T00:00:00Z", usedAt: now, employeeName: "Previous snapshot", locationRecorded: true, createdAt: now }));
-    expect(await t.mutation(api.employeeCheckIn.checkInWithToken, { token: "synthetic-completed" })).toEqual({ success: true, employeeName: "Previous snapshot", accessTime: now, locationRecorded: true });
+    expect(await t.mutation(api.employeeCheckIn.checkInWithToken, { token: "synthetic-completed" })).toEqual({ success: true, status: "used" });
     expect(await t.mutation(api.employeeCheckIn.checkInWithToken, { token: "missing" })).toMatchObject({ success: false, code: "invalid_token" });
     expect(await t.run(ctx => ctx.db.query("cardReadings").take(20))).toEqual([]);
   });

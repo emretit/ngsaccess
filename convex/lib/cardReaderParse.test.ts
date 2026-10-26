@@ -303,18 +303,12 @@ describe("parseCardReaderBody – multipart", () => {
 // ─── Edge Case / Hata Durumları ────────────────────────────────────────────
 
 describe("parseCardReaderBody – edge cases", () => {
-  it("boş string → tüm alanlar undefined", () => {
-    const result = parseCardReaderBody("", "application/json");
-    expect(result.user_id).toBeUndefined();
-    expect(result.serial).toBeUndefined();
-    expect(result.deviceIp).toBeUndefined();
+  it("boş JSON gövdesini 400 hatasıyla reddeder", () => {
+    expect(() => parseCardReaderBody("", "application/json")).toThrow("Geçerli bir JSON");
   });
-
-  it("geçersiz JSON → XML fallback dener, sonuç undefined", () => {
-    const result = parseCardReaderBody("{invalid json}", "application/json");
-    expect(result.user_id).toBeUndefined();
+  it("geçersiz JSON artık XML fallback yerine 400 hatası verir", () => {
+    expect(() => parseCardReaderBody("{invalid json}", "application/json")).toThrow("Geçerli bir JSON");
   });
-
   it("content-type null olsa bile JSON parse dener", () => {
     const body = JSON.stringify({ cardNo: "NO_CT" });
     const result = parseCardReaderBody(body, null);

@@ -50,6 +50,19 @@ async function settleIfReady(ctx: MutationCtx, row: Doc<"auditLog">, state: Dest
   await saveState(ctx, row, state, state.status === "completed" ? "Biyometrik imha tutanağı" : "Biyometrik imha ilerlemesi");
 }
 
+/** Enrollment tombstones survive failed device purges, unlike scheduler success states. */
+function trackPending(state: DestructionState, ids: readonly string[]) {
+  const pending = [...new Set([...state.pendingOpIds, ...ids])];
+  if (pending.length > MAX_PENDING_DEVICE_OPS) {
+    state.status = "failed";
+    state.finishedAt = Date.now();
+    state.error = "Bekleyen cihaz silme sayısı güvenli sınırı aşıyor. İmha tamamlanmadı; kalan kayıtları kontrol edip yeniden başlatın.";
+    state.deviceUnconfirmed += pending.length - MAX_PENDING_DEVICE_OPS;
+  }
+  state.pendingOpIds = pending.slice(-MAX_PENDING_DEVICE_OPS);
+  state.pendingDeviceChecks = state.pendingOpIds.length ? 1 : 0;
+}
+
 export const previewBiometricDestruction = authedQuery({
   args: { projectId: v.id("projects"), kinds: v.array(kind) },
   handler: async (ctx, args) => {
@@ -142,7 +155,11 @@ export const prepareBatch = internalMutation({
       if (state.phase === "fingerprint") {
         // Source-only captures (central save failed) also need device erasure.
         const central = await ctx.db.query("employeeFingerprints").withIndex("by_employee", q => q.eq("employeeId", employee._id)).first();
-        if (!central) await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: employee._id, employeeNo: employee.cardNumber });
+        if (!central) {
+          const purgeIds: Id<"deviceFingerprintEnrollments">[] = await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: employee._id, employeeNo: employee.cardNumber });
+          trackPending(state, purgeIds);
+          state.deviceOperations += purgeIds.length;
+        }
       }
       state.employeeCursor = employees.continueCursor;
       state.legacyEmployeeId = employee._id;
@@ -267,7 +284,9 @@ export const finishBatch = internalMutation({
     if (item.fingerprintId) {
       const fingerprint = await ctx.db.get(item.fingerprintId);
       if (fingerprint && (fingerprint.projectId === projectId || (fingerprint.projectId === undefined && (await ctx.db.get(fingerprint.employeeId))?.projectId === projectId)) && fingerprint.addedAt === item.addedAt) {
-        await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: fingerprint.employeeId, employeeNo: item.cardNumber, fingerNo: fingerprint.fingerPrintID });
+        const purgeIds: Id<"deviceFingerprintEnrollments">[] = await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: fingerprint.employeeId, employeeNo: item.cardNumber, fingerNo: fingerprint.fingerPrintID });
+        trackPending(state, purgeIds);
+        state.deviceOperations += purgeIds.length;
         state.deletedFingerprints += 1;
       } else if (fingerprint) state.skippedChanged += 1;
     }
@@ -277,11 +296,8 @@ export const finishBatch = internalMutation({
     state.heartbeatAt = Date.now();
     // Increment invalidates duplicate action completions before scheduling the next page.
     state.batch += 1;
-    // Keep a bounded tail. Overflow is explicitly unconfirmed, never assumed successful.
-    const pending = [...state.pendingOpIds, ...args.queuedOpIds];
-    state.deviceUnconfirmed += Math.max(0, pending.length - MAX_PENDING_DEVICE_OPS);
-    state.pendingOpIds = pending.slice(-MAX_PENDING_DEVICE_OPS);
-    state.pendingDeviceChecks = state.pendingOpIds.length ? 1 : 0;
+    // Stop on overflow rather than completing with discarded purge evidence.
+    trackPending(state, args.queuedOpIds);
     await saveState(ctx, row, state, "Convex biyometrik şablon partisi silindi");
     await ctx.scheduler.runAfter(0, internal.biometricDestruction.prepareBatch, { runId: args.runId });
   },
@@ -300,6 +316,21 @@ export const checkDeviceOperations = internalMutation({
     const pending: string[] = [];
     const deviceCache = new Map<string, Doc<"devices"> | null>();
     for (const id of state.pendingOpIds) {
+      const enrollmentId = ctx.db.normalizeId("deviceFingerprintEnrollments", id);
+      if (enrollmentId) {
+        const enrollment = await ctx.db.get(enrollmentId);
+        if (!enrollment) continue;
+        const enrollmentProjectId = enrollment.projectId ?? (await ctx.db.get(enrollment.employeeId))?.projectId;
+        if (enrollmentProjectId !== projectId || enrollment.deletionEmployeeNo === undefined || enrollment.deletionRequestedAt === undefined || now >= (state.deviceCheckDeadline ?? now)) {
+          state.status = "failed";
+          state.finishedAt = now;
+          state.error = "Cihazdaki parmak izi silmesi doğrulanamadı. Bekleyen silme kayıtlarını kontrol edip imhayı yeniden başlatın.";
+          await saveState(ctx, run.row, state, state.error);
+          return;
+        }
+        pending.push(id);
+        continue;
+      }
       const op = await ctx.db.get(id as Id<"hikPendingOperations">);
       if (!op || op.projectId !== projectId) { state.deviceUnconfirmed += 1; continue; }
       if (op.status === "failed") { state.deviceFailures += 1; continue; }

@@ -2,6 +2,7 @@
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import { limiter } from "../lib/rateLimit";
 import { authedAction } from "../lib/customFunctions";
 
 const OPENAI_API_ENDPOINT = "https://api.openai.com/v1/chat/completions";
@@ -48,6 +49,7 @@ export const processMessage = authedAction({
     source: v.union(v.literal("openai"), v.literal("error")),
   }),
   handler: async (ctx, args) => {
+    if (args.input.length > 4000) return { content: "Mesaj en fazla 4000 karakter olabilir. Lütfen mesajınızı kısaltın.", source: "error" as const };
     let projectId = args.projectId;
     const legacyClient = projectId === undefined;
     if (!projectId) {
@@ -65,6 +67,8 @@ export const processMessage = authedAction({
       };
     }
 
+    const limit = await limiter.limit(ctx, "assistantMessage", { key: ctx.user._id });
+    if (!limit.ok) return { content: "Saatlik 20 mesaj sınırına ulaştınız. Lütfen daha sonra yeniden deneyin.", source: "error" as const };
     // İstemci bağlamı güven sınırı değildir; güncel proje ayarıyla yeniden üret.
     const dbContext: string = await ctx.runQuery(internal.privacyRetention.getAssistantContext, { projectId, ...(legacyClient ? { forceMaskNames: true } : {}) });
     const controller = new AbortController();

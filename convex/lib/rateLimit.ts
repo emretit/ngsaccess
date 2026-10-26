@@ -9,5 +9,6 @@ export const limiter = new RateLimiter(components.rateLimiter, {
   // E-posta doğrulama maili gönderimi (resend dahil) için ayrı bucket —
   // proje oluşturma (register) ile aynı kotayı tüketmesin.
   emailVerify: { kind: "fixed window", rate: 5, period: HOUR },
+  assistantMessage: { kind: "token bucket", rate: 20, period: HOUR, capacity: 20 },
   inviteCreate: { kind: "fixed window", rate: 20, period: HOUR },
 });

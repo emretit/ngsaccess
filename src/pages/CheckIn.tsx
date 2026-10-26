@@ -8,6 +8,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 
 type CheckInResult = {
   success: boolean;
+  status?: "used";
   error?: string;
   code?: string;
   locationRecorded?: boolean;
@@ -16,6 +17,7 @@ type CheckInResult = {
 };
 
 export function checkInPresentation(result: CheckInResult) {
+  if (result.success && result.status === "used") return { status: "used" as const };
   if (result.success) {
     return {
       status: 'success' as const,
@@ -39,7 +41,7 @@ export default function CheckIn() {
   const checkIn = useMutation(api.employeeCheckIn.checkInWithToken);
   const running = useRef<string | null>(null);
   const [phase, setPhase] = useState('Konum bilgisi bekleniyor…');
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'used' | 'error'>('loading');
   const [failure, setFailure] = useState<'invalid' | 'rejected' | 'unknown'>('invalid');
   const [record, setRecord] = useState<{ name: string; accessTime?: string | number } | null>(null);
   const [locationNotice, setLocationNotice] = useState('');
@@ -95,7 +97,10 @@ export default function CheckIn() {
 
         if (running.current !== token) return;
         const presentation = checkInPresentation(result);
-        if (presentation.status === 'success') {
+        if (presentation.status === 'used') {
+          setStatus('used');
+          setRecord(null);
+        } else if (presentation.status === 'success') {
           setUsedLocation(presentation.usedLocation);
           setStatus('success');
           setRecord(presentation.record);
@@ -126,6 +131,7 @@ export default function CheckIn() {
         )}
       </StatusScreen>
     );
+  if (status === 'used') return <StatusScreen iconSize="large" tone="success" title="Bu QR kod daha önce kullanıldı." description="Bu sayfayı kapatabilirsiniz." />;
   if (status === 'success') {
     const time = record?.accessTime ? new Date(record.accessTime) : null;
     const validTime = time && !Number.isNaN(time.getTime());

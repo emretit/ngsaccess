@@ -59,7 +59,7 @@ export const checkInWithToken = mutation({
     const state = checkInTokenState(record, Date.now());
     if (!record || state === "invalid") return { success: false as const, code: "invalid_token", error: "Geçersiz veya süresi dolmuş kod" };
     if (state === "completed") return {
-      success: true as const, employeeName: record.employeeName, accessTime: record.usedAt, locationRecorded: record.locationRecorded,
+      success: true as const, status: "used" as const,
     };
     if (state === "expired") return { success: false as const, code: "expired_token", error: "Kodun süresi doldu" };
     return { success: false as const, code: "READER_REQUIRED", error: "Bu kod yalnız fiziksel okuyucu tarafından kullanılabilir" };

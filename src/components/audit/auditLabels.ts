@@ -82,6 +82,7 @@ const commonLabels: Record<string, string> = {
   fingerprints: "Parmak izi kayıtları",
   consentsRevoked: "İptal edilen rızalar",
   readingsAnonymized: "Anonimleştirilen okumalar",
+  readingsAnonymizationPending: "Anonimleştirme sürüyor",
 };
 const tableLabels: Record<string, Record<string, string>> = {
   hikPendingOperations: { dismissedAt: "Uyarının kapatılma zamanı" },

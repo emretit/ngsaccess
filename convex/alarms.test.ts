@@ -133,7 +133,9 @@ describe("alarm handlers", () => {
     await expect(payloadFn(makeCtx() as unknown as QueryCtx, { eventId: "email" as Id<"deviceEvents"> })).resolves.toMatchObject({ recipients: ["ops@example.com"], device: { name: "Kapı" }, sentRecently: true });
   });
   it("summarizes only the authorized project and audits settings without recipient addresses", async () => {
-    mocks.events = [event("a", { severity: "critical" }), event("b", { projectId: "p2", severity: "critical" })];
+    // summary yalnız son 7 günü sayar; sabit fixture tarihi zamanla pencereden düşer.
+    const eventTime = new Date().toISOString();
+    mocks.events = [event("a", { severity: "critical", eventTime }), event("b", { projectId: "p2", severity: "critical", eventTime })];
     const summaryFn = handler<(ctx: QueryCtx, args: FunctionArgs<typeof api.alarms.summary>) => Promise<FunctionReturnType<typeof api.alarms.summary>>>(summary);
     const ctx = makeCtx() as unknown as QueryCtx;
     await expect(summaryFn(ctx, { projectId })).resolves.toMatchObject({ critical: 1, warning: 0 });

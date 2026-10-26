@@ -1,8 +1,57 @@
-import { ConvexError } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import { internalMutation } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { scheduleFingerprintPurge } from "./employeeCardChange";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { writeAudit } from "./audit";
+
+const CASCADE_BATCH_SIZE = 200;
+
+/** Both employees and visitors store their profile photo on employees. */
+export async function deleteUnusedEmployeePhoto(ctx: MutationCtx, storageId: Id<"_storage">, excludeEmployeeId?: Id<"employees">) {
+  const linked = await ctx.db.query("employees")
+    .withIndex("by_photo_storage", q => q.eq("photoStorageId", storageId)).take(2);
+  if (!linked.some(employee => employee._id !== excludeEmployeeId)) await ctx.storage.delete(storageId);
+}
+
+async function anonymizeReadingsPage(ctx: MutationCtx, employeeId: Id<"employees">, cursor: string | null) {
+  const readings = await ctx.db.query("cardReadings")
+    .withIndex("by_employee", q => q.eq("employeeId", employeeId))
+    .paginate({ numItems: CASCADE_BATCH_SIZE, cursor });
+  for (const reading of readings.page) {
+    await ctx.db.patch(reading._id, { employeeName: "[silindi]", cardNo: hashCardNo(reading.cardNo) });
+  }
+  if (!readings.isDone) await ctx.scheduler.runAfter(0, internal.lib.employeeCascade.anonymizeReadings, {
+    employeeId, cursor: readings.continueCursor,
+  });
+  return readings;
+}
+
+export const anonymizeReadings = internalMutation({
+  args: { employeeId: v.id("employees"), cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await anonymizeReadingsPage(ctx, args.employeeId, args.cursor);
+    return null;
+  },
+});
+
+async function deleteCheckInTokensPage(ctx: MutationCtx, employeeId: Id<"employees">) {
+  const tokens = await ctx.db.query("checkInTokens")
+    .withIndex("by_employee", q => q.eq("employeeId", employeeId)).take(CASCADE_BATCH_SIZE);
+  for (const token of tokens) await ctx.db.delete(token._id);
+  if (tokens.length === CASCADE_BATCH_SIZE) await ctx.scheduler.runAfter(0, internal.lib.employeeCascade.deleteCheckInTokens, { employeeId });
+}
+
+export const deleteCheckInTokens = internalMutation({
+  args: { employeeId: v.id("employees") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await deleteCheckInTokensPage(ctx, args.employeeId);
+    return null;
+  },
+});
 
 /**
  * KVKK 6698 / GDPR — çalışan silinince:
@@ -51,8 +100,12 @@ export async function cascadeRemoveEmployeePII(
     .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
     .collect();
   for (const f of faces) {
-    await ctx.storage.delete(f.pictureStorageId);
+    await deleteUnusedEmployeePhoto(ctx, f.pictureStorageId, employeeId);
     await ctx.db.delete(f._id);
+  }
+
+  if (employee?.photoStorageId && !faces.some(face => face.pictureStorageId === employee.photoStorageId)) {
+    await deleteUnusedEmployeePhoto(ctx, employee.photoStorageId, employeeId);
   }
 
   // 2) employeeFingerprints — DB
@@ -77,16 +130,8 @@ export async function cascadeRemoveEmployeePII(
   }
 
   // 4) cardReadings — PII anonimleştir
-  const readings = await ctx.db
-    .query("cardReadings")
-    .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
-    .collect();
-  for (const r of readings) {
-    await ctx.db.patch(r._id, {
-      employeeName: "[silindi]",
-      cardNo: hashCardNo(r.cardNo),
-    });
-  }
+  const readings = await anonymizeReadingsPage(ctx, employeeId, null);
+  await deleteCheckInTokensPage(ctx, employeeId);
 
   // 5) Audit
   await writeAudit(ctx, {
@@ -100,17 +145,18 @@ export async function cascadeRemoveEmployeePII(
         faces: faces.length,
         fingerprints: fingerprints.length,
         consentsRevoked,
-        readingsAnonymized: readings.length,
+        readingsAnonymized: readings.page.length,
+        readingsAnonymizationPending: !readings.isDone,
       },
     },
-    note: "KVKK cascade: biyometrik veri silindi, rıza iptal edildi, kart okumaları anonimleştirildi",
+    note: "KVKK cascade: biyometrik veri silindi, rıza iptal edildi, kart okumalarının anonimleştirilmesi başlatıldı",
   });
 
   return {
     facesDeleted: faces.length,
     fingerprintsDeleted: fingerprints.length,
     consentsRevoked,
-    readingsAnonymized: readings.length,
+    readingsAnonymized: readings.page.length,
   };
 }
 

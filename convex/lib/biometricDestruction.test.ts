@@ -52,6 +52,7 @@ function createCtx() {
   const ctx = {
     user: { _id: "u", role: "project_admin" },
     db: {
+      normalizeId: vi.fn(() => null),
       get: vi.fn(async (id: string) => documents.get(id) ?? null),
       patch: vi.fn(async (id: string, patch: Record<string, unknown>) => {
         const current = documents.get(id);
@@ -243,12 +244,12 @@ describe("run başına sınırlı kontrol ve audit", () => {
       expect(mocks.audit).toHaveBeenCalledTimes(1); // one final report, zero progress/device audits
     } finally { date.mockRestore(); }
   });
-  it("kimlik listesini sınırlar ve taşanları doğrulanamayan sayar", async () => {
+  it("kimlik sınırında tutanağı failed yapar ve tüm bekleyenleri doğrulanamayan sayar", async () => {
     const data = createCtx();
     seedRun(data, { pendingOpIds: Array.from({ length: MAX_PENDING_DEVICE_OPS }, (_, i) => `old-${i}`) });
     await handler(finishBatch)(data.ctx, { runId: "run", batch: 1, item, deviceOperations: 1, deviceFailures: 0, deviceUnconfirmed: 0, queuedOpIds: ["new"] });
-    expect(data.ctx.db.patch).toHaveBeenCalledWith("run", { newValue: expect.objectContaining({ deviceUnconfirmed: 1, pendingOpIds: expect.arrayContaining(["new"]) }) });
-    expect((data.documents.get("run") as { newValue: { pendingOpIds: string[] } }).newValue.pendingOpIds).toHaveLength(MAX_PENDING_DEVICE_OPS);
+    expect(data.ctx.db.patch).toHaveBeenCalledWith("run", { newValue: expect.objectContaining({ status: "failed", deviceUnconfirmed: MAX_PENDING_DEVICE_OPS + 1, pendingOpIds: [] }) });
+    expect((data.documents.get("run") as { newValue: { pendingOpIds: string[] } }).newValue.pendingOpIds).toHaveLength(0);
   });
   it("çevrimdışı köprüde ilk kontrolde tamamlar, yeniden planlamaz", async () => {
     const data = createCtx();

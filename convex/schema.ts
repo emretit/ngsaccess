@@ -53,6 +53,7 @@ export default defineSchema({
   })
     .index("email", ["email"])
     .index("by_setup_token", ["setupToken"])
+    .index("by_tokenExpiresAt", ["tokenExpiresAt"])
     .index("by_role", ["role"])
     .index("by_photo_url", ["photoUrl"]),
 
@@ -177,6 +178,8 @@ export default defineSchema({
     locationRecorded: v.optional(v.boolean()),
     createdAt: v.string(),
   })
+    .index("by_expiresAt", ["expiresAt"])
+    .index("by_usedAt", ["usedAt"])
     .index("by_token", ["token"])
     .index("by_employee", ["employeeId"]),
 
@@ -204,6 +207,7 @@ export default defineSchema({
     createdAt: v.string(),
     lastUsedAt: v.optional(v.string()),
   })
+    .index("by_expiresAt", ["expiresAt"])
     .index("by_token", ["token"])
     .index("by_employee", ["employeeId"]),
 
@@ -224,6 +228,7 @@ export default defineSchema({
     transport: v.union(v.literal("ide_mqtt"), v.literal("hik_local_bridge"), v.literal("hik_gateway")),
     actuator: v.number(),
   })
+    .index("by_status_and_requestedAt", ["status", "requestedAt"])
     .index("by_employeeId_and_requestId", ["employeeId", "requestId"]),
 
   departments: defineTable({
@@ -690,6 +695,7 @@ export default defineSchema({
     createdAt: v.string(),
     updatedAt: v.string(),
   })
+    .index("by_eventTime", ["eventTime"])
     .index("by_project", ["projectId"])
     .index("by_device", ["deviceId"])
     .index("by_project_and_event_time", ["projectId", "eventTime"])
@@ -843,6 +849,7 @@ export default defineSchema({
     /** Bu op'u üreten cihaz gönderim çalıştırması (deviceSyncRuns); eski op'larda yok. */
     runId: v.optional(v.id("deviceSyncRuns")),
   })
+    .index("by_status_and_createdAt", ["status", "createdAt"])
     .index("by_device_status", ["deviceId", "status"])
     .index("by_status_nextRetry", ["status", "nextRetryAt"])
     .index("by_msx", ["deviceId", "msxId"])
@@ -876,6 +883,7 @@ export default defineSchema({
     }),
     dispatchFinished: v.optional(v.boolean()),
   })
+    .index("by_status_and_finishedAt", ["status", "finishedAt"])
     .index("by_project_started", ["projectId", "startedAt"])
     .index("by_rule_started", ["ruleId", "startedAt"]),
 

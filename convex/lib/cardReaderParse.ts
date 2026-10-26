@@ -300,11 +300,12 @@ export function parseCardReaderBody(
 
   const trimmedSource = jsonSource.trim();
   if (
-    (trimmedSource.startsWith("{") && trimmedSource.endsWith("}")) ||
+    trimmedSource.startsWith("{") || trimmedSource.startsWith("[") ||
     contentType?.includes("application/json")
   ) {
     try {
-      const body = JSON.parse(jsonSource) as Record<string, unknown>;
+      const body = parseJsonObject(jsonSource);
+      validateCardFields(body);
 
       // IDE Smart envelope (GERÇEK şekil, canlı yakalandı 2026-05-29):
       //   { transaction: { type:"access_event", src-id:<panelUUID> },
@@ -401,8 +402,9 @@ export function parseCardReaderBody(
         bodyForLog: body,
         ...hikFields,
       };
-    } catch {
-      /* JSON parse hatası, XML/multipart'a geç */
+    } catch (error) {
+      if (error instanceof HttpInputError) throw error;
+      throw new HttpInputError(400, "Kart olayı alanlarını kontrol edin.");
     }
   }
 
@@ -442,4 +444,68 @@ export function parseCardReaderBody(
     deviceIp: undefined,
     bodyForLog: { _raw: raw.slice(0, 500), _format: "unknown" },
   };
+}
+
+export class HttpInputError extends Error {
+  // Explicit field: Node's strip-only TS loader (bridge node tests) rejects parameter properties.
+  readonly status: 400 | 413;
+  constructor(status: 400 | 413, message: string) { super(message); this.status = status; }
+}
+
+export const HTTP_BODY_LIMIT = 64 * 1024;
+/** Hik httpHosts direct push (HIK_FORWARDING_URL) sends multipart events with an attached face picture. */
+export const MULTIPART_BODY_LIMIT = 1024 * 1024;
+
+export function cardReaderBodyLimit(contentType: string | null): number {
+  return contentType?.toLowerCase().includes("multipart/") ? MULTIPART_BODY_LIMIT : HTTP_BODY_LIMIT;
+}
+
+/** Count actual bytes as they arrive, including bodies without Content-Length. */
+export async function readLimitedBody(request: Request, limit = HTTP_BODY_LIMIT): Promise<string> {
+  const tooLarge = () => new HttpInputError(413, `İstek gövdesi en fazla ${Math.round(limit / 1024)} KB olabilir.`);
+  const declared = Number(request.headers.get("Content-Length"));
+  if (declared > limit) throw tooLarge();
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let size = 0;
+  let raw = "";
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > limit) {
+        void reader.cancel().catch(() => undefined);
+        throw tooLarge();
+      }
+      raw += decoder.decode(chunk.value, { stream: true });
+    }
+    return raw + decoder.decode();
+  } finally { reader.releaseLock(); }
+}
+
+export function parseJsonObject(raw: string): Record<string, unknown> {
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { throw new HttpInputError(400, "Geçerli bir JSON gövdesi gönderin."); }
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new HttpInputError(400, "JSON gövdesi bir nesne olmalıdır.");
+  return value as Record<string, unknown>;
+}
+
+const SCALAR_CARD_KEYS: ReadonlySet<string> = new Set<string>([...CARD_FIELDS, ...SERIAL_FIELDS, "user_id", "serial", "userId", "card", "uuid", "device_uuid", "src-id", "dst-id", "ipAddress", "ip", "IP", "time", "TIME", "actuator", "io_id", "ioId", "result"]);
+const NESTED_CARD_KEYS: ReadonlySet<string> = new Set(["transaction", "payload", "EventNotificationAlert", "AccessControllerEvent", "AcsEvent"]);
+
+function validateCardFields(body: Record<string, unknown>): void {
+  const objects = [body];
+  while (objects.length) {
+    const current = objects.pop();
+    if (!current) continue;
+    for (const [key, value] of Object.entries(current)) {
+      if (SCALAR_CARD_KEYS.has(key) && value !== null && value !== undefined && typeof value !== "string" && typeof value !== "number") throw new HttpInputError(400, "Kart olayı alan türlerini kontrol edin.");
+      if (NESTED_CARD_KEYS.has(key) && value !== undefined) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new HttpInputError(400, "Kart olayı nesnelerini kontrol edin.");
+        objects.push(value as Record<string, unknown>);
+      }
+    }
+  }
 }

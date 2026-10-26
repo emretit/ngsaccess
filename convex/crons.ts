@@ -69,10 +69,11 @@ crons.interval(
 );
 
 // E-posta doğrulama token temizliği: her gün 03:00 UTC — setupToken+tokenExpiresAt sıfırla.
-crons.daily(
+crons.cron(
   "cleanup-expired-email-tokens",
-  { hourUTC: 3, minuteUTC: 0 },
+  "0 3 * * *",
   internal.emailVerification.cleanupExpiredTokens,
+  {},
 );
 
 crons.cron(
@@ -96,5 +97,10 @@ crons.interval("purge-expired-card-readings", { hours: 24 }, internal.privacyRet
 crons.cron("close-ended-employments", "5 21 * * *", internal.employeeTermination.closeEndedEmployments, {});
 
 crons.cron("retry-fingerprint-purges", "30 4 * * *", internal.fingerprintEnrollment.retryStalePurges, {});
+
+// Independent retention chains, each bounded to 20 purge calls (UTC / TR +3).
+crons.cron("purge-operational-retention", "40 0 * * *", internal.privacyRetention.startDailyPurge, { group: "operations" });
+crons.cron("purge-device-event-retention", "50 0 * * *", internal.privacyRetention.startDailyPurge, { group: "events" });
+crons.cron("purge-access-retention", "55 0 * * *", internal.privacyRetention.startDailyPurge, { group: "access" });
 
 export default crons;

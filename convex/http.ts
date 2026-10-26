@@ -1,9 +1,11 @@
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
+import { v } from "convex/values";
+import { z } from "zod";
+import { httpAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
-import { parseCardReaderBody } from "./lib/cardReaderParse";
+import { parseCardReaderBody, readLimitedBody, parseJsonObject, HttpInputError, cardReaderBodyLimit } from "./lib/cardReaderParse";
 import { shouldCreateCardReadingForHikEvent } from "./lib/hikEventCatalog";
 import { resolveCardReaderAuth } from "./lib/cardReaderAuth";
 
@@ -89,8 +91,36 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     try {
+      const requestUrl = new URL(request.url);
+      const cardReaderAuth = resolveCardReaderAuth({
+        authorizationHeader: request.headers.get("Authorization"),
+        queryToken: requestUrl.searchParams.get("token"),
+        relayHeader: request.headers.get("X-Relay-Secret"),
+        queryRelay: requestUrl.searchParams.get("relay"),
+        relaySecret: process.env.CARD_READER_RELAY_SECRET,
+        allowUnauthenticated: process.env.CARD_READER_ALLOW_UNAUTHENTICATED,
+      });
+      if (cardReaderAuth.kind === "reject") {
+        return unauthorizedCardReader();
+      }
+      const authedDevice =
+        cardReaderAuth.kind === "token"
+          ? await ctx.runQuery(internal.devices.getByApiToken, { token: cardReaderAuth.token })
+          : null;
+      if (cardReaderAuth.kind === "token" && !authedDevice) {
+        console.warn("[card-reader] geçersiz apiToken — reddedildi", {
+          token: cardReaderAuth.token.slice(0, 8) + "…",
+        });
+        return unauthorizedCardReader();
+      }
+      if (cardReaderAuth.kind === "legacy") {
+        console.warn(
+          "[card-reader] CARD_READER_ALLOW_UNAUTHENTICATED=1 — token'sız serial/IP lookup (geçiş modu)",
+        );
+      }
+
       const contentType = request.headers.get("Content-Type");
-      const raw = await request.text();
+      const raw = await readLimitedBody(request, cardReaderBodyLimit(contentType));
       const parsed = parseCardReaderBody(raw, contentType);
       const {
         user_id,
@@ -115,38 +145,6 @@ http.route({
         ideResult,
         ideTime,
       } = parsed;
-
-      const requestUrl = new URL(request.url);
-      const cardReaderAuth = resolveCardReaderAuth({
-        authorizationHeader: request.headers.get("Authorization"),
-        queryToken: requestUrl.searchParams.get("token"),
-        relayHeader: request.headers.get("X-Relay-Secret"),
-        queryRelay: requestUrl.searchParams.get("relay"),
-        relaySecret: process.env.CARD_READER_RELAY_SECRET,
-        allowUnauthenticated: process.env.CARD_READER_ALLOW_UNAUTHENTICATED,
-      });
-      if (cardReaderAuth.kind === "reject") {
-        console.warn("[card-reader] kimlik bilgisi yok — reddedildi", {
-          deviceIp: deviceIp ?? "(yok)",
-          serial: serial ?? "(yok)",
-        });
-        return unauthorizedCardReader();
-      }
-      const authedDevice =
-        cardReaderAuth.kind === "token"
-          ? await ctx.runQuery(internal.devices.getByApiToken, { token: cardReaderAuth.token })
-          : null;
-      if (cardReaderAuth.kind === "token" && !authedDevice) {
-        console.warn("[card-reader] geçersiz apiToken — reddedildi", {
-          token: cardReaderAuth.token.slice(0, 8) + "…",
-        });
-        return unauthorizedCardReader();
-      }
-      if (cardReaderAuth.kind === "legacy") {
-        console.warn(
-          "[card-reader] CARD_READER_ALLOW_UNAUTHENTICATED=1 — token'sız serial/IP lookup (geçiş modu)",
-        );
-      }
 
       // Token doğrulandıysa attribution zaten token cihazına SABİTLENİR (aşağıda
       // updateLastSeen/processCardReading'e authedDeviceId/deviceId geçilir) → body
@@ -294,6 +292,7 @@ http.route({
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
+      if (error instanceof HttpInputError) return inputErrorResponse(error);
       console.error("Card reader error:", error);
       return new Response(
         JSON.stringify({ cevap: "error", error: "system error" }),
@@ -342,8 +341,8 @@ http.route({
     const unauth = checkBridgeAuth(request);
     if (unauth) return unauth;
     try {
-      const { body } = (await request.json()) as { topic?: string; body?: string };
-      const raw = typeof body === "string" ? body : JSON.stringify(body ?? {});
+      const { body } = await readBridgeBody(request, z.object({ topic: z.string().optional(), body: z.union([z.string(), z.record(z.string(), z.unknown())]) }));
+      const raw = typeof body === "string" ? body : JSON.stringify(body);
       const parsed = parseCardReaderBody(raw, "application/json");
       const { user_id, ideUuid, ideIoId, ideResult, ideTime } = parsed;
 
@@ -369,6 +368,7 @@ http.route({
       });
       return jsonResponse({ ok: true, granted: result.granted });
     } catch (error) {
+      if (error instanceof HttpInputError) return inputErrorResponse(error);
       console.error("[ide-bridge/event] error:", error);
       return jsonResponse({ ok: false, error: "system error" }, 500);
     }
@@ -382,11 +382,11 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const unauth = checkBridgeAuth(request);
     if (unauth) return unauth;
-    const { max } = (await request.json().catch(() => ({}))) as { max?: number };
-    const result = await ctx.runMutation(internal.ideSync.pollForBridge, {
-      max: typeof max === "number" ? max : undefined,
+    return handleBridgeInput(async () => {
+      const { max } = await readBridgeBody(request, z.object({ max: z.number().finite().optional() }));
+      const result = await ctx.runMutation(internal.ideSync.pollForBridge, { max });
+      return jsonResponse(result);
     });
-    return jsonResponse(result);
   }),
 });
 
@@ -397,13 +397,13 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const unauth = checkBridgeAuth(request);
     if (unauth) return unauth;
-    const { opId, msxId } = (await request.json()) as { opId?: string; msxId?: number };
-    if (!opId || typeof msxId !== "number") return jsonResponse({ ok: false, error: "opId+msxId gerekli" }, 400);
-    const accepted = await ctx.runMutation(internal.ideSync.markSent, {
-      opId: opId as Id<"idePendingOperations">,
-      msxId,
+    return handleBridgeInput(async () => {
+      const body = await readBridgeBody(request, z.object({ opId: z.string().min(1), msxId: z.number().finite() }));
+      const opId = await ctx.runQuery(internal.http.normalizeOperationId, { table: "idePendingOperations", id: body.opId });
+      if (!opId) throw new HttpInputError(400, "Geçerli bir komut kimliği gönderin.");
+      const accepted = await ctx.runMutation(internal.ideSync.markSent, { opId: opId as Id<"idePendingOperations">, msxId: body.msxId });
+      return accepted ? jsonResponse({ ok: true }) : jsonResponse({ ok: false, error: "Komut teslim edilemez" }, 409);
     });
-    return accepted ? jsonResponse({ ok: true }) : jsonResponse({ ok: false, error: "Komut teslim edilemez" }, 409);
   }),
 });
 
@@ -414,24 +414,13 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const unauth = checkBridgeAuth(request);
     if (unauth) return unauth;
-    const { opId, msxId, result, message, errorCode } = (await request.json()) as {
-      opId?: string;
-      msxId?: number;
-      result?: string;
-      message?: string;
-      errorCode?: string;
-    };
-    if (!opId) return jsonResponse({ ok: false, error: "opId gerekli" }, 400);
-    const normalized: "success" | "fail" | "timeout" =
-      result === "success" ? "success" : result === "timeout" ? "timeout" : "fail";
-    await ctx.runMutation(internal.ideSync.markAck, {
-      opId: opId as Id<"idePendingOperations">,
-      msxId: typeof msxId === "number" ? msxId : undefined,
-      result: normalized,
-      message,
-      errorCode: typeof errorCode === "string" ? errorCode : undefined,
+    return handleBridgeInput(async () => {
+      const body = await readBridgeBody(request, z.object({ opId: z.string().min(1), msxId: z.number().finite().optional(), result: z.string().optional(), message: z.string().optional(), errorCode: z.string().optional() }));
+      const opId = await ctx.runQuery(internal.http.normalizeOperationId, { table: "idePendingOperations", id: body.opId });
+      if (!opId) throw new HttpInputError(400, "Geçerli bir komut kimliği gönderin.");
+      await ctx.runMutation(internal.ideSync.markAck, { opId: opId as Id<"idePendingOperations">, msxId: body.msxId, result: body.result === "success" ? "success" : body.result === "timeout" ? "timeout" : "fail", message: body.message, errorCode: body.errorCode });
+      return jsonResponse({ ok: true });
     });
-    return jsonResponse({ ok: true });
   }),
 });
 
@@ -450,13 +439,13 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const token = bridgeBearerToken(request);
     if (!token) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
-    const body = (await request.json().catch(() => ({}))) as { max?: unknown };
-    const result = await ctx.runMutation(internal.hikvisionSync.claimLocalBridgeOperations, {
-      token,
-      max: typeof body.max === "number" ? body.max : undefined,
+    const device = await ctx.runQuery(internal.devices.getByApiToken, { token });
+    if (!device || device.hikTransport !== "localBridge") return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    return handleBridgeInput(async () => {
+      const body = await readBridgeBody(request, z.object({ max: z.number().finite().optional() }));
+      const result = await ctx.runMutation(internal.hikvisionSync.claimLocalBridgeOperations, { token, max: body.max });
+      return jsonResponse(result, result.ok ? 200 : 401);
     });
-    if (!result.ok) return jsonResponse(result, 401);
-    return jsonResponse(result);
   }),
 });
 
@@ -469,27 +458,15 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     const token = bridgeBearerToken(request);
     if (!token) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
-    const body = (await request.json()) as {
-      opId?: string;
-      ok?: boolean;
-      message?: string;
-    };
-    if (!body.opId || typeof body.ok !== "boolean") {
-      return jsonResponse({ ok: false, error: "opId+ok gerekli" }, 400);
-    }
-    const result = await ctx.runMutation(internal.hikvisionSync.ackLocalBridgeOperation, {
-      token,
-      opId: body.opId as Id<"hikPendingOperations">,
-      ok: body.ok,
-      // null → undefined: Convex v.optional(v.string()) açık null'ı reddeder; başarılı
-      // ack'te bridge message=null gönderir, bu satır olmadan op processing'te kalırdı.
-      message: typeof body.message === "string" ? body.message : undefined,
+    const device = await ctx.runQuery(internal.devices.getByApiToken, { token });
+    if (!device || device.hikTransport !== "localBridge") return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    return handleBridgeInput(async () => {
+      const body = await readBridgeBody(request, z.object({ opId: z.string().min(1), ok: z.boolean(), message: z.string().nullable().optional() }));
+      const opId = await ctx.runQuery(internal.http.normalizeOperationId, { table: "hikPendingOperations", id: body.opId });
+      if (!opId) throw new HttpInputError(400, "Geçerli bir komut kimliği gönderin.");
+      const result = await ctx.runMutation(internal.hikvisionSync.ackLocalBridgeOperation, { token, opId: opId as Id<"hikPendingOperations">, ok: body.ok, message: body.message ?? undefined });
+      return jsonResponse(result, result.ok ? 200 : result.error === "unauthorized" ? 401 : 404);
     });
-    if (!result.ok && result.error === "unauthorized") {
-      return jsonResponse(result, 401);
-    }
-    if (!result.ok) return jsonResponse(result, 404);
-    return jsonResponse(result);
   }),
 });
 
@@ -511,3 +488,24 @@ http.route({
 });
 
 export default http;
+
+function inputErrorResponse(error: HttpInputError): Response {
+  return jsonResponse({ ok: false, cevap: "error", error: error.message }, error.status);
+}
+async function readBridgeBody<T>(request: Request, validator: z.ZodType<T>): Promise<T> {
+  const body = parseJsonObject(await readLimitedBody(request));
+  const parsed = validator.safeParse(body);
+  if (!parsed.success) throw new HttpInputError(400, "İstek alanlarının türlerini ve zorunlu alanları kontrol edin.");
+  return parsed.data;
+}
+async function handleBridgeInput(run: () => Promise<Response>): Promise<Response> {
+  try { return await run(); } catch (error) {
+    if (error instanceof HttpInputError) return inputErrorResponse(error);
+    throw error;
+  }
+}
+export const normalizeOperationId = internalQuery({
+  args: { table: v.union(v.literal("idePendingOperations"), v.literal("hikPendingOperations")), id: v.string() },
+  returns: v.union(v.id("idePendingOperations"), v.id("hikPendingOperations"), v.null()),
+  handler: (ctx, args) => ctx.db.normalizeId(args.table, args.id),
+});

@@ -24,6 +24,7 @@ describe("asistan isim maskeleme", () => {
 });
 
 
+vi.mock("./rateLimit", () => ({ limiter: { limit: vi.fn(async () => ({ ok: true })) } }));
 vi.mock("./customFunctions", () => ({ authedAction: (definition: { handler: unknown }) => ({ _handler: definition.handler }) }));
 import { processMessage } from "../actions/openaiChat";
 import type { ActionCtx } from "../_generated/server";
@@ -37,7 +38,7 @@ describe("OpenAI sunucu gizlilik sınırı", () => {
     const fetcher = vi.fn(async (_url: string, _init: RequestInit) => ({ ok: true, json: async () => ({ choices: [{ message: { content: "Personel 1 bugün geç geldi." } }] }) }));
     vi.stubGlobal("fetch", fetcher);
     const runQuery = vi.fn(async () => '{"employeeName":"Personel 1"}');
-    const result = await processHandler({ runQuery } as unknown as ActionCtx, { projectId: "project-a", input: "Ali Yılmaz bugün geç mi geldi?", dbContext: '{"name":"Ali Yılmaz"}' });
+    const result = await processHandler({ runQuery, user: { _id: "user" } } as unknown as ActionCtx, { projectId: "project-a", input: "Ali Yılmaz bugün geç mi geldi?", dbContext: '{"name":"Ali Yılmaz"}' });
     expect(runQuery).toHaveBeenCalledWith(expect.anything(), { projectId: "project-a" });
     const request = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body ?? "{}")) as { messages: { content: string }[] };
     expect(request.messages[0].content).toContain("Personel 1");
@@ -50,7 +51,7 @@ describe("OpenAI sunucu gizlilik sınırı", () => {
     const fetcher = vi.fn(async (_url: string, _init: RequestInit) => ({ ok: true, json: async () => ({ choices: [{ message: { content: "Önce bir proje seçin." } }] }) }));
     vi.stubGlobal("fetch", fetcher);
     const runQuery = vi.fn(async () => ["project-a", "project-b"]);
-    const result = await processHandler({ runQuery } as unknown as ActionCtx, { input: "Durum nedir?", dbContext: "Çalışan adı: Ali Yılmaz" });
+    const result = await processHandler({ runQuery, user: { _id: "user" } } as unknown as ActionCtx, { input: "Durum nedir?", dbContext: "Çalışan adı: Ali Yılmaz" });
     expect(runQuery).toHaveBeenCalledOnce();
     expect(fetcher).not.toHaveBeenCalled();
     expect(result).toEqual({ content: "Hangi proje için sorduğunuzu belirlemek üzere sayfayı yenileyin", source: "error" });
@@ -60,7 +61,7 @@ describe("OpenAI sunucu gizlilik sınırı", () => {
     const fetcher = vi.fn(async (_url: string, _init: RequestInit) => ({ ok: true, json: async () => ({ choices: [{ message: { content: "Hazır" } }] }) }));
     vi.stubGlobal("fetch", fetcher);
     const runQuery = vi.fn().mockResolvedValueOnce(["project-a"]).mockResolvedValueOnce("Personel 1");
-    const result = await processHandler({ runQuery } as unknown as ActionCtx, { input: "Durum?", dbContext: "Ali Yılmaz" });
+    const result = await processHandler({ runQuery, user: { _id: "user" } } as unknown as ActionCtx, { input: "Durum?", dbContext: "Ali Yılmaz" });
     expect(runQuery).toHaveBeenLastCalledWith(expect.anything(), { projectId: "project-a", forceMaskNames: true });
     expect(String(fetcher.mock.calls[0]?.[1]?.body)).toContain("Personel 1");
     expect(String(fetcher.mock.calls[0]?.[1]?.body)).not.toContain("Ali Yılmaz");

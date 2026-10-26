@@ -142,3 +142,170 @@ export const setVisitorNotice = authedMutation({
     return null;
   },
 });
+
+// Operational retention: separate from project-configured card reading retention.
+export const DAY_MS = 86_400_000;
+export const OPERATION_RETENTION_DAYS = 30;
+export const SYNC_RUN_RETENTION_DAYS = 90;
+export const DEVICE_EVENT_RETENTION_DAYS = 365;
+export const CHECK_IN_RETENTION_DAYS = 7;
+export const SESSION_RETENTION_DAYS = 30;
+export const MOBILE_OPERATION_RETENTION_DAYS = 30;
+export const PURGE_BATCH_SIZE = 200;
+export const MAX_CHAIN_LENGTH = 20;
+
+// Audit log intentionally has no purge: its legal retention period needs a decision.
+const stages = [
+  ["purgeHik", "done"], ["purgeHik", "failed"],
+  ["purgeIde", "acked"], ["purgeIde", "failed"],
+  ["purgeSyncRuns", "done"], ["purgeSyncRuns", "partial"], ["purgeSyncRuns", "failed"],
+  ["purgeDeviceEvents", ""], ["purgeCheckInTokens", "expired"], ["purgeCheckInTokens", "used"],
+  ["purgeEmployeeSessions", ""],
+  ["purgeMobileOperations", "confirmed"], ["purgeMobileOperations", "failed"], ["purgeMobileOperations", "unknown"],
+] as const;
+const groups = {
+  operations: { first: 0, last: 6 },
+  events: { first: 7, last: 7 },
+  access: { first: 8, last: 13 },
+} as const;
+function stageGroup(stage: number) {
+  return Object.values(groups).find(group => stage >= group.first && stage <= group.last);
+}
+type BatchArgs = { stage: number; batch: number; runAt: number; cursor?: string };
+const batchArgs = { stage: v.number(), batch: v.number(), runAt: v.number(), cursor: v.optional(v.string()) };
+async function advance(ctx: MutationCtx, args: BatchArgs, done: boolean, cursor?: string) {
+  const batch = args.batch + 1;
+  if (batch >= MAX_CHAIN_LENGTH) return;
+  const group = stageGroup(args.stage);
+  if (!group) return;
+  // Reserve one invocation for each remaining stage within this cron's group.
+  const remaining = group.last - args.stage;
+  const stage = done || MAX_CHAIN_LENGTH - batch <= remaining ? args.stage + 1 : args.stage;
+  if (stage > group.last) return;
+  const next = stages[stage];
+  if (next) await ctx.scheduler.runAfter(0, internal.privacyRetention[next[0]], {
+    stage, batch, runAt: args.runAt, ...(stage === args.stage && cursor ? { cursor } : {}),
+  });
+}
+function valid(args: BatchArgs, name: string) {
+  return Number.isInteger(args.stage) && Number.isInteger(args.batch) && args.batch >= 0 &&
+    args.batch < MAX_CHAIN_LENGTH && stages[args.stage]?.[0] === name;
+}
+const cutoff = (args: BatchArgs, days: number) => args.runAt - days * DAY_MS;
+const isoCutoff = (args: BatchArgs, days: number) => new Date(cutoff(args, days)).toISOString();
+// Retry deadlines and permanent-deferral sentinels are not completed updates.
+const elapsedRetryAt = (nextRetryAt: number | undefined, runAt: number) =>
+  nextRetryAt !== undefined && nextRetryAt < Number.MAX_SAFE_INTEGER && nextRetryAt <= runAt ? nextRetryAt : 0;
+const opts = (args: BatchArgs) => ({ numItems: PURGE_BATCH_SIZE, cursor: args.cursor ?? null });
+
+export const startDailyPurge = internalMutation({
+  args: { group: v.optional(v.union(v.literal("operations"), v.literal("events"), v.literal("access"))) }, returns: v.null(),
+  handler: async (ctx, args) => {
+    const stage = groups[args.group ?? "operations"].first;
+    await ctx.scheduler.runAfter(0, internal.privacyRetention[stages[stage][0]], { stage, batch: 0, runAt: Date.now() });
+    return null;
+  },
+});
+
+export const purgeHik = internalMutation({
+  args: batchArgs, returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!valid(args, "purgeHik")) return null;
+    const status = stages[args.stage][1] === "done" ? "done" : "failed";
+    const before = cutoff(args, OPERATION_RETENTION_DAYS);
+    const page = await ctx.db.query("hikPendingOperations").withIndex("by_status_created", q => q.eq("status", status).lt("createdAt", before)).paginate(opts(args));
+    for (const row of page.page) {
+      const lastUpdate = Math.max(row.createdAt, row.completedAt ?? 0, row.dismissedAt ?? 0, row.processingStartedAt ?? 0, elapsedRetryAt(row.nextRetryAt, args.runAt));
+      // Failed access changes remain actionable until dismissed or successfully completed.
+      const unresolvedRevocation = row.status === "failed" && (row.operation.startsWith("delete") || row.operation === "addPerson" || row.operation === "updatePerson") && row.dismissedAt === undefined;
+      if (lastUpdate < before && !unresolvedRevocation) await ctx.db.delete(row._id);
+    }
+    await advance(ctx, args, page.isDone, page.continueCursor);
+    return null;
+  },
+});
+export const purgeIde = internalMutation({
+  args: batchArgs, returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!valid(args, "purgeIde")) return null;
+    const status = stages[args.stage][1] === "acked" ? "acked" : "failed";
+    const before = cutoff(args, OPERATION_RETENTION_DAYS);
+    const page = await ctx.db.query("idePendingOperations").withIndex("by_status_and_createdAt", q => q.eq("status", status).lt("createdAt", before)).paginate(opts(args));
+    for (const row of page.page) {
+      const lastUpdate = Math.max(row.createdAt, row.ackedAt ?? 0, row.dismissedAt ?? 0, row.sentAt ?? 0, elapsedRetryAt(row.nextRetryAt, args.runAt));
+      const unresolvedRevocation = row.status === "failed" && (row.opType.startsWith("delete") || row.opType === "upsertUser") && row.dismissedAt === undefined;
+      if (lastUpdate < before && !unresolvedRevocation) await ctx.db.delete(row._id);
+    }
+    await advance(ctx, args, page.isDone, page.continueCursor);
+    return null;
+  },
+});
+export const purgeSyncRuns = internalMutation({
+  args: batchArgs, returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!valid(args, "purgeSyncRuns")) return null;
+    const value = stages[args.stage][1];
+    const status = value === "done" || value === "partial" ? value : "failed";
+    let deleted = 0;
+    let done = false;
+    while (deleted < PURGE_BATCH_SIZE) {
+      const run = await ctx.db.query("deviceSyncRuns").withIndex("by_status_and_finishedAt", q => q.eq("status", status).gt("finishedAt", 0).lt("finishedAt", cutoff(args, SYNC_RUN_RETENTION_DAYS))).first();
+      if (!run) { done = true; break; }
+      const capacity = PURGE_BATCH_SIZE - deleted;
+      const targets = await ctx.db.query("deviceSyncRunTargets").withIndex("by_run", q => q.eq("runId", run._id)).take(capacity);
+      for (const target of targets) await ctx.db.delete(target._id);
+      deleted += targets.length;
+      if (targets.length < capacity) { await ctx.db.delete(run._id); deleted++; }
+    }
+    await advance(ctx, args, done);
+    return null;
+  },
+});
+export const purgeDeviceEvents = internalMutation({
+  args: batchArgs, returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!valid(args, "purgeDeviceEvents")) return null;
+    const page = await ctx.db.query("deviceEvents").withIndex("by_eventTime", q => q.lt("eventTime", isoCutoff(args, DEVICE_EVENT_RETENTION_DAYS))).paginate(opts(args));
+    for (const row of page.page) await ctx.db.delete(row._id);
+    await advance(ctx, args, page.isDone, page.continueCursor);
+    return null;
+  },
+});
+export const purgeCheckInTokens = internalMutation({
+  args: batchArgs, returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!valid(args, "purgeCheckInTokens")) return null;
+    const before = isoCutoff(args, CHECK_IN_RETENTION_DAYS);
+    const query = ctx.db.query("checkInTokens");
+    const page = await (stages[args.stage][1] === "used"
+      ? query.withIndex("by_usedAt", q => q.gt("usedAt", "").lt("usedAt", before))
+      : query.withIndex("by_expiresAt", q => q.lt("expiresAt", before))).paginate(opts(args));
+    for (const row of page.page) {
+      if (!row.usedAt || row.usedAt < before) await ctx.db.delete(row._id);
+    }
+    await advance(ctx, args, page.isDone, page.continueCursor);
+    return null;
+  },
+});
+export const purgeEmployeeSessions = internalMutation({
+  args: batchArgs, returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!valid(args, "purgeEmployeeSessions")) return null;
+    const page = await ctx.db.query("employeeSessions").withIndex("by_expiresAt", q => q.lt("expiresAt", isoCutoff(args, SESSION_RETENTION_DAYS))).paginate(opts(args));
+    for (const row of page.page) await ctx.db.delete(row._id);
+    await advance(ctx, args, page.isDone, page.continueCursor);
+    return null;
+  },
+});
+export const purgeMobileOperations = internalMutation({
+  args: batchArgs, returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!valid(args, "purgeMobileOperations")) return null;
+    const value = stages[args.stage][1];
+    const status = value === "confirmed" || value === "unknown" ? value : "failed";
+    const page = await ctx.db.query("mobileAccessOperations").withIndex("by_status_and_requestedAt", q => q.eq("status", status).lt("requestedAt", isoCutoff(args, MOBILE_OPERATION_RETENTION_DAYS))).paginate(opts(args));
+    for (const row of page.page) await ctx.db.delete(row._id);
+    await advance(ctx, args, page.isDone, page.continueCursor);
+    return null;
+  },
+});
