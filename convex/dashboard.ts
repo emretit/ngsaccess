@@ -1,3 +1,4 @@
+import { resolveReadingScope, MONITORING_READING_PERMISSIONS, REPORT_READING_PERMISSIONS } from "./lib/readingAccess";
 import { scopedPdksPlan, shiftForInstant, usesPlanDayRules, splitReadingsByShift } from "./lib/pdksMultiShift";
 import { buildPeriodDateKeys } from "./lib/pdksCalc";
 import { hasFixedShiftRules, usesShiftDayRules } from "./lib/pdksFixedRules";
@@ -129,7 +130,7 @@ export const getTodayTimeline = authedQuery({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+    const allowedProjectIds = await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     const today = trTodayKey();
     const { startISO, endISO } = trDayRangeISO(today, today);
     const counter = createHourlyCounter();
@@ -178,7 +179,7 @@ async function loadPdksDataset(
   workSettings: EffectiveWorkSettings;
   ruleRows: Map<Id<"employees">, PdksTableRow>;
 }> {
-  const allowedProjectIds = await resolveProjectScope(ctx, filters.projectId);
+  const allowedProjectIds = await resolveReadingScope(ctx, filters.projectId, REPORT_READING_PERMISSIONS);
   let employees: Doc<"employees">[] = [];
   let readings: Doc<"cardReadings">[] = [];
 
@@ -621,7 +622,7 @@ export const getRecentReadings = authedQuery({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+    const allowedProjectIds = await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     const limit = args.limit ?? 10;
 
     let readings;

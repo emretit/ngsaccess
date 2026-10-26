@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "convex/react";
@@ -123,8 +124,10 @@ function ProjectReadings({ projectId }: { projectId: Id<"projects"> }) {
   </div>;
 }
 export default function CardReadings() {
+  const { can } = usePermissions();
   const { projectId, loading } = useActiveProjectScope();
   if (loading) return <SectionSkeleton rows={6} label="Proje yükleniyor" />;
   if (!projectId) return <EmptyState title="Proje seçin" description="Okumaları görmek için üst çubuktan bir proje seçin." />;
+  if (!can("reports.view") && !can("devices.manage")) return null;
   return <ProjectReadings key={projectId} projectId={projectId} />;
 }

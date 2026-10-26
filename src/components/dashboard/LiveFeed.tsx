@@ -26,6 +26,7 @@ export default function LiveFeed() {
   const latestTime = Math.max(...readings.map(reading => Date.parse(reading.accessTime)).filter(Number.isFinite));
   const hasLatest = Number.isFinite(latestTime);
   const live = !loading && hasLatest && now - latestTime <= 60 * 60_000;
+  if (!can("reports.view") && !can("devices.manage")) return null;
   return (
     <DashboardPanel
       title="Son okumalar"

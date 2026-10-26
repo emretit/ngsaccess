@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { todayInTurkey } from "@/lib/date";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -9,11 +10,13 @@ export function PDKSOvertimeAlert({
 }: {
   year?: number;
 }) {
+  const { can } = usePermissions();
   const { projectId, activeProject } = useActiveProject();
   const balance = useQuery(
     api.dashboard.getAnnualOvertimeBalance,
-    projectId ? { projectId, year } : "skip",
+    projectId && can("reports.view") ? { projectId, year } : "skip",
   );
+  if (!can("reports.view")) return null;
   if (!projectId) return <p className="text-sm">Bir proje seçin.</p>;
   if (balance === undefined)
     return (

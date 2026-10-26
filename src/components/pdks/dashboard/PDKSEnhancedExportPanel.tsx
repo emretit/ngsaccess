@@ -106,7 +106,7 @@ function ExportPanel({
     setType(next);
   };
   const execute = async () => {
-    if (lock.current || !type || reviewBlocked) return;
+    if (lock.current || !type || reviewBlocked || !projectId) return;
     lock.current = true;
     setPending(true);
     setError("");

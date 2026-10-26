@@ -13,7 +13,7 @@ import { PDKSEmployeeDetailDrawer } from "./PDKSEmployeeDetailDrawer";
 const state = vi.hoisted(() => ({ detail: {} as unknown }));
 vi.mock("convex/react", () => ({ useQuery: () => state.detail }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "p" }) }));
-vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => false }) }));
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => permission === "reports.view" }) }));
 vi.mock("./PDKSAuditTimeline", () => ({ PDKSAuditTimeline: () => null }));
 vi.mock("../ManualPdksEditDialog", () => ({ ManualPdksEditDialog: () => null }));
 vi.mock("@/components/ui/sheet", () => {

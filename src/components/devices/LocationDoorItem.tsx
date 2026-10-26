@@ -30,7 +30,7 @@ const formatTime = (iso: string) =>
 /** Okuyucunun durum ve Hik teknik ayrıntıları; menü başlığında ve ipucunda gösterilir. */
 function readerDetails(reader: ReaderRow): string[] {
   return [
-    `${reader.online ? "Çevrimiçi" : "Çevrimdışı"} · ${reader.lastReadAt ? `son okuma ${formatTime(reader.lastReadAt)}` : "henüz okuma yok"}`,
+    `${reader.online ? "Çevrimiçi" : "Çevrimdışı"}${reader.lastReadAt ? ` · son okuma ${formatTime(reader.lastReadAt)}` : ""}`,
     reader.hikReaderNo !== null ? `Hik okuyucu #${reader.hikReaderNo}` : null,
     reader.hikCardReaderPlanTemplateNo !== null ? `Plan ${reader.hikCardReaderPlanTemplateNo}` : null,
     reader.hikCardReaderAntiSneakEnabled !== null ? `APB ${reader.hikCardReaderAntiSneakEnabled ? "açık" : "kapalı"}` : null,

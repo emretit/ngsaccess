@@ -26,3 +26,5 @@ describe("PDKS tarih ve kişi bağlantısı", () => {
     expect(html).toContain("Kasım 2026");
   });
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));

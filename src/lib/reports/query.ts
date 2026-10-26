@@ -1,3 +1,5 @@
+import type { FunctionArgs } from 'convex/server';
+import type { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import type { ReportDefinition } from './registry';
 
@@ -6,11 +8,11 @@ export interface ReportQueryFilters {
   employeeId?: Id<'employees'>; departmentId?: Id<'departments'>; result?: 'granted' | 'denied' | 'unknown';
   year: number; month: number;
 }
-export function dailyReportArgs(filters: ReportQueryFilters, definition?: ReportDefinition) {
+export function dailyReportArgs(filters: ReportQueryFilters, definition?: ReportDefinition): FunctionArgs<typeof api.cardReadings.getPdksTableData> {
   return { projectId: filters.projectId, startDate: filters.from, endDate: filters.to, viewMode: 'matrix' as const, departmentId: filters.departmentId, person: filters.person || undefined,
     ...(definition?.includePunches ? { includePunches: true } : {}) };
 }
-export function monthlyReportArgs(filters: ReportQueryFilters) {
+export function monthlyReportArgs(filters: ReportQueryFilters): FunctionArgs<typeof api.cardReadings.getMonthlyPayrollSheet> {
   return { projectId: filters.projectId, year: filters.year, month: filters.month };
 }
 export function transactionReportArgs(filters: ReportQueryFilters, definition?: ReportDefinition) {

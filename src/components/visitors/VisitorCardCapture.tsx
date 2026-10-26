@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { canCaptureVisitorCard, visitorReaderLabel } from "./lib/readerCapability";
 import { createCardCaptureSession } from "./cardCaptureSession";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
@@ -29,6 +30,8 @@ interface VisitorCardCaptureProps {
 // Kayıt okuyucusu seçilir; ziyaretçi kartı bastırılınca okunan numara Convex reaktif
 // query ile anında yakalanıp forma düşürülür (getLastUnknownByDevice → bilinmeyen kart).
 export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCardCaptureProps) {
+  const { can } = usePermissions();
+  const canCapture = can("employees.manage") || can("visitors.manage") || can("devices.manage") || can("reports.view");
   const { devices: projectDevices } = useDevices();
   const devices = projectDevices.filter(canCaptureVisitorCard);
   const { projectId } = useActiveProjectScope();
@@ -60,7 +63,7 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
   const validReaderId = devices.some(device => device._id === readerId) ? readerId : null;
   const reading = useQuery(
     api.cardReadings.getLastUnknownByDevice,
-    projectId && validReaderId && sinceTime && !captured ? { projectId, deviceId: validReaderId, sinceTime } : "skip",
+    canCapture && projectId && validReaderId && sinceTime && !captured ? { projectId, deviceId: validReaderId, sinceTime } : "skip",
   );
 
   useEffect(() => {

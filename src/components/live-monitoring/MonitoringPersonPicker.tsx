@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -15,7 +16,8 @@ export function MonitoringPersonPicker({ projectId, value, onChange, disabled, a
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const term = useDebouncedValue(search);
-  const people = useQuery(api.cardReadings.searchMonitoringPeople, { projectId, search: term, selectedId: value || undefined });
+  const { can } = usePermissions();
+  const people = useQuery(api.cardReadings.searchMonitoringPeople, can("reports.view") || can("devices.manage") ? { projectId, search: term, selectedId: value || undefined } : "skip");
   const selected = people?.find(person => person._id === value);
   useEffect(() => {
     if (allowClear && value && people !== undefined && !selected) onChange(null);

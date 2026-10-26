@@ -4,7 +4,7 @@ import type { QueryCtx } from "../_generated/server";
 import { loadPdksPolicies } from "./pdksRules";
 import { employedDuring, employedOn } from "./employment";
 import { canSeePayInProject } from "./payVisibility";
-import { resolveProjectScope } from "./projectScope";
+import { resolveReadingScope, REPORT_READING_PERMISSIONS } from "./readingAccess";
 import { getEffectiveWorkSettings, getEffectiveOvertimeRates, getHolidaysMap, resolveHourlyRate } from "./pdksHelpers";
 import { buildShiftResolver } from "./shiftResolver";
 import { overtimePeriodRange, calculatePeriodOvertime } from "./overtimeCalc";
@@ -17,7 +17,7 @@ import { buildPdksEmployeeReadingMap } from "./pdksTable";
 import { computePayrollCell } from "./pdksPayroll";
 
 export type PdksPayrollQueryArgs = {
-  projectId?: Id<"projects">;
+  projectId: Id<"projects">;
   year: number;
   month: number;
 };
@@ -32,7 +32,7 @@ export async function getMonthlyPayrollSheet(
   },
 ) {
   const { scopedPdksShift, flexiblePreviousReadings } = helpers;
-  const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+  const allowedProjectIds = await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
 
   if (!Number.isInteger(args.year) || args.year < 1000 || args.year > 9999 || !Number.isInteger(args.month) || args.month < 1 || args.month > 12) {
     throw new Error("Geçerli bir yıl ve ay seçin");
@@ -41,27 +41,14 @@ export async function getMonthlyPayrollSheet(
   const lastDay = new Date(Date.UTC(args.year, args.month, 0)).getUTCDate();
   const startDate = `${args.year}-${monthStr}-01`;
   const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
-  const referenceProjectId = args.projectId ?? (
-    ctx.user.role === "super_admin" && !args.projectId
-      ? undefined
-      : allowedProjectIds[0] ?? undefined);
+  const referenceProjectId = args.projectId;
   const overtimeRates = await getEffectiveOvertimeRates(ctx, referenceProjectId);
   const overtimeRange = overtimePeriodRange(startDate, endDate, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
   const { startISO, endISO } = pdksWorkDayRange(overtimeRange.startDate, overtimeRange.endDate);
 
   let readings;
   let employees: Doc<"employees">[];
-  if (ctx.user.role === "super_admin" && !args.projectId) {
-    [readings, employees] = await Promise.all([
-      ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time", q => q.gte("accessTime", startISO).lte("accessTime", endISO))
-        .collect(),
-      ctx.db
-        .query("employees")
-        .collect(),
-    ]);
-  } else if (allowedProjectIds.length > 0) {
+  if (allowedProjectIds.length > 0) {
     const [readingResults, empResults] = await Promise.all([
       Promise.all(
         allowedProjectIds.map((pid) =>
@@ -89,7 +76,7 @@ export async function getMonthlyPayrollSheet(
   employees = employees.filter(employee => employedDuring(employee, startDate, endDate));
   const payrollBoundaryShiftResolver = await buildShiftResolver(ctx, employees);
   const payrollHasFlexible = [...payrollBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") && hasFlexiblePdksShift(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
-  if (payrollHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, ctx.user.role === "super_admin" && !args.projectId ? undefined : allowedProjectIds), ...readings];
+  if (payrollHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, allowedProjectIds), ...readings];
   const earlyPayrollRecords = payrollHasFlexible ? await ctx.db.query("pdksRecords")
     .withIndex("by_date", q => q.gte("date", addWorkDate(overtimeRange.startDate, -1)).lte("date", addWorkDate(overtimeRange.endDate, 1))).take(10001) : undefined;
   if (earlyPayrollRecords && earlyPayrollRecords.length > 10000) throw new Error("Manuel kayıt sınırı aşıldı; proje veya tarih aralığını daraltın");

@@ -30,3 +30,5 @@ it("shows an informational message when every selected person already has a card
   const html = renderToStaticMarkup(<BatchCardAssignDialog open onOpenChange={() => {}} projectId={"projects:1" as Id<"projects">} employees={[person("employees:1", "existing")]} />);
   expect(html).toContain("Seçili kişilerin hepsinde kart var.");
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));

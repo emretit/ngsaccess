@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useRef, Suspense } from "react";
 import { Navigate, Link, useLocation, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -8,7 +9,7 @@ import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { SyncIssuesBanner } from "@/components/sync/SyncIssuesBanner";
 
-import { routeMeta } from "@/lib/routeMeta";
+import { readingRouteAccess, routeMeta } from "@/lib/routeMeta";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -18,6 +19,7 @@ import { useDarkMode } from "@/hooks/useDarkMode";
 export default function Layout() {
   const { loading, session, profile } = useAuth();
   const location = useLocation();
+  const { can, loading: permissionsLoading } = usePermissions();
   const { activeProjectId } = useActiveProject();
   useDarkMode();
 
@@ -35,6 +37,10 @@ export default function Layout() {
     const next = location.pathname + location.search + location.hash;
     return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
   }
+
+  const readingAccess = readingRouteAccess(location.pathname, location.search, can);
+  if (readingAccess !== null && permissionsLoading) return <SectionSkeleton label="Yetkiler yükleniyor" />;
+  if (readingAccess === false) return <Navigate to="/home" replace />;
 
   return (
     <SidebarProvider>

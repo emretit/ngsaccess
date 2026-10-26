@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { notify } from "@/lib/notify";
 import { readableDate } from "../lib/presentation";
@@ -28,12 +29,13 @@ export function PDKSSmartPresets({
   selection,
   onChange,
 }: PDKSSmartPresetsProps) {
+  const { can } = usePermissions();
   const convex = useConvex();
   const { projectId, activeProject } = useActiveProject();
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
 
   const runPreset = async (key: SmartPresetSelection["key"], label: string) => {
-    if (loadingKey || !projectId) return;
+    if (loadingKey || !projectId || !can("reports.view")) return;
     setLoadingKey(key);
     try {
       let employeeIds: Id<"employees">[] = [];
@@ -98,6 +100,7 @@ export function PDKSSmartPresets({
     },
   ];
 
+  if (!can("reports.view")) return null;
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">

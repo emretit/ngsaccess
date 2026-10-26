@@ -91,10 +91,11 @@ describe("PDKS source filtering at loader/handler boundaries", () => {
     expect(raw).toHaveLength(3);
   });
   it.each([
-    ["table", getPdksTableData, { startDate: "2026-06-22", endDate: "2026-06-22", viewMode: "matrix" }],
-    ["payroll", getMonthlyPayrollSheet, { year: 2026, month: 6 }],
+    ["table", getPdksTableData, { projectId, startDate: "2026-06-22", endDate: "2026-06-22", viewMode: "matrix" }],
+    ["payroll", getMonthlyPayrollSheet, { projectId, year: 2026, month: 6 }],
     ["detail", getEmployeeAttendanceDetail, { employeeId, startDate: "2026-06-22", endDate: "2026-06-22" }],
   ])("%s: biyometri kart gibi devam/süre/mesai/hareket üretir; tek süzme korunur", async (_name, fn, args) => {
+    vi.spyOn(projectScope, "resolveProjectScope").mockResolvedValue([projectId]);
     const empty = await invoke(fn, readingContext([]), args);
     const spy = vi.spyOn(pdksSource, "filterPdksReadings");
     const biometricOnly = await invoke(fn, readingContext(reportReadings), args);

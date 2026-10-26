@@ -103,3 +103,14 @@ describe("visitor audit fixes", () => {
     expect(html).not.toContain("Kaydedilmedi");
   });
 });
+
+it("hides redacted visitor reading fields without breaking the detail or list", () => {
+  const redacted = { ...detail, presence: null, lastSeenAt: null, lastDirection: null, recentReadings: [] };
+  const html = renderToStaticMarkup(<VisitorDetailView detail={redacted} now={Date.now()} canManage={false} onEdit={noop} onDeleted={noop} />);
+  expect(html).not.toContain("Son okumalar");
+  expect(html).not.toContain("Son okumaya göre konum");
+  expect(html).toContain("KVKK rıza kaydı");
+  const list = renderToStaticMarkup(<VisitorTable visitors={[redacted]} onOpen={noop} />);
+  expect(list).toContain(redacted.firstName);
+  expect(list).toContain("—");
+});

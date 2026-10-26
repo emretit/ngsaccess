@@ -41,7 +41,7 @@ function fixture() {
     return chain;
   };
   const db = { query, get: async (id: string) => Object.values(tables).flat().find(row => row._id === id) ?? null };
-  return { ctx: { db } as unknown as QueryCtx, rows, employee, department };
+  return { ctx: { db, user: { _id: "user", role: "super_admin" } } as unknown as QueryCtx, rows, employee, department };
 }
 type ReportArgs = FunctionArgs<typeof api.cardReadings.listReportTransactions>;
 function invoke(ctx: QueryCtx, args: ReportArgs) {

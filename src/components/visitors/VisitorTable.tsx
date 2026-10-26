@@ -15,7 +15,7 @@ export default function VisitorTable({ visitors, onOpen }: { visitors: Visitor[]
     <div className="min-w-0 rounded-md border min-[761px]:hidden"><ul className="divide-y">
       {visitors.map(visitor => <li key={visitor._id} onClick={onRowActivate(() => onOpen(visitor))} className={`${ROW_CLICK_CLASS} grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_36px] items-center gap-2 px-3 py-3`}>
         <div className="min-w-0">{name(visitor)}<p className="mt-1 break-words text-xs tabular-nums text-muted-foreground">{formatVisitorTime(visitor.visitEnd)}</p></div>
-        <div className="min-w-0 [&_span]:whitespace-normal">{badge(visitor)}<p className="mt-1 text-xs text-muted-foreground">{visitorPresenceLabels[visitor.presence]}</p></div>
+        <div className="min-w-0 [&_span]:whitespace-normal">{badge(visitor)}<p className="mt-1 text-xs text-muted-foreground">{visitor.presence ? visitorPresenceLabels[visitor.presence] : "—"}</p></div>
         {menu(visitor)}
       </li>)}
     </ul></div>
@@ -25,7 +25,7 @@ export default function VisitorTable({ visitors, onOpen }: { visitors: Visitor[]
       </TableRow></TableHeader><TableBody>{visitors.map(visitor => <TableRow key={visitor._id} className={ROW_CLICK_CLASS} onClick={onRowActivate(() => onOpen(visitor))}>
         <TableCell className="break-words">{name(visitor)}</TableCell><TableCell className="truncate" title={visitor.hostName ?? undefined}>{visitor.hostName ?? "—"}</TableCell>
         <TableCell className="truncate" title={visitor.presetRuleName ?? undefined}>{visitor.presetRuleName ?? "—"}</TableCell><TableCell className="tabular-nums whitespace-normal">{formatVisitorTime(visitor.visitEnd)}</TableCell>
-        <TableCell className="[&_span]:whitespace-normal">{badge(visitor)}</TableCell><TableCell>{visitorPresenceLabels[visitor.presence]}</TableCell><TableCell>{menu(visitor)}</TableCell>
+        <TableCell className="[&_span]:whitespace-normal">{badge(visitor)}</TableCell><TableCell>{visitor.presence ? visitorPresenceLabels[visitor.presence] : "—"}</TableCell><TableCell>{menu(visitor)}</TableCell>
       </TableRow>)}</TableBody></Table>
     </div>
   </>;

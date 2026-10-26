@@ -1,3 +1,4 @@
+import { hasReadingPermission, resolveReadingScope, REPORT_READING_PERMISSIONS, MONITORING_READING_PERMISSIONS, CARD_CAPTURE_PERMISSIONS } from "./lib/readingAccess";
 import { scopedPdksPlan } from "./lib/pdksMultiShift";
 import { usesShiftDayRules } from "./lib/pdksFixedRules";
 import { requirePermission } from "./lib/permissions";
@@ -71,7 +72,7 @@ export const getLastUnknownByDevice = authedQuery({
   },
   returns: v.union(v.object({ cardNo: v.string(), accessTime: v.string() }), v.null()),
   handler: async (ctx, args) => {
-    const allowed = await resolveProjectScope(ctx, args.projectId);
+    const allowed = await resolveReadingScope(ctx, args.projectId, CARD_CAPTURE_PERMISSIONS);
     const device = await ctx.db.get(args.deviceId);
     if (!device?.projectId || !allowed.includes(device.projectId)) return null;
     const reading = await ctx.db.query("cardReadings")
@@ -93,7 +94,7 @@ export const list = authedQuery({
     accessFilter: v.optional(v.union(v.literal("all"), v.literal("granted"), v.literal("denied"))),
   },
   handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
+    await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     const result = await scopedCardReadingQuery(ctx, args).order("desc").paginate(args.paginationOpts);
     return { ...result, page: await enrichReadingsForList(ctx, result.page) };
   },
@@ -105,7 +106,7 @@ const monitoringSource = v.union(v.literal("card"), v.literal("qr"), v.literal("
 export const searchMonitoringPeople = authedQuery({
   args: { projectId: v.id("projects"), search: v.string(), selectedId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
+    await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     const term = args.search.trim().slice(0, 100);
     const people = term
       ? (await Promise.all([
@@ -127,7 +128,7 @@ export const searchMonitoringPeople = authedQuery({
 export const lastMonitoringReading = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
+    await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     const row = await ctx.db.query("cardReadings").withIndex("by_project", q => q.eq("projectId", args.projectId)).order("desc").first();
     return row ? { accessTime: row.accessTime } : null;
   },
@@ -149,7 +150,7 @@ export const listFiltered = authedQuery({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
+    await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     const bounds = cardReadingDateBounds(args.startDate, args.endDate);
     const search = readingSearchTerm(args.search);
     const door = args.doorId ? await ctx.db.get(args.doorId) : null;
@@ -255,7 +256,7 @@ export const listLiveSince = authedQuery({
     limit: v.number(),
   },
   handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
+    await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     if (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > 500) {
       throw new ConvexError("Canlı kayıt sınırı 1–500 arasında tam sayı olmalı");
     }
@@ -299,7 +300,8 @@ export const getReading = authedQuery({
     const reading = await ctx.db.get(id);
     if (!reading?.projectId) return null;
     const allowed = await resolveProjectScope(ctx);
-    if (!allowed.includes(reading.projectId)) return null;
+    if (!allowed.includes(reading.projectId)
+      || !(await hasReadingPermission(ctx, reading.projectId, MONITORING_READING_PERMISSIONS))) return null;
     const [enriched] = await enrichReadingsForList(ctx, [reading]);
     return enriched ?? null;
   },
@@ -395,7 +397,7 @@ async function flexiblePreviousReadings(
 
 export const getPdksTableData = authedQuery({
   args: {
-    projectId: v.optional(v.id("projects")),
+    projectId: v.id("projects"),
     date: v.optional(v.string()),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
@@ -436,7 +438,7 @@ export const getPdksTableData = authedQuery({
  */
 export const getMonthlyPayrollSheet = authedQuery({
   args: {
-    projectId: v.optional(v.id("projects")),
+    projectId: v.id("projects"),
     year: v.number(),
     month: v.number(), // 1-12
   },
@@ -545,18 +547,13 @@ export const getEmployeeAttendanceDetail = authedQuery({
     endDate: v.string(),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+    if (args.projectId) await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
 
     const employee = await ctx.db.get(args.employeeId);
     if (!employee || (args.projectId && employee.projectId !== args.projectId)) return null;
 
-    // Projesiz (orphan) çalışan yalnız super_admin'e açıktır.
-    if (
-      ctx.user.role !== "super_admin" &&
-      (!employee.projectId || !allowedProjectIds.includes(employee.projectId))
-    ) {
-      return null;
-    }
+    if (!employee.projectId && ctx.user.role !== "super_admin") return null;
+    if (employee.projectId) await resolveReadingScope(ctx, employee.projectId, REPORT_READING_PERMISSIONS);
 
     const referenceProjectId = args.projectId ?? (
       ctx.user.role === "super_admin" && !args.projectId ? undefined : employee.projectId);
@@ -580,7 +577,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const detailBoundaryShiftResolver = await buildShiftResolver(ctx, availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate)));
     const detailHasFlexible = [...detailBoundaryShiftResolver.shifts.values()].some(usesShiftDayRules) && hasPdksShiftDayRules([employee], (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
-    if (detailHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, allowedProjectIds, employee), ...readings];
+    if (detailHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, employee.projectId ? [employee.projectId] : undefined, employee), ...readings];
     const sourceReadings = readings;
     const earlyDetailRecords = detailHasFlexible ? await ctx.db.query("pdksRecords")
       .withIndex("by_employee_date", q => q.eq("employeeId", args.employeeId).gte("date", addWorkDate(overtimeRange.startDate, -1)).lte("date", addWorkDate(overtimeRange.endDate, 1))).take(1001) : undefined;
@@ -863,7 +860,7 @@ export const listReportTransactions = authedQuery({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
+    await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
     const bounds = cardReadingDateBounds(args.startDate, args.endDate);
     if (args.departmentId) {
       const department = await ctx.db.get(args.departmentId);

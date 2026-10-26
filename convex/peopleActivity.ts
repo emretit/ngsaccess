@@ -1,3 +1,4 @@
+import { resolveReadingScope, MONITORING_READING_PERMISSIONS } from "./lib/readingAccess";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
@@ -94,6 +95,7 @@ export const employeeRecentReadings = authedQuery({
   handler: async (ctx, { employeeId, limit: requestedLimit }) => {
     const scope = await scopedEmployee(ctx, employeeId);
     if (!scope) return null;
+    await resolveReadingScope(ctx, scope.projectId, MONITORING_READING_PERMISSIONS);
     const limit = normalizeRecentReadingsLimit(requestedLimit);
     // Eski durum-alanı boş okumaları da erişim geçmişinde tut; biyometri süzmesi yok.
     const statuses: Doc<"cardReadings">["accessStatus"][] = ["izin_verildi", "reddedildi", undefined];

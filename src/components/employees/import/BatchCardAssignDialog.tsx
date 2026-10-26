@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -22,6 +23,8 @@ function cardlessRows(employees: Employee[]): CardAssignmentRow[] {
 export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees }: Props) {
   const assignCards = useMutation(api.employeeImport.assignCards);
   const startProjectResync = useAction(api.deviceSyncRuns.startProjectResync);
+  const { can } = usePermissions();
+  const canCapture = can("employees.manage") || can("visitors.manage") || can("devices.manage") || can("reports.view");
   const { devices } = useDevices();
   const readers = devices.filter(canCaptureVisitorCard);
   const [rows, setRows] = useState<CardAssignmentRow[]>(() => cardlessRows(employees));
@@ -32,7 +35,7 @@ export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees
   const [message, setMessage] = useState<string | null>(null);
   const lastReading = useRef<string | null>(null);
   const reading = useQuery(api.cardReadings.getLastUnknownByDevice,
-    open && readerId && sinceTime ? { projectId, deviceId: readerId, sinceTime } : "skip");
+    canCapture && open && readerId && sinceTime ? { projectId, deviceId: readerId, sinceTime } : "skip");
 
   useEffect(() => {
     if (!open) return;

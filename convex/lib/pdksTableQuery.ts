@@ -4,7 +4,7 @@ import type { QueryCtx } from "../_generated/server";
 import { loadPdksPolicies } from "./pdksRules";
 import { employedDuring, employedOn } from "./employment";
 import { canSeePayInProject } from "./payVisibility";
-import { resolveProjectScope } from "./projectScope";
+import { resolveReadingScope, REPORT_READING_PERMISSIONS } from "./readingAccess";
 import { getEffectiveWorkSettings, getEffectiveOvertimeRates, getHolidaysMap } from "./pdksHelpers";
 import { buildShiftResolver } from "./shiftResolver";
 import { overtimePeriodRange } from "./overtimeCalc";
@@ -16,7 +16,7 @@ import { countExcludedUnknownPdksReadings, filterPdksReadings } from "./pdksSour
 import { buildPdksEmployeeReadingMap, computePdksTableRow, filterPdksTableRows, type PdksTableStatusFilter } from "./pdksTable";
 
 export type PdksTableQueryArgs = {
-  projectId?: Id<"projects">;
+  projectId: Id<"projects">;
   date?: string;
   startDate?: string;
   endDate?: string;
@@ -41,15 +41,12 @@ export async function getPdksTableData(
   },
 ) {
   const { scopedPdksShift, flexiblePreviousReadings } = helpers;
-  const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+  const allowedProjectIds = await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
 
   const today = args.date ?? trTodayKey();
   const startDate = args.startDate ?? today;
   const endDate = args.endDate ?? today;
-  const referenceProjectId = args.projectId ?? (
-    ctx.user.role === "super_admin" && !args.projectId
-      ? undefined
-      : allowedProjectIds[0] ?? undefined);
+  const referenceProjectId = args.projectId;
   const overtimeRates = await getEffectiveOvertimeRates(ctx, referenceProjectId);
   const overtimeRange = overtimePeriodRange(startDate, endDate, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
   const { startISO, endISO } = pdksWorkDayRange(overtimeRange.startDate, overtimeRange.endDate);
@@ -58,19 +55,7 @@ export async function getPdksTableData(
 
   let readings;
   let employees: Doc<"employees">[];
-  if (ctx.user.role === "super_admin" && !args.projectId) {
-    [readings, employees] = await Promise.all([
-      ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time", (q) =>
-          q.gte("accessTime", startISO).lte("accessTime", endISO)
-        )
-        .collect(),
-      ctx.db
-        .query("employees")
-        .collect(),
-    ]);
-  } else if (allowedProjectIds.length > 0) {
+  if (allowedProjectIds.length > 0) {
     const [readingResults, empResults] = await Promise.all([
       Promise.all(
         allowedProjectIds.map((pid) =>
@@ -128,7 +113,7 @@ export async function getPdksTableData(
     }));
   }
   const tableHasFlexible = [...tableBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") && hasFlexiblePdksShift(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
-  if (tableHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, ctx.user.role === "super_admin" && !args.projectId ? undefined : allowedProjectIds), ...readings];
+  if (tableHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, allowedProjectIds), ...readings];
   const sourceReadings = readings;
   const earlyTableRecords = tableHasFlexible ? await Promise.all(availabilityEmployees.map(emp => ctx.db.query("pdksRecords")
     .withIndex("by_employee_date", q => q.eq("employeeId", emp._id).gte("date", addWorkDate(overtimeRange.startDate, -1)).lte("date", addWorkDate(overtimeRange.endDate, 1))).take(1001))) : undefined;
@@ -148,7 +133,7 @@ export async function getPdksTableData(
   }
   const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
 
-  // Settings & holidays per project (super_admin için global = undefined)
+  // Ayarlar ve tatiller seçili projeden (projectId zorunlu; global geri dönüş yok)
   const [workSettings, holidayMap, generalSettings, shiftResolver] =
     await Promise.all([
       getEffectiveWorkSettings(ctx, referenceProjectId),

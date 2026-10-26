@@ -101,14 +101,15 @@ function Detail({
   const { projectId } = useActiveProject();
   const { can } = usePermissions();
   const canManage = can("attendance.approve");
-  const detail = useQuery(api.cardReadings.getEmployeeAttendanceDetail, {
+  const detail = useQuery(api.cardReadings.getEmployeeAttendanceDetail, can("reports.view") && projectId ? {
     projectId,
     employeeId,
     startDate: highlightDate ?? startDate,
     endDate: highlightDate ?? endDate,
-  });
+  } : "skip");
   const [manualTrigger, setManualTrigger] = useState<HTMLElement | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  if (!can("reports.view")) return null;
   if (detail === undefined)
     return <SectionSkeleton rows={6} label="Gün detayı yükleniyor." />;
   if (detail === null)

@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -23,8 +24,10 @@ function LegendItem({ color, label, value }: { color: string; label: string; val
 
 /** Bugünkü kart okumalarının saatlik dağılımı; altında ortalama ilk giriş / son çıkış. */
 export default function ReadingsTimeline() {
+  const { can } = usePermissions();
   const { timeline, loading } = useDashboardTimeline();
   const { summary, loading: summaryLoading } = useDashboardActivity();
+  if (!can("reports.view") && !can("devices.manage")) return null;
   return (
     <DashboardPanel
       title="Kart okumaları"
@@ -62,7 +65,7 @@ export default function ReadingsTimeline() {
           </ChartContainer>
         )}
       </div>
-      <dl className="mt-3 grid grid-cols-2 border-t text-xs">
+      {can("reports.view") && <dl className="mt-3 grid grid-cols-2 border-t text-xs">
         <div className="border-r px-4 py-2.5 min-[761px]:px-5">
           <dt className="text-muted-foreground">Ortalama ilk giriş</dt>
           <dd className="mt-0.5 font-[550] tabular-nums">{summaryLoading ? "—" : summary?.averageFirstEntry ?? "Henüz giriş yok"}</dd>
@@ -71,7 +74,7 @@ export default function ReadingsTimeline() {
           <dt className="text-muted-foreground">Ortalama son çıkış</dt>
           <dd className="mt-0.5 font-[550] tabular-nums">{summaryLoading ? "—" : summary?.averageLastExit ?? "Henüz çıkış yok"}</dd>
         </div>
-      </dl>
+      </dl>}
     </DashboardPanel>
   );
 }

@@ -12,10 +12,12 @@ import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { AssignReadingCardForm } from "./AssignReadingCardForm";
 import { personLabel, sourceLabel, resultLabel, trTime, physicalCard } from "./lib/readings";
 export function Detail({ id, onDirty, onPending, onClose }: { onClose: () => void; id: Id<"cardReadings">; onDirty: (v: boolean) => void; onPending: (v: boolean) => void }) {
-  const reading = useQuery(api.cardReadings.getReading, { readingId: id });
-  const { projectId } = useActiveProjectScope();
   const { can } = usePermissions();
+  const canRead = can("reports.view") || can("devices.manage");
+  const reading = useQuery(api.cardReadings.getReading, canRead ? { readingId: id } : "skip");
+  const { projectId } = useActiveProjectScope();
   const canManage = can("employees.manage");
+  if (!canRead) return null;
   if (reading === undefined) return <SectionSkeleton rows={6} label="Okuma ayrıntısı yükleniyor" />;
   if (!reading || reading.projectId !== projectId) return <EmptyState title="Bu okuma artık görüntülenemiyor" description="Kayıt kaldırılmış olabilir veya bu projede erişiminiz olmayabilir." action={{ label: "Listeye dön", onClick: onClose }} />;
   const fields = [["Zaman (TR)", trTime(reading.accessTime)], ["Kişi", personLabel(reading)], ...(reading.source === "biometric" ? [] : [["Kart numarası", reading.cardNo]]), ["Kapı", reading.door?.name || "Kapı eşleşmedi"], ["Okuyucu", reading.door?.readerName || (reading.ideIoId !== undefined ? `IO ${reading.ideIoId}` : "Okuyucu bilinmiyor")], ["Cihaz", reading.devices?.name || "Cihaz bilinmiyor"], ["Yön", reading.direction === "entry" ? "Giriş" : reading.direction === "exit" ? "Çıkış" : "Bilinmiyor"], ["Departman", reading.employees?.departments?.name || "—"], ["Sonuç", resultLabel(reading)], ["Kaynak", sourceLabel(reading.source)]];

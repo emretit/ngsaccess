@@ -1,3 +1,4 @@
+import { hasReadingPermission, VISITOR_READING_PERMISSIONS } from "./lib/readingAccess";
 import { hasPermission, requirePermission } from "./lib/permissions";
 import { validateVisitorPresetCard } from "./lib/mobileVisitors";
 import { visitorQueryNow } from "./lib/visitorStatus";
@@ -164,11 +165,11 @@ async function latestVisitorPresence(ctx: QueryCtx, visitor: Doc<"employees">) {
   return visitorPresence(simultaneous.length > 50 ? [] : simultaneous.filter(row => row.projectId === visitor.projectId));
 }
 
-async function visitorListRow(ctx: QueryCtx, visitor: Doc<"employees">, now: number) {
+async function visitorListRow(ctx: QueryCtx, visitor: Doc<"employees">, now: number, canRead: boolean) {
   const [host, rule, presence, consent] = await Promise.all([
     visitor.hostEmployeeId ? ctx.db.get(visitor.hostEmployeeId) : null,
     visitor.accessRuleId ? ctx.db.get(visitor.accessRuleId) : null,
-    latestVisitorPresence(ctx, visitor),
+    canRead ? latestVisitorPresence(ctx, visitor) : null,
     activeKvkkConsentId(ctx, visitor._id),
   ]);
   return {
@@ -182,9 +183,9 @@ async function visitorListRow(ctx: QueryCtx, visitor: Doc<"employees">, now: num
     visitStart: visitorTimeISO(visitor.accessStartsAt),
     visitEnd: visitorTimeISO(visitor.accessExpiresAt),
     status: visitorStatus(visitor, now),
-    lastSeenAt: presence.lastReadingAt,
-    lastDirection: presence.lastDirection,
-    presence: presence.presence,
+    lastSeenAt: presence?.lastReadingAt ?? null,
+    lastDirection: presence?.lastDirection ?? null,
+    presence: presence?.presence ?? null,
     hasKvkkConsent: consent !== null,
   };
 }
@@ -203,6 +204,7 @@ export const listPage = authedQuery({
     if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 100) {
       throw new Error("Sayfa boyutu 1–100 arasında olmalıdır");
     }
+    const canRead = await hasReadingPermission(ctx, args.projectId, VISITOR_READING_PERMISSIONS);
     const now = visitorQueryNow(args.now);
     // The generous window includes legacy TR wall-clock and offset ISO values;
     // exact instant comparison below removes the overlap before pagination.
@@ -227,7 +229,7 @@ export const listPage = authedQuery({
       .paginate(args.paginationOpts);
     return {
       ...result,
-      page: await Promise.all(result.page.map(visitor => visitorListRow(ctx, visitor, now))),
+      page: await Promise.all(result.page.map(visitor => visitorListRow(ctx, visitor, now, canRead))),
       searchScope: "project" as const,
       statusScope: "project" as const,
       evaluatedAt: new Date(now).toISOString(),
@@ -264,12 +266,13 @@ export const getDetail = authedQuery({
     if (!visitor || visitor.isVisitor !== true) return null;
     const allowed = await resolveProjectScope(ctx, visitor.projectId);
     if (!visitor.projectId || !allowed.includes(visitor.projectId)) throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
+    const canRead = await hasReadingPermission(ctx, visitor.projectId, VISITOR_READING_PERMISSIONS);
     const [row, consent, accepted, denied, unknown] = await Promise.all([
-      visitorListRow(ctx, visitor, Date.now()),
+      visitorListRow(ctx, visitor, Date.now(), canRead),
       activeKvkkConsentId(ctx, visitor._id),
-      ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "izin_verildi")).order("desc").take(10),
-      ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "reddedildi")).order("desc").take(10),
-      ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", undefined)).order("desc").take(10),
+      canRead ? ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "izin_verildi")).order("desc").take(10) : [],
+      canRead ? ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "reddedildi")).order("desc").take(10) : [],
+      canRead ? ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", undefined)).order("desc").take(10) : [],
     ]);
     return {
       ...row,

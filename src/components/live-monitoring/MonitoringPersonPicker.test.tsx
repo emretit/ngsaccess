@@ -31,3 +31,5 @@ it("retains an available selected person and never clears an assignment picker i
   renderToStaticMarkup(<MonitoringPersonPicker projectId={"p" as Id<"projects">} value="missing" onChange={change} />);
   mocks.effects.forEach(effect => effect()); expect(change).not.toHaveBeenCalled();
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));

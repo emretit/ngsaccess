@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { Link } from "react-router-dom";
 import { formatTrDateTime } from "@/lib/date";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
@@ -17,10 +18,13 @@ export function EmployeeRecentReadings({
   employeeId: Id<"employees">;
 }) {
   const { projectId } = useActiveProjectScope();
-  const result = useQuery(api.peopleActivity.employeeRecentReadings, {
+  const { can } = usePermissions();
+  const canRead = can("reports.view") || can("devices.manage");
+  const result = useQuery(api.peopleActivity.employeeRecentReadings, canRead ? {
     employeeId,
     limit: 5,
-  });
+  } : "skip");
+  if (!canRead) return null;
   return (
     <section className="space-y-3 border-t pt-5">
       <h3 className="text-base font-semibold">Son geçişler</h3>

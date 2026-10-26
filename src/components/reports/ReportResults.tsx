@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useConvex, useQuery } from 'convex/react';
 import type { FunctionArgs, FunctionReturnType } from 'convex/server';
@@ -43,9 +44,11 @@ function usePdksTableSnapshot(args: PdksTableArgs, enabled: boolean): PdksTableD
 }
 function DailyResults(props: ReportResultsProps) {
   const args = dailyReportArgs(props, props.definition);
+  const { can } = usePermissions();
+  const enabled = can("reports.view") && !!props.projectId;
   const snapshot = props.definition.rowsMode === 'personMonth';
-  const live = useQuery(api.cardReadings.getPdksTableData, snapshot ? 'skip' : args);
-  const once = usePdksTableSnapshot(args, snapshot);
+  const live = useQuery(api.cardReadings.getPdksTableData, !enabled || snapshot ? 'skip' : args);
+  const once = usePdksTableSnapshot(args, enabled && snapshot);
   const data = snapshot ? once : live;
   const rows = useMemo(() => props.definition.rowsMode === 'personMonth' ? buildPersonMonthRows(data ?? []) : dailyRowsForReport(data ?? [], props.definition.slug, props.violationsOnly), [data, props.definition.rowsMode, props.definition.slug, props.violationsOnly]);
   const days = useMemo(() => [...new Set((data ?? []).flatMap(row => row.days.map(cell => cell.date)))].sort(), [data]);
@@ -54,7 +57,8 @@ function DailyResults(props: ReportResultsProps) {
   </ReportPage>;
 }
 function MonthlyResults(props: ReportResultsProps) {
-  const sheet = useQuery(api.cardReadings.getMonthlyPayrollSheet, monthlyReportArgs(props));
+  const { can } = usePermissions();
+  const sheet = useQuery(api.cardReadings.getMonthlyPayrollSheet, can("reports.view") && props.projectId ? monthlyReportArgs(props) : "skip");
   const rows = useMemo(() => sheet ? monthlyRowsForReport(sheet, props.definition.monthlyRows, props.person, props.departmentName) : [], [sheet, props.definition.monthlyRows, props.departmentName, props.person]);
   return <ReportPage projectId={props.projectId} onClear={props.onClear} definition={props.definition} rows={rows} days={sheet?.days} loading={sheet === undefined} meta={meta(props)}>
     {props.definition.monthlyDays === 'code' && <p className="text-xs text-muted-foreground">Kodlar: N normal · DV devamsız · İZN izinli · HT hafta tatili · RT resmî tatil · — henüz gelmedi / veri yok.</p>}
@@ -63,7 +67,8 @@ function MonthlyResults(props: ReportResultsProps) {
 function TransactionResults(props: ReportResultsProps) {
   const [snapshots, dispatch] = useReducer(transactionReducer, { pages: {} });
   const [cursor, setCursor] = useState<string | null>(null);
-  const current = useQuery(api.cardReadings.listReportTransactions, { ...transactionReportArgs(props, props.definition), paginationOpts: { numItems: 50, cursor } });
+  const { can } = usePermissions();
+  const current = useQuery(api.cardReadings.listReportTransactions, can("reports.view") && props.projectId ? { ...transactionReportArgs(props, props.definition), paginationOpts: { numItems: 50, cursor } } : "skip");
   const snapshot = useMemo(() => transactionSnapshot(snapshots, cursor, current), [snapshots, cursor, current]);
   const rows = useMemo(() => buildTransactionRows(snapshot.rows), [snapshot.rows]);
   const loadMore = () => {
@@ -77,6 +82,8 @@ function TransactionResults(props: ReportResultsProps) {
   </ReportPage>;
 }
 export function ReportResults(props: ReportResultsProps) {
+  const { can } = usePermissions();
+  if (!can("reports.view") || !props.projectId) return null;
   if (props.definition.dataSource === 'pdksMatrix') return <DailyResults {...props} />;
   if (props.definition.dataSource === 'monthlyPayroll') return <MonthlyResults {...props} />;
   return <TransactionResults {...props} />;

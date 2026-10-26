@@ -111,7 +111,8 @@ describe.each(roles)("%s public pay responses", (role) => {
     if (!visitor) throw new Error("Missing visitor fixture");
     const base = fixture(role);
     const query = (table: string) => {
-      const chain = { withIndex: () => chain, order: () => chain, first: async () => null,
+      const chain = { withIndex: () => chain, order: () => chain, first: async () => null, unique: async () => null,
+        take: async () => table === "userProjects" ? [{ userId: "user", projectId }] : [],
         async *[Symbol.asyncIterator]() { if (table === "employees") yield visitor; },
       };
       return chain;

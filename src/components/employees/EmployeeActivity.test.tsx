@@ -16,3 +16,5 @@ it("02-O7/D1: requests five readings and links history with person and project f
   expect(html).toContain('/live-monitoring?employee=employee-a&amp;liveProject=project-a');
   expect(html).toContain("Tüm geçişler");
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));

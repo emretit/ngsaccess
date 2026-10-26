@@ -1,3 +1,4 @@
+import { hasReadingPermission, MONITORING_READING_PERMISSIONS } from "./lib/readingAccess";
 import { deviceConnection } from "./lib/deviceConnection";
 import { hasPermission, requirePermission } from "./lib/permissions";
 import { doorStatusPlanValidator, normalizeDoorStatusPlan, normalizeVerifyPlan, verifyPlanValidator, templateToDoorStatusPlan, holidayPlanValidator, holidayRanges, holidaySupportFromSnapshot } from "./lib/doorStatusPlan";
@@ -455,6 +456,17 @@ export const readerStatus = authedQuery({
     const now = Date.now();
     const within = (iso: string | null | undefined): boolean =>
       iso ? now - new Date(iso).getTime() < ONLINE_WINDOW_MS : false;
+    // Son geçiş alanları izleme yetkisine bağlı; yetki proje başına bir kez çözülür.
+    const readingAccess = new Map<string, Promise<boolean>>();
+    const canReadDoor = (projectId: Id<"projects"> | undefined) => {
+      const key = String(projectId);
+      let access = readingAccess.get(key);
+      if (!access) {
+        access = hasReadingPermission(ctx, projectId, MONITORING_READING_PERMISSIONS);
+        readingAccess.set(key, access);
+      }
+      return access;
+    };
 
     // 3) Her kapı için son okuma + çevrimiçi bayrağını BİR KEZ hesapla, okuyuculara paylaştır.
     //    Yalnız gerçek readers satırları döner. Okuyucu taşınınca kaynak kapıda okuyucu
@@ -499,13 +511,14 @@ export const readerStatus = authedQuery({
           const employee = await ctx.db.get(last.employeeId);
           if (!employee || employee.projectId !== door.projectId) last = null;
         }
+        const canRead = await canReadDoor(door.projectId);
         const base = {
           doorId: door._id,
-          lastReadAt: last?.accessTime ?? null,
-          lastCardNo: last?.cardNo ?? null,
-          lastEmployeeName: last?.employeeName ?? null,
-          lastStatus: last?.accessStatus ?? null,
-          lastDirection: last?.direction ?? null,
+          lastReadAt: canRead ? last?.accessTime ?? null : null,
+          lastCardNo: canRead ? last?.cardNo ?? null : null,
+          lastEmployeeName: canRead ? last?.employeeName ?? null : null,
+          lastStatus: canRead ? last?.accessStatus ?? null : null,
+          lastDirection: canRead ? last?.direction ?? null : null,
           online: within(last?.accessTime) || within(panel?.lastSeen),
         };
 

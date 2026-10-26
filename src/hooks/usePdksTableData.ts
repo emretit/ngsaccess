@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { pdksToday } from "@/components/pdks/lib/calendar";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -42,16 +43,18 @@ export interface PdksTableFilters {
 
 export const usePdksTableData = (filters?: PdksTableFilters) => {
   const { loading: projectLoading, projectId } = useActiveProject();
+  const { can } = usePermissions();
+  const canRead = can("reports.view");
   const selectedDate = filters?.anchorDate ?? pdksToday();
 
   const reportType = filters?.reportType ?? "daily";
   const isMatrix = reportType !== "daily";
 
-  const getQueryArgs = () => {
+  const getQueryArgs = (selectedProjectId: Id<"projects"> | undefined) => {
     const dateRange = filters?.dateRange;
 
     const baseArgs = {
-      projectId,
+      projectId: selectedProjectId,
       companyId: filters?.companyId,
       departmentId: filters?.departmentId,
       positionId: filters?.positionId,
@@ -98,7 +101,7 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
 
   const tableData = useQuery(
     api.cardReadings.getPdksTableData,
-    !projectLoading && projectId ? getQueryArgs() : "skip",
+    !projectLoading && projectId && canRead ? { ...getQueryArgs(projectId), projectId } : "skip",
   );
 
   const dateRangeLabel = () => {
@@ -117,7 +120,7 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
     return format(selectedDate, "d MMMM yyyy", { locale: tr });
   };
 
-  const args = getQueryArgs();
+  const args = getQueryArgs(projectId);
   const startDate = "startDate" in args ? args.startDate : args.date;
   const endDate = "endDate" in args ? args.endDate : args.date;
 
@@ -126,7 +129,7 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
     allRecords: tableData ?? [],
     tableRecords: filterPdksRows(tableData ?? [], filters?.statusFilter),
     isLoading:
-      projectLoading || (Boolean(projectId) && tableData === undefined),
+      projectLoading || (Boolean(projectId) && canRead && tableData === undefined),
     selectedDate,
     dateRangeLabel: dateRangeLabel(),
     isMatrix,

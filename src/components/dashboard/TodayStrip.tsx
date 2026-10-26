@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import NumberFlow from "@number-flow/react";
@@ -34,6 +35,7 @@ function Metric({ label, value, suffix, tone, loading, children }: {
 
 /** Bugünün durumu: gelen / içeride / geç kalan / kart okuması. */
 export default function TodayStrip() {
+  const { can } = usePermissions();
   const { stats, loading: statsLoading } = useDashboardStats();
   const { summary, loading: activityLoading } = useDashboardActivity();
   // Bugünkü okuma sayısı saatlik grafikle aynı sorgudan gelir; getStats okumaları taramaz.
@@ -45,6 +47,7 @@ export default function TodayStrip() {
   return (
     <>
       <dl aria-label="Bugünün özeti" aria-busy={loading || timelineLoading} className="grid grid-cols-2 overflow-hidden rounded-lg border bg-surface min-[1000px]:grid-cols-4 max-[999px]:[&>div:nth-child(-n+2)]:border-b max-[999px]:[&>div:nth-child(odd)]:border-r min-[1000px]:[&>div:not(:last-child)]:border-r">
+        {can("reports.view") && <>
         <Metric label="Bugün gelen" value={present} suffix={`/ ${employees.toLocaleString("tr-TR")}`} loading={loading}>
           {present === null ? "Bugün okuma yok" : <span className="flex items-center gap-2">
             <span
@@ -66,9 +69,10 @@ export default function TodayStrip() {
         <Metric label="Geç kalan" value={summary?.lateArrivals ?? null} tone="warning" loading={loading}>
           {summary?.lateArrivals == null ? "Bugün okuma yok" : summary.workHours ? `Mesai ${summary.workHours}` : "Mesai saati okumayla görünür"}
         </Metric>
-        <Metric label="Kart okuması" value={timeline?.total ?? 0} loading={timelineLoading}>
+        </>}
+        {(can("reports.view") || can("devices.manage")) && <Metric label="Kart okuması" value={timeline?.total ?? 0} loading={timelineLoading}>
           İzin verilen + reddedilen
-        </Metric>
+        </Metric>}
       </dl>
       {!loading && stats?.employees === 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-surface px-4 py-3 min-[761px]:px-5">

@@ -2,15 +2,15 @@ import { permissionCapabilities } from "./capabilities";
 import { ROLE_DEFAULTS, legacyRoleToProjectRole, type Permission } from "../../convex/lib/roleCatalog";
 import { Activity, BarChart3, BellRing, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, User, type LucideIcon } from "lucide-react";
 
-export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; permission?: Permission; settings?: boolean; superAdminOnly?: boolean; menu?: boolean; badge?: "Yakında"; group?: "main" | "attendance" | "management" }
+export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; permission?: Permission; anyPermission?: readonly Permission[]; settings?: boolean; superAdminOnly?: boolean; menu?: boolean; badge?: "Yakında"; group?: "main" | "attendance" | "management" }
 export const routeMeta: RouteMeta[] = [
   { href: "/home", group: "main", name: "Ana Sayfa", icon: Home },
   { href: "/employees", group: "main", name: "Kişiler", icon: Users, permission: "employees.view" },
   { href: "/devices", group: "main", name: "Cihazlar", icon: Cpu },
   { href: "/access-control", group: "main", name: "Geçiş Kontrol", icon: Shield },
   { href: "/visitors", group: "main", name: "Ziyaretçiler", icon: DoorOpen },
-  { href: "/live-monitoring", group: "main", name: "Canlı İzleme", icon: Activity },
-  { href: "/pdks-records", group: "attendance", name: "PDKS", icon: FileText },
+  { href: "/live-monitoring", group: "main", name: "Canlı İzleme", icon: Activity, anyPermission: ["reports.view", "devices.manage"] },
+  { href: "/pdks-records", group: "attendance", name: "PDKS", icon: FileText, permission: "reports.view" },
   { href: "/leaves", group: "attendance", name: "İzinler", icon: Palmtree },
   { href: "/reports", group: "attendance", name: "Raporlar", icon: BarChart3, permission: "reports.view" },
   { href: "/alarms", group: "management", name: "Alarmlar", icon: BellRing },
@@ -41,5 +41,22 @@ export function visibleRoutes(role: string | undefined, includeProfile = false, 
   const allowed = can ?? ((permission: Permission) => Boolean(role) && (role === "super_admin" || ROLE_DEFAULTS[legacyRoleToProjectRole(role)].includes(permission)));
   const access = permissionCapabilities(allowed, role ?? null);
   return routeMeta.filter(item => (item.menu !== false || (includeProfile && item.href === "/profile")) &&
-    (!item.permission || allowed(item.permission)) && (!item.settings || access.settingsTabs.length > 0) && (!item.adminOnly || access.admin) && (!item.superAdminOnly || access.systemAdmin));
+    canAccessRoute(item, allowed) && (!item.settings || access.settingsTabs.length > 0) && (!item.adminOnly || access.admin) && (!item.superAdminOnly || access.systemAdmin));
+}
+
+/** Okuma verisi gösteren sayfaların doğrudan erişim kararı; korunmayan yolda null.
+ * /pdks-records/settings kendi yetkisini (schedule.manage) denetler. Vardiya planı (?plan=1)
+ * schedule.manage ile de açılır; PDKS tablo sorgusu reports.view yoksa zaten atlanır. */
+export function readingRouteAccess(pathname: string, search: string, can: (permission: Permission) => boolean): boolean | null {
+  const route = routeMeta.find(item => item.href === "/live-monitoring"
+    ? pathname === item.href || pathname.startsWith(`${item.href}/`)
+    : item.href === "/pdks-records" && pathname === item.href);
+  if (!route) return null;
+  if (route.href === "/pdks-records" && new URLSearchParams(search).get("plan") === "1") return can("reports.view") || can("schedule.manage");
+  return canAccessRoute(route, can);
+}
+
+/** Navigation and direct route access share the same permission rules. */
+export function canAccessRoute(route: RouteMeta, can: (permission: Permission) => boolean): boolean {
+  return (!route.permission || can(route.permission)) && (!route.anyPermission || route.anyPermission.some(can));
 }

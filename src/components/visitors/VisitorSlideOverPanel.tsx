@@ -64,8 +64,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
     ["Geçerlilik bitişi (TR)", formatVisitorTime(detail.visitEnd)],
     ["Erişim bölgesi", detail.presetRuleName ?? "Belirtilmedi"],
     ["Ziyaret edilen", detail.hostName ?? "Belirtilmedi"],
-    ["Son okumaya göre konum", visitorPresenceLabels[detail.presence]],
-    ["Son izinli okuma", formatVisitorTime(detail.lastSeenAt)],
+    ...(detail.presence ? [["Son okumaya göre konum", visitorPresenceLabels[detail.presence]], ["Son izinli okuma", formatVisitorTime(detail.lastSeenAt)]] : []),
   ];
   return <div className="min-w-0 space-y-5 p-5">
     <div className="flex flex-wrap items-center justify-between gap-2"><StatusBadge tone={status.tone}>{status.label}</StatusBadge>{canManage && <Button variant="outline" onClick={onEdit}>{canAssignVisitorPreset(detail) ? "Kart ve erişim ata" : "Düzenle"}</Button>}</div>
@@ -73,14 +72,14 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
       <div><dt className="text-xs text-muted-foreground">Kart</dt><dd className="break-all tabular-nums">{detail.cardReleased ? "İade edildi" : needsCard ? "Henüz kart atanmadı" : showCard ? detail.cardNumber : `•••• ${detail.cardNumber.slice(-4)}`}
         {!detail.cardReleased && !needsCard && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</dd></div>
     </dl>
-    <p className="text-xs text-muted-foreground">Son konum izinli okumaya dayanır. Sürenin dolması veya manuel sonlandırma fiziksel çıkış okuması oluşturmaz.</p>
+    {detail.presence && <p className="text-xs text-muted-foreground">Son konum izinli okumaya dayanır. Sürenin dolması veya manuel sonlandırma fiziksel çıkış okuması oluşturmaz.</p>}
     <VisitorCollapsible title="Şirket, iletişim ve ek bilgiler"><dl className="space-y-3">
       {[["Şirket", detail.visitorCompany], ["Ziyaret amacı", detail.visitPurpose], ["Telefon", detail.visitorPhone], ["E-posta", detail.email?.toLowerCase().endsWith("@ngsaccess.local") ? null : detail.email], ["Notlar", detail.notes]].map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="whitespace-pre-wrap break-words">{value || "Belirtilmedi"}</dd></div>)}
     </dl></VisitorCollapsible>
     <div className="space-y-1 border-t pt-3"><h3 className="font-medium">KVKK rıza kaydı</h3><p>{detail.kvkkConsent ? `Kayıt tarihi: ${formatVisitorTime(detail.kvkkConsent.grantedAt)}` : "Rıza kaydı bulunmuyor."}</p>
       {detail.kvkkConsent && <><p className="text-xs text-muted-foreground">Sürüm: {detail.kvkkConsent.version ?? "Kaydedilmedi"}</p>{detail.kvkkConsent.documentUrl && /^https?:\/\//i.test(detail.kvkkConsent.documentUrl) && <a className="underline" href={detail.kvkkConsent.documentUrl} target="_blank" rel="noopener noreferrer">Kayıtlı belgeyi aç</a>}</>}
     </div>
-    <div className="space-y-2 border-t pt-3"><h3 className="font-medium">Son okumalar</h3>{detail.recentReadings.length ? <ul className="divide-y">{detail.recentReadings.map(reading => <li key={reading._id} className="flex flex-wrap justify-between gap-2 py-2 text-xs"><time className="tabular-nums">{formatVisitorTime(reading.accessTime)}</time><span>{reading.direction === "entry" ? "Giriş" : reading.direction === "exit" ? "Çıkış" : "Yön bilinmiyor"} · {reading.accessStatus === "izin_verildi" ? "İzin verildi" : reading.accessStatus === "reddedildi" ? "Reddedildi" : "Sonuç bilinmiyor"}</span></li>)}</ul> : <p className="text-muted-foreground">Henüz kart okuması yok.</p>}</div>
+    {detail.presence && <div className="space-y-2 border-t pt-3"><h3 className="font-medium">Son okumalar</h3>{detail.recentReadings.length ? <ul className="divide-y">{detail.recentReadings.map(reading => <li key={reading._id} className="flex flex-wrap justify-between gap-2 py-2 text-xs"><time className="tabular-nums">{formatVisitorTime(reading.accessTime)}</time><span>{reading.direction === "entry" ? "Giriş" : reading.direction === "exit" ? "Çıkış" : "Yön bilinmiyor"} · {reading.accessStatus === "izin_verildi" ? "İzin verildi" : reading.accessStatus === "reddedildi" ? "Reddedildi" : "Sonuç bilinmiyor"}</span></li>)}</ul> : <p className="text-muted-foreground">Henüz kart okuması yok.</p>}</div>}
     {canManage && <div className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t bg-surface py-3">
       {detail.isActive && <Button variant="outline" onClick={() => setConfirmation("checkout")}>Ziyareti sonlandır</Button>}
       <RowActions label={`${name} kayıt işlemleri`}>
