@@ -1,7 +1,7 @@
 import { AccessDenied } from '@/components/shared/AccessDenied';
 import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
 import { usePermissions } from "@/hooks/usePermissions";
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowUpRight, FileText, FolderOpen } from 'lucide-react';
 import { REPORT_GROUPS, REPORTS_BASE_PATH, isReportGroupKey, reportGroupPath } from '@/lib/reports/groups';
 import { getReport, reportsInGroup } from '@/lib/reports/registry';
@@ -25,11 +25,17 @@ function ReportsHub() {
 export default function Reports() {
   const { group, slug } = useParams<{ group: string; slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { can, loading } = usePermissions();
   if (loading) return <SectionSkeleton label="Raporlar yükleniyor…" />;
   if (!can("reports.view")) return <AccessDenied message="Rapor görüntüleme yetkiniz yok. Proje yöneticinizle iletişime geçin." />;
   if (!group) return <ReportsHub />;
   if (!isReportGroupKey(group)) return <MissingReport />;
+  if (group === 'gunluk' && slug === 'mola-ihlalleri') {
+    const search = new URLSearchParams(location.search);
+    search.set('ihlal', '1');
+    return <Navigate replace to={{ pathname: reportGroupPath('gunluk', 'mola'), search: `?${search.toString()}` }} />;
+  }
   const reports = reportsInGroup(group);
   const report = slug ? getReport(group, slug) : undefined;
   if (slug && !report) return <MissingReport />;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pairPdksPunches, pdksPairReadings } from "./pdksPunchPairs";
+import { pairPdksPunches, pdksPairReadings, pdksPunchSegments } from "./pdksPunchPairs";
 import { computePdksDay } from "./pdksDay";
 import { DEFAULT_OVERTIME_RATES, DEFAULT_WORK_SETTINGS } from "./pdksHelpers";
 import { LEGACY_PDKS_POLICY, type PdksDayPolicy } from "./pdksRules";
@@ -93,4 +93,44 @@ it("fractional punches conserve whole minutes in overtime segments", () => {
 it("optional missing side preserves attendance credit without inventing a measured duration", () => {
   expect(run(readings(punch("08:00", "entry")), { policy: { ...policy, requireCheckOut: false } })).toMatchObject({ attendanceDecision: "present", durationMeasured: false, totalMinutes: 0, punchQuality: "missingExit" });
   expect(run(readings(punch("17:00", "exit")), { policy: { ...policy, requireCheckIn: false } })).toMatchObject({ attendanceDecision: "present", durationMeasured: false, totalMinutes: 0, punchQuality: "missingEntry" });
+});
+
+describe("display punch segments", () => {
+  it("shows zero, one and two breaks, resolving undirected and debounced readings", () => {
+    const items = [punch("08:00"), punch("08:00:30"), punch("12:02"), punch("12:48"), punch("15:10"), punch("15:25"), punch("17:00")];
+    expect(pdksPunchSegments(pdksPairReadings(items.slice(0, 3))).breakMinutes).toBe(0);
+    expect(pdksPunchSegments(pdksPairReadings(items.slice(0, 5)))).toMatchObject({ breakMinutes: 46, breaks: [{ startISO: iso("12:02"), endISO: iso("12:48"), minutes: 46 }] });
+    expect(pdksPunchSegments(pdksPairReadings(items))).toMatchObject({ breakMinutes: 61, breaks: [{ minutes: 46 }, { minutes: 15 }] });
+  });
+  it("keeps orphan sides without producing breaks and omits subminute gaps", () => {
+    expect(pdksPunchSegments([punch("07:00", "exit"), punch("08:00", "entry")])).toEqual({ pairs: [{ entryISO: null, exitISO: iso("07:00") }, { entryISO: iso("08:00"), exitISO: null }], breaks: [], breakMinutes: 0 });
+    const items = [punch("08:00", "entry"), punch("12:00", "exit"), punch("12:00:30", "entry"), punch("17:00", "exit")];
+    expect(pdksPunchSegments(items).breaks).toEqual([]);
+    expect(pdksPunchSegments(items.slice(0, 3)).breaks).toEqual([]);
+  });
+  it("measures the break across a stray one-sided punch between two visits", () => {
+    const items = [punch("09:00", "entry"), punch("12:00", "exit"), punch("12:30", "exit"), punch("13:00", "entry"), punch("17:00", "exit")];
+    expect(pdksPunchSegments(items)).toMatchObject({
+      pairs: [{ entryISO: iso("09:00"), exitISO: iso("12:00") }, { entryISO: null, exitISO: iso("12:30") }, { entryISO: iso("13:00"), exitISO: iso("17:00") }],
+      breaks: [{ startISO: iso("12:00"), endISO: iso("13:00"), minutes: 60 }], breakMinutes: 60,
+    });
+  });
+  it("uses the replaced manual endpoints and preserves interior gaps", () => {
+    const items = [punch("08:00", "entry"), punch("12:00", "exit"), punch("13:00", "entry"), punch("17:00", "exit")];
+    expect(pdksPunchSegments(pdksPairReadings(items, { entryISO: iso("09:00"), exitISO: iso("18:00") }))).toMatchObject({ pairs: [{ entryISO: iso("09:00"), exitISO: iso("12:00") }, { entryISO: iso("13:00"), exitISO: iso("18:00") }], breakMinutes: 60 });
+  });
+  it("retains the real dates across midnight", () => {
+    const next = (time: string) => `2026-10-24T${time}:00+03:00`;
+    const items = [punch("22:00", "entry"), { accessTime: next("02:00"), direction: "exit" }, { accessTime: next("02:30"), direction: "entry" }, { accessTime: next("06:00"), direction: "exit" }];
+    expect(pdksPunchSegments(items)).toMatchObject({ breakMinutes: 30, breaks: [{ startISO: next("02:00"), endISO: next("02:30"), minutes: 30 }] });
+  });
+  it("adds display evidence in both modes without changing the original calculation", () => {
+    const items = readings(punch("08:00", "entry"), punch("12:00", "exit"), punch("13:00", "entry"), punch("17:00", "exit"));
+    for (const calculationMode of ["firstLast", "eachPunch"] as const) {
+      const options = { policy: { ...policy, calculationMode } };
+      const { punchSegments, ...withDisplay } = run(items, { ...options, includePunchSegments: true });
+      expect(withDisplay).toEqual(run(items, options));
+      expect(punchSegments?.breakMinutes).toBe(60);
+    }
+  });
 });

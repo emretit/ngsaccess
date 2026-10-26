@@ -15,7 +15,7 @@ function definition(source: 'transactions' | 'monthlyPayroll' | 'pdksMatrix') {
 describe('server query identity', () => {
   it('requests punches only for the time card and break reports and keys the server argument', () => {
     for (const report of REPORTS.filter(item => item.dataSource === 'pdksMatrix')) {
-      const needsPunches = ['okutma-karti', 'mola-ihlalleri'].includes(report.slug);
+      const needsPunches = ['okutma-karti', 'mola', 'aylik-ozet', 'kisi-devam-dokumu'].includes(report.slug);
       const args = dailyReportArgs(filters, report);
       if (needsPunches) {
         expect(args).toHaveProperty('includePunches', true);

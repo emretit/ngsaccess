@@ -1,20 +1,22 @@
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => mocks.reportsAllowed, loading: mocks.permissionsLoading }) }));
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { PDF_MAX_ROWS, PDF_ROW_LIMIT_MESSAGE } from '@/lib/reports/export';
-import { ReportPage } from './ReportPage';
+import { ReportPage, reportExportLabel } from './ReportPage';
 import { ReportResults } from './ReportResults';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { toggleHiddenColumn } from '@/lib/reports/columns';
 import { dailyCell, dailySource, monthlySheet, transactionPage } from '@/lib/reports/testFixtures';
 import { flattenDailyRows } from '@/lib/reports/rows';
+import { buildPersonMonthRows } from '@/lib/reports/personMonth';
+import { dailyReportArgs } from '@/lib/reports/query';
 import { REPORTS, type ReportDefinition } from '@/lib/reports/registry';
 import Reports from '@/pages/Reports';
-const mocks = vi.hoisted(() => ({ permissionsLoading: false, reportsAllowed: true, role: 'project_user', scoped: false, query: vi.fn() }));
+const mocks = vi.hoisted(() => ({ permissionsLoading: false, reportsAllowed: true, role: 'project_user', scoped: false, query: vi.fn(), convexQuery: vi.fn() }));
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { role: mocks.role, _id: 'user-a' } }) }));
 vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ loading: false, projectId: mocks.scoped ? 'project-a' : null }) }));
-vi.mock('convex/react', () => ({ useQuery: mocks.query }));
+vi.mock('convex/react', () => ({ useQuery: mocks.query, useConvex: () => ({ query: mocks.convexQuery }) }));
 const definition: ReportDefinition = { slug: 'example', group: 'gunluk', title: 'Örnek rapor', description: 'Örnek', dataSource: 'pdksMatrix', filters: [], formats: ['csv'], columns: [
   { key: 'name', label: 'Ad Soyad', defaultVisible: true, value: row => row.kind === 'daily' ? row.name : null },
   { key: 'department', label: 'Departman', defaultVisible: true, value: row => row.kind === 'daily' ? row.department : null },
@@ -112,7 +114,7 @@ describe('report routes', () => {
     expect(route('/reports/aylik/departman-bazli-devam?q=Ayşe')).not.toContain('type="search"');
     expect(route('/reports/aylik/kisi-bazli-devam')).toContain('type="search"');
   });
-  it('renders the four groups and sixteen reports in the hub', () => { const html = route('/reports'); expect(html).toContain('Kayıtlar'); expect(html).toContain('Resmi'); for (const report of REPORTS) expect(html).toContain(`/reports/${report.group}/${report.slug}`); });
+  it('renders the four groups and eighteen reports in the hub', () => { const html = route('/reports'); expect(html).toContain('Kayıtlar'); expect(html).toContain('Resmi'); for (const report of REPORTS) expect(html).toContain(`/reports/${report.group}/${report.slug}`); });
   it('provides recovery for unknown groups, mismatched slugs and official slugs', () => { for (const path of ['/reports/invalid', '/reports/gunluk/ham-okutmalar', '/reports/resmi/sgk']) expect(route(path)).toContain('Rapor bulunamadı'); });
   it('gates official settings links and skips all queries when no project is selected', () => {
     mocks.reportsAllowed = false;
@@ -131,4 +133,70 @@ it("rapor yetkisi yüklenirken erişim reddi yerine iskelet gösterir ve veri so
   expect(html).toContain("Raporlar yükleniyor");
   expect(html).not.toContain("Proje erişimi yok");
   expect(mocks.query).not.toHaveBeenCalled();
+});
+
+vi.mock('react-router-dom', async importOriginal => ({
+  ...await importOriginal<typeof import('react-router-dom')>(),
+  Navigate: vi.fn(() => null),
+}));
+it('replaces the legacy break URL and preserves its search filters', () => {
+  route('/reports/gunluk/mola-ihlalleri?from=2026-10-01&to=2026-10-20&dept=d1&q=Ada&ihlal=0');
+  const props = vi.mocked(Navigate).mock.calls[vi.mocked(Navigate).mock.calls.length - 1]?.[0];
+  expect(props?.replace).toBe(true);
+  expect(props?.to).toEqual({ pathname: '/reports/gunluk/mola', search: '?from=2026-10-01&to=2026-10-20&dept=d1&q=Ada&ihlal=1' });
+});
+it('applies the violations-only client filter while keeping server args unchanged', () => {
+  const report = REPORTS.find(item => item.slug === 'mola');
+  const detail = dailyCell().detail;
+  if (!report || !detail) throw new Error('Missing break fixture');
+  mocks.query.mockReturnValue([dailySource([
+    dailyCell({ date: '2026-10-01', detail: { ...detail, breaks: [{ start: '12:00', end: '13:00', minutes: 60 }], breakMinutes: 60 } }),
+    dailyCell({ date: '2026-10-02', detail: { ...detail, breakViolation: true } }),
+  ])]);
+  const props = { definition: report, projectId: 'p' as Id<'projects'>, from: '2026-10-01', to: '2026-10-02', person: '', year: 2026, month: 10 };
+  const all = renderToStaticMarkup(<ReportResults {...props} />);
+  const args = mocks.query.mock.calls[mocks.query.mock.calls.length - 1]?.[1];
+  const violations = renderToStaticMarkup(<ReportResults {...props} violationsOnly />);
+  expect(all).toContain('01.10.2026');
+  expect(violations).not.toContain('01.10.2026</td>');
+  expect(violations).toContain('02.10.2026');
+  expect(mocks.query.mock.calls[mocks.query.mock.calls.length - 1]?.[1]).toEqual(args);
+});
+
+it('uses month filters for the daily matrix summary and requests the full leap month', () => {
+  mocks.scoped = true;
+  mocks.query.mockReturnValue([]);
+  const html = route('/reports/aylik/aylik-ozet?month=2028-02&from=2026-01-01&to=2026-01-02&preset=custom');
+  expect(html).toContain('Aylık Özet');
+  expect(html).toContain('for="report-period">Ay</label>');
+  expect(html).not.toContain('id="report-from"');
+  expect(html).toContain('01.02.2028 – 29.02.2028');
+  const report = REPORTS.find(item => item.slug === 'aylik-ozet');
+  if (!report) throw new Error('Missing summary');
+  expect(dailyReportArgs({ projectId: 'p' as Id<'projects'>, from: '2028-02-01', to: '2028-02-29', person: '', year: 2028, month: 2 }, report)).toEqual(expect.objectContaining({ startDate: '2028-02-01', endDate: '2028-02-29', viewMode: 'matrix', includePunches: true }));
+});
+it('fetches month summaries once instead of subscribing to every new reading', () => {
+  const report = REPORTS.find(item => item.slug === 'aylik-ozet');
+  if (!report) throw new Error('Missing summary');
+  mocks.query.mockReturnValue([dailySource([dailyCell()])]);
+  const html = renderToStaticMarkup(<ReportResults definition={report} projectId={'project-a' as Id<'projects'>} from="2026-10-01" to="2026-10-31" person="" year={2026} month={10} />);
+  expect(mocks.query).toHaveBeenCalledWith(expect.anything(), 'skip');
+  expect(html).toContain('Rapor yükleniyor');
+  expect(html).toContain('Yeniden yükle');
+});
+it('displays one summary row per person and labels the specialized exports', () => {
+  const report = REPORTS.find(item => item.slug === 'aylik-ozet');
+  if (!report) throw new Error('Missing summary');
+  const rows = buildPersonMonthRows([dailySource([dailyCell(), dailyCell({ date: '2026-10-20', totalMinutes: 60 })])]);
+  const html = renderToStaticMarkup(<ReportPage projectId="project-a" definition={report} rows={rows} meta={{ from: '2026-10-01', to: '2026-10-31' }} />);
+  expect(html).toContain('1 kayıt');
+  expect(html).toContain('9 sa 55 dk');
+  expect(html).toContain('İnceleme (gün)');
+  expect(reportExportLabel('excel', report)).toBe('Excel (kişi blokları)');
+  for (const [slug, label] of [['kisi-devam-dokumu', 'Excel (kişi başına sayfa)'], ['aylik-durum', 'Excel (renkli durum tablosu)']]) {
+    const definition = REPORTS.find(item => item.slug === slug);
+    if (!definition) throw new Error('Missing definition');
+    expect(reportExportLabel('excel', definition)).toBe(label);
+  }
+  expect(reportExportLabel('csv', report)).toBe('CSV');
 });

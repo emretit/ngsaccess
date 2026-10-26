@@ -1,3 +1,4 @@
+import type { PersonMonthReportRow } from './personMonth';
 import { STATUS_META } from '@/components/pdks/statusMeta';
 import { type ReportGroupKey } from './groups';
 import { departmentLabel, formatDailyExceptions, formatMinutes, formatPunches, formatReportDate, formatShortMinutes, formatTransactionTime, type AttendanceCounts, type DailyReportRow, type DepartmentReportRow, type MonthlyReportRow, type MonthlyRowMode, type ReportRow, type TransactionReportRow } from './rows';
@@ -12,9 +13,11 @@ export interface ReportDefinition {
   dataSource: 'pdksMatrix' | 'monthlyPayroll' | 'transactions';
   pinnedColumns?: readonly string[];
   includePunches?: boolean;
+  rowsMode?: 'personMonth';
+  excelLayout?: 'personBlocks' | 'personSheets' | 'statusMatrix';
   monthlyDays?: 'code' | 'minutes'; monthlyRows?: MonthlyRowMode;
   transactionSources?: readonly ('card' | 'pin' | 'qr' | 'mobile' | 'manual' | 'unknown')[];
-  columns: readonly ReportColumn[]; filters: readonly ('period' | 'department' | 'person' | 'result' | 'month')[]; formats: readonly ReportFormat[];
+  columns: readonly ReportColumn[]; filters: readonly ('period' | 'department' | 'person' | 'result' | 'month' | 'breakViolation')[]; formats: readonly ReportFormat[];
 }
 function durationColumn(key: string): Pick<ReportColumn, 'minutesValue'> {
   if (key !== 'duration' && key !== 'overtime') return {};
@@ -49,11 +52,27 @@ export const DAILY_COLUMNS: readonly ReportColumn[] = [
   daily('overtime', 'Fazla mesai', row => formatMinutes(row.cell.overtimeMinutes)), daily('status', 'Durum', row => STATUS_META[row.cell.status].label),
   daily('readingCount', 'Okutma sayısı', row => row.cell.detail?.readingCount ?? null, 'right'), daily('manual', 'Manuel', row => row.cell.detail ? row.cell.detail.isManual ? 'Evet' : 'Hayır' : null),
 ];
+function personMonth(key: string, label: string, value: (row: PersonMonthReportRow) => string | number, minutes?: (row: PersonMonthReportRow) => number): ReportColumn {
+  return { key, label, defaultVisible: true, value: row => row.kind === 'personMonth' ? value(row) : null,
+    ...(minutes ? { minutesValue: (row: ReportRow) => row.kind === 'personMonth' ? minutes(row) : null } : {}) };
+}
+const PERSON_MONTH_COLUMNS: readonly ReportColumn[] = [
+  personMonth('name', 'Ad Soyad', row => row.name), personMonth('department', 'Departman', row => row.department), personMonth('payrollCode', 'Bordro kodu', row => row.payrollCode),
+  personMonth('workedDays', 'Çalışılan gün', row => row.totals.workedDays),
+  personMonth('duration', 'Toplam süre', row => formatMinutes(row.totals.totalMinutes), row => row.totals.totalMinutes),
+  personMonth('overtime', 'Fazla mesai', row => formatMinutes(row.totals.overtimeMinutes), row => row.totals.overtimeMinutes),
+  personMonth('lateDays', 'Geç (gün)', row => row.totals.lateDays), personMonth('lateMinutes', 'Geç (dk)', row => row.totals.lateMinutes),
+  personMonth('earlyExitDays', 'Erken çıkış (gün)', row => row.totals.earlyExitDays), personMonth('earlyExitMinutes', 'Erken çıkış (dk)', row => row.totals.earlyExitMinutes),
+  personMonth('absentDays', 'Devamsız', row => row.totals.absentDays), personMonth('leaveDays', 'İzinli', row => row.totals.leaveDays),
+  personMonth('breakMinutes', 'Mola', row => formatMinutes(row.totals.breakMinutes), row => row.totals.breakMinutes),
+  personMonth('holidayWorkedDays', 'Hafta sonu/tatil çalışma', row => row.totals.holidayWorkedDays), personMonth('incompleteDays', 'İnceleme (gün)', row => row.totals.incompleteDays),
+];
 const DAY_TYPES = { workday: 'Hafta içi', weekend: 'Hafta sonu', holiday: 'Resmî tatil', halfDayHoliday: 'Yarım gün' };
 const MONTHLY_IDENTITY = [monthly('name', 'Ad Soyad', row => row.name), monthly('department', 'Departman', row => departmentLabel(row.department)), monthly('payrollCode', 'Bordro kodu', row => row.payrollCode)];
 const MONTHLY_TOTALS = [
   monthly('duration', 'Toplam süre', row => formatMinutes(row.totals.totalMinutes)), monthly('overtime', 'Fazla mesai', row => formatMinutes(row.totals.overtimeMinutes)),
   monthly('leaveDays', 'İzin (gün)', row => row.totals.leaveDays, 'right'), monthly('absentDays', 'Devamsız (gün)', row => row.totals.absentDays, 'right'), monthly('lateDays', 'Geç (gün)', row => row.totals.lateDays, 'right'),
+  { ...monthly('earlyExitDays', 'Erken çıkış (gün)', row => row.attendance.earlyExitDays, 'right'), defaultVisible: false },
 ];
 const INCOMPLETE_DAYS: ReportColumn = { key: "incompleteDays", label: "İnceleme (gün)", defaultVisible: false, align: "right", value: row => row.kind === "monthly" ? row.totals.incompleteDays ?? row.attendance.incompleteDays ?? null : row.kind === "department" ? row.attendance.incompleteDays ?? null : null };
 const ATTENDANCE_COUNTS = [attendance('workedDays', 'Çalışılan gün'), attendance('holidayWorkedDays', 'Tatilde çalışma (gün)'), attendance('lateDays', 'Geç (gün)'), attendance('earlyExitDays', 'Erken çıkış (gün)'), attendance('absentDays', 'Devamsız'), attendance('leaveDays', 'İzinli')];
@@ -80,13 +99,16 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
   { ...dailyReport('ilk-giris-son-cikis', 'İlk Giriş / Son Çıkış', 'Planlanan saatlerle günün ilk giriş ve son çıkışını karşılaştırın.'), columns: dailyColumns('date', 'name', 'department', 'plannedStart', 'firstEntry', 'plannedEnd', 'lastExit', 'readingCount') },
   { ...dailyReport('istisnalar', 'İstisnalar', 'Geç kalma, erken çıkış ve devamsızlık görünen günler.'), columns: [...DAILY_COLUMNS, daily('exception', 'İstisna', row => formatDailyExceptions(row.cell))] },
   dailyReport('erken-cikanlar', 'Erken Çıkanlar', 'Erken çıkış süresine göre sıralanan günlük kayıtlar.'),
-  { ...dailyReport('mola-ihlalleri', 'Mola İhlalleri', 'Vardiyada tanımlı mola aralığında hiç okutma olmayan ve 7,5 saatten uzun süren günler.'), includePunches: true, columns: [...dailyColumns('date', 'name', 'department', 'shift'), daily('plannedBreak', 'Plan mola', row => row.cell.detail?.plannedBreakStart && row.cell.detail.plannedBreakEnd ? `${row.cell.detail.plannedBreakStart}–${row.cell.detail.plannedBreakEnd}` : null), ...dailyColumns('firstEntry', 'lastExit', 'duration'), PUNCHES] },
-  { slug: 'aylik-durum', group: 'aylik', title: 'Aylık Durum', description: 'Ayın günlerini durum kodları ve kişi toplamlarıyla inceleyin.', dataSource: 'monthlyPayroll', monthlyDays: 'code', pinnedColumns: ['name'], columns: [...MONTHLY_IDENTITY, ...MONTHLY_TOTALS], filters: ['month', 'department', 'person'], formats: FORMATS },
+  { ...dailyReport('mola', 'Mola', 'Okutmalar arasındaki mola kayıtlarını, sürelerini ve plan mola ihlallerini inceleyin.'), includePunches: true, filters: ['period', 'department', 'person', 'breakViolation'], columns: [...dailyColumns('date', 'name', 'department', 'shift'), daily('plannedBreak', 'Plan mola', row => row.cell.detail?.plannedBreakStart && row.cell.detail.plannedBreakEnd ? `${row.cell.detail.plannedBreakStart}–${row.cell.detail.plannedBreakEnd}` : null), daily('breaks', 'Mola kayıtları', row => row.cell.detail?.breaks?.map(gap => `${gap.start}–${gap.end}`).join(' · ') || null), { ...daily('breakMinutes', 'Mola süresi', row => formatMinutes(row.cell.detail?.breakMinutes ?? 0)), minutesValue: row => row.kind === 'daily' ? row.cell.detail?.breakMinutes ?? 0 : null }, daily('breakViolation', 'İhlal', row => row.cell.detail?.breakViolation ? 'Plan molada okutma yok' : null), ...dailyColumns('firstEntry', 'lastExit', 'duration'), PUNCHES] },
+  { slug: 'aylik-ozet', group: 'aylik', title: 'Aylık Özet', description: 'Kişi başına aylık devam toplamlarını ve günlük okutma dökümünü inceleyin.', dataSource: 'pdksMatrix', includePunches: true, rowsMode: 'personMonth', excelLayout: 'personBlocks', pinnedColumns: ['name'], columns: PERSON_MONTH_COLUMNS, filters: ['month', 'department', 'person'], formats: FORMATS },
+  { slug: 'kisi-devam-dokumu', group: 'aylik', title: 'Kişi Devam Dökümü', description: 'Kişi başına aylık günlük döküm; her kişi ayrı sayfa.', dataSource: 'pdksMatrix', includePunches: true, rowsMode: 'personMonth', excelLayout: 'personSheets', pinnedColumns: ['name'], columns: PERSON_MONTH_COLUMNS, filters: ['month', 'department', 'person'], formats: FORMATS },
+  { slug: 'aylik-durum', excelLayout: 'statusMatrix', group: 'aylik', title: 'Aylık Durum', description: 'Ayın günlerini durum kodları ve kişi toplamlarıyla inceleyin.', dataSource: 'monthlyPayroll', monthlyDays: 'code', pinnedColumns: ['name'], columns: [...MONTHLY_IDENTITY, ...MONTHLY_TOTALS], filters: ['month', 'department', 'person'], formats: FORMATS },
   { slug: 'aylik-calisma-suresi', group: 'aylik', title: 'Aylık Çalışma Süresi', description: 'Günlük çalışma sürelerini ayın günleri ve kişi toplamlarıyla inceleyin.', dataSource: 'monthlyPayroll', monthlyDays: 'minutes', pinnedColumns: ['name'], columns: [...MONTHLY_IDENTITY, ...MONTHLY_TOTALS], filters: ['month', 'department', 'person'], formats: FORMATS },
   { slug: 'kisi-bazli-devam', group: 'aylik', title: 'Kişi Bazlı Devam', description: 'Kişi başına devam, devamsızlık ve çalışma süresi toplamları.', dataSource: 'monthlyPayroll', pinnedColumns: ['name'], columns: [...MONTHLY_IDENTITY, ...ATTENDANCE_COUNTS, attendance('weekendDays', 'Hafta tatili'), attendance('holidayDays', 'Resmî tatil'), ...MONTHLY_TOTALS.slice(0, 2)], filters: ['month', 'department', 'person'], formats: FORMATS },
   { slug: 'departman-bazli-devam', group: 'aylik', title: 'Departman Bazlı Devam', description: 'Departmanların kişi, devam ve çalışma süresi toplamları.', dataSource: 'monthlyPayroll', monthlyRows: 'departments', pinnedColumns: ['department'], columns: [department('department', 'Departman', row => departmentLabel(row.department)), department('personCount', 'Kişi sayısı', row => row.personCount), ...ATTENDANCE_COUNTS.map(column => column.key === 'workedDays' ? { ...column, label: 'Çalışılan kişi-gün' } : column), department('duration', 'Toplam süre', row => formatMinutes(row.totalMinutes)), department('overtime', 'Fazla mesai', row => formatMinutes(row.overtimeMinutes)), department('attendanceRate', 'Devam oranı (%)', row => row.attendanceRate === null ? null : row.attendanceRate.toLocaleString('tr-TR', { maximumFractionDigits: 1 }))], filters: ['month', 'department'], formats: FORMATS },
 ];
 const FOCUSED_COLUMNS: Record<string, readonly string[]> = {
+  mola: ['date', 'name', 'department', 'shift', 'plannedBreak', 'breaks', 'breakMinutes', 'breakViolation'],
   'ham-okutmalar': ['time', 'name', 'department', 'device', 'direction', 'result', 'source'],
   'mobil-okutmalar': ['time', 'name', 'department', 'device', 'direction', 'result', 'source'],
   'aylik-durum': ['name', 'department', 'duration', 'overtime'],
@@ -101,6 +123,7 @@ const FOCUSED_COLUMNS: Record<string, readonly string[]> = {
   istisnalar: ['date', 'name', 'department', 'exception', 'lateMinutes', 'earlyExitMinutes', 'status'],
 };
 export const REPORTS: readonly ReportDefinition[] = REPORT_DEFINITIONS.map(def => {
+  if (def.rowsMode === 'personMonth') return def;
   if (def.dataSource !== 'pdksMatrix') {
     const focused = FOCUSED_COLUMNS[def.slug];
     const columns = def.dataSource === "monthlyPayroll" ? [...def.columns, INCOMPLETE_DAYS] : def.columns;

@@ -1,3 +1,4 @@
+import type ExcelJS from 'exceljs';
 import { notify } from '@/lib/notify';
 import { neutralizeSpreadsheetFormula } from '@/lib/spreadsheetSafety';
 import type { ReportColumn, ReportDefinition, ReportFormat } from './registry';
@@ -16,7 +17,7 @@ export function pdfColumnChunks(columns: readonly ReportColumn[], pinnedColumns?
   for (let i = 0; i < remaining.length; i += capacity) chunks.push([...pinned, ...remaining.slice(i, i + capacity)]);
   return chunks;
 }
-export interface ReportExportMeta { from: string; to: string; projectName?: string; columns: readonly ReportColumn[] }
+export interface ReportExportMeta { from: string; to: string; projectName?: string; columns: readonly ReportColumn[]; days?: readonly string[] }
 function safeSpreadsheetValue(value: string | number | null): string | number {
   if (typeof value === 'number') return value;
   return neutralizeSpreadsheetFormula(value ?? '');
@@ -112,10 +113,24 @@ export async function exportReport(format: ReportFormat, def: ReportDefinition, 
   if (format === 'pdf' && rows.length > PDF_MAX_ROWS) { notify.info(PDF_ROW_LIMIT_MESSAGE); return; }
   const ext = format === 'excel' ? 'xlsx' : format;
   const filename = `rapor-${def.slug}-${meta.from}_${meta.to}.${ext}`;
-  if (format === 'csv') { download(new Blob([buildCsv(meta.columns, rows)], { type: 'text/csv;charset=utf-8' }), filename); return; }
+  if (format === 'csv') { download(new Blob([buildCsv(def.rowsMode === 'personMonth' ? excelReportColumns(meta.columns) : meta.columns, rows)], { type: 'text/csv;charset=utf-8' }), filename); return; }
   if (format === 'pdf') { await exportPdf(def, rows, meta, filename); return; }
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
+  if (def.excelLayout === 'personBlocks') { const { buildPersonBlocks } = await import('./excel/personBlocks'); buildPersonBlocks(workbook, { def, rows, meta }); }
+  else if (def.excelLayout === 'personSheets') { const { buildPersonSheets } = await import('./excel/personSheets'); buildPersonSheets(workbook, { def, rows, meta }); }
+  else if (def.excelLayout === 'statusMatrix') { const { buildStatusMatrix } = await import('./excel/statusMatrix'); buildStatusMatrix(workbook, { def, rows, meta }); }
+  else addTableSheet(workbook, def, rows, meta);
+  const buffer = await workbook.xlsx.writeBuffer();
+  download(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
+}
+
+export function excelReportColumns(columns: readonly ReportColumn[]): ReportColumn[] {
+  return columns.flatMap(column => column.minutesValue ? [column, { key: `${column.key}:minutes`, label: `${column.fullLabel ?? column.label} (dk)`, defaultVisible: true, value: column.minutesValue }] : [column]);
+}
+
+/** Original flat export, also used by layouts awaiting their dedicated phase. */
+export function addTableSheet(workbook: ExcelJS.Workbook, def: ReportDefinition, rows: readonly ReportRow[], meta: ReportExportMeta): ExcelJS.Worksheet {
   const sheet = workbook.addWorksheet('Rapor', { views: [{ state: 'frozen', ySplit: 4 }] });
   sheet.addRow([def.title]); sheet.addRow([meta.projectName ?? '', `${formatReportDate(meta.from)} – ${formatReportDate(meta.to)}`, 'İstanbul saati (UTC+3)']); sheet.addRow([]);
   const excelColumns = excelReportColumns(meta.columns);
@@ -123,10 +138,5 @@ export async function exportReport(format: ReportFormat, def: ReportDefinition, 
   rows.forEach(row => sheet.addRow(excelColumns.map(column => safeSpreadsheetValue(column.value(row)))));
   sheet.getRow(4).font = { bold: true };
   sheet.columns.forEach((column, index) => { const reportColumn = excelColumns[index]; column.width = reportColumn?.key.startsWith('day:') ? 12 : reportColumn?.key === 'name' ? 28 : 22; });
-  const buffer = await workbook.xlsx.writeBuffer();
-  download(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
-}
-
-export function excelReportColumns(columns: readonly ReportColumn[]): ReportColumn[] {
-  return columns.flatMap(column => column.minutesValue ? [column, { key: `${column.key}:minutes`, label: `${column.fullLabel ?? column.label} (dk)`, defaultVisible: true, value: column.minutesValue }] : [column]);
+  return sheet;
 }

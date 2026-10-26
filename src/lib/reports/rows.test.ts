@@ -38,7 +38,7 @@ describe('daily report rows', () => {
     expect(dates('ilk-giris-son-cikis')).toEqual(['02', '03']);
     expect(dates('istisnalar')).toEqual(['02', '03', '04']);
     expect(dates('erken-cikanlar')).toEqual(['03', '02']);
-    expect(dates('mola-ihlalleri')).toEqual(['03']);
+    expect(dates('mola')).toEqual(['03']);
     expect(dates('okutma-karti')).toEqual(['02']);
     expect(formatDailyExceptions(rows[0].days[1])).toBe('Geç 12 dk · Erken çıkış 8 dk');
     expect(formatDailyExceptions(rows[0].days[3])).toBe('Devamsız');
@@ -150,4 +150,17 @@ it('offers a hidden review-day column, counts review days separately and aggrega
     expect(column?.defaultVisible).toBe(false); expect(column?.label).toBe('İnceleme (gün)'); expect(column?.value(report.monthlyRows === 'departments' ? department : row)).toBe(1);
     expect(report.columns.filter(item => item.defaultVisible).map(item => item.key)).not.toContain('incompleteDays');
   }
+});
+
+it('filters all breaks and preserves exactly the former violation day list', () => {
+  const detail = dailyCell().detail;
+  if (!detail) throw new Error('Missing detail');
+  const rows = [dailySource([
+    dailyCell({ date: '2026-10-01', detail: { ...detail, breaks: [{ start: '12:02', end: '12:48', minutes: 46 }], breakMinutes: 46 } }),
+    dailyCell({ date: '2026-10-02', detail: { ...detail, breakViolation: true } }),
+    dailyCell({ date: '2026-10-03', detail }),
+    dailyCell({ date: '2026-10-04', status: 'future', detail: { ...detail, breakViolation: true } }),
+  ])];
+  expect(dailyRowsForReport(rows, 'mola').map(row => row.cell.date)).toEqual(['2026-10-01', '2026-10-02']);
+  expect(dailyRowsForReport(rows, 'mola', true)).toEqual(flattenDailyRows(rows, cell => Boolean(cell.detail?.breakViolation)));
 });

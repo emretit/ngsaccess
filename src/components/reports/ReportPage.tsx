@@ -40,11 +40,11 @@ function ReportTable({ definition, rows, days, meta, loading = false, hasMoreTra
   const runExport = async (format: ReportFormat) => {
     if (exporting) return;
     setExporting(true);
-    try { await exportReport(format, definition, rows, { ...meta, columns: visible }); }
+    try { await exportReport(format, definition, rows, { ...meta, columns: visible, days: days ?? meta.days }); }
     catch (error: unknown) { notify.error('Rapor dışa aktarılamadı', error); }
     finally { setExporting(false); }
   };
-  const emptyTitle = ({ devamsizlar: 'Bu dönemde devamsız kişi yok.', 'erken-cikanlar': 'Bu dönemde erken çıkan kişi yok.', 'mola-ihlalleri': 'Bu dönemde mola ihlali yok.', 'gec-kalanlar': 'Bu dönemde geç kalan kişi yok.' } as Record<string, string>)[definition.slug] ?? 'Kayıt bulunamadı';
+  const emptyTitle = ({ devamsizlar: 'Bu dönemde devamsız kişi yok.', 'erken-cikanlar': 'Bu dönemde erken çıkan kişi yok.', mola: 'Bu dönemde mola kaydı yok.', 'gec-kalanlar': 'Bu dönemde geç kalan kişi yok.' } as Record<string, string>)[definition.slug] ?? 'Kayıt bulunamadı';
   return <div className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-xs text-muted-foreground" role="status">{loadedCount === undefined ? `${rows.length} kayıt` : `Yüklenen ${loadedCount} kayıt${rows.length !== loadedCount ? ` · Filtreye uyan ${rows.length}` : ''}`}</p>
@@ -53,7 +53,7 @@ function ReportTable({ definition, rows, days, meta, loading = false, hasMoreTra
           <DropdownMenuContent align="end" className="max-h-80 max-w-[calc(100vw-32px)] overflow-y-auto"><DropdownMenuLabel>Görünür kolonlar</DropdownMenuLabel>{columns.filter(column => !column.exportOnly).map(column => <DropdownMenuCheckboxItem key={column.key} checked={visible.some(item => item.key === column.key)} disabled={visible.length === 1 && visible[0]?.key === column.key} onSelect={event => event.preventDefault()} onCheckedChange={() => toggle(column.key, column.defaultVisible)}>{column.label}</DropdownMenuCheckboxItem>)}</DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={loading || rows.length === 0 || visible.length === 0 || exporting}><Download className="mr-2 h-4 w-4" aria-hidden="true" />{exporting ? 'Hazırlanıyor…' : 'Dışa aktar'}</Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end">{definition.formats.map(format => <DropdownMenuItem key={format} disabled={format === 'pdf' && pdfOverLimit} title={format === 'pdf' && pdfOverLimit ? PDF_ROW_LIMIT_MESSAGE : undefined} onSelect={() => { void runExport(format); }}>{format === 'pdf' && pdfOverLimit ? 'PDF (en fazla 2.000 satır)' : ({ excel: 'Excel (.xlsx)', csv: 'CSV', pdf: 'PDF' })[format]}</DropdownMenuItem>)}</DropdownMenuContent>
+          <DropdownMenuContent align="end">{definition.formats.map(format => <DropdownMenuItem key={format} disabled={format === 'pdf' && pdfOverLimit} title={format === 'pdf' && pdfOverLimit ? PDF_ROW_LIMIT_MESSAGE : undefined} onSelect={() => { void runExport(format); }}>{format === 'pdf' && pdfOverLimit ? 'PDF (en fazla 2.000 satır)' : reportExportLabel(format, definition)}</DropdownMenuItem>)}</DropdownMenuContent>
         </DropdownMenu>
       </div>
     </div>
@@ -67,4 +67,9 @@ function ReportTable({ definition, rows, days, meta, loading = false, hasMoreTra
     </div>}
     {children}
   </div>;
+}
+
+export function reportExportLabel(format: ReportFormat, definition: ReportDefinition): string {
+  if (format === 'excel' && definition.excelLayout) return ({ personBlocks: 'Excel (kişi blokları)', personSheets: 'Excel (kişi başına sayfa)', statusMatrix: 'Excel (renkli durum tablosu)' })[definition.excelLayout];
+  return ({ excel: 'Excel (.xlsx)', csv: 'CSV', pdf: 'PDF' })[format];
 }

@@ -12,7 +12,7 @@ import { excelReportColumns } from '@/lib/reports/export';
 import { readHiddenColumns, saveHiddenColumns, columnStorageKey } from '@/lib/reports/columns';
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { _id: 'user-a', role: 'project_admin' } }) }));
 vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ projectId: 'project-a', activeProject: { name: 'Proje' }, loading: false }) }));
-vi.mock('convex/react', () => ({ useQuery: () => [] }));
+vi.mock('convex/react', () => ({ useQuery: () => [], useConvex: () => ({ query: async () => [] }) }));
 const meta = { from: '2026-10-01', to: '2026-10-31' };
 function report(slug: string) { const value = REPORTS.find(item => item.slug === slug); if (!value) throw new Error(slug); return value; }
 describe('reports audit fixes', () => {
@@ -51,7 +51,7 @@ describe('reports audit fixes', () => {
     for (const slug of ['devamsizlar', 'erken-cikanlar', 'istisnalar', 'fazla-mesai']) expect(report(slug).columns.filter(column => column.defaultVisible).length).toBeLessThan(10);
   });
   it('provides report-specific empty messages and clear action', () => {
-    for (const [slug, title] of [['devamsizlar', 'devamsız kişi'], ['erken-cikanlar', 'erken çıkan kişi'], ['mola-ihlalleri', 'mola ihlali']]) {
+    for (const [slug, title] of [['devamsizlar', 'devamsız kişi'], ['erken-cikanlar', 'erken çıkan kişi'], ['mola', 'mola kaydı']]) {
       const html = renderToStaticMarkup(<ReportPage definition={report(slug)} rows={[]} onClear={() => {}} meta={meta} />);
       expect(html).toContain(title); expect(html).toContain('Filtreleri temizle');
     }
@@ -72,4 +72,13 @@ describe('reports audit fixes', () => {
     expect(readHiddenColumns('report', scope)).toEqual(['name']); expect(readHiddenColumns('report', { ...scope, userId: 'other' })).toEqual([]); expect(readHiddenColumns('report', { ...scope, projectId: 'b' })).toEqual([]);
     expect(columnStorageKey('report', scope)).toBe('reports.columns.a.u.report'); vi.unstubAllGlobals();
   });
+});
+
+it('shows the break filter and enables clearing a URL-only violation selection', () => {
+  const definition = REPORTS.find(item => item.slug === 'mola');
+  if (!definition) throw new Error('Missing break report');
+  const html = renderToStaticMarkup(<MemoryRouter initialEntries={['/?ihlal=1']}><ReportScreen definition={definition} /></MemoryRouter>);
+  expect(html).toContain('id="report-break"');
+  expect(html).toContain('for="report-break"');
+  expect(html).toMatch(/<button(?![^>]* disabled=)[^>]*>Filtreleri temizle<\/button>/);
 });

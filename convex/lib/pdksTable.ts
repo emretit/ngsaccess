@@ -1,3 +1,5 @@
+import { computePdksDay } from "./pdksDay";
+import { manualForSegment } from "./pdksMultiShift";
 import { hasDirectionalPdksCheckpoints } from "./pdksRules";
 import { flexibleMinuteFields, type FlexibleMinutes } from "./pdksFlexible";
 import { employedOn } from "./employment";
@@ -109,6 +111,9 @@ export function classifyPdksDay(params: {
 
 /** Rapor ekranları için gün ayrıntısı: plan (vardiya) ve gerçekleşen yan yana. */
 export type PdksDayDetail = {
+  pairs?: Array<{ in: string | null; out: string | null }>;
+  breaks?: Array<{ start: string; end: string; minutes: number }>;
+  breakMinutes?: number;
   segments?: PdksSegment[];
   planKind?: "rest";
   dayType: "workday" | "weekend" | "holiday" | "halfDayHoliday";
@@ -308,7 +313,7 @@ export function computePdksTableRow(params: {
     // Arrival waits on the first piece; exit time and early-exit tolerance belong to the last.
     const lastShift = dayPlan?.kind === "shifts" ? dayPlan.shifts[dayPlan.shifts.length - 1] ?? shift : shift;
     const settings = settingsForShift(lastShift, workSettings);
-    const day = computePdksPlannedDay({
+    const dayParams = {
       policy: params.policyFor?.(date),
       hasLeave: !!leave,
       date,
@@ -322,7 +327,21 @@ export function computePdksTableRow(params: {
       workingDays: params.workingDays,
       holiday: params.holidayMap.get(date),
       holidayMap: params.holidayMap,
-    });
+    };
+    const splitPunches = params.includePunches && dayPlan?.kind === "shifts" && dayPlan.shifts.length > 1;
+    // Split days collect display segments per piece below, so the merged calculation skips them.
+    const day = computePdksPlannedDay({ ...dayParams, includePunchSegments: params.includePunches && !splitPunches });
+    // Reuse each calculation bucket and endpoint policy; gaps between shifts are never breaks.
+    const punchDays = splitPunches && dayPlan?.kind === "shifts"
+      ? splitReadingsByShift(date, readings, dayPlan.shifts, params.policyFor?.(date)).map((bucket, index) => {
+          const piece = dayPlan.shifts[index];
+          return computePdksDay({ ...dayParams, includePunchSegments: true, shift: piece ?? null,
+            dayKind: dayPlan.calendar === "plan" ? "work" : undefined, readings: bucket,
+            manual: manualForSegment(manual, index, dayPlan.shifts.length),
+            manualExitNextDay: index === dayPlan.shifts.length - 1 && !!piece && piece.endTime <= piece.startTime && !!manual?.exitTime && manual.exitTime <= piece.startTime,
+          });
+        }) : [day];
+    const punchSegments = punchDays.flatMap(piece => piece.punchSegments ? [piece.punchSegments] : []);
     const status = noShift ? "noData" : outsideEmployment ? "notEmployed" : classifyPdksDay({
       date,
       firstRecordDate: params.firstRecordDate,
@@ -369,6 +388,16 @@ export function computePdksTableRow(params: {
           : code,
       detail: noShift ? undefined : {
         ...plannedDayFields(day),
+        ...(params.includePunches ? {
+          pairs: punchSegments.flatMap(segment => segment.pairs.map(pair => ({
+            in: pair.entryISO ? formatIstanbulTime(pair.entryISO) : null,
+            out: pair.exitISO ? formatIstanbulTime(pair.exitISO) : null,
+          }))),
+          breaks: punchSegments.flatMap(segment => segment.breaks.map(gap => ({
+            start: formatIstanbulTime(gap.startISO), end: formatIstanbulTime(gap.endISO), minutes: gap.minutes,
+          }))),
+          breakMinutes: punchSegments.reduce((sum, segment) => sum + segment.breakMinutes, 0),
+        } : {}),
         dayType: day.classification,
         shiftName: dayPlan?.kind === "shifts" && dayPlan.shifts.length > 1 ? dayPlan.shifts.map(s => s.name).join(" + ") : shift?.name ?? null,
         plannedStart: day.scheduleType === "flexible" ? "Esnek" : shift?.startTime ?? settings.workStartTime,

@@ -530,3 +530,25 @@ it("R3B-E1: known attendance retains its status before the inferred first record
   }));
   expect(row.days[0]).toMatchObject({ status: "present", payrollCode: "RT" });
 });
+
+it("only includes display pairs and breaks when requested, preserving all duration fields", () => {
+  const empReadings = ["08:00", "12:00", "13:00", "17:00"].map(time => reading(`${MONDAY}T${time}:00+03:00`));
+  const params = rowParams({ empReadings, viewMode: "matrix" });
+  const without = computePdksTableRow(params);
+  const withPunches = computePdksTableRow({ ...params, includePunches: true });
+  expect(without.days[0]?.detail).not.toHaveProperty("pairs");
+  expect(without.days[0]?.detail).not.toHaveProperty("breaks");
+  expect(without.days[0]?.detail).not.toHaveProperty("breakMinutes");
+  expect(withPunches.days[0]?.detail).toMatchObject({ pairs: [{ in: "08:00", out: "12:00" }, { in: "13:00", out: "17:00" }], breaks: [{ start: "12:00", end: "13:00", minutes: 60 }], breakMinutes: 60 });
+  const detail = withPunches.days[0]?.detail;
+  if (!detail) throw new Error("Missing detail");
+  const { pairs: _pairs, breaks: _breaks, breakMinutes: _breakMinutes, ...originalDetail } = detail;
+  expect({ ...withPunches, days: withPunches.days.map(cell => ({ ...cell, detail: { ...originalDetail, punches: [] } })) }).toEqual(without);
+});
+
+it("does not count the gap between shift buckets as a break", () => {
+  const shifts = [{ name: "Sabah", startTime: "08:00", endTime: "12:00" }, { name: "Akşam", startTime: "14:00", endTime: "18:00" }].map((piece, index) => ({ ...piece, _id: `shift-${index}` as Id<"shifts">, _creationTime: 0, createdAt: "", updatedAt: "" }));
+  const empReadings = ["08:00", "12:00", "14:00", "18:00"].map((time, index) => reading(`${MONDAY}T${time}:00+03:00`, { direction: index % 2 === 0 ? "entry" : "exit" }));
+  const result = computePdksTableRow(rowParams({ empReadings, viewMode: "matrix", includePunches: true, resolveShift: () => shifts[0] ?? null, resolvePlan: () => ({ kind: "shifts", shifts, source: "department", calendar: "plan" }) }));
+  expect(result.days[0]?.detail).toMatchObject({ pairs: [{ in: "08:00", out: "12:00" }, { in: "14:00", out: "18:00" }], breaks: [], breakMinutes: 0 });
+});

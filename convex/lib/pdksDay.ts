@@ -18,7 +18,7 @@ import {
 import type { OvertimeSegment } from "./overtimeCalc";
 import { addWorkDate, isOvernightShift, manualPdksTimes } from "./pdksWorkDay";
 
-import { pairPdksPunches, pdksPairReadings } from "./pdksPunchPairs";
+import { pairPdksPunches, pdksPairReadings, pdksPunchSegments } from "./pdksPunchPairs";
 
 type Interval = { start: number; end: number };
 const overlap = (a: Interval, b: Interval) =>
@@ -52,6 +52,7 @@ function recurringWindows(
  * day's timeline; legal breaks without a scheduled window are allocated proportionally. */
 export function computePdksDay(params: {
   policy?: PdksDayPolicy;
+  includePunchSegments?: boolean;
   hasLeave?: boolean;
   dayKind?: "rest" | "work";
   /** Split plans attribute a manual exit against the last piece, independently of the first entry. */
@@ -148,10 +149,11 @@ export function computePdksDay(params: {
     ? Math.floor((new Date(lastISO).getTime() - origin) / 60000)
     : undefined;
   const minPunchInterval = params.policy?.minPunchIntervalMinutes ?? 1;
-  const pairResult = eachPunch ? pairPdksPunches(flexibleConflict ? [] : pdksPairReadings(readings, fixedEvidence?.manual ?? {
+  const resolvedPairReadings = eachPunch || params.includePunchSegments ? flexibleConflict ? [] : pdksPairReadings(readings, fixedEvidence?.manual ?? {
     entryISO: flex ? validManualEntry : manual?.entryTime ? evidenceManualTimes.entryISO : undefined,
     exitISO: flex ? validManualExit : evidenceManualTimes.exitISO,
-  }, minPunchInterval), minPunchInterval) : undefined;
+  }, minPunchInterval) : [];
+  const pairResult = eachPunch ? pairPdksPunches(resolvedPairReadings, minPunchInterval) : undefined;
   const pairIntervals = pairResult?.pairs.map(pair => ({
     start: (Date.parse(pair.entryISO) - origin) / 60000,
     end: (Date.parse(pair.exitISO) - origin) / 60000,
@@ -327,6 +329,7 @@ export function computePdksDay(params: {
     : absentByFixedRule && evidence ? "absent" as const : evidence?.decision;
   return {
     date,
+    ...(params.includePunchSegments ? { punchSegments: pdksPunchSegments(resolvedPairReadings, minPunchInterval) } : {}),
     ...(flex ? {
       scheduleType: "flexible" as const,
       requiredNetMinutes,

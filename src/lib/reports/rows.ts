@@ -1,3 +1,4 @@
+import type { PersonMonthReportRow } from './personMonth';
 import type { FunctionReturnType } from 'convex/server';
 import type { api } from '../../../convex/_generated/api';
 import type { ReportTransactionRow } from '../../../convex/lib/reportAttendance';
@@ -16,7 +17,7 @@ export type DepartmentReportRow = {
   attendance: AttendanceCounts; totalMinutes: number; overtimeMinutes: number; attendanceRate: number | null;
 };
 export type TransactionReportRow = { kind: 'transaction'; id: string; transaction: ReportTransactionRow };
-export type ReportRow = DailyReportRow | MonthlyReportRow | DepartmentReportRow | TransactionReportRow;
+export type ReportRow = DailyReportRow | MonthlyReportRow | DepartmentReportRow | TransactionReportRow | PersonMonthReportRow;
 export type MonthlyRowMode = 'people' | 'departments';
 export type DailyPredicate = (cell: DailyCell) => boolean;
 export const DAILY_PREDICATES: Record<string, DailyPredicate> = {
@@ -28,7 +29,7 @@ export const DAILY_PREDICATES: Record<string, DailyPredicate> = {
   'ilk-giris-son-cikis': cell => Boolean(cell.firstEntry),
   istisnalar: cell => (cell.detail?.dayType === 'workday' && (cell.isLate || cell.detail.isEarlyExit)) || cell.status === 'absent',
   'erken-cikanlar': cell => cell.detail?.dayType === 'workday' && cell.detail.isEarlyExit,
-  'mola-ihlalleri': cell => Boolean(cell.detail?.breakViolation),
+  mola: cell => (cell.detail?.breaks?.length ?? 0) > 0 || Boolean(cell.detail?.breakViolation),
   'okutma-karti': cell => (cell.detail?.punches.length ?? 0) > 0,
 };
 const DAILY_SORTS: Record<string, (a: DailyReportRow, b: DailyReportRow) => number> = {
@@ -95,8 +96,8 @@ export function monthlyRowsForReport(sheet: MonthlySheet, mode: MonthlyRowMode =
 export function buildTransactionRows(rows: readonly ReportTransactionRow[]): TransactionReportRow[] {
   return rows.map(transaction => ({ kind: 'transaction', id: transaction._id, transaction }));
 }
-export function dailyRowsForReport(rows: readonly DailySourceRow[], slug: string): DailyReportRow[] {
-  const result = flattenDailyRows(rows, DAILY_PREDICATES[slug]);
+export function dailyRowsForReport(rows: readonly DailySourceRow[], slug: string, violationsOnly = false): DailyReportRow[] {
+  const result = flattenDailyRows(rows, slug === 'mola' && violationsOnly ? cell => Boolean(cell.detail?.breakViolation) : DAILY_PREDICATES[slug]);
   const sort = DAILY_SORTS[slug];
   return sort ? result.sort(sort) : result;
 }
