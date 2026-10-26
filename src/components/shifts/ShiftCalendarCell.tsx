@@ -43,7 +43,7 @@ export function ShiftCalendarCell({
   const records = dayDisplayRecords(data);
   const rest = data.resolved?.cell.kind === "rest";
   const source = data.resolved?.cell.source;
-  const sourceLabel = source === "department" ? `Departmandan: ${data.resolved?.departmentName ?? "Departman"}` : source === "default" ? "Varsayılan vardiya" : "";
+  const sourceLabel = source === "department" ? `Departmandan: ${data.resolved?.departmentName ?? "Departman"}` : "";
   const title = [sourceLabel, rest ? "Boş" : records.map(({ shift }) => `${shift.name} · ${shiftTimeLabel(shift)}`).join(", ")].filter(Boolean).join(" · ");
   const ariaLabel = [employeeName, dayLabel(date), rest ? "Boş" : records.length ? `${records.length} atama: ${records.map(({ shift }) => shift.name).join(", ")}` : "atama yok",
     sourceLabel, rest || records.length ? "ayrıntıları aç" : canAssign ? "vardiya ata" : "günü aç"].filter(Boolean).join(", ");
@@ -65,8 +65,7 @@ export function ShiftCalendarCell({
         {records.slice(0, limit).map(({ key, shift, continuation }) => {
           const bar = shiftColorClasses(shift.color)?.bar;
           return (
-            <span key={key} className={`relative block ${bar ? source === "default" ? "pl-1.5" : `${bar} pl-1.5` : ""}`} title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
-              {bar && source === "default" && <span aria-hidden="true" className={`absolute inset-y-0 left-0 opacity-50 ${bar}`} />}
+            <span key={key} className={`relative block ${bar ? `${bar} pl-1.5` : ""}`} title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
               {!compact && <span className="block font-medium">{shift.name}</span>}
               <span className={`text-muted-foreground tabular-nums ${compact ? "block text-[10px] leading-tight tracking-tight" : ""}`}>
                 {cellTimeLabel(shift, continuation, compact)}

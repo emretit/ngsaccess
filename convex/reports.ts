@@ -11,6 +11,7 @@ import {
   overtimePayTRY,
 } from "./lib/pdksHelpers";
 
+import { buildPeriodDateKeys } from "./lib/pdksCalc";
 import { legacyAttendanceDays, legacyOvertimeMinutes } from "./lib/legacyOvertime";
 
 const LEGACY_REPORT_RELIABILITY_NOTE = "Güvenilirlik sınırı: Bu rapor okuma ve manuel PDKS kayıtlarından üretilir; kayıtsız personel bu özete dahil değildir. Eski kurallı günlerde ilk–son süre kullanılır: tek günlük veride 8 saat, birden çok günde takvim haftası başına 45 saat eşiği uygulanır; dönem dışındaki günler hesaba katılmaz. Bordro doğrulaması yerine kullanılmamalıdır.";
@@ -82,9 +83,8 @@ export const getSgkMonthlyReport = authedQuery({
               .reduce((sum, l) => {
                 const overlapStart = l.startDate < startDate ? startDate : l.startDate;
                 const overlapEnd = l.endDate > endDate ? endDate : l.endDate;
-                const start = new Date(overlapStart);
-                const end = new Date(overlapEnd);
-                return sum + Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
+                return sum + buildPeriodDateKeys(overlapStart, overlapEnd)
+                  .filter(date => employee && ruleReport.hasPlan(employee, date)).length;
               }, 0)
           : 0;
 

@@ -2,7 +2,7 @@ import { getProjectIdsWithPermission, requirePermission } from "./lib/permission
 import { v } from "convex/values";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { validateManualPdksInput, validateManualPdksNote } from "./lib/pdksManual";
-import { findManualPdksRecord, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
+import { findManualPdksRecord, manualValidationShift, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
 import { buildShiftResolver } from "./lib/shiftResolver";
 import { resolveProjectScope } from "./lib/projectScope";
 import { isOvernightShift } from "./lib/pdksWorkDay";
@@ -74,7 +74,7 @@ export const bulkUpsertManual = authedMutation({
           }
         }
 
-        const shift = resolver.resolveLast(employee._id, row.date);
+        const shift = manualValidationShift(resolver, employee, row.date);
         const input = validateManualPdksInput({ ...row, note: batchNote }, shift?.projectId === employee.projectId ? shift : null);
 
         const existing = await findManualPdksRecord(ctx, row.employeeId, row.date);
@@ -149,7 +149,9 @@ export const previewManualShifts = authedQuery({
     const resolver = await buildShiftResolver(ctx, employees);
     return args.rows.flatMap(row => {
       if (!employeeIds.has(row.employeeId)) return [];
-      const shift = resolver.resolveLast(row.employeeId, row.date);
+      const employee = employees.find(employee => employee._id === row.employeeId);
+      if (!employee) return [];
+      const shift = manualValidationShift(resolver, employee, row.date);
       return shift?.projectId === args.projectId && isOvernightShift(shift)
         ? [{ key: `${row.employeeId}__${row.date}`, startTime: shift.startTime, endTime: shift.endTime }] : [];
     });

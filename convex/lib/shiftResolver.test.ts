@@ -18,18 +18,24 @@ const dept = (id: string, extra: Partial<Doc<"departmentShiftAssignments">> = {}
 const date = "2026-06-01";
 
 describe("shared DayPlan resolution", () => {
-  it("uses personal > nearest department > default > project and carries sources", () => {
+  it("requires a dated assignment even with the legacy shiftId", () => {
+    const resolver = createShiftResolver([employee], shifts, [[personal({ startDate: "2026-06-15" })]]);
+    expect(resolver.resolvePlan(employee._id, "2026-06-14").kind).toBe("none");
+    expect(resolver.resolvePlan(employee._id, "2026-06-15").kind).toBe("shifts");
+    expect(resolver.resolvePlan(employee._id, "2026-07-01").kind).toBe("none");
+  });
+  it("uses personal > nearest department > no plan and carries sources", () => {
     const resolve = (people: Doc<"shiftAssignments">[], depts: Doc<"departmentShiftAssignments">[], emp = employee) => createShiftResolver([emp], shifts, [people], departments, depts).resolvePlan(emp._id, date);
     expect(resolve([personal()], [dept("child"), dept("parent")])).toMatchObject({ kind: "shifts", source: "employee", calendar: "project", assignmentId: personal()._id, shifts: [shift("personal")] });
     expect(resolve([], [dept("parent"), dept("child")])).toMatchObject({ source: "department", departmentId: "child", departmentAssignmentId: "childAssignment", shifts: [shift("childShift")] });
     expect(resolve([], [dept("parent")])).toMatchObject({ source: "department", departmentId: "parent" });
-    expect(resolve([], [])).toMatchObject({ source: "default", calendar: "project", shifts: [shift("default")] });
+    expect(resolve([], [])).toMatchObject({ kind: "none", source: "project" });
     expect(resolve([], [], { ...employee, shiftId: undefined })).toEqual({ kind: "none", source: "project" });
   });
-  it("falls through unmatched weekdays to parent, then default", () => {
+  it("falls through unmatched weekdays to parent, then none", () => {
     const resolver = createShiftResolver([employee], shifts, [[personal({ weekPattern: ["TUE"] })]], departments, [dept("child", { weekPattern: ["TUE"] }), dept("parent", { weekPattern: ["MON"] })]);
     expect(resolver.resolvePlan(employee._id, date)).toMatchObject({ departmentId: "parent" });
-    expect(resolver.resolvePlan(employee._id, "2026-06-03")).toMatchObject({ source: "default" });
+    expect(resolver.resolvePlan(employee._id, "2026-06-03")).toMatchObject({ kind: "none", source: "project" });
   });
   it("preserves stable index order for equal updatedAt and selects latest updates", () => {
     const first = personal();
@@ -63,19 +69,19 @@ describe("shared DayPlan resolution", () => {
   it("bounds cycles and depth at 32, ignoring level and cross-project parents", () => {
     const cycle = [department("child", "parent"), department("parent", "child")];
     expect(departmentChain(employee.departmentId, projectId, new Map(cycle.map(item => [String(item._id), item])))).toEqual(["child", "parent"]);
-    expect(createShiftResolver([employee], shifts, [[]], cycle, []).resolve(employee._id, date)?._id).toBe("default");
+    expect(createShiftResolver([employee], shifts, [[]], cycle, []).resolve(employee._id, date)?._id).toBeUndefined();
     const cross = [department("child", "foreign"), { ...department("foreign", "parent"), projectId: "other" as Id<"projects"> }, department("parent")];
-    expect(createShiftResolver([employee], shifts, [[]], cross, [dept("parent")]).resolvePlan(employee._id, date)).toMatchObject({ source: "default" });
+    expect(createShiftResolver([employee], shifts, [[]], cross, [dept("parent")]).resolvePlan(employee._id, date)).toMatchObject({ kind: "none", source: "project" });
     const deep = Array.from({ length: 40 }, (_, i) => department(`d${i}`, `d${i + 1}`));
     expect(departmentChain("d0" as Id<"departments">, projectId, new Map(deep.map(item => [String(item._id), item])))).toHaveLength(32);
   });
-  it("exactly equals the old resolver for all legacy dates, patterns, deleted ids and stable ties", () => {
+  it("preserves dated legacy assignments for all legacy dates, patterns, deleted ids and stable ties", () => {
     const rows = [personal({ weekPattern: ["TUE"], updatedAt: "2026-06-03" }), personal({ shiftId: "deleted" as Id<"shifts">, updatedAt: "2026-06-04" }), personal({ shiftId: "last" as Id<"shifts">, weekPattern: ["MON", "FRI"], updatedAt: "2026-06-03" })];
     const resolver = createShiftResolver([employee], shifts, [rows]);
     const map = new Map(shifts.map(item => [String(item._id), item]));
     for (let i = 0; i < 45; i++) {
       const day = new Date(Date.parse("2026-05-25") + i * 86_400_000).toISOString().slice(0, 10);
-      const old = rows.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).filter(row => assignmentAppliesOnDate(row, day)).map(row => map.get(row.shiftId)).find(item => item !== undefined) ?? map.get(String(employee.shiftId)) ?? null;
+      const old = rows.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).filter(row => assignmentAppliesOnDate(row, day)).map(row => map.get(row.shiftId)).find(item => item !== undefined) ?? null;
       expect(resolver.resolve(employee._id, day)).toStrictEqual(old);
       expect(resolver.resolveLast(employee._id, day)).toStrictEqual(old);
     }
@@ -130,5 +136,58 @@ describe("bounded resolver loading", () => {
       if (!emp) throw new Error("fixture");
       await expect(buildBoundedShiftResolver(ctx, [emp])).rejects.toThrow("sınırı aşıldı");
     });
+  });
+});
+
+it("bounded reports skip the legacy shiftId get and preserve creation-order ties with an end-date index", async () => {
+  const t = convexTest(schema, modules);
+  await t.run(async ctx => {
+    const projectId = await ctx.db.insert("projects", { name: "Scoped" });
+    const legacyId = await ctx.db.insert("shifts", { name: "Legacy", startTime: "22:00", endTime: "06:00", createdAt: "", updatedAt: "" });
+    const firstId = await ctx.db.insert("shifts", { projectId, name: "First", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "" });
+    const secondId = await ctx.db.insert("shifts", { projectId, name: "Second", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" });
+    const id = await ctx.db.insert("employees", { projectId, shiftId: legacyId, firstName: "Test", lastName: "Tie", email: "tie@test", cardNumber: "1" });
+    const employee = await ctx.db.get(id);
+    if (!employee) throw new Error("Missing employee");
+    const gets: unknown[] = [];
+    const db = new Proxy(ctx.db, { get(target, key) {
+      if (key !== "get") return Reflect.get(target, key);
+      return (...args: unknown[]) => { gets.push(args[0]); return Reflect.apply(target.get, target, args); };
+    } });
+    const range = { start: "2026-06-15", end: "2026-06-16" };
+    expect((await buildBoundedShiftResolver({ ...ctx, db }, [employee], range)).resolvePlan(id, range.start).kind).toBe("none");
+    expect(gets).toEqual([]);
+    const base = { employeeId: id, projectId, startDate: "2026-06-01", createdAt: "", updatedAt: "" };
+    await ctx.db.insert("shiftAssignments", { ...base, shiftId: firstId, endDate: "2026-06-30" });
+    await ctx.db.insert("shiftAssignments", { ...base, shiftId: secondId, endDate: "2026-06-20" });
+    const resolver = await buildBoundedShiftResolver({ ...ctx, db }, [employee], range);
+    expect(resolver.resolve(id, range.start)?._id).toBe(firstId);
+    expect(gets).not.toContain(legacyId);
+    expect(gets).toHaveLength(2);
+  });
+});
+
+it("bounded reports load long and open-ended assignments and keep department creation-order ties", async () => {
+  const t = convexTest(schema, modules);
+  await t.run(async ctx => {
+    const projectId = await ctx.db.insert("projects", { name: "Long" });
+    const departmentId = await ctx.db.insert("departments", { projectId, name: "Ops", createdAt: "", updatedAt: "" });
+    const longId = await ctx.db.insert("shifts", { projectId, name: "Long", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "" });
+    const firstId = await ctx.db.insert("shifts", { projectId, name: "First", startTime: "07:00", endTime: "16:00", createdAt: "", updatedAt: "" });
+    const secondId = await ctx.db.insert("shifts", { projectId, name: "Second", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" });
+    const personalId = await ctx.db.insert("employees", { projectId, firstName: "Uzun", lastName: "Atama", email: "long@test", cardNumber: "1" });
+    const memberId = await ctx.db.insert("employees", { projectId, departmentId, firstName: "Departman", lastName: "Bağ", email: "dept@test", cardNumber: "2" });
+    const base = { projectId, createdAt: "", updatedAt: "2026-01-01T00:00:00.000Z" };
+    await ctx.db.insert("shiftAssignments", { ...base, employeeId: personalId, shiftId: longId, startDate: "2024-01-01", endDate: "2099-12-31" });
+    // Created first but ends later: by_project_end would read it second.
+    await ctx.db.insert("departmentShiftAssignments", { ...base, departmentId, shiftId: firstId, startDate: "2024-01-01", endDate: "2026-06-30" });
+    await ctx.db.insert("departmentShiftAssignments", { ...base, departmentId, shiftId: secondId, startDate: "2024-01-01", endDate: "2026-06-20" });
+    const employees = (await Promise.all([personalId, memberId].map(id => ctx.db.get(id)))).filter((e): e is NonNullable<typeof e> => e !== null);
+    const range = { start: "2026-06-15", end: "2026-06-16" };
+    const bounded = await buildBoundedShiftResolver(ctx, employees, range);
+    const unbounded = await buildShiftResolver(ctx, employees);
+    expect(bounded.resolve(personalId, range.start)?._id).toBe(longId);
+    expect(bounded.resolve(memberId, range.start)?._id).toBe(unbounded.resolve(memberId, range.start)?._id);
+    expect(bounded.resolve(memberId, range.start)?._id).toBe(firstId);
   });
 });

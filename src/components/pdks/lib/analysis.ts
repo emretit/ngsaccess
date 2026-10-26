@@ -14,7 +14,7 @@ export function analyzePdksRows(rows: readonly PdksRow[]): AnalysisDay[] {
   const days = new Map<string, AnalysisDay>();
   for (const row of rows)
     for (const cell of row.days) {
-      if (cell.status === "notEmployed") continue;
+      if (cell.noShift || cell.status === "notEmployed") continue;
       const item = days.get(cell.date) ?? {
         date: cell.date,
         counts: {

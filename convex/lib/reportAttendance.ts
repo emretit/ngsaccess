@@ -1,5 +1,5 @@
 import { scopedPdksPlan, usesPlanDayRules } from "./pdksMultiShift";
-import type { DayPlan } from "./shiftResolver";
+import type { DayPlan, ShiftResolver } from "./shiftResolver";
 import { hasFixedShiftRules, usesShiftDayRules } from "./pdksFixedRules";
 import { hasDirectionalPdksCheckpoints, hasVersionedPdksPolicy, loadPdksPolicies } from "./pdksRules";
 import { employedDuring, employedOn } from "./employment";
@@ -97,8 +97,8 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
       getHolidaysMap(ctx, projectId, startDate, endDate),
       ctx.db.query("generalSettings").withIndex("by_project", (q) => q.eq("projectId", projectId)).first(),
     ]);
-    const employees = allEmployees.filter((employee) => employedDuring(employee, startDate, endDate) && employee.isVisitor !== true);
     const shiftResolver = await buildShiftResolver(ctx, allEmployees.filter(e => employedDuring(e, startDate, endDate)));
+    const employees = allEmployees.filter(employee => employedDuring(employee, startDate, endDate) && employee.isVisitor !== true && periodDateKeys.some(date => scopedPdksPlan(shiftResolver.resolvePlan(employee._id, date), projectId).kind !== "none"));
     const workingDays = generalSettings?.workingDays?.length ? generalSettings.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
     const leaveLists = await Promise.all(employees.map(employee => ctx.db.query("leaves")
       .withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", endDate)).collect()));
@@ -252,7 +252,7 @@ export function splitPdksEligible<T extends PdksSourceReading>(
 }
 
 /** Versioned report adapter. Legacy report rows keep their existing aggregations. */
-export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects">[], startDate: string, endDate: string, options: { includeLegacyReadings?: boolean; preloadedReadings?: { readings: readonly Doc<"cardReadings">[]; startISO: string; endISO: string } } = {}) {
+export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects">[], startDate: string, endDate: string, options: { includeLegacyReadings?: boolean; preloadedEmployees?: Doc<"employees">[]; shiftResolver?: ShiftResolver; preloadedReadings?: { readings: readonly Doc<"cardReadings">[]; startISO: string; endISO: string } } = {}) {
   const policies = await loadPdksPolicies(ctx, projectIds, addWorkDate(startDate, -7), addWorkDate(endDate, 1));
   const dates = buildPeriodDateKeys(startDate, endDate);
   const activeProjects = projectIds.filter(id => hasVersionedPdksPolicy(policies, id, addWorkDate(startDate, -1), endDate));
@@ -272,7 +272,13 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
       legacyEmployees.set(employee._id, employee);
     }
   };
+  const planResolvers = new Map<Id<"projects">, ShiftResolver>();
   const discoveryEmployees = new Map<Id<"projects">, Doc<"employees">[]>();
+  for (const projectId of projectIds) {
+    if (options.preloadedEmployees) discoveryEmployees.set(projectId, options.preloadedEmployees.filter(employee => employee.projectId === projectId));
+    if (options.shiftResolver) planResolvers.set(projectId, options.shiftResolver);
+  }
+  const resolverRange = { start: addWorkDate(startDate, -7), end: addWorkDate(endDate, 1) };
   const flexibleProjects = await flexibleReportProjects(ctx, projectIds.filter(id => !activeProjects.includes(id)), startDate, endDate, discoveryEmployees, usesShiftDayRules);
   const managedProjects = projectIds.filter(id => activeProjects.includes(id) || flexibleProjects.has(id));
   const legacyProjects = projectIds.filter(id => !managedProjects.includes(id));
@@ -284,6 +290,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
       const employees = discoveryEmployees.get(projectId) ?? await ctx.db.query("employees")
         .withIndex("by_project", q => q.eq("projectId", projectId)).take(10001);
       if (employees.length > 10000) throw new Error("Rapor personel sınırı aşıldı");
+      discoveryEmployees.set(projectId, employees);
       for (const employee of employees.filter(e => employedDuring(e, startDate, endDate))) {
         rememberLegacyManual(employee, await readReportManualRecords(ctx, employee._id, startDate, endDate));
       }
@@ -292,7 +299,9 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
   for (const projectId of managedProjects) {
     const allEmployees = discoveryEmployees.get(projectId) ?? await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).take(10001);
     if (allEmployees.length > 10000) throw new Error("Rapor personel sınırı aşıldı");
-    const shifts = await buildBoundedShiftResolver(ctx, allEmployees);
+    discoveryEmployees.set(projectId, allEmployees);
+    const shifts = planResolvers.get(projectId) ?? await buildBoundedShiftResolver(ctx, allEmployees, resolverRange);
+    planResolvers.set(projectId, shifts);
     const flexible = [...shifts.shifts.values()].some(shift => shift.scheduleType === "flexible");
     const plannedDates = buildPeriodDateKeys(addWorkDate(startDate, -1), addWorkDate(endDate, 1));
     const planned = allEmployees.some(employee => plannedDates.some(date => usesPlanDayRules(shifts.resolvePlan(employee._id, date))));
@@ -393,8 +402,35 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     return policies(reading.projectId, date).calculationMode === "eachPunch" || policies(reading.projectId, date).punchMode === "requirements" || hasDirectionalPdksCheckpoints(policies(reading.projectId, date)) ||
       (employeeId !== undefined && result.get(employeeId)?.days.some(day => day.date === date) === true);
   };
-  return { policies, workDate: dateFor, managesReading,
+  const planEmployees = (await Promise.all(projectIds.filter(projectId => options.includeLegacyReadings !== false || managedProjects.includes(projectId) || discoveryEmployees.has(projectId)).map(async projectId => {
+    const employees = discoveryEmployees.get(projectId) ?? await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).take(10001);
+    if (employees.length > 10000) throw new Error("Rapor personel sınırı aşıldı");
+    if (!planResolvers.has(projectId)) planResolvers.set(projectId, await buildBoundedShiftResolver(ctx, employees, resolverRange));
+    return employees;
+  }))).flat();
+  const planById = new Map(planEmployees.map(employee => [employee._id, employee]));
+  const planByCard = new Map(planEmployees.map(employee => [`${employee.projectId}__${employee.cardNumber}`, employee]));
+  const hasPlan = (employee: Doc<"employees">, date: string) => {
+    const resolver = employee.projectId ? planResolvers.get(employee.projectId) : undefined;
+    return resolver !== undefined && scopedPdksPlan(resolver.resolvePlan(employee._id, date), employee.projectId).kind !== "none";
+  };
+  for (const [id, row] of result) {
+    const days = row.days.filter(day => !day.noShift);
+    if (days.length) result.set(id, { ...row, days });
+    else { result.delete(id); ruleEmployees.delete(id); }
+  }
+  for (const [id, records] of legacyManualRecords) {
+    const employee = planById.get(id);
+    const planned = employee ? records.filter(record => hasPlan(employee, record.date)) : [];
+    if (planned.length) legacyManualRecords.set(id, planned);
+    else { legacyManualRecords.delete(id); legacyEmployees.delete(id); }
+  }
+  const plannedReadings = [...readingsByProject.values()].flat().filter(reading => {
+    const employee = reading.employeeId ? planById.get(reading.employeeId) : planByCard.get(`${reading.projectId}__${reading.cardNo}`);
+    return employee !== undefined && hasPlan(employee, dateFor(reading));
+  });
+  return { policies, workDate: dateFor, managesReading, hasPlan, planResolvers,
     manualEntryFor: (id: Id<"employees">, date: string) => manualEntriesByEmployee.get(`${id}__${date}`)?.entryTime,
     legacyManualRecords, reportEmployees: new Map([...legacyEmployees, ...ruleEmployees]),
-    ruleRows: result, ruleEmployees, readings: [...readingsByProject.values()].flat() };
+    ruleRows: result, ruleEmployees, readings: plannedReadings };
 }

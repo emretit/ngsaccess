@@ -16,6 +16,7 @@ async function fixture(night = false, typed = false) {
     const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 100 * 86400000 });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Vardiya", startTime: night ? "22:00" : "08:00", endTime: night ? "06:00" : "17:00", createdAt: "", updatedAt: "", overtimeStartToleranceMinutes: 0 });
     const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Test", lastName: "Test", email: "test@example.test", cardNumber: "TEST", isActive: true, shiftId });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const deviceId = await ctx.db.insert("devices", { projectId, name: "Panel", brand: "ide_smart", createdAt: "", updatedAt: "" });
     const entryDoor = await ctx.db.insert("doors", { projectId, deviceId, name: "Giriş", ioId: 1 });
     const exitDoor = await ctx.db.insert("doors", { projectId, deviceId, name: "Çıkış", ioId: 2 });

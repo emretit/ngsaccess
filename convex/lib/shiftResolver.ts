@@ -24,7 +24,7 @@ export function assignmentAppliesOnDate(
 }
 
 export type DayPlan =
-  | { kind: "shifts"; shifts: Doc<"shifts">[]; source: "employee" | "department" | "default"; calendar: "project" | "plan";
+  | { kind: "shifts"; shifts: Doc<"shifts">[]; source: "employee" | "department"; calendar: "project" | "plan";
       assignmentId?: Id<"shiftAssignments">; departmentAssignmentId?: Id<"departmentShiftAssignments">; departmentId?: Id<"departments"> }
   | { kind: "rest"; source: "employee" | "department"; calendar: "plan";
       assignmentId?: Id<"shiftAssignments">; departmentAssignmentId?: Id<"departmentShiftAssignments">; departmentId?: Id<"departments"> }
@@ -39,6 +39,11 @@ export interface ResolverRange { start: string; end: string }
 export const DEPARTMENT_READ_LIMIT = 2000;
 export const DEPARTMENT_CHAIN_LIMIT = 32;
 
+/** Range-index reads order by endDate; keep rows starting by range.end and restore creation order so equal updatedAt ties match the unbounded by_employee/by_project reads. */
+function startingByRangeEnd<T extends { startDate: string; _creationTime: number }>(rows: T[], range?: ResolverRange): T[] {
+  return rows.filter(row => !range || row.startDate <= range.end).sort((a, b) => a._creationTime - b._creationTime);
+}
+
 export async function readDepartmentPlans(ctx: AnyCtx, projectIds: Id<"projects">[], range?: ResolverRange) {
   const departments: Doc<"departments">[] = [];
   const assignments: Doc<"departmentShiftAssignments">[] = [];
@@ -47,7 +52,7 @@ export async function readDepartmentPlans(ctx: AnyCtx, projectIds: Id<"projects"
       ? q.eq("projectId", projectId).gte("endDate", new Date(Date.parse(range.start) - 86_400_000).toISOString().slice(0, 10))
       : q.eq("projectId", projectId)).take(DEPARTMENT_READ_LIMIT + 1);
     if (rows.length > DEPARTMENT_READ_LIMIT) throw new ConvexError("Departman vardiya okuma sınırı aşıldı; tarih aralığını daraltın");
-    const relevant = rows.filter(row => !range || row.startDate <= range.end);
+    const relevant = startingByRangeEnd(rows, range);
     // A project with no applicable department assignments retains the legacy path,
     // irrespective of how large its department tree is.
     if (!relevant.length) continue;
@@ -70,14 +75,17 @@ export async function buildShiftResolver(ctx: AnyCtx, employees: Doc<"employees"
 /** Versioned/mobile paths load only referenced shifts and bounded assignments. */
 export async function buildBoundedShiftResolver(ctx: AnyCtx, employees: Doc<"employees">[], range?: ResolverRange): Promise<ShiftResolver> {
   const [assignmentLists, departmentData] = await Promise.all([
-    Promise.all(employees.map(employee => ctx.db.query("shiftAssignments").withIndex("by_employee", q => q.eq("employeeId", employee._id)).take(1001))),
+    Promise.all(employees.map(employee => (range
+      ? ctx.db.query("shiftAssignments").withIndex("by_employee_end", q => q.eq("employeeId", employee._id).gte("endDate", range.start))
+      : ctx.db.query("shiftAssignments").withIndex("by_employee", q => q.eq("employeeId", employee._id))).take(1001))),
     readDepartmentPlans(ctx, employees.flatMap(employee => employee.projectId && employee.departmentId ? [employee.projectId] : []), range),
   ]);
   if (assignmentLists.some(list => list.length > 1000) || assignmentLists.flat().length > 10000) throw new ConvexError("Vardiya atama sınırı aşıldı; tarih aralığını daraltın");
-  const rows = [...assignmentLists.flat(), ...departmentData.assignments];
-  const ids = [...new Set([...employees.flatMap(employee => employee.shiftId ? [employee.shiftId] : []), ...rows.flatMap(row => [row.shiftId, ...planShiftIds(row.plan)])])];
+  const relevantLists = assignmentLists.map(list => startingByRangeEnd(list, range));
+  const rows = [...relevantLists.flat(), ...departmentData.assignments];
+  const ids = [...new Set(rows.flatMap(row => [row.shiftId, ...planShiftIds(row.plan)]))];
   const allShifts = (await Promise.all(ids.map(id => ctx.db.get(id)))).filter((shift): shift is NonNullable<typeof shift> => shift !== null);
-  return createShiftResolver(employees, allShifts, assignmentLists, departmentData.departments, departmentData.assignments);
+  return createShiftResolver(employees, allShifts, relevantLists, departmentData.departments, departmentData.assignments);
 }
 
 /** Compute once per department; ignore corrupt cycles and cross-project parents. */
@@ -139,8 +147,7 @@ export function createShiftResolver(employees: Doc<"employees">[], allShifts: Do
         }
       }
     }
-    const shift = employee?.shiftId ? shiftMap.get(employee.shiftId) : undefined;
-    return shift ? { kind: "shifts", shifts: [shift], source: "default", calendar: "project" } : { kind: "none", source: "project" };
+    return { kind: "none", source: "project" };
   }
   function resolvePlan(employeeId: Id<"employees">, date: string): DayPlan {
     const key = `${employeeId}|${date}`;

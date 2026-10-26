@@ -286,8 +286,10 @@ export async function exportMonthlyPayrollSheet(
     sheet.getCell(r, 3).value = row.payrollCode;
     sheet.getCell(r, 4).value = row.department;
 
-    row.cells.forEach((cell, ci) => {
-      const c = sheet.getCell(r, 5 + ci);
+    row.cells.forEach((cell) => {
+      const dayIndex = data.days.indexOf(cell.date);
+      if (dayIndex < 0) return;
+      const c = sheet.getCell(r, 5 + dayIndex);
       c.value = cell.payrollCode;
       c.alignment = { horizontal: "center" };
       let bg: string | null = null;

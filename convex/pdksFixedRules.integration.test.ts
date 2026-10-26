@@ -19,6 +19,7 @@ async function fixture(patch: Partial<Doc<"shifts">> = {}) {
     await ctx.db.insert("userProjects", { userId, projectId });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Sabit", startTime: "09:00", endTime: "17:00", minWorkMinutes: 500, createdAt: "", updatedAt: "", ...patch });
     const employeeId = await ctx.db.insert("employees", { projectId, shiftId, firstName: "Ada", lastName: "Test", email: "fixed@example.test", cardNumber: "1", isActive: true });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     await ctx.db.insert("employeeAuth", { employeeId, passwordHash: "fixture", passwordVersion: 1, createdAt: "", updatedAt: "" });
     await ctx.db.insert("employeeSessions", { employeeId, token: "fixed-session", passwordVersion: 1, expiresAt: "2099-01-01T00:00:00Z", createdAt: "" });
     return { projectId, employeeId, shiftId, userId, sessionId };
@@ -35,10 +36,10 @@ it("fixed minimum and late rules agree across dashboard and mobile under a legac
   await f.add("17:00", "exit");
   const summary = () => f.t.query(api.mobileAttendance.summary, { sessionToken: "fixed-session", startDate: date, endDate: date });
   const dashboard = () => f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId });
-  expect((await summary()).totals.presentDays).toBe(0);
+  expect((await summary()).totals.pdksPresentDays).toBe(0);
   expect(await dashboard()).toMatchObject({ presentToday: 0 });
   await f.t.run(ctx => ctx.db.patch(f.shiftId, { minWorkMinutes: 300 }));
-  expect((await summary()).totals.presentDays).toBe(1);
+  expect((await summary()).totals.pdksPresentDays).toBe(1);
   expect(await dashboard()).toMatchObject({ presentToday: 1 });
 });
 it("detail and mobile attribute an extended fixed night exit to the preceding work day", async () => {
@@ -50,5 +51,5 @@ it("detail and mobile attribute an extended fixed night exit to the preceding wo
   const detail = await f.caller.query(api.cardReadings.getEmployeeAttendanceDetail, { projectId: f.projectId, employeeId: f.employeeId, startDate: date, endDate: next });
   expect(detail?.days.find(day => day.date === date)).toMatchObject({ firstEntry: "22:00", lastExit: "15:00", exitNextDay: true, durationMeasured: true });
   const mobile = await f.t.query(api.mobileAttendance.summary, { sessionToken: "fixed-session", startDate: date, endDate: next });
-  expect(mobile.totals.presentDays).toBe(1);
+  expect(mobile.totals.pdksPresentDays).toBe(1);
 });

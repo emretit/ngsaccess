@@ -143,6 +143,7 @@ it("discovers fixed rules only when requested and routes legacy-policy reports t
     const projectId = await ctx.db.insert("projects", { name: "Kurallı proje" });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Kurallı", startTime: "09:00", endTime: "17:00", minWorkMinutes: 500, createdAt: "", updatedAt: "" });
     const employeeId = await ctx.db.insert("employees", { projectId, shiftId, firstName: "Ada", lastName: "Test", email: "ada@example.test", cardNumber: "1", isActive: true });
+    await ctx.db.insert("shiftAssignments", { projectId: projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const readingIds = [];
     for (const [time, direction] of [["09:00", "entry"], ["17:00", "exit"]] as const) {
       readingIds.push(await ctx.db.insert("cardReadings", { projectId, employeeId, cardNo: "1", accessTime: reading(time).accessTime, accessStatus: "izin_verildi", direction }));

@@ -51,6 +51,7 @@ export function computeAttendanceDetailDay(params: {
   const lastShift = params.dayPlan?.kind === "shifts" ? params.dayPlan.shifts[params.dayPlan.shifts.length - 1] ?? dayShift : dayShift;
   const settings = settingsForShift(lastShift, workSettings);
   const status = classifyPdksDay({
+    noShift: day.noShift,
     date,
     dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manualDay),
     firstRecordDate: params.firstRecordDate,
@@ -94,12 +95,12 @@ export function computeAttendanceDetailDay(params: {
         ? "—"
         : code,
     overtimeMinutes: day.overtimeMinutes,
-    isManual: !!params.manualDay,
+    isManual: !day.noShift && !!params.manualDay,
     isOvernightShift: day.isOvernightShift,
     exitNextDay: day.exitNextDay,
-    manualNote: params.manualDay?.manualNote ?? null,
-    leaveType: leave?.leaveType ?? null,
-    rawReadings: params.dayReadings.map((r) => ({
+    manualNote: day.noShift ? null : params.manualDay?.manualNote ?? null,
+    leaveType: day.noShift ? null : leave?.leaveType ?? null,
+    rawReadings: (day.noShift ? [] : params.dayReadings).map((r) => ({
       id: String(r._id),
       time: formatIstanbulTime(r.accessTime, true),
       accessStatus: r.accessStatus,

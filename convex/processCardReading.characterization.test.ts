@@ -158,10 +158,14 @@ describe("directions, repeats and notifications", () => {
     await run(f, args(), false, [denied]);
     await run(f, args(), false, [denied, denied]);
   });
-  it.each(["projectEmail", "environmentEmail", "disabled", "onTime", "exit"] as const)("late notification: %s", async kind => {
+  it.each(["projectEmail", "environmentEmail", "disabled", "onTime", "exit", "noShift"] as const)("late notification: %s", async kind => {
     const f = await fixture();
     vi.stubEnv("NOTIFICATION_EMAIL", "fallback@example.test");
     await f.t.run(async ctx => {
+      if (kind !== "noShift") {
+        const shiftId = await ctx.db.insert("shifts", { projectId: f.projectId, name: "Plan", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" });
+        await ctx.db.insert("shiftAssignments", { projectId: f.projectId, employeeId: f.employeeId, shiftId, startDate: "2026-10-01", endDate: "2026-10-31", createdAt: "", updatedAt: "" });
+      }
       if (kind !== "environmentEmail") await ctx.db.insert("generalSettings", { projectId: f.projectId, companyName: "Company", email: "project@example.test" });
       if (kind === "disabled") await ctx.db.insert("notificationSettings", { projectId: f.projectId, lateNotifications: false });
       if (kind === "exit") await ctx.db.patch(f.deviceId, { accessDirection: "exit" });
@@ -170,7 +174,7 @@ describe("directions, repeats and notifications", () => {
     vi.setSystemTime(new Date(accessTime));
     expect(await f.t.mutation(internal.cardReadings.processCardReading, args())).toEqual({ granted: true });
     const expected = reading(f, { accessTime, createdAt: accessTime, updatedAt: accessTime, direction: kind === "exit" ? "exit" : "entry" });
-    await effects(f, [expected], ["disabled", "onTime"].includes(kind) ? [] : [{
+    await effects(f, [expected], ["disabled", "onTime", "noShift"].includes(kind) ? [] : [{
       name: "actions/sendEmail:sendLateNotification", args: [{ to: kind === "environmentEmail" ? "fallback@example.test" : "project@example.test", employeeName: "Ada Test", lateTime: new Date(accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), projectId: f.projectId }],
       scheduledTime: Date.parse(accessTime), state: { kind: "pending" },
     }]);

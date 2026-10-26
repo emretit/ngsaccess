@@ -40,7 +40,7 @@ it.each([monday, "2026-06-27"])("dashboard uses merged piece overtime without ga
 
 it("rest is excluded from the attendance-rate population; ordinary and leave behavior stays intact", () => {
   const other = { ...employee, _id: "rest" as Id<"employees">, cardNumber: "2" };
-  const working: DayPlan = { kind: "shifts", source: "default", calendar: "project", shifts: [morning] };
+  const working: DayPlan = { kind: "shifts", source: "employee", calendar: "project", shifts: [morning] };
   const run = (shifts: ShiftResolver) => computePdksCoreInMemory([employee, other], readings(monday).slice(0, 1), [], rangeFor(monday), new Map(), shifts, DEFAULT_WORK_SETTINGS).core;
   const ordinary = run(resolver(() => working));
   expect(ordinary).toMatchObject({ totalEmployees: 2, presentToday: 1, devamOrani: 50 });
@@ -56,6 +56,7 @@ it("ordinary versioned night policy preserves the legacy previous-day attributio
     const userId = await ctx.db.insert("users", { role: "project_admin" });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gece", startTime: "22:00", endTime: "06:00", createdAt: "", updatedAt: "" });
     const employeeId = await ctx.db.insert("employees", { projectId, shiftId, firstName: "Ada", lastName: "Test", email: "night@test", cardNumber: "1", isActive: true });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     await ctx.db.insert("pdksRuleVersions", { projectId, effectiveFrom: "2026-01-01", punchMode: "requirements", checkpointMode: "all", requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "review", noPunch: "absent", createdAt: "", createdBy: userId });
     for (const [accessTime, direction] of [["2026-06-22T19:00:00Z", "entry"], ["2026-06-23T03:00:00Z", "exit"]] as const) await ctx.db.insert("cardReadings", { projectId, employeeId, cardNo: "1", accessStatus: "izin_verildi", accessTime, direction });
     const emp = await ctx.db.get(employeeId);
@@ -84,7 +85,7 @@ it("one employee's plan does not switch an ordinary employee to report attributi
   expect(workDate({ ...reading, employeeId: plannedEmployee._id })).toBe("report-day");
 });
 
-it("versioned policy without a plan preserves the HEAD dashboard overtime formula", async () => {
+it("versioned policy with an ordinary dated plan preserves the HEAD dashboard overtime formula", async () => {
   const t = convexTest(schema, import.meta.glob("./**/*.ts"));
   await t.run(async ctx => {
     const projectId = await ctx.db.insert("projects", { name: "Plansız" });
@@ -92,6 +93,7 @@ it("versioned policy without a plan preserves the HEAD dashboard overtime formul
     const userId = await ctx.db.insert("users", { role: "project_admin" });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gündüz", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "", overtimeStartToleranceMinutes: 0 });
     const employeeId = await ctx.db.insert("employees", { projectId, shiftId, firstName: "Ada", lastName: "Test", email: "ordinary@test", cardNumber: "1", isActive: true });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     await ctx.db.insert("pdksRuleVersions", { projectId, effectiveFrom: "2026-01-01", punchMode: "requirements", checkpointMode: "all", requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "review", noPunch: "absent", createdAt: "", createdBy: userId });
     for (const [time, direction] of [["08:00", "entry"], ["14:00", "entry"], ["20:00", "exit"]] as const) await ctx.db.insert("cardReadings", { projectId, employeeId, cardNo: "1", accessStatus: "izin_verildi", accessTime: new Date(`${monday}T${time}:00+03:00`).toISOString(), direction });
     const emp = await ctx.db.get(employeeId);

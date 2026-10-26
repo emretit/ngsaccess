@@ -196,7 +196,7 @@ describe("mobileAttendance independent raw movement summary", () => {
     expect(total).toBe(150);
     const after = await f.t.query(summary, args);
     expect(before.days).toEqual(after.days);
-    expect(before.totals).toEqual({ entryCount: 75, exitCount: 75, deniedCount: 0, unknownCount: 0, presentDays: 15 });
+    expect(before.totals).toEqual({ entryCount: 75, exitCount: 75, deniedCount: 0, unknownCount: 0, presentDays: 15, pdksPresentDays: 0 });
     expect(after.totals).toEqual(before.totals);
     expect(after.days).toHaveLength(31);
     expect(after.days[30]).toMatchObject({ date: "2026-10-31", entryCount: 0, lastDirection: "unknown" });
@@ -232,6 +232,7 @@ describe("mobileAttendance independent raw movement summary", () => {
       firstEntry: entry, lastEntry: entry, lastExit: exit, lastDirection: "exit",
     }]);
     expect(result.totals.presentDays).toBe(1);
+    expect(result.totals.pdksPresentDays).toBe(0);
   });
 
   it("treats overnight exit as a new calendar day and never invents a late/shift/payroll result", async () => {
@@ -244,6 +245,7 @@ describe("mobileAttendance independent raw movement summary", () => {
     expect(result.days[1]).toMatchObject({ date: "2026-10-20", entryCount: 0, exitCount: 1, lastDirection: "exit" });
     expect(result.days[2]).toMatchObject({ date: "2026-10-21", entryCount: 0, exitCount: 0, lastDirection: "unknown" });
     expect(result.totals.presentDays).toBe(1);
+    expect(result.totals.pdksPresentDays).toBe(0);
     expect(result).not.toHaveProperty("lateCount");
   });
 

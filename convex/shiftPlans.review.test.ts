@@ -118,8 +118,8 @@ describe("review: bounded reads and project blockers", () => {
       const spy = vi.spyOn(ctx.db, "query");
       for (const build of [buildShiftResolver, buildBoundedShiftResolver]) {
         const resolver = await build(ctx, [employee]);
-        expect(resolver.resolve(f.employeeId, dates.startDate)).toStrictEqual(await ctx.db.get(f.morning));
-        expect(resolver.resolvePlan(f.employeeId, dates.startDate)).toMatchObject({ source: "default" });
+        expect(resolver.resolve(f.employeeId, dates.startDate)).toBeNull();
+        expect(resolver.resolvePlan(f.employeeId, dates.startDate)).toMatchObject({ kind: "none", source: "project" });
       }
       expect(spy.mock.calls.filter(([table]) => table === "departments")).toEqual([]);
       spy.mockRestore();

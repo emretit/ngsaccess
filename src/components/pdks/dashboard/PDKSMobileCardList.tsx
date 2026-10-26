@@ -22,7 +22,7 @@ export function PDKSMobileCardList({
     <ul className="divide-y border-y">
       {records.map((r) => (
         <li
-          className={`min-w-0 py-3 ${onShowDetail ? ROW_CLICK_CLASS : ""} ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
+          className={`min-w-0 py-3 ${r.noShift ? "bg-muted text-muted-foreground" : ""} ${onShowDetail ? ROW_CLICK_CLASS : ""} ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
           key={r.id}
           onClick={
             onShowDetail
@@ -62,7 +62,7 @@ export function PDKSMobileCardList({
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Toplam</dt>
-                  <dd>{displayDuration(r.totalMinutes, r.status, r.durationMeasured)}</dd>
+                  <dd>{r.noShift ? "—" : displayDuration(r.totalMinutes, r.status, r.durationMeasured)}</dd>
                 </div>
               </dl>
               {(r.nightMinutes ?? 0) > 0 && <p className="mt-2 text-xs tabular-nums">Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}</p>}

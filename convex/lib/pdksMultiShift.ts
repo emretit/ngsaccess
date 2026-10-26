@@ -14,9 +14,9 @@ export type PdksSegment = {
   lateMinutes: number; earlyExitMinutes: number; overtimeMinutes: number;
   decision: "present" | "absent" | "incomplete";
 };
-export type PlannedDay = Omit<Day, "attendanceDecision"> & { attendanceDecision?: Day["attendanceDecision"]; segments?: PdksSegment[]; planKind?: "rest" };
-export function plannedDayFields(day: Pick<PlannedDay, "segments" | "planKind">) {
-  return { ...(day.segments ? { segments: day.segments } : {}), ...(day.planKind ? { planKind: day.planKind } : {}) };
+export type PlannedDay = Omit<Day, "attendanceDecision"> & { attendanceDecision?: Day["attendanceDecision"]; noShift?: boolean; segments?: PdksSegment[]; planKind?: "rest" };
+export function plannedDayFields(day: Pick<PlannedDay, "segments" | "planKind" | "noShift">) {
+  return { ...(day.noShift ? { noShift: true } : {}), ...(day.segments ? { segments: day.segments } : {}), ...(day.planKind ? { planKind: day.planKind } : {}) };
 }
 
 /** A project-scoped view must never leak a shift from another project. */
@@ -107,6 +107,16 @@ export function mergePdksDays(days: readonly Day[], shifts: readonly Doc<"shifts
 export function computePdksPlannedDay(params: Params & { dayPlan?: DayPlan }): PlannedDay {
   const plan = params.dayPlan;
   if (!plan) return computePdksDay(params);
+  // No dated assignment: neither access events, manual edits nor leave create PDKS.
+  if (plan.kind === "none") return {
+    date: params.date, noShift: true, firstISO: null, lastISO: null,
+    rawTotalMinutes: 0, breakMinutes: 0, totalMinutes: 0, overtimeMinutes: 0,
+    nightMinutes: 0, rawNightMinutes: 0, nightOvertimeMinutes: 0,
+    multiplier: 0, classification: "workday", isLate: false, lateMinutes: 0,
+    isEarlyExit: false, earlyExitMinutes: 0, exitNextDay: false,
+    isOvernightShift: false, hasAttendance: false, durationMeasured: false,
+    punchQuality: "noPunch", overtimePayTRY: null, overtimeSegments: [],
+  };
   const dayKind = plan.kind === "rest" ? "rest" : plan.kind === "shifts" && plan.calendar === "plan" ? "work" : undefined;
   if (plan.kind !== "shifts" || plan.shifts.length <= 1) {
     const day = computePdksDay({ ...params, shift: plan.kind === "shifts" ? plan.shifts[0] ?? null : null, dayKind });

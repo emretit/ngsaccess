@@ -1,3 +1,4 @@
+import { NoShiftStatus } from "./PdksRowStatus";
 import { PdksPlanSummary } from "./PdksPlanSummary";
 import { planDayLabel, segmentTimeRange } from "../lib/presentation";
 import { eachDayOfInterval, format } from "date-fns";
@@ -69,7 +70,7 @@ export function PDKSHeatmapView({
               <div
                 style={grid}
                 key={row.id}
-                className="grid min-h-[42px] border-t"
+                className={`grid min-h-[42px] border-t ${row.noShift ? "bg-muted text-muted-foreground" : ""}`}
               >
                 <div className="sticky left-0 z-10 border-r bg-background px-3 py-2">
                   <span className="block max-w-full break-words font-medium">
@@ -78,6 +79,7 @@ export function PDKSHeatmapView({
                   <span className="text-muted-foreground">
                     {row.department}
                   </span>
+                  {row.noShift && <NoShiftStatus />}
                 </div>
                 {dates.map((date) => {
                   const cell = cells.get(date);
@@ -109,7 +111,7 @@ export function PDKSHeatmapView({
                       className={`min-h-[42px] border-r px-1 ${planLabel ? "h-[42px] overflow-hidden py-1 leading-[11px]" : "py-2"} text-center text-[11px] whitespace-nowrap hover:underline ${meta.bgClass} ${meta.textClass}`}
                       onClick={() => onCellClick?.(row.id, date)}
                     >
-                      {meta.code} · {duration}
+                      {cell?.noShift ? "Vardiya yok" : `${meta.code} · ${duration}`}
                       <PdksPlanSummary day={cell} compact />
                       {timeRange && timeRange !== "—" && <span className="block text-[10px] leading-[10px]">
                         {timeRange}
@@ -118,7 +120,7 @@ export function PDKSHeatmapView({
                   );
                 })}
                 <div className="px-2 py-2">
-                  {formatDuration(totals.totalMinutes)}
+                  {row.noShift ? "—" : formatDuration(totals.totalMinutes)}
                   {totals.overtimeMinutes > 0 && (
                     <div className="mt-1 text-muted-foreground">
                       Mesai {formatDuration(totals.overtimeMinutes)}

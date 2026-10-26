@@ -28,6 +28,7 @@ it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK ayn�
     await ctx.db.insert("userProjects", { userId, projectId });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gündüz", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "" });
     const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "123", isActive: true, shiftId });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     for (const [accessTime, direction] of [["2026-10-23T05:00:00.000Z", "entry"], ["2026-10-23T14:00:00.000Z", "exit"], ["2026-09-30T05:00:00.000Z", "entry"], ["2026-11-01T05:00:00.000Z", "entry"]] as const) {
       await ctx.db.insert("cardReadings", { projectId, employeeId, cardNo: "123", accessStatus: "izin_verildi", direction, accessTime });
     }

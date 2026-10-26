@@ -130,7 +130,7 @@ export function PDKSTableView({
             {rows.map((r) => (
               <tr
                 key={r.id}
-                className={`h-[42px] border-b hover:bg-muted/50 ${onShowDetail ? ROW_CLICK_CLASS : ""} ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
+                className={`h-[42px] ${r.noShift ? "bg-muted text-muted-foreground hover:bg-muted" : "hover:bg-muted/50"} border-b ${onShowDetail ? ROW_CLICK_CLASS : ""} ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
                 onClick={
                   onShowDetail
                     ? onRowActivate(() => onShowDetail(r.id as Id<"employees">))
@@ -159,11 +159,11 @@ export function PDKSTableView({
                 </td>
                 <td className="px-2 tabular-nums">{displayTime(r.lastExit)}</td>
                 <td className="px-2 tabular-nums">
-                  <DurationCell minutes={r.totalMinutes} status={r.status} measured={r.durationMeasured} />
+                  {r.noShift ? "—" : <DurationCell minutes={r.totalMinutes} status={r.status} measured={r.durationMeasured} />}
                   {(r.nightMinutes ?? 0) > 0 && <span className="block text-muted-foreground">Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}</span>}
                 </td>
                 <td className="px-2 tabular-nums">
-                  <DurationCell minutes={r.overtimeMinutes} status={r.status} measured={r.durationMeasured} />
+                  {r.noShift ? "—" : <DurationCell minutes={r.overtimeMinutes} status={r.status} measured={r.durationMeasured} />}
                 </td>
                 <td className="px-2 py-1">
                   <PdksRowStatus record={r} />

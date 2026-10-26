@@ -40,6 +40,7 @@ export type PdksDayStatus =
 
 /** Absence needs project data and a known employment period; time before shift start is pending. */
 export function classifyPdksDay(params: {
+  noShift?: boolean;
   pendingUntil?: number;
   durationMeasured?: boolean;
   attendanceDecision?: "present" | "absent" | "incomplete";
@@ -58,6 +59,7 @@ export function classifyPdksDay(params: {
   hasLeave: boolean;
   isLate: boolean;
 }): PdksDayStatus {
+  if (params.noShift) return "noData";
   if (params.date > (params.today ?? trTodayKey())) return "future";
   const status = resolveDayStatus({
     ...params,
@@ -125,6 +127,7 @@ export type PdksDayDetail = {
 };
 
 export type PdksTableDayCell = FlexibleMinutes & {
+  noShift?: boolean;
   segments?: PdksSegment[];
   planKind?: "rest";
   durationMeasured?: boolean;
@@ -146,6 +149,7 @@ export type PdksTableDayCell = FlexibleMinutes & {
 };
 
 export type PdksTableRow = FlexibleMinutes & {
+  noShift?: boolean;
   incompleteDays?: number;
   durationMeasured?: boolean;
   punchQuality?: import("./pdksEvidence").PunchQuality;
@@ -293,13 +297,14 @@ export function computePdksTableRow(params: {
   const range = overtimePeriodRange(periodStart, periodEnd, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
   const allCalculations = buildPeriodDateKeys(range.startDate, range.endDate).map((date) => {
     const outsideEmployment = params.policyFor?.(date).punchMode === "requirements" && employee !== null && !employedOn(employee, date);
-    const readings = outsideEmployment ? [] : byDate.get(date) ?? [];
+    const dayPlan = empId ? params.resolvePlan?.(empId, date) : undefined;
+    const noShift = dayPlan?.kind === "none";
+    const readings = noShift || outsideEmployment ? [] : byDate.get(date) ?? [];
     const shift = empId ? params.resolveShift(empId, date) : null;
-    const manual = outsideEmployment ? undefined : params.manualPdksByEmpDate.get(`${empKey}__${date}`);
-    const leave = params.allLeaves.find(
+    const manual = noShift || outsideEmployment ? undefined : params.manualPdksByEmpDate.get(`${empKey}__${date}`);
+    const leave = noShift ? undefined : params.allLeaves.find(
       (l) => l.employeeId === empId && pdksLeaveMatchesProject(l, employee?.projectId) && date >= l.startDate && date <= l.endDate,
     );
-    const dayPlan = empId ? params.resolvePlan?.(empId, date) : undefined;
     // Arrival waits on the first piece; exit time and early-exit tolerance belong to the last.
     const lastShift = dayPlan?.kind === "shifts" ? dayPlan.shifts[dayPlan.shifts.length - 1] ?? shift : shift;
     const settings = settingsForShift(lastShift, workSettings);
@@ -318,7 +323,7 @@ export function computePdksTableRow(params: {
       holiday: params.holidayMap.get(date),
       holidayMap: params.holidayMap,
     });
-    const status = outsideEmployment ? "notEmployed" : classifyPdksDay({
+    const status = noShift ? "noData" : outsideEmployment ? "notEmployed" : classifyPdksDay({
       date,
       firstRecordDate: params.firstRecordDate,
       shiftStart: shift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
@@ -362,7 +367,7 @@ export function computePdksTableRow(params: {
         status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
           ? "—"
           : code,
-      detail: {
+      detail: noShift ? undefined : {
         ...plannedDayFields(day),
         dayType: day.classification,
         shiftName: dayPlan?.kind === "shifts" && dayPlan.shifts.length > 1 ? dayPlan.shifts.map(s => s.name).join(" + ") : shift?.name ?? null,
@@ -407,14 +412,16 @@ export function computePdksTableRow(params: {
     const calculation = calculationByDate.get(date);
     return calculation ? [calculation] : [];
   });
-  const periodOvertime = calculatePeriodOvertime(allCalculations.map((c) => c.day), {
+  const periodOvertime = calculatePeriodOvertime(allCalculations.filter(c => !c.day.noShift).map((c) => c.day), {
     startDate: periodStart, endDate: periodEnd,
     overtimeBasis: overtimeRates.overtimeBasis, hourlyRate,
   });
   for (const calculation of calculations) {
     calculation.cell.overtimeMinutes = periodOvertime.overtimeByDate[calculation.cell.date]?.overtimeMinutes ?? 0;
   }
-  const first = calculations.find((c) => c.day.firstISO) ?? calculations[0];
+  const assignedCalculations = calculations.filter(c => !c.day.noShift);
+  const noShift = calculations.length > 0 && assignedCalculations.length === 0;
+  const first = assignedCalculations.find((c) => c.day.firstISO) ?? assignedCalculations[0];
   const last = [...calculations].reverse().find((c) => c.day.lastISO);
   const totalMinutes = calculations.reduce(
     (sum, c) => sum + c.day.totalMinutes,
@@ -432,8 +439,9 @@ export function computePdksTableRow(params: {
       excessMinutes: flexibleDays.reduce((sum, c) => sum + (c.day.excessMinutes ?? 0), 0),
       leaveWorkWarning: flexibleDays.some(c => c.day.leaveWorkWarning),
     } : {}),
+    ...(noShift ? { noShift: true } : {}),
     incompleteDays: calculations.filter(c => c.cell.status === "incomplete").length,
-    durationMeasured: calculations.every(c => c.day.durationMeasured),
+    durationMeasured: assignedCalculations.length > 0 && assignedCalculations.every(c => c.day.durationMeasured),
     punchQuality: first?.day.punchQuality ?? "noPunch",
     id: empKey,
     name: employee
@@ -448,7 +456,7 @@ export function computePdksTableRow(params: {
       ? formatIstanbulTime(first.day.firstISO)
       : "-",
     lastExit: last?.day.lastISO ? formatIstanbulTime(last.day.lastISO) : "-",
-    totalHours: formatHoursLabel(totalMinutes),
+    totalHours: noShift ? "—" : formatHoursLabel(totalMinutes),
     totalMinutes,
     rawTotalMinutes: calculations.reduce(
       (sum, c) => sum + c.day.rawTotalMinutes,
@@ -456,11 +464,11 @@ export function computePdksTableRow(params: {
     ),
     nightMinutes: calculations.reduce((sum, c) => sum + c.day.nightMinutes, 0),
     overtimeMinutes,
-    overtime: `${overtimeMinutes}m`,
+    overtime: noShift ? "—" : `${overtimeMinutes}m`,
     overtimeHours: overtimeMinutes / 60,
     overtimeMultiplier: periodOvertime.overtimeMultiplier,
     overtimePayTRY: periodOvertime.overtimePayTRY,
-    hourlyRate,
+    hourlyRate: noShift ? null : hourlyRate,
     yearlyOvertimeLimit: workSettings.annualOvertimeLimitHours,
     leaveType: leaveRecord
       ? (LEAVE_TYPE_LABELS[leaveRecord.leaveType] ?? leaveRecord.leaveType)
@@ -470,7 +478,7 @@ export function computePdksTableRow(params: {
     isEarlyExit: last?.day.isEarlyExit ?? false,
     isManual: params.isSingleDay && !!first?.manual,
     manualNote: params.isSingleDay ? (first?.manual?.manualNote ?? null) : null,
-    manualEditedBy: params.manualEditedBy,
+    manualEditedBy: noShift ? null : params.manualEditedBy,
     detailedLogs: calculations
       .flatMap((c) => c.readings)
       .map((r) => ({
@@ -496,6 +504,7 @@ export function filterPdksTableRows<T extends PdksTableRow>(
 ): T[] {
   if (!statusFilter || statusFilter === "all") return rows;
   return rows.filter((row) => {
+    if (row.noShift) return false;
     if (statusFilter === "overtime") return row.overtimeHours > 0;
     return row.status === statusFilter;
   });

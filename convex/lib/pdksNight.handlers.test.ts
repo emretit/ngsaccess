@@ -82,19 +82,19 @@ const punches = [
   reading("2026-07-01T06:00:00+03:00", 2),
 ];
 const workingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
-function fixture(readings = punches, assigned = true, extraRows: Record<string, Record<string, unknown>[]> = {}) {
+function fixture(readings = punches, assigned: boolean | "day" = true, extraRows: Record<string, Record<string, unknown>[]> = {}) {
   const rows: Record<string, Record<string, unknown>[]> = {
     employees: [employee],
     cardReadings: readings,
-    shifts: assigned ? [shift] : [],
+    shifts: assigned ? [assigned === "day" ? { ...shift, startTime: "09:00", endTime: "18:00" } : shift] : [],
     shiftAssignments: assigned
       ? [
           {
             _id: "a",
             employeeId,
             shiftId: shift._id,
-            startDate: date,
-            endDate: date,
+            startDate: assigned === "day" ? "2026-01-01" : date,
+            endDate: assigned === "day" ? "2026-12-31" : date,
             updatedAt: "",
           },
         ]
@@ -164,7 +164,7 @@ async function call<T>(
     }
   ).handler(ctx, args);
 }
-async function threePaths(readings = punches, assigned = true) {
+async function threePaths(readings = punches, assigned: boolean | "day" = true) {
   const { ctx } = fixture(readings, assigned);
   const table = await call<
     FunctionReturnType<typeof api.cardReadings.getPdksTableData>
@@ -234,12 +234,14 @@ describe("08-H2 / 11-H2 real query paths", () => {
   });
   it("unassigned overnight readings stay on separate calendar days", async () => {
     const result = await threePaths(punches, false);
-    for (const day of [result.table?.days[0], result.cell, result.detail])
+    for (const day of [result.table?.days[0], result.detail])
       expect(day).toMatchObject({
         totalMinutes: 0,
         overtimeMinutes: 0,
         rawTotalMinutes: 0,
       });
+    expect(result.cell).toBeUndefined();
+    expect(result.table?.noShift).toBe(true);
     expect(pdksWorkDay(punches[1].accessTime, employeeId, () => null)).toBe(
       "2026-07-01",
     );
@@ -250,7 +252,7 @@ describe("08-H2 / 11-H2 real query paths", () => {
         reading(`${date}T18:49:00+03:00`, 1),
         reading(`${date}T18:57:00+03:00`, 2),
       ],
-      false,
+      "day",
     );
     for (const day of [result.table?.days[0], result.cell, result.detail])
       expect(day).toMatchObject({
@@ -268,7 +270,7 @@ describe("08-H2 / 11-H2 real query paths", () => {
         reading(`${date}T09:00:00+03:00`, 1),
         reading(`${date}T20:00:00+03:00`, 2),
       ],
-      false,
+      "day",
     );
     for (const day of [result.table?.days[0], result.cell, result.detail])
       expect(day).toMatchObject({ totalMinutes: 600, overtimeMinutes: 0 });
@@ -520,7 +522,7 @@ it("equal start/end assigned shift permits a full next-day interval", () => {
 
 describe("R3B regression paths", () => {
   it.each([undefined, projectId, "foreign" as Id<"projects">])("E1/D5: legacy and scoped leave agree in every loader (%s)", async leaveProjectId => {
-    const { ctx } = fixture([], false, { leaves: [{ _id: "leave", employeeId, projectId: leaveProjectId, startDate: date, endDate: date, status: "approved", leaveType: "annual" }] });
+    const { ctx } = fixture([], "day", { leaves: [{ _id: "leave", employeeId, projectId: leaveProjectId, startDate: date, endDate: date, status: "approved", leaveType: "annual" }] });
     const table = await call<FunctionReturnType<typeof api.cardReadings.getPdksTableData>>(getPdksTableData, ctx, { projectId, startDate: date, endDate: date, viewMode: "matrix" });
     const payroll = await call<FunctionReturnType<typeof api.cardReadings.getMonthlyPayrollSheet>>(getMonthlyPayrollSheet, ctx, { projectId, year: 2026, month: 6 });
     const detail = await call<FunctionReturnType<typeof api.cardReadings.getEmployeeAttendanceDetail>>(getEmployeeAttendanceDetail, ctx, { projectId, employeeId, startDate: date, endDate: date });
@@ -580,7 +582,7 @@ describe("R3B regression paths", () => {
 
   it("D4: 50-hour week allocates all 300 overtime minutes to Friday", async () => {
     const readings = Array.from({ length: 5 }, (_, index) => `2026-06-${22 + index}`).flatMap(day => [reading(`${day}T09:00:00+03:00`, 1), reading(`${day}T20:00:00+03:00`, 2)]);
-    const { ctx } = fixture(readings, false);
+    const { ctx } = fixture(readings, "day");
     const result = await call<FunctionReturnType<typeof api.cardReadings.getMonthlyPayrollSheet>>(getMonthlyPayrollSheet, ctx, { projectId, year: 2026, month: 6 });
     expect(result.rows[0]?.totals).toMatchObject({ totalMinutes: 3000, overtimeMinutes: 300 });
     expect(result.rows[0]?.cells.filter(cell => cell.totalMinutes > 0).map(cell => cell.overtimeMinutes)).toEqual([0, 0, 0, 0, 300]);

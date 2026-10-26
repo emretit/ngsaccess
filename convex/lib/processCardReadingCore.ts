@@ -468,7 +468,7 @@ async function notifyLateReading(ctx: MutationCtx, employee: Doc<"employees">, a
   const date = trDateKey(accessTime);
   const dayShiftResolver = await buildShiftResolver(ctx, [employee], { start: date, end: date });
   const plan = dayShiftResolver.resolvePlan(employee._id, date);
-  if (plan.kind === "rest") return;
+  if (plan.kind !== "shifts") return;
   const dayShift = shiftForInstant(date, accessTime, plan, direction);
   const { lateThresholdMin } = thresholdsForShift(dayShift, settings);
   const isLate = isoTimeToTRMinutes(accessTime) > lateThresholdMin;

@@ -152,7 +152,7 @@ function Detail({
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-xs text-muted-foreground">{label}</dt>
-                <dd>{value}</dd>
+                <dd>{day.noShift ? "—" : value}</dd>
               </div>
             ))}
           </dl>

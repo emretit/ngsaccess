@@ -5,7 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
 import { resolveProjectScope } from "./lib/projectScope";
 import { loadRuleReportDays } from "./lib/reportAttendance";
-import { APHB_DRAFT_WARNING, buildAphbXml } from "./lib/sgkCodes";
+import { APHB_DRAFT_WARNING, buildAphbXml, sgkCodeForLeaveType } from "./lib/sgkCodes";
 import { calculateSgkEksikGun } from "./lib/sgkEksikGun";
 import { legacyAttendanceDays, legacyOvertimeMinutes } from "./lib/legacyOvertime";
 
@@ -58,7 +58,7 @@ export const buildAphbForMonth = authedQuery({
     const holidayMap = new Map(
       [...globalHolidays, ...projectHolidays].map((holiday) => [holiday.date, holiday]),
     );
-    const ruleReport = await loadRuleReportDays(ctx, [targetProjectId], startDate, endDate);
+    const ruleReport = await loadRuleReportDays(ctx, [targetProjectId], startDate, endDate, { preloadedEmployees: projectEmployees });
     const empIds = new Set(projectEmployees.map((employee) => employee._id));
     const employeesWithReadings = new Set<Id<"employees">>();
     const readingsByEmployee = new Map<Id<"employees">, typeof ruleReport.readings>();
@@ -70,10 +70,19 @@ export const buildAphbForMonth = authedQuery({
       readings.push(reading);
       readingsByEmployee.set(reading.employeeId, readings);
     }
+    const employedDates = (employee: typeof projectEmployees[number]) => monthDays.filter(date => !employee.employmentEndDate || employedOn(employee, date));
+    const plannedDates = (employee: typeof projectEmployees[number]) => employedDates(employee).filter(date => ruleReport.hasPlan(employee, date));
+    // SGK bildirimi istihdama bağlıdır: vardiyasız gün devamsızlık sayılmaz, prim gününden düşülmez.
     const employees = projectEmployees.filter(
       (employee) => employedDuring(employee, startDate, endDate) || employeesWithReadings.has(employee._id),
     );
     const warnings: string[] = [APHB_DRAFT_WARNING];
+    for (const employee of employees) {
+      const unplannedDays = employedDates(employee).length - plannedDates(employee).length;
+      if (unplannedDays > 0) warnings.push(plannedDates(employee).length === 0
+        ? `${employee.firstName} ${employee.lastName}: vardiya atanmamış; PDKS verisi yok, prim günü devamsızlık düşülmeden istihdam günlerinden hesaplandı, bildirimden önce kontrol edin.`
+        : `${employee.firstName} ${employee.lastName}: ${unplannedDays} gün vardiya atanmamış; bu günler devamsızlık sayılmadan prim gününe dahil edildi, bildirimden önce kontrol edin.`);
+    }
     const entries = await Promise.all(employees.map(async (employee) => {
       // Çalışana bağlı eski (projectId'siz) izinler de korunur.
       const employeeLeaves = await ctx.db.query("leaves")
@@ -94,8 +103,15 @@ export const buildAphbForMonth = authedQuery({
         workedDays.delete(day.date);
         if (day.status === "present" || day.status === "late") workedDays.add(day.date);
       }
+      // Vardiyasız gün çalışılmış sayılır; yalnız ücretsiz izin (SGK kodlu) o günü eksik güne çevirir.
+      const planned = new Set(plannedDates(employee));
+      for (const date of employedDates(employee)) {
+        if (planned.has(date)) continue;
+        const unpaidLeave = approvedLeaves.some(leave => leave.startDate <= date && leave.endDate >= date && sgkCodeForLeaveType(leave.leaveType) !== null);
+        if (!unpaidLeave) workedDays.add(date);
+      }
       const result = calculateSgkEksikGun({
-        monthDays: employee.employmentEndDate ? monthDays.filter(date => employedOn(employee, date)) : monthDays,
+        monthDays: employedDates(employee),
         workingDays: generalSettings?.workingDays,
         holidayMap,
         workedDays,
@@ -107,7 +123,7 @@ export const buildAphbForMonth = authedQuery({
         tcKimlikNo: employee.tcNo?.trim() ?? "",
         adSoyad: `${employee.firstName} ${employee.lastName}`.trim(),
         cumulativeWorkdays: employee.employmentEndDate && employee.employmentEndDate < endDate
-          ? Math.max(0, Math.min(30, monthDays.filter(date => employedOn(employee, date)).length) - result.eksikGunSayisi)
+          ? Math.max(0, Math.min(30, employedDates(employee).length) - result.eksikGunSayisi)
           : result.primGunu,
         totalOvertimeHours: (legacyOvertimeMinutes(legacyDays) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0)) / 60,
         eksikGunSayisi: result.eksikGunSayisi,

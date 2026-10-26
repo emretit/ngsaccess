@@ -113,6 +113,7 @@ export function summarizeMovements(
   readings: readonly Doc<"cardReadings">[], startDate: string, endDate: string,
   projectId: Doc<"employees">["projectId"], generatedAt: string, policyFor?: PdksPolicyResolver,
   rules?: { workDate: (reading: Doc<"cardReadings">) => string; presentDates: ReadonlySet<string> },
+  hasPlan?: (date: string) => boolean,
 ) {
   attendanceDateRange(startDate, endDate, SUMMARY_MAX_DAYS);
   const days: MovementDay[] = [];
@@ -153,16 +154,20 @@ export function summarizeMovements(
       day.lastDirection = "exit";
     }
   }
-  const totals = { entryCount: 0, exitCount: 0, deniedCount: 0, unknownCount: 0, presentDays: 0 };
+  const totals = { entryCount: 0, exitCount: 0, deniedCount: 0, unknownCount: 0, presentDays: 0, pdksPresentDays: 0 };
   for (const day of days) {
     totals.entryCount += day.entryCount;
     totals.exitCount += day.exitCount;
     totals.deniedCount += day.deniedCount;
     totals.unknownCount += day.unknownCount;
+    // The published Flutter parser requires presentDays to equal raw entry days.
+    if (day.entryCount > 0) totals.presentDays++;
+    // PDKS attendance credit is separate and requires a dated plan.
+    if (hasPlan && !hasPlan(day.date)) continue;
     const policy = policyFor?.(day.date);
     if (policy?.punchMode === "requirements") {
-      if (rules?.presentDates.has(day.date)) totals.presentDays++;
-    } else if (day.entryCount > 0) totals.presentDays++;
+      if (rules?.presentDates.has(day.date)) totals.pdksPresentDays++;
+    } else if (day.entryCount > 0) totals.pdksPresentDays++;
   }
   return { startDate, endDate, timeZone: ATTENDANCE_TIME_ZONE, generatedAt, days, totals };
 }

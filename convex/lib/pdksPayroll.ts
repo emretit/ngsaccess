@@ -49,6 +49,7 @@ export function computePayrollCell(params: {
   const lastShift = params.dayPlan?.kind === "shifts" ? params.dayPlan.shifts[params.dayPlan.shifts.length - 1] ?? dayShift : dayShift;
   const settings = settingsForShift(lastShift, workSettings);
   const status = classifyPdksDay({
+    noShift: day.noShift,
     date,
     dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manual),
     firstRecordDate: params.firstRecordDate,
@@ -90,7 +91,7 @@ export function computePayrollCell(params: {
     overtimePayTRY: day.overtimePayTRY,
     isLate: day.isLate,
     isEarlyExit: day.isEarlyExit,
-    isManual: !!params.manual,
+    isManual: !day.noShift && !!params.manual,
     classification: day.classification,
   };
 }

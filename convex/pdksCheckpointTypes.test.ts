@@ -57,6 +57,7 @@ async function fixture() {
     const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 100 * 86400000 });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Vardiya", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "" });
     const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Test", lastName: "Test", email: "test@example.test", cardNumber: "TEST", isActive: true, shiftId });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const deviceId = await ctx.db.insert("devices", { projectId, name: "Panel", brand: "hikvision", doorCount: 2, hikDevIndex: "dev-test", apiToken: "test-token", createdAt: "", updatedAt: "" });
     const doorId = await ctx.db.insert("doors", { projectId, deviceId, name: "Kapı" });
     const readerId = await ctx.db.insert("readers", { projectId, deviceId, doorId, name: "İç okuyucu", direction: "exit", hikReaderNo: 2, createdAt: "", updatedAt: "" });

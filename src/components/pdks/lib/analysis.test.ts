@@ -75,3 +75,7 @@ it("does not add employees excluded by the page filter", () => {
   expect(analyzePdksRows(rows)[0].counts.present).toBe(0);
   expect(rows).toEqual(before);
 });
+
+it("does not count no-plan cells as missing data or attendance", () => {
+  expect(analyzePdksRows([make([{ ...cell("2026-06-14", "noData", 0), noShift: true }])])).toEqual([]);
+});

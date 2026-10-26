@@ -2,7 +2,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { writeAudit } from "./audit";
 import { validateManualPdksInput } from "./pdksManual";
-import { buildShiftResolver } from "./shiftResolver";
+import { buildShiftResolver, type ShiftResolver } from "./shiftResolver";
 
 type ManualPdksInput = { date: string; entryTime?: string; exitTime?: string; note?: string };
 type ValidManualPdks = ReturnType<typeof validateManualPdksInput>;
@@ -14,7 +14,7 @@ export async function findManualPdksRecord(ctx: MutationCtx, employeeId: Id<"emp
 /** Tek kişilik elle yazım doğrulaması: atanmış gece vardiyası çıkışın girişten önce olmasına izin verir. */
 export async function validateManualPdksForEmployee(ctx: MutationCtx, employee: Doc<"employees">, input: ManualPdksInput): Promise<ValidManualPdks> {
   const resolver = await buildShiftResolver(ctx, [employee]);
-  const shift = resolver.resolveLast(employee._id, input.date);
+  const shift = manualValidationShift(resolver, employee, input.date);
   return validateManualPdksInput(input, shift?.projectId === employee.projectId ? shift : null);
 }
 
@@ -51,4 +51,12 @@ export async function writeManualPdksRecord(
     await writeAudit(ctx, { user, projectId: employee.projectId ?? null, action: "create", targetTable: "pdksRecords", targetId: id, newValue, note: input.note });
   }
   return { id, created: true };
+}
+
+/** Input validation is unchanged; this fallback never grants PDKS attendance credit. */
+export function manualValidationShift(resolver: ShiftResolver, employee: Doc<"employees">, date: string) {
+  const shift = resolver.resolveLast(employee._id, date);
+  if (shift) return shift;
+  if (resolver.resolvePlan(employee._id, date).kind !== "none") return null;
+  return employee.shiftId ? resolver.shifts.get(employee.shiftId) ?? null : null;
 }

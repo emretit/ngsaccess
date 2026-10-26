@@ -17,6 +17,8 @@ async function fixture() {
     const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 86400000 });
     await ctx.db.insert("userProjects", { userId, projectId });
     const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Test", lastName: "Kişi", email: "test@example.com", cardNumber: "123", isActive: true, tcNo: "11111111111", hourlyRate: 100 });
+    const datedShiftId = await ctx.db.insert("shifts", { projectId, name: "Plan", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId: datedShiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     return { projectId, foreignId, userId, sessionId, employeeId };
   });
   const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });

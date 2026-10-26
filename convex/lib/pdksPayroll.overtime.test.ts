@@ -28,6 +28,8 @@ function fixture(extra: Record<string, Row[]> = {}) {
     workSettings: [{ projectId: "p", overtimeStartToleranceMinutes: 0 }],
     ...extra,
   };
+  rows.shifts ??= [{ _id: "s", projectId: "p", name: "Plan", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" }];
+  rows.shiftAssignments = [...(rows.shiftAssignments ?? []), { _id: "base", employeeId: "e", shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" }];
   const bounds: Array<{ table: string; field: string; value: string; operator: "gte" | "lte" }> = [];
   const query = (table: string) => {
     let selected = rows[table] ?? [];

@@ -194,14 +194,14 @@ describe("department assignments and calendar cells", () => {
     await f.caller.mutation(api.departments.remove, { departmentId: f.departmentId });
     expect(await f.t.run(ctx => ctx.db.get(f.departmentId))).toBeNull();
   });
-  it("returns exact employee, inherited department, default and project source fields", async () => {
+  it("returns exact employee, inherited department and no-plan source fields", async () => {
     const f = await fixture();
     expect(await f.caller.query(api.shiftPlans.planCells, f.cells)).toEqual([
       { employeeId: f.employeeId, date: "2026-06-01", kind: "none", source: "project", shiftIds: [] },
       { employeeId: f.employeeId, date: "2026-06-02", kind: "none", source: "project", shiftIds: [] },
     ]);
     await f.t.run(ctx => ctx.db.patch(f.employeeId, { shiftId: f.evening }));
-    expect((await f.caller.query(api.shiftPlans.planCells, f.cells))[0]).toEqual({ employeeId: f.employeeId, date: "2026-06-01", kind: "shifts", source: "default", shiftIds: [f.evening] });
+    expect((await f.caller.query(api.shiftPlans.planCells, f.cells))[0]).toEqual({ employeeId: f.employeeId, date: "2026-06-01", kind: "none", source: "project", shiftIds: [] });
     const departmentAssignmentId = await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, departmentId: f.parentId, plan: { kind: "dayCycle", anchorDate: range.startDate, slots: [[], [f.morning, f.night]] } });
     expect(await f.caller.query(api.shiftPlans.planCells, f.cells)).toEqual([
       { employeeId: f.employeeId, date: "2026-06-01", kind: "rest", source: "department", shiftIds: [], departmentId: f.parentId, departmentAssignmentId },

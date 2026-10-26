@@ -29,6 +29,7 @@ async function fixture(role: "project_admin" | "project_user" | "super_admin" = 
     await ctx.db.insert("userProjects", { projectId, userId });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gündüz", startTime: "08:00", endTime: "17:00", earlyExitToleranceMinutes: 15, createdAt: "", updatedAt: "" });
     const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "123", isActive: true, shiftId });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const deviceId = await ctx.db.insert("devices", { projectId, name: "IDE", brand: "ide_smart", createdAt: "", updatedAt: "" });
     const versionId = effectiveFrom ? await ctx.db.insert("pdksRuleVersions", { projectId, effectiveFrom, punchMode: "requirements", checkpointMode: "all", requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "review", noPunch: "absent", createdAt: "", createdBy: userId }) : null;
     await ctx.db.insert("employeeAuth", { employeeId, passwordHash: "fixture", passwordVersion: 1, createdAt: "", updatedAt: "" });
@@ -150,26 +151,32 @@ it("D5: mobil requirements manuel ve gece günlerini tabloyla aynı sayar, ham h
   await f.manual("2026-10-26", { entryTime: "22:00", exitTime: "06:00" });
   const table = await f.table("2026-10-23", "2026-10-26");
   const summary = await f.t.query(api.mobileAttendance.summary, { sessionToken: "fix1-session", startDate: "2026-10-23", endDate: "2026-10-26" });
-  expect(summary.totals.presentDays).toBe(table[0]?.days.filter(day => day.status === "present" || day.status === "late").length);
-  expect(summary.totals.presentDays).toBe(2);
+  expect(summary.totals.pdksPresentDays).toBe(table[0]?.days.filter(day => day.status === "present" || day.status === "late").length);
+  expect(summary.totals.pdksPresentDays).toBe(2);
   expect(summary.days.find(day => day.date === "2026-10-24")?.exitCount).toBe(1);
   expect(summary.days.find(day => day.date === "2026-10-26")?.entryCount).toBe(0);
 });
 
-it("ENGEL-2: vardiyasız requirements çalışan çalışma ayarı bitişine kadar bekler; ham dashboard girişini sayar", async () => {
+it("Plansız requirements günü PDKS üretmez; ham bina girişi korunur", async () => {
   const f = await fixture();
-  await f.t.run(ctx => ctx.db.patch(f.employeeId, { shiftId: undefined }));
+  await f.t.run(async ctx => {
+    for (const assignment of await ctx.db.query("shiftAssignments").collect()) await ctx.db.delete(assignment._id);
+  });
   await f.add("2026-10-23T05:00:00.000Z", "entry");
   vi.setSystemTime(new Date("2026-10-23T09:00:00.000Z"));
-  expect((await f.table("2026-10-23"))[0]?.days[0]?.status).toBe("future");
-  expect(await f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId })).toMatchObject({ presentToday: 1, insideBuilding: 1, averageFirstEntry: "08:00", incompleteDays: 0 });
+  expect((await f.table("2026-10-23"))[0]?.days[0]?.status).toBe("noData");
+  expect(await f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId })).toMatchObject({ presentToday: 0, insideBuilding: 1, averageFirstEntry: "08:00", incompleteDays: 0 });
   vi.setSystemTime(new Date("2026-10-23T15:16:00.000Z"));
-  expect((await f.table("2026-10-23"))[0]?.days[0]?.status).toBe("incomplete");
+  expect((await f.table("2026-10-23"))[0]?.days[0]?.status).toBe("noData");
 });
 
 it("D6: karma dashboard geç gelen kişiyi birden çok geç okumada yalnız bir kere sayar", async () => {
   const f = await fixture("super_admin");
   const legacyEmployee = await f.t.run(ctx => ctx.db.insert("employees", { projectId: f.foreignId, firstName: "Lin", lastName: "Test", email: "lin@test", cardNumber: "456", isActive: true }));
+  await f.t.run(async ctx => {
+    const shiftId = await ctx.db.insert("shifts", { projectId: f.foreignId, name: "Plan", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" });
+    await ctx.db.insert("shiftAssignments", { projectId: f.foreignId, employeeId: legacyEmployee, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
+  });
   for (const time of ["10:00", "11:00", "12:00"]) await f.add(`2026-10-23T${time}:00.000Z`, "entry", { projectId: f.foreignId, employeeId: legacyEmployee, cardNo: "456" });
   vi.setSystemTime(new Date("2026-10-23T17:00:00.000Z"));
   expect(await f.caller.query(api.dashboard.getActivitySummary, {})).toMatchObject({ lateArrivals: 1, presentToday: 1 });
@@ -215,7 +222,7 @@ it("N-perf: kontrol noktası Map sayımı çok kapılı Hik cihazını doğru re
   expect(targets.doors.filter(door => door.deviceId === f.deviceId).every(door => door.reason?.includes("Çok kapılı"))).toBe(true);
 });
 
-it("D1: karma kapsamda ek personel/vardiya/okuma yalnız sürümlü proje içindir", async () => {
+it("D1: karma kapsamda legacy/yabancı projenin personel ve okumaları yüklenmez; sürümlü personel en fazla bir kez okunur", async () => {
   const f = await fixture();
   const queriedProjects: { table: string; projectId: unknown }[] = [];
   await f.t.run(async ctx => {
@@ -242,6 +249,7 @@ it("D1: karma kapsamda ek personel/vardiya/okuma yalnız sürümlü proje içind
   });
   expect(queriedProjects.some(query => query.table === "employees" && query.projectId === f.projectId)).toBe(true);
   expect(queriedProjects.some(query => ["employees", "cardReadings"].includes(query.table) && query.projectId === f.foreignId)).toBe(false);
+  expect(queriedProjects.filter(query => query.table === "employees" && query.projectId === f.projectId).length).toBeLessThanOrEqual(1);
 });
 
 it("D1: yalnız selected legacy sürümü de iş günü check point filtresini yükler", async () => {

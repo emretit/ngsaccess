@@ -100,9 +100,9 @@ export function computePdksChartData(params: {
   const lateByHourMap = new Map<number, number>();
   const hourlyCheckinMap = new Map<string, number>();
 
-  const allEmployeeIds = new Set<string>();
+  const allEmployeeIds = new Map<string, Id<"employees"> | undefined>();
   for (const r of readings) {
-    allEmployeeIds.add(readingEmployeeKey(r));
+    allEmployeeIds.set(readingEmployeeKey(r), r.employeeId);
   }
 
   const start = new Date(startDate);
@@ -113,7 +113,7 @@ export function computePdksChartData(params: {
       present: new Set(),
       late: new Set(),
       absent: new Set(),
-      total: new Set(allEmployeeIds),
+      total: new Set([...allEmployeeIds].filter(([, id]) => !params.resolvePlan || (id !== undefined && params.resolvePlan(id, dateKey).kind !== "none")).map(([key]) => key)),
     });
   }
 
@@ -124,7 +124,7 @@ export function computePdksChartData(params: {
     const empKey = readingEmployeeKey(r);
     const dateKey = trDateKey(r.accessTime);
     const dayData = dailyMap.get(dateKey);
-    if (!dayData) continue;
+    if (!dayData || !dayData.total.has(empKey)) continue;
 
     if (r.accessStatus === "izin_verildi") {
       let empDay = employeeDayMap.get(empKey);
@@ -171,7 +171,7 @@ export function computePdksChartData(params: {
   }
 
   for (const dayData of dailyMap.values()) {
-    for (const empKey of allEmployeeIds) {
+    for (const empKey of dayData.total) {
       if (!dayData.present.has(empKey)) {
         dayData.absent.add(empKey);
       }

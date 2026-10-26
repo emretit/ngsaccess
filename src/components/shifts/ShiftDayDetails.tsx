@@ -62,14 +62,13 @@ export function ShiftDayDetails({
           {data.resolved.shifts.map(shift => <p key={shift._id} className="text-sm">{shift.name} · {shiftTimeLabel(shift)}</p>)}
           {can("schedule.manage") && data.resolved.departmentAssignment && onEditDepartment && <Button variant="outline" onClick={() => { if (data.resolved?.departmentAssignment) onEditDepartment(data.resolved.departmentAssignment); }}>Departman atamasını düzenle</Button>}
         </section>}
-        {data.resolved?.cell.source === "default" && <section className="space-y-2 text-muted-foreground"><p>Varsayılan vardiya</p>{data.resolved.shifts.map(shift => <p key={shift._id}>{shift.name} · {shiftTimeLabel(shift)}</p>)}</section>}
         {data.resolved?.cell.kind === "rest" && <p className="rounded bg-subtle p-3 text-sm">Boş gün (döngü)</p>}
         {data.resolved?.cell.kind === "rest" && data.resolved.assignment && can("schedule.manage") && <Button variant="outline" onClick={() => { if (data.resolved?.assignment) onEdit(data.resolved.assignment); }}>Tüm seriyi düzenle</Button>}
         {data.inheritedContinuations?.map(({ shift, source, departmentName, departmentAssignment }) => (
           <section key={`previous-${shift._id}`} className="border-t py-3 space-y-2">
             <p className="font-medium">{shift.name}</p>
             <p className="text-sm tabular-nums">Önceki günden · 00:00–{shift.endTime}</p>
-            <p className="text-xs text-muted-foreground">{source === "department" ? `Departmandan: ${departmentName ?? "Departman"}` : source === "default" ? "Varsayılan vardiya" : "Önceki günün planı"}</p>
+            <p className="text-xs text-muted-foreground">{source === "department" ? `Departmandan: ${departmentName ?? "Departman"}` : "Önceki günün planı"}</p>
             {can("schedule.manage") && departmentAssignment && onEditDepartment && <Button variant="outline" onClick={() => onEditDepartment(departmentAssignment)}>Departman atamasını düzenle</Button>}
           </section>
         ))}

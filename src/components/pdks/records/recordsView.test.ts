@@ -59,3 +59,15 @@ describe("PDKS kayıt görünümü hesapları", () => {
     expect(view.counters.find(counter => counter.status === "future")?.value).toBe(1);
   });
 });
+
+it("excludes no-plan people and days from counters and exports, retaining their visible rows", () => {
+  const noShiftDay: PdksCell = { date: "2026-10-21", noShift: true, status: "noData", firstEntry: null, lastExit: null, totalMinutes: 0, overtimeMinutes: 0, isLate: false, lateMinutes: 0, leaveType: null, payrollCode: "—" };
+  const absent: PdksRow = { ...rows[0], noShift: true, status: "noData", days: [noShiftDay] };
+  const partial: PdksRow = { ...rows[1], days: [noShiftDay, { ...noShiftDay, date: "2026-10-22", noShift: undefined, status: "present", totalMinutes: 480 }] };
+  const view = derivePdksRecordsView({ ...input, rawRecords: [absent, partial], rawAllRecords: [absent, partial] });
+  expect(view.records).toHaveLength(2);
+  expect(view.summary).toMatchObject({ totalEmployees: 1, present: 1, absent: 0 });
+  expect(view.counters.find(counter => counter.status === "noData")?.value).toBe(0);
+  expect(view.exportRows).toHaveLength(1);
+  expect(view.exportRows[0]?.days.map(day => day.date)).toEqual(["2026-10-22"]);
+});

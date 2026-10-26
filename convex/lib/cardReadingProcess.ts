@@ -59,7 +59,11 @@ async function directionShift(ctx: MutationCtx, employeeId: Id<"employees">, dat
   const shifts = (await Promise.all(ids.map(id => ctx.db.get(id))))
     .filter((shift): shift is NonNullable<typeof shift> => shift !== null)
     .filter(shift => !shift.projectId || shift.projectId === employee.projectId);
-  return createShiftResolver([employee], shifts, [applicable], departmentData.departments, departmentData.assignments).resolveLast(employeeId, date);
+  const plan = createShiftResolver([employee], shifts, [applicable], departmentData.departments, departmentData.assignments).resolvePlan(employeeId, date);
+  if (plan.kind === "shifts") return plan.shifts[plan.shifts.length - 1] ?? null;
+  if (plan.kind === "rest") return null;
+  // Raw access direction keeps its legacy overnight toggle; this is not PDKS eligibility.
+  return shifts.find(shift => shift._id === employee.shiftId) ?? null;
 }
 
 // Cihazın yön ayarına ve toggle state'ine göre okumanın yönünü çözer.

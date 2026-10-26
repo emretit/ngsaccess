@@ -57,7 +57,7 @@ it.each([true, false])("department=%s: table, detail, payroll, reports and mobil
   expect(payroll.rows[0]?.cells.find(day => day.date === date)).toMatchObject(expected);
   expect((await f.report())[0]).toMatchObject(expected);
   const mobile = await f.summary();
-  expect(mobile.totals.presentDays).toBe(1);
+  expect(mobile.totals.pdksPresentDays).toBe(1);
   expect(mobile.days[0]?.date).toBe(date);
   expect(await f.dashboard()).toMatchObject({ presentToday: 1, incompleteDays: 0, lateArrivals: 0 });
   expect(await f.caller.query(api.cardReadings.getPdksTableData, { projectId: f.projectId, startDate: date, endDate: date, viewMode: "matrix", shiftId: f.evening })).toHaveLength(1);
@@ -67,7 +67,7 @@ it("missing afternoon is incomplete everywhere, while the worked morning is reta
   const f = await fixture();
   await f.add("08:00", "entry"); await f.add("12:00", "exit");
   expect((await f.table())[0]?.days[0]).toMatchObject({ status: "incomplete", totalMinutes: 225, segments: [{ decision: "present" }, { decision: "absent" }] });
-  expect((await f.summary()).totals.presentDays).toBe(0);
+  expect((await f.summary()).totals.pdksPresentDays).toBe(0);
   expect(await f.dashboard()).toMatchObject({ presentToday: 0, incompleteDays: 1 });
 });
 
@@ -77,7 +77,7 @@ it("cycle rest produces weekend and never absence in the report/dashboard path",
   expect((await f.table(next, next))[0]?.days[0]).toMatchObject({ status: "weekend", planKind: "rest" });
   expect((await f.report(next, next))[0]).toMatchObject({ status: "weekend", planKind: "rest" });
   expect(await f.dashboard()).toMatchObject({ presentToday: 0, incompleteDays: 0 });
-  expect((await f.summary(next, next)).totals.presentDays).toBe(0);
+  expect((await f.summary(next, next)).totals.pdksPresentDays).toBe(0);
 });
 
 it("late afternoon uses its own threshold and retains the first morning entry", async () => {
@@ -93,7 +93,7 @@ it("last night piece consumes D+1 exit in table/detail/mobile and manual validat
   await f.add("08:00", "entry"); await f.add("12:00", "exit"); await f.add("22:00", "entry"); await f.add("06:00", "exit", next);
   expect((await f.table(date, next))[0]?.days[0]).toMatchObject({ status: "present", lastExit: "06:00", segments: [{ decision: "present" }, { decision: "present" }] });
   expect((await f.detail(date, next))?.days[0]).toMatchObject({ isOvernightShift: true, exitNextDay: true });
-  expect((await f.summary(date, next)).totals.presentDays).toBe(1);
+  expect((await f.summary(date, next)).totals.pdksPresentDays).toBe(1);
   await expect(f.caller.mutation(api.pdksRecords.upsertManual, { employeeId: f.employeeId, date, entryTime: "08:00", exitTime: "06:00", note: "Çoklu gece düzeltmesi" })).resolves.toBeTruthy();
 });
 

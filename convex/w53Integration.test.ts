@@ -34,7 +34,7 @@ async function fixture(versioned: boolean, assignmentOnly = false, globalShift =
       projectId, firstName: "Ada", lastName: "Test", email: "w53@example.test", cardNumber: "53", isActive: true,
       shiftId: assignmentOnly ? undefined : shiftId, employmentEndDate: date,
     });
-    if (assignmentOnly) await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const deviceId = await ctx.db.insert("devices", { projectId, name: "A", createdAt: "", updatedAt: "" });
     const otherDeviceId = await ctx.db.insert("devices", { projectId, name: "B", createdAt: "", updatedAt: "" });
     if (versioned) await ctx.db.insert("pdksRuleVersions", {
@@ -98,7 +98,7 @@ describe.each([false, true])("W5.3 legacy/versioned=%s", versioned => {
     // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
     vi.setSystemTime(new Date(iso(date, "23:59")));
     const mobile = await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date });
-    expect(mobile.totals.presentDays).toBe(1);
+    expect(mobile.totals.pdksPresentDays).toBe(1);
     expect(mobile.totals.exitCount).toBe(exitDate === date ? 1 : 0);
     const dashboard = await f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId });
     expect(dashboard).toMatchObject({ presentToday: 1, lateArrivals: 0, incompleteDays: 0 });
@@ -115,7 +115,7 @@ describe.each([false, true])("W5.3 legacy/versioned=%s", versioned => {
     expect(sgk.rows[0]).toMatchObject({ calismaGunu: 1, toplamSaat: 7.5 });
     // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
     vi.setSystemTime(new Date(iso(date, "23:59")));
-    expect((await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date })).totals.presentDays).toBe(1);
+    expect((await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date })).totals.pdksPresentDays).toBe(1);
   });
 
   it("assignment-only esnek vardiyayı keşfeder ve geceyi mobil/rapor/SGK adaptörüne dahil eder", async () => {
@@ -129,7 +129,7 @@ describe.each([false, true])("W5.3 legacy/versioned=%s", versioned => {
     // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
     vi.setSystemTime(new Date(iso(date, "23:59")));
     const mobile = await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date });
-    expect(mobile.totals.presentDays).toBe(1);
+    expect(mobile.totals.pdksPresentDays).toBe(1);
   });
 });
 
@@ -153,7 +153,7 @@ it("manuel D girişi + D+1 çıkışı checkpoint sürümü değişse de tablo/b
   vi.setSystemTime(new Date(iso(date, "23:59")));
   expect(await f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId })).toMatchObject({ presentToday: 1, incompleteDays: 0 });
   const mobile = await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: nextDate });
-  expect(mobile.totals).toMatchObject({ presentDays: 1, exitCount: 1, unknownCount: 0 });
+  expect(mobile.totals).toMatchObject({ pdksPresentDays: 1, exitCount: 1, unknownCount: 0 });
 });
 
 it("gerçek giriş D politikasıyla açılır; yeni gün çıkış politikası geçerli gece çiftini bozmaz", async () => {
@@ -191,7 +191,7 @@ it("projectId'siz esnek tanımı keşif kapısından geçer; tablo/rapor/mobil a
   expect((await f.caller.query(api.reports.getAttendanceSummaryReport, { projectId: f.projectId, year: 2026, month: 6 })).rows[0]?.presentDays).toBe(1);
   // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
   vi.setSystemTime(new Date(iso(date, "23:59")));
-  expect((await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date })).totals.presentDays).toBe(1);
+  expect((await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date })).totals.pdksPresentDays).toBe(1);
 });
 
 it("aynı legacy projedeki sabit vardiyanın takvim günleri ve brüt eski SGK hesabı korunur", async () => {
@@ -201,6 +201,7 @@ it("aynı legacy projedeki sabit vardiyanın takvim günleri ve brüt eski SGK h
   await f.t.run(async ctx => {
     const shiftId = await ctx.db.insert("shifts", { projectId: f.projectId, name: "Sabit gece", startTime: "22:00", endTime: "06:00", createdAt: "", updatedAt: "" });
     const employeeId = await ctx.db.insert("employees", { projectId: f.projectId, firstName: "Sabit", lastName: "Test", email: "fixed@example.test", cardNumber: "54", isActive: true, shiftId });
+    await ctx.db.insert("shiftAssignments", { projectId: f.projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     for (const [day, time, direction] of [[date, "22:00", "entry"], [nextDate, "06:00", "exit"]] as const) await ctx.db.insert("cardReadings", { projectId: f.projectId, employeeId, cardNo: "54", direction, accessStatus: "izin_verildi", accessTime: iso(day, time) });
   });
   const sgk = await f.caller.query(api.reports.getSgkMonthlyReport, { projectId: f.projectId, year: 2026, month: 6 });
@@ -234,7 +235,7 @@ it("legacy manuel kayıtlar sınırlı okunur; esnekte yalnız gerekli indeksli 
     cardReadings: 2, workSettings: 1, overtimeRates: 1, holidays: 2, generalSettings: 1, leaves: 1,
   }, gets: 1 });
   await f.t.run(ctx => ctx.db.patch(f.shiftId, { scheduleType: "fixed", flexible: undefined }));
-  expect(await counts()).toEqual({ tables: { shiftPlanRefs: 1, departmentShiftAssignments: 1, pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 1 }, gets: 0 });
+  expect(await counts()).toEqual({ tables: { shiftPlanRefs: 1, departmentShiftAssignments: 1, pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 1, shiftAssignments: 1 }, gets: 1 });
 });
 
 it.each(["ham", "manuel"] as const)("dashboard D+1 ham çıkışı D'nin %s giriş politikasını taşır; bugünkü devamı artırmaz", async kind => {
@@ -340,7 +341,7 @@ it("N1: kapalı ayın tüm günleri ölçülür; günlük ve non-null satır hed
   expect(report.rows[0]).toMatchObject({ requiredNetMinutes: row?.requiredNetMinutes, shortfallMinutes: row?.shortfallMinutes, excessMinutes: row?.excessMinutes });
 });
 
-it("D3: 500 kişilik legacy manuel taramayı global esnek keşif yeniden kullanır; kişi başı vardiya sorgusu açmaz", async () => {
+it("D3: 500 kişide atama sorguları en fazla N+1; personel ve resolver ikinci kez okunmaz", async () => {
   const f = await fixture(false);
   await f.t.run(async ctx => {
     await ctx.db.patch(f.shiftId, { scheduleType: "fixed", flexible: undefined, startTime: "08:00", endTime: "17:00" });
@@ -363,10 +364,10 @@ it("D3: 500 kişilik legacy manuel taramayı global esnek keşif yeniden kullan�
     return { tables, gets, readings: result.readings, rows: [...result.ruleRows] };
   });
   const before = await counts();
-  expect(before).toEqual({ tables: { shiftPlanRefs: 1, departmentShiftAssignments: 1, pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 500 }, gets: 0, readings: [], rows: [] });
+  expect(before).toEqual({ tables: { shiftPlanRefs: 1, departmentShiftAssignments: 1, pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 500, shiftAssignments: 500 }, gets: 1, readings: [], rows: [] });
   const globalId = await f.t.run(ctx => ctx.db.insert("shifts", { name: "Atanmamış global", startTime: "05:00", endTime: "22:00", scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE, createdAt: "", updatedAt: "" }));
   const after = await counts();
-  expect(after).toEqual({ ...before, tables: { ...before.tables, employees: 1, shiftAssignments: 1 } });
+  expect(after).toEqual({ ...before, tables: { ...before.tables, employees: 1, shiftAssignments: 501 } });
   expect(Object.values(after.tables).reduce((sum, n) => sum + n, 0) - Object.values(before.tables).reduce((sum, n) => sum + n, 0)).toBe(1);
   await f.t.run(async ctx => {
     const otherProject = await ctx.db.insert("projects", { name: "Globali kullanan başka proje" });
@@ -374,7 +375,12 @@ it("D3: 500 kişilik legacy manuel taramayı global esnek keşif yeniden kullan�
     await ctx.db.insert("shiftAssignments", { projectId: otherProject, employeeId: otherEmployee, shiftId: globalId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     await ctx.db.insert("shiftAssignments", { projectId: f.projectId, employeeId: f.employeeId, shiftId: globalId, startDate: "2026-06-01", endDate: "2026-06-20", createdAt: "", updatedAt: "" });
   });
-  expect(await counts()).toEqual(after);
+  expect(await counts()).toEqual({ ...after, gets: 2 });
+  for (const result of [before, after, await counts()]) {
+    expect(result.tables.shiftAssignments).toBeLessThanOrEqual(501);
+    expect(result.tables.employees).toBeLessThanOrEqual(1);
+    expect(result.gets).toBeLessThanOrEqual(2);
+  }
 });
 
 it("D3: 1000'den fazla eski atamalı esnek tanım keşfi hata vermez; kullanım kanıtlanamayınca esnek yola düşer", async () => {

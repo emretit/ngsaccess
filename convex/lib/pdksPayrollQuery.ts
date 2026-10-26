@@ -196,7 +196,7 @@ export async function getMonthlyPayrollSheet(
         })
       );
 
-      const periodOvertime = calculatePeriodOvertime(allCells, {
+      const periodOvertime = calculatePeriodOvertime(allCells.filter(cell => !cell.noShift), {
         startDate, endDate, overtimeBasis: overtimeRates.overtimeBasis,
         hourlyRate: empHourlyRate,
       });
@@ -210,6 +210,7 @@ export async function getMonthlyPayrollSheet(
 
       const totals = cells.reduce(
         (acc, c) => {
+          if (c.noShift) return acc;
           acc.totalMinutes += c.totalMinutes;
           if (c.payrollCode === "İZN") acc.leaveDays += 1;
           if (c.status === "incomplete") acc.incompleteDays += 1;
@@ -248,7 +249,7 @@ export async function getMonthlyPayrollSheet(
 
   return {
     days,
-    rows: rows.sort((a, b) => a.name.localeCompare(b.name, "tr")),
+    rows: rows.filter(row => row.cells.some(cell => !cell.noShift)).sort((a, b) => a.name.localeCompare(b.name, "tr")),
     year: args.year,
     month: args.month,
   };

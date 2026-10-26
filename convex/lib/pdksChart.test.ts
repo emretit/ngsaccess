@@ -186,9 +186,11 @@ describe("pdksChart – computePdksChartData", () => {
 it("plan-aware chart keeps zero/one shift results structurally identical", () => {
   for (const dayShift of [null, shift()]) {
     const input = chartParams({ readings: [reading(`${MONDAY}T08:00:00Z`, EMP_A, "1")], resolveShift: () => dayShift });
-    expect(computePdksChartData({ ...input, resolvePlan: () => dayShift
-      ? { kind: "shifts", source: "default", calendar: "project", shifts: [dayShift] }
-      : { kind: "none", source: "project" } })).toStrictEqual(computePdksChartData(input));
+    const result = computePdksChartData({ ...input, resolvePlan: () => dayShift
+      ? { kind: "shifts", source: "employee", calendar: "project", shifts: [dayShift] }
+      : { kind: "none", source: "project" } });
+    if (dayShift) expect(result).toStrictEqual(computePdksChartData(input));
+    else expect(result.dailyAttendance.every(day => day.present === 0 && day.absent === 0 && day.late === 0)).toBe(true);
   }
 });
 

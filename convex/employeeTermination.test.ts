@@ -17,6 +17,8 @@ async function fixture(role: "project_admin" | "project_user" | "super_admin" = 
     const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 86400000 });
     await ctx.db.insert("userProjects", { userId, projectId });
     const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "test@example.test", cardNumber: "123", isActive: true });
+    const datedShiftId = await ctx.db.insert("shifts", { projectId, name: "Plan", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId: datedShiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const deviceId = await ctx.db.insert("devices", { projectId, name: "IDE", brand: "ide_smart", isActive: true, createdAt: "2026-10-01", updatedAt: "2026-10-01" });
     const ruleId = await ctx.db.insert("accessRules", { projectId, name: "Rule", isActive: true });
     await ctx.db.insert("groupMembers", { projectId, groupId: ruleId, employeeId, createdAt: "2026-10-01" });

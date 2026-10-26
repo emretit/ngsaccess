@@ -42,10 +42,9 @@ export function derivePdksRecordsView({ projectId, filters, smartPreset, selecti
         )
       : new Set<string>();
   const detail = drilldown?.scope === scope ? drilldown : null;
-  const summary = summarizePdksRecords(allRecords, todayKey);
-  const exportRows = selectedIds.size
-    ? records.filter((r) => selectedIds.has(r.id))
-    : records;
+  const summary = summarizePdksRecords(allRecords.filter(row => !row.noShift), todayKey);
+  const exportRows = records.filter(row => !row.noShift && (!selectedIds.size || selectedIds.has(row.id)))
+    .map(row => ({ ...row, days: row.days.filter(day => !day.noShift) }));
   const hasFilters = Boolean(
     filters.person || filters.employeeId ||
     filters.companyId ||
@@ -73,7 +72,7 @@ export function derivePdksRecordsView({ projectId, filters, smartPreset, selecti
     ]
       .filter(Boolean)
       .join(" · ") || "Tüm personel";
-  const passive = (status: "weekend" | "holiday" | "noData" | "future") => allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(d => d.status === status).length : Number(row.status === status)), 0);
+  const passive = (status: "weekend" | "holiday" | "noData" | "future") => allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(d => !d.noShift && d.status === status).length : Number(!row.noShift && row.status === status)), 0);
   const inProgress = allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(isPdksInProgress).length : Number(isPdksInProgress(row))), 0);
   const counters = [
     { status: "present", value: summary.present },

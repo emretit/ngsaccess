@@ -149,7 +149,7 @@ describe('Departman ve takvim', () => {
   it.each([
     ['kişi', baseCell, 'data-source="employee"'],
     ['departman', { ...baseCell, source: 'department', assignmentId: undefined, departmentId: department._id, departmentAssignmentId: departmentAssignment._id }, 'Departmandan: Üretim'],
-    ['varsayılan', { ...baseCell, source: 'default', assignmentId: undefined }, 'opacity-50'],
+    ['plansız', { ...baseCell, kind: 'none', source: 'project', assignmentId: undefined, shiftIds: [] }, 'atama yok'],
     ['boş', { ...baseCell, kind: 'rest', shiftIds: [] }, 'repeating-linear-gradient'],
     ['çoklu', { ...baseCell, shiftIds: shifts.map(s => s._id) }, '+1'],
   ] satisfies [string, PlanCell, string][])('%s hücre görünümü sunucu kararını gösterir', (_name, cell, expected) => {
@@ -232,9 +232,9 @@ describe('C1 denetim düzeltmeleri', () => {
     const rest = renderToStaticMarkup(<ShiftCalendarCell data={dataFor({ ...baseCell, kind: 'rest', shiftIds: [] })} date={baseCell.date} employeeName="Ada Test" onOpen={() => {}} />);
     expect(rest).toContain('aria-label="Ada Test, 19 Ekim 2026 Pzt, Boş, ayrıntıları aç"');
     expect(rest).not.toContain(', ,');
-    const fallback = renderToStaticMarkup(<ShiftCalendarCell data={dataFor({ ...baseCell, source: 'default' })} date={baseCell.date} employeeName="Ada Test" onOpen={() => {}} />);
+    const fallback = renderToStaticMarkup(<ShiftCalendarCell data={dataFor({ ...baseCell, source: 'employee' })} date={baseCell.date} employeeName="Ada Test" onOpen={() => {}} />);
     expect(fallback).not.toMatch(/class="group[^"]*opacity-/);
-    expect(fallback).toMatch(/aria-hidden="true" class="absolute[^"]*opacity-50/);
+    expect(fallback).not.toContain('Varsayılan vardiya');
     expect(fallback).toContain('<span class="block font-medium">Sabah</span>');
   });
   it.each(['weekly', 'dayCycle'] as const)('%s kişisel satırın ikinci vardiyasıyla çakışmayı işaretler', kind => {
@@ -286,7 +286,7 @@ describe('C1 denetim düzeltmeleri', () => {
 });
 
 describe('Birleşik denetim: kaynak bağımsız gece devamı', () => {
-  it.each(['department', 'default'] as const)('%s kaynaklı 22–06 vardiyası sonraki gün hücre ve detayında görünür', source => {
+  it.each(['department'] as const)('%s kaynaklı 22–06 vardiyası sonraki gün hücre ve detayında görünür', source => {
     const overnight = { ...night, startTime: '22:00', endTime: '06:00' };
     const previousCell: PlanCell = { ...baseCell, date: '2026-10-18', source, assignmentId: undefined, shiftIds: [night._id], ...(source === 'department' ? { departmentId: department._id, departmentAssignmentId: departmentAssignment._id } : {}) };
     const cell: PlanCell = { ...baseCell, kind: 'none', source: 'project', shiftIds: [], assignmentId: undefined };
@@ -309,7 +309,7 @@ describe('Birleşik denetim: kaynak bağımsız gece devamı', () => {
   });
   it('önceki hücredeki gündüz ve esnek vardiyadan gece devamı üretmez', () => {
     const flexible = { ...night, scheduleType: 'flexible' as const, startTime: '22:00', endTime: '06:00' };
-    const previousCell: PlanCell = { ...baseCell, date: '2026-10-18', source: 'default', assignmentId: undefined, shiftIds: [morning._id, night._id] };
+    const previousCell: PlanCell = { ...baseCell, date: '2026-10-18', source: 'employee', assignmentId: undefined, shiftIds: [morning._id, night._id] };
     const data = resolvedCalendarDay(employee, baseCell.date, baseCell, [assignment], [morning, flexible], [], [], [], [], previousCell);
     expect(data.inheritedContinuations).toBeUndefined();
     expect(data.records.map(record => record.continuation)).toEqual([false]);

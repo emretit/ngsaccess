@@ -237,6 +237,7 @@ it("gerçek tablo/detay/bordro handler'ları manuel gece girişini aynı gün he
     const { _id: _unused, _creationTime: _creation, ...fields } = shift();
     const shiftId = await ctx.db.insert("shifts", { ...fields, projectId: f.projectId });
     const employeeId = await ctx.db.insert("employees", { projectId: f.projectId, shiftId, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "1", isActive: true });
+    await ctx.db.insert("shiftAssignments", { projectId: f.projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     await ctx.db.insert("pdksRecords", { projectId: f.projectId, employeeId, employeeFirstName: "Ada", employeeLastName: "Test", date, entryTime: "21:00", manualEntry: true, status: "present", createdAt: "", updatedAt: "" });
     const { _id: _readingId, _creationTime: _readingCreation, ...raw } = reading("06:00", "exit", addWorkDate(date, 1));
     await ctx.db.insert("cardReadings", { ...raw, employeeId, projectId: f.projectId });

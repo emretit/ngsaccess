@@ -45,7 +45,8 @@ describe("planned PDKS day", () => {
     for (const item of [null, morning]) {
       const input = { ...params(readings), shift: item };
       const dayPlan: DayPlan = item ? plan([item]) : { kind: "none", source: "project" };
-      expect(computePdksPlannedDay({ ...input, dayPlan })).toStrictEqual(computePdksDay(input));
+      if (item) expect(computePdksPlannedDay({ ...input, dayPlan })).toStrictEqual(computePdksDay(input));
+      else expect(computePdksPlannedDay({ ...input, dayPlan })).toMatchObject({ noShift: true, totalMinutes: 0, hasAttendance: false, overtimeSegments: [] });
       expect(computePdksPlannedDay(input)).toStrictEqual(computePdksDay(input));
     }
   });
@@ -53,7 +54,7 @@ describe("planned PDKS day", () => {
     const input = { ...rowParams(), empReadings: full.slice(0, 2) };
     expect(computePdksTableRow({ ...input, resolvePlan: () => plan([morning]), resolveLast: () => morning })).toStrictEqual(computePdksTableRow(input));
     const none = { ...input, resolveShift: () => null };
-    expect(computePdksTableRow({ ...none, resolvePlan: () => ({ kind: "none", source: "project" }) })).toStrictEqual(computePdksTableRow(none));
+    expect(computePdksTableRow({ ...none, resolvePlan: () => ({ kind: "none", source: "project" }) })).toMatchObject({ noShift: true, totalMinutes: 0, status: "noData" });
   });
   it("08–12 plus 14–18 totals pieces, preserving both breaks and excluding the gap", () => {
     const result = computePdksPlannedDay({ ...params(), dayPlan: plan() });

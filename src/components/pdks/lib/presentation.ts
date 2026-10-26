@@ -77,8 +77,8 @@ export function punchQualityHint(quality: string | undefined): string {
   }
 }
 /** Legacy rows also carry punchQuality; the hint is shown only where the rule decision needs it. */
-export function reviewHint(item: { status: string; punchQuality?: string; durationMeasured?: boolean } | undefined): string {
-  if (!item || (item.status !== "incomplete" && item.durationMeasured !== false)) return "";
+export function reviewHint(item: { noShift?: boolean; status: string; punchQuality?: string; durationMeasured?: boolean } | undefined): string {
+  if (!item || item.noShift || (item.status !== "incomplete" && item.durationMeasured !== false)) return "";
   return punchQualityHint(item.punchQuality);
 }
 export function displayTime(value: string | null): string {
@@ -158,6 +158,7 @@ export function filterPdksRows(
 ): PdksRow[] {
   if (!status || status === "all") return rows;
   return rows.filter((row) => {
+    if (row.noShift) return false;
     if (status === "overtime")
       return row.days.length > 1
         ? row.days.some(
@@ -168,7 +169,7 @@ export function filterPdksRows(
           )
         : row.overtimeMinutes > 0;
     return row.days.length > 1
-      ? row.days.some((day) => day.status === status)
+      ? row.days.some((day) => !day.noShift && day.status === status)
       : row.status === status;
   });
 }

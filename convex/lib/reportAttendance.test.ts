@@ -79,7 +79,7 @@ it("biyometrik okuma zamanlanmış rapor yükleyicisinde bir kez süzülür", as
   const raw: Doc<"cardReadings">[] = [{ _id: "r" as Id<"cardReadings">, _creationTime: 0, employeeId: emp._id, projectId, cardNo: emp.cardNumber, accessStatus: "izin_verildi", accessTime: "2026-01-02T06:00:00Z", hikCurrentVerifyMode: "face" }];
   const ctx = (readings: Doc<"cardReadings">[]) => ({ db: {
     query: (table: string) => {
-      const rows = table === "employees" ? [emp] : table === "cardReadings" ? readings : [];
+      const rows = table === "employees" ? [emp] : table === "cardReadings" ? readings : table === "shifts" ? [{ _id: "s", projectId, name: "Plan", startTime: "09:00", endTime: "18:00" }] : table === "shiftAssignments" ? [{ employeeId: emp._id, shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", updatedAt: "" }] : [];
       const chain = { withIndex: () => chain, order: () => chain, take: async () => rows, collect: async () => rows, first: async () => null };
       return chain;
     },
@@ -247,7 +247,7 @@ it("ay ortasında ayrılan personeli raporda tutar ve son gününden sonra devam
   const emp = { ...employee("departed"), projectId, isActive: false, employmentEndDate: "2026-01-15" };
   const ctx = { db: {
     query: (table: string) => {
-      const rows = table === "employees" ? [emp] : [];
+      const rows = table === "employees" ? [emp] : table === "shifts" ? [{ _id: "s", projectId, name: "Plan", startTime: "09:00", endTime: "18:00" }] : table === "shiftAssignments" ? [{ employeeId: emp._id, shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", updatedAt: "" }] : [];
       const chain = { withIndex: () => chain, order: () => chain, take: async () => rows, collect: async () => rows, first: async () => null };
       return chain;
     },

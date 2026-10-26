@@ -18,6 +18,7 @@ async function fixture(role: "project_admin" | "project_user" | "super_admin" = 
     await ctx.db.insert("userProjects", { userId, projectId });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gündüz", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "" });
     const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "123", isActive: true, shiftId });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const deviceId = await ctx.db.insert("devices", { projectId, name: "IDE", brand: "ide_smart", createdAt: "", updatedAt: "" });
     const doorId = await ctx.db.insert("doors", { projectId, name: "Dış kapı", deviceId, ioId: 2 });
     const otherDevice = await ctx.db.insert("devices", { projectId: foreignId, name: "Başka", createdAt: "", updatedAt: "" });
