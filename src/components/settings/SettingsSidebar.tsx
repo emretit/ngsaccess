@@ -10,7 +10,7 @@ export const SETTINGS_SECTIONS: { key: SettingsTab; label: string; scope: string
   { key: "reports", label: "Raporlar", scope: "Proje kapsamına göre indirme ve kişisel e-posta hatırlatması." },
   { key: "integrations", label: "Entegrasyonlar", scope: "Seçili projenin köprü anahtarları ve entegrasyon bilgileri." },
   { key: "privacy", label: "Gizlilik ve KVKK", scope: "Seçili projenin biyometri, saklama süresi ve asistan gizlilik ayarları." },
-  { key: "mail", label: "E-posta gönderimi", scope: "Sistem genelindeki gönderim sağlayıcısı; proje seçimi sağlayıcıyı değiştirmez." },
+  { key: "mail", label: "E-posta gönderimi", scope: "Seçili projenin rapor e-postalarını kendi hesabınızdan (Google Workspace, kurumsal SMTP) gönderme ayarı." },
   { key: "notifications", label: "Bildirimler", scope: "Seçili projenin bildirim tercihleri." },
 ];
 export function SettingsSidebar({ selected, onSelect, disabled = false }: {

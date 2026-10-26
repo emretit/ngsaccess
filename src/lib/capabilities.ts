@@ -5,9 +5,8 @@ export function permissionCapabilities(can: (permission: Permission) => boolean,
   const systemAdmin = role === "super_admin";
   const admin = can("admin.manage");
   const settingsTabs: SettingsTab[] = [];
-  if (admin) settingsTabs.push("general", "users", "roles", "privacy", "notifications");
+  if (admin) settingsTabs.push("general", "users", "roles", "privacy", "mail", "notifications");
   if (can("reports.view")) settingsTabs.push("reports");
   if (can("devices.manage")) settingsTabs.push("integrations");
-  if (systemAdmin) settingsTabs.push("mail");
   return { admin, systemAdmin, inviteUsers: admin, manageUsers: systemAdmin, auditLog: admin, settingsTabs };
 }

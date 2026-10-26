@@ -83,6 +83,7 @@ describe("denetim sorgusu", () => {
       "hikPendingOperations",
       "holidays",
       "leaves",
+      "mailSettings",
       "overtimeRates",
       "pdksRecords",
       "pdksRuleVersions",

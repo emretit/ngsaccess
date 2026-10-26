@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({ role: "project_admin", query: vi.fn(), mutatio
 vi.mock("@/components/auth/AuthProvider", () => ({ useAuth: () => ({ profile: { role: mocks.role } }) }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project-a", projectIds: ["project-a", "project-b"], activeProject: { name: "Merkez" }, isAdmin: true, loading: false }) }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useProjectChangeGuard: () => undefined }));
-vi.mock("convex/react", () => ({ useQuery: mocks.query, useMutation: () => mocks.mutation }));
+vi.mock("convex/react", () => ({ useQuery: mocks.query, useMutation: () => mocks.mutation, useAction: () => mocks.mutation }));
 afterEach(() => { mocks.role = "project_admin"; mocks.query.mockReset(); });
 
 function draftSequence(steps: { source: { name: string; enabled: boolean }; edit?: { name?: string; enabled?: boolean }; reset?: boolean }[]) {
@@ -84,13 +84,15 @@ describe("settings draft and payload contracts", () => {
 });
 
 describe("settings presentation contracts", () => {
-  it("shows a labeled mobile select and desktop navigation without widening mail permission", () => {
+  it("shows a labeled mobile select and desktop navigation with project mail for managers", () => {
     const render = () => renderToStaticMarkup(<MemoryRouter><SettingsSidebar selected="general" onSelect={() => undefined} /></MemoryRouter>);
     const manager = render();
     expect(manager).toContain('aria-label="Ayar bölümleri"');
     expect(manager).toContain('for="settings-section"');
     expect(manager).toContain('aria-current="page"');
-    expect(manager).not.toContain("E-posta gönderimi");
+    expect(manager).toContain("E-posta gönderimi");
+    mocks.role = "project_user";
+    expect(render()).not.toContain("E-posta gönderimi");
     mocks.role = "super_admin";
     const admin = render();
     expect(admin).toContain("E-posta gönderimi");
@@ -118,14 +120,21 @@ describe("settings presentation contracts", () => {
 
 
 describe("settings page permission boundary", () => {
-  it("does not mount any settings query for a member or a manager requesting mail", () => {
-    for (const role of ["project_user", "project_admin"]) {
-      mocks.role = role;
-      const html = renderToStaticMarkup(<MemoryRouter initialEntries={["/settings?tab=mail"]}><Settings /></MemoryRouter>);
-      expect(html).toContain("Bu ayar bölümünü görüntüleme yetkiniz yok");
-      expect(html).not.toContain("Ayar bölümleri");
-      expect(mocks.query).not.toHaveBeenCalled();
-    }
+  it("does not mount any settings query for a member requesting mail", () => {
+    mocks.role = "project_user";
+    const html = renderToStaticMarkup(<MemoryRouter initialEntries={["/settings?tab=mail"]}><Settings /></MemoryRouter>);
+    expect(html).toContain("Bu ayar bölümünü görüntüleme yetkiniz yok");
+    expect(html).not.toContain("Ayar bölümleri");
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
+  it("lets a manager set up the project mail account with the Google guide", () => {
+    mocks.query.mockReturnValue(null);
+    const html = renderToStaticMarkup(<MemoryRouter initialEntries={["/settings?tab=mail"]}><Settings /></MemoryRouter>);
+    expect(html).not.toContain("Bu ayar bölümünü görüntüleme yetkiniz yok");
+    expect(html).toContain("NGS+ adresinden");
+    expect(html).toContain("myaccount.google.com/apppasswords");
+    expect(html).toContain('value="smtp.gmail.com"');
+    expect(html).not.toContain("Bağlantıyı test et");
   });
   it("renders an invalid tab as general with one page heading and preserves the no-record state", () => {
     mocks.query.mockReturnValue(null);

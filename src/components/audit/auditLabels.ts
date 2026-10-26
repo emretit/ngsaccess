@@ -94,6 +94,7 @@ const tableLabels: Record<string, Record<string, string>> = {
   projectRolePermissions: { permissions: "Rol yetkileri", default: "Varsayılan yetkiler" },
   holidays: { name: "Tatil adı", type: "Tatil türü", isHalfDay: "Yarım gün" },
   generalSettings: { workingDays: "Çalışma günleri" },
+  mailSettings: { smtpHost: "SMTP sunucusu", smtpPort: "SMTP portu", smtpUsername: "SMTP kullanıcı adı", fromEmail: "Gönderen e-posta", isActive: "Raporlar bu hesaptan", passwordChanged: "Şifre değişti" },
   employees: {
     cardNo: "Kart numarası",
     department: "Bölüm",

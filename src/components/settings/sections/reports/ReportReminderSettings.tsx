@@ -44,7 +44,7 @@ function ReminderForm({ scope, setScope }: { scope: string; setScope: (scope: st
   useSettingsFormState("report-reminder", draft.dirty, action.pending);
   return <section className="min-w-0 space-y-4 border-t pt-6">
     <div><h3 className="text-base font-semibold">Kişisel e-posta hatırlatması</h3>
-      <p className="mt-1 text-sm text-muted-foreground">Her ayın ilk günü size rapor hatırlatması ve kapsam bilgisi gönderilir. Dosya eki gönderilmez; raporu bu ekrandan indirirsiniz.</p></div>
+      <p className="mt-1 text-sm text-muted-foreground">Her ayın ilk günü size rapor hatırlatması ve kapsam bilgisi gönderilir. Dosya eki gönderilmez; raporu bu ekrandan indirirsiniz. Proje için <strong>E-posta gönderimi</strong> bölümünde hesap kayıtlıysa e-posta o adresten, değilse NGS+ adresinden gelir.</p></div>
     <FormFieldWrapper htmlFor="reminder-scope" label="Hatırlatma kapsamı">
       <select className={selectStyle} value={scope} disabled={action.pending} onChange={event => { const next = event.target.value; if (draft.dirty) setNextScope(next); else setScope(next); }}>
         <option value="active">{activeProject?.name ?? "Aktif proje"}</option>

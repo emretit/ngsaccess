@@ -4,30 +4,9 @@ import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 
 import { trCalendarDate } from "../lib/trDate";
-
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
-}
-
-async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  if (!RESEND_API_KEY) return false;
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: "NGS Access <noreply@ngsaccess.com>",
-      to: [to],
-      subject,
-      html,
-    }),
-  });
-  return res.ok;
-}
+import { escapeHtml } from "../lib/escapers";
+import { renderEmailTemplate } from "../lib/emailTemplate";
+import { deliverProjectMail } from "../lib/projectMailer";
 
 export const sendMonthlyReports = internalAction({
   args: {},
@@ -37,6 +16,7 @@ export const sendMonthlyReports = internalAction({
     prevMonth.setUTCMonth(prevMonth.getUTCMonth() - 1);
     const year = prevMonth.getUTCFullYear();
     const month = prevMonth.getUTCMonth() + 1;
+    const site = process.env.SITE_URL ?? "https://ngsplus.app";
 
     const schedules = await ctx.runQuery(internal.reports.getEnabledSchedules, {});
 
@@ -50,17 +30,20 @@ export const sendMonthlyReports = internalAction({
           });
         if (!reportSummary) continue;
 
-        const html = `
-          <h2>NGS Access - Aylık Rapor Özeti</h2>
-          <p>${escapeHtml(reportSummary.title)}</p>
-          <p>${escapeHtml(reportSummary.summary)}</p>
-          <p>Raporu indirmek için <a href="${process.env.CONVEX_SITE_URL ?? "https://app.ngsaccess.com"}/settings">Ayarlar → Raporlar</a> bölümüne gidin.</p>
-          <p>NGS Access PDKS</p>
-        `;
+        const subject = `${reportSummary.title} — ${year}/${month}`;
+        const html = renderEmailTemplate({
+          title: escapeHtml(subject),
+          heading: "Aylık rapor özeti",
+          body: `<strong>${escapeHtml(reportSummary.title)}</strong><br/>${escapeHtml(reportSummary.summary)}`,
+          ctaUrl: `${site}/settings?tab=reports`,
+          ctaLabel: "Ayarlar → Raporlar",
+          footerNote: "Bu e-posta Ayarlar › Raporlar › Kişisel e-posta hatırlatması açık olduğu için gönderildi.",
+        });
 
-        const sent = await sendEmail(s.email, `${reportSummary.title} — ${year}/${month}`, html);
-        if (sent) await ctx.runMutation(internal.reports.markReportSent, { scheduleId: s._id });
-        else console.error("Zamanlanmış rapor gönderilemedi", s._id);
+        // Proje SMTP hesabı (müşterinin kendi posta kutusu) varsa ondan, yoksa NGS+ varsayılanından.
+        const sent = await deliverProjectMail(ctx, s.projectId, { to: s.email, subject, html });
+        if (sent.ok) await ctx.runMutation(internal.reports.markReportSent, { scheduleId: s._id });
+        else console.error("Zamanlanmış rapor gönderilemedi", s._id, sent.channel, sent.error);
       } catch (error: unknown) {
         console.error("Zamanlanmış rapor gönderilemedi", s._id, error);
       }
