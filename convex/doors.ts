@@ -303,6 +303,13 @@ export const update = authedMutation({
       }
     }
     const { doorId, ...updates } = args;
+    if (updates.name !== undefined) updates.name = updates.name.trim();
+    const renamedDoorName = updates.name !== undefined && updates.name !== door.name
+      ? updates.name
+      : undefined;
+    if (renamedDoorName !== undefined && args.readerName === undefined && door.readerName === door.name) {
+      updates.readerName = renamedDoorName;
+    }
     if (updates.hikDoorStatusPlan) updates.hikDoorStatusPlan = normalizeDoorStatusPlan(updates.hikDoorStatusPlan);
     if (updates.hikVerifyPlan) updates.hikVerifyPlan = normalizeVerifyPlan(updates.hikVerifyPlan);
     const now = new Date().toISOString();
@@ -318,18 +325,27 @@ export const update = authedMutation({
       hikPlanResults: undefined, hikPlanApplyError: undefined, hikPlanAppliedAt: undefined,
       hikPlanSavedAt: undefined, hikDoorHolidaySlots: undefined, hikVerifyPlanReaderNos: undefined,
     } : {}) });
-    if (args.hikDoorNo !== undefined) {
+    if (args.hikDoorNo !== undefined || renamedDoorName !== undefined) {
       const readers = await ctx.db
         .query("readers")
         .withIndex("by_door", (q) => q.eq("doorId", doorId))
         .collect();
       await Promise.all(
-        readers.map((reader) =>
-          ctx.db.patch(reader._id, {
-            hikReaderNo: deriveHikReaderNoFromDoorNo(args.hikDoorNo, reader.direction),
+        readers.map(async (reader) => {
+          // Yalnız kapı adından üretilen görüntü adlarını takip et; özel adları koru.
+          const suffix = ["", " Giriş", " Çıkış"].find((value) => reader.name === `${door.name}${value}`);
+          const name = renamedDoorName !== undefined && suffix !== undefined
+            ? `${renamedDoorName}${suffix}`
+            : undefined;
+          if (name === undefined && args.hikDoorNo === undefined) return;
+          await ctx.db.patch(reader._id, {
+            ...(name !== undefined ? { name } : {}),
+            ...(args.hikDoorNo !== undefined ? {
+              hikReaderNo: deriveHikReaderNoFromDoorNo(args.hikDoorNo, reader.direction),
+            } : {}),
             updatedAt: now,
-          }),
-        ),
+          });
+        }),
       );
     }
     // Sensör ayarı değiştiyse panele yaz (ioId güncellenmiş olabilir → yeni değer öncelikli).
