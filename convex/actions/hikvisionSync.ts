@@ -13,8 +13,6 @@ import {
 } from "../lib/hikSyncEmployee";
 import type { Id } from "../_generated/dataModel";
 import {
-  setWeekPlanOnDevice,
-  setPlanTemplate,
   addFaceToDevice,
   deleteFaceFromDevice,
 } from "../lib/hikGateway";
@@ -360,32 +358,5 @@ export const deleteEmployeeFingerprintFromDevicesInternal = internalAction({
     if (!data || !makeProjectGuard(args.allowedProjectIds)(data.employee.projectId)) return { removed: 0, failed: 0, errors: [] };
     await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: args.employeeId, employeeNo: data.employee.cardNumber, fingerNo: args.fingerPrintID });
     return { removed: 0, failed: 0, errors: [] };
-  },
-});
-
-/** Template updates keep person RightPlans stable: direct gateway sends plans only. */
-export const executeTemplateTarget = internalAction({
-  args: { targetId: v.id("deviceSyncRunTargets"), ruleIds: v.array(v.id("accessRules")), changedRuleIds: v.array(v.id("accessRules")) },
-  handler: async (ctx, args): Promise<void> => {
-    const data = await ctx.runQuery(internal.deviceSyncRuns.loadTemplateTarget, { targetId: args.targetId, ruleIds: args.ruleIds });
-    if (!data) return;
-    let failure: string | undefined;
-    const direct = data.device.brand === "hikvision" && data.device.hikTransport !== "localBridge";
-    try {
-      if (direct) {
-        const index = data.device.hikDevIndex;
-        if (!index) throw new Error("Gateway kaydı bulunamadı");
-        for (const plan of data.plans) {
-          const no = plan.rule.hikWeekPlanNo;
-          if (!no) throw new Error("Hafta planı numarası bulunamadı");
-          const week = await setWeekPlanOnDevice(index, no, plan.schedule);
-          if (!week.ok) throw new Error(week.error ?? "Hafta planı gönderilemedi");
-          const template = await setPlanTemplate(index, no, { weekPlanNo: no, templateName: plan.rule.name });
-          if (!template.ok) throw new Error(template.error ?? "Plan şablonu gönderilemedi");
-        }
-      } else await ctx.runMutation(internal.deviceSyncRuns.enqueueTemplateTarget, args);
-    } catch (error) { failure = error instanceof Error ? error.message : "Şablon gönderilemedi"; }
-    await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: args.targetId, failure, directSent: direct,
-      skipped: !data.plans.length && !failure ? "Cihaza bağlı şablon kuralı yok" : undefined });
   },
 });

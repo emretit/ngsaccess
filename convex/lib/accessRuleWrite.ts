@@ -2,13 +2,11 @@ import { requirePermission } from "./permissions";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { validateScheduleBinding, assertIdeScheduleCapacity } from "../accessScheduleTemplates";
 import { validateAccessRelations } from "./accessScopeRelations";
 import { assertAccessSchedule } from "./accessRuleUx";
 import { resolveProjectScope } from "./projectScope";
 
 type CreateAccessRuleWithGroupsArgs = {
-  scheduleTemplateId?: Id<"accessScheduleTemplates"> | null;
   name: string;
   projectId?: Id<"projects">;
   targetType?: string;
@@ -34,13 +32,11 @@ export async function createAccessRuleWithGroups(
   await requirePermission(ctx, ctx.user, args.projectId, "accessRules.manage");
   await validateAccessRelations(ctx, args.projectId, args);
   const { employeeIds, deviceIds, doorIds, ...ruleData } = args;
-  await validateScheduleBinding(ctx, args.projectId, args.scheduleTemplateId);
   assertAccessSchedule(args);
   if (!args.name.trim()) throw new Error("Kural adı zorunludur");
   const now = new Date().toISOString();
   const ruleId = await ctx.db.insert("accessRules", {
     ...ruleData,
-    scheduleTemplateId: ruleData.scheduleTemplateId ?? undefined,
     isActive: ruleData.isActive ?? true,
     createdAt: now,
     updatedAt: now,
@@ -88,7 +84,6 @@ export async function createAccessRuleWithGroups(
     );
   }
 
-  if (args.scheduleTemplateId) await assertIdeScheduleCapacity(ctx, args.projectId, undefined, [ruleId]);
   const syncJobs: Promise<unknown>[] = [
     ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
       accessRuleId: ruleId,

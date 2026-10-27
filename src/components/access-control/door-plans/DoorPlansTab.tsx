@@ -1,3 +1,4 @@
+import { pastAttemptText } from "@/lib/pastAttempt";
 import { CopyDoorPlansDialog } from "./CopyDoorPlansDialog";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useState } from "react";
@@ -111,18 +112,20 @@ export function DoorPlansTab() {
   return (
     <div className="space-y-4 min-w-0">
       {heading}
-      <div className="flex flex-wrap items-center gap-3 mb-3">
-        <span className="text-sm">
-          {checked.length} kapı seçildi (en fazla {MAX_BULK_DOORS})
-        </span>
-        <Button
-          className="min-h-11"
-          disabled={!checked.length || checked.length > MAX_BULK_DOORS}
-          onClick={() => setCopyProject(projectId)}
-        >
-          Planı kopyala
-        </Button>
-      </div>
+      {checked.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <span className="text-sm">
+            {checked.length} kapı seçildi (en fazla {MAX_BULK_DOORS})
+          </span>
+          <Button
+            className="min-h-11"
+            disabled={!checked.length || checked.length > MAX_BULK_DOORS}
+            onClick={() => setCopyProject(projectId)}
+          >
+            Planı kopyala
+          </Button>
+        </div>
+      )}
       <Table className="block w-full md:table">
         <TableHeader className="block md:table-header-group">
           <TableRow className="block md:table-row">
@@ -150,14 +153,7 @@ export function DoorPlansTab() {
                 <span className="md:hidden">Tüm kapıları seç</span>
               </label>
             </TableHead>
-            {[
-              "Kapı",
-              "Cihaz",
-              "Bölge",
-              "Durum planı",
-              "Doğrulama planı",
-              "Gönderim",
-            ].map((label) => (
+            {["Kapı", "Plan", "Gönderim"].map((label) => (
               <TableHead className="hidden md:table-cell" key={label}>
                 {label}
               </TableHead>
@@ -206,53 +202,86 @@ export function DoorPlansTab() {
                 >
                   {door.doorName}
                 </button>
+                <p className="text-xs text-muted-foreground">
+                  {door.deviceName}{" "}
+                  {!door.deviceOnline && (
+                    <StatusBadge tone="warning">Çevrimdışı</StatusBadge>
+                  )}
+                </p>
               </TableCell>
-              <TableCell>
-                {door.deviceName}{" "}
-                {!door.deviceOnline && (
-                  <StatusBadge tone="warning">Çevrimdışı</StatusBadge>
-                )}
-              </TableCell>
-              <TableCell className="order-4 text-sm">
-                <span className="md:hidden">Bölge: </span>
-                {door.zoneName ?? "—"}
-              </TableCell>
-              <TableCell className="order-3 text-sm">
-                <span className="font-medium md:hidden">Durum planı: </span>
-                {door.templateName && <p>Şablon: {door.templateName}</p>}
-                {statusSummary(door.hikDoorStatusPlan)}
-                {door.templateChanged && (
-                  <p className="text-amber-700 dark:text-amber-400">
-                    Şablon değişti — yeniden gönder
-                  </p>
-                )}
-                {door.hikDoorHolidayPlan?.enabled && (
+              <TableCell
+                className="order-3 text-sm"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <p className="line-clamp-1">
+                  {door.hikDoorStatusPlan?.enabled
+                    ? door.hikDoorStatusPlan.weekly
+                      ? `Haftalık · ${door.hikDoorStatusPlan.weekly.reduce((n, day) => n + day.segments.length, 0)} aralık`
+                      : statusSummary(door.hikDoorStatusPlan)
+                    : door.hikVerifyPlan?.enabled
+                      ? "Doğrulama planı etkin"
+                      : door.hikDoorHolidayPlan?.enabled
+                        ? `${door.hikDoorHolidayPlan.year} tatil planı etkin`
+                        : "Plan etkin değil"}
+                </p>
+                <details>
+                  <summary className="min-h-11 cursor-pointer py-3">
+                    Plan ayrıntıları
+                  </summary>
+                  <p>Bölge: {door.zoneName ?? "—"}</p>
+                  <p>Durum planı: {statusSummary(door.hikDoorStatusPlan)}</p>
                   <p>
-                    Tatil: {door.hikDoorHolidayPlan.year} ·{" "}
-                    {modes[door.hikDoorHolidayPlan.mode]}
+                    Doğrulama planı:{" "}
+                    {door.hikVerifyPlan?.enabled
+                      ? door.hikVerifyPlan.weekly
+                        ? door.hikVerifyPlan.weekly
+                            .map(
+                              (day) =>
+                                `${days[DOOR_STATUS_DAYS.indexOf(day.day)]}: ${day.segments.map((segment) => `${segment.beginTime}–${segment.endTime} ${modes[segment.verifyMode] ?? segment.verifyMode}`).join(", ") || "Aralık yok"}`,
+                            )
+                            .join("; ")
+                        : `${door.hikVerifyPlan.beginTime}–${door.hikVerifyPlan.endTime} ${modes[door.hikVerifyPlan.verifyMode] ?? door.hikVerifyPlan.verifyMode}`
+                      : "Plan etkin değil"}
                   </p>
-                )}
-              </TableCell>
-              <TableCell className="order-3 text-sm">
-                <span className="font-medium md:hidden">Doğrulama planı: </span>
-                {door.hikVerifyPlan?.enabled
-                  ? door.hikVerifyPlan.weekly
-                    ? `Haftalık · ${door.hikVerifyPlan.weekly.reduce((n, day) => n + day.segments.length, 0)} aralık`
-                    : `${door.hikVerifyPlan.beginTime.slice(0, 5)}–${door.hikVerifyPlan.endTime.slice(0, 5)} ${modes[door.hikVerifyPlan.verifyMode] ?? door.hikVerifyPlan.verifyMode}`
-                  : "Plan etkin değil"}
+                  {door.hikDoorHolidayPlan?.enabled && (
+                    <p>
+                      Tatil: {door.hikDoorHolidayPlan.year} ·{" "}
+                      {modes[door.hikDoorHolidayPlan.mode]}
+                    </p>
+                  )}
+                </details>
               </TableCell>
               <TableCell
                 className="order-2 rounded bg-muted/50 text-sm font-medium md:bg-transparent md:font-normal"
                 aria-label={`${door.doorName} gönderim durumu`}
               >
                 <span className="md:hidden">Gönderim: </span>
-                {door.hikPlanApplyError
-                  ? `Hata: ${door.hikPlanApplyError}`
-                  : door.plansPending
-                    ? "Kaydedildi, gönderilmedi"
-                    : door.hikPlanAppliedAt
-                      ? `Gönderildi ${formatTrDateTime(new Date(door.hikPlanAppliedAt))}`
-                      : "Gönderilmedi"}
+                {door.hikPlanApplyError ? (
+                  <>
+                    <p>Son gönderim başarısız</p>
+                    <p className="text-xs">
+                      {pastAttemptText(
+                        door.hikPlanFailedAt,
+                        door.hikPlanApplyError,
+                      )}
+                    </p>
+                    {door.deviceOnline && (
+                      <p className="text-xs">Cihaz şu an çevrimiçi</p>
+                    )}
+                    <details onClick={(event) => event.stopPropagation()}>
+                      <summary className="min-h-11 cursor-pointer py-3">
+                        Hata ayrıntısı
+                      </summary>
+                      <p>{door.hikPlanApplyError}</p>
+                    </details>
+                  </>
+                ) : door.plansPending ? (
+                  "Kaydedildi, gönderilmedi"
+                ) : door.hikPlanAppliedAt ? (
+                  `Gönderildi ${formatTrDateTime(new Date(door.hikPlanAppliedAt))}`
+                ) : (
+                  "Gönderilmedi"
+                )}
               </TableCell>
             </TableRow>
           ))}

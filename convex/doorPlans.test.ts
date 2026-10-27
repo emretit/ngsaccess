@@ -259,81 +259,6 @@ describe("door plans", () => {
 });
 
 describe("phase 2 door plan persistence", () => {
-  it("resolves template server-side, rejects cross-project and detached templates stop warning", async () => {
-    const f = await setup();
-    const caller = await f.member("technician");
-    const week = {
-      Monday: [{ start: "22:00", end: "02:00" }],
-      Tuesday: [],
-      Wednesday: [],
-      Thursday: [],
-      Friday: [],
-      Saturday: [],
-      Sunday: [],
-    };
-    const templateId = await f.t.run((ctx) =>
-      ctx.db.insert("accessScheduleTemplates", {
-        projectId: f.projectId,
-        name: "Gece",
-        week,
-        version: 1,
-        createdAt: "2026-01-01",
-        updatedAt: "2026-01-01",
-      }),
-    );
-    await caller.mutation(api.doors.updatePlans, {
-      doorId: f.doorId,
-      hikDoorStatusTemplateId: templateId,
-      hikDoorStatusPlan: plan,
-    });
-    const saved = await f.t.run((ctx) => ctx.db.get(f.doorId));
-    expect(saved?.hikDoorStatusPlan?.weekly?.[0].segments).toEqual([
-      { beginTime: "22:00:00", endTime: "23:59:59", mode: "remainOpen" },
-    ]);
-    await f.t.mutation(internal.doors.recordPlanResult, {
-      doorId: f.doorId,
-      key: "status",
-      revision: 1,
-    });
-    expect(
-      (
-        await caller.query(api.doors.listPlanTargets, {
-          projectId: f.projectId,
-        })
-      )[0].templateChanged,
-    ).toBe(false);
-    await f.t.run((ctx) =>
-      ctx.db.patch(templateId, { updatedAt: "2099-01-01" }),
-    );
-    expect(
-      (
-        await caller.query(api.doors.listPlanTargets, {
-          projectId: f.projectId,
-        })
-      )[0].templateChanged,
-    ).toBe(true);
-    expect(
-      (await f.t.run((ctx) => ctx.db.get(f.doorId)))?.hikPlanRevision,
-    ).toBe(1);
-    await caller.mutation(api.doors.updatePlans, {
-      doorId: f.doorId,
-      hikDoorStatusTemplateId: null,
-      hikDoorStatusPlan: plan,
-    });
-    expect(
-      (await f.t.run((ctx) => ctx.db.get(f.doorId)))?.hikDoorStatusTemplateId,
-    ).toBeUndefined();
-    await f.t.run((ctx) =>
-      ctx.db.patch(templateId, { projectId: f.otherProjectId }),
-    );
-    await expect(
-      caller.mutation(api.doors.updatePlans, {
-        doorId: f.doorId,
-        hikDoorStatusTemplateId: templateId,
-        hikDoorStatusPlan: plan,
-      }),
-    ).rejects.toThrow("şablonu");
-  });
   it("stores weekly verify modes and rejects overlaps atomically", async () => {
     const f = await setup();
     const caller = await f.member("technician");
@@ -402,7 +327,10 @@ describe("phase 2 door plan persistence", () => {
     });
     expect(await f.t.run((ctx) => ctx.db.get(f.doorId))).toMatchObject({
       hikPlanApplyError: "offline",
+      hikPlanResults: { status: { error: "offline", failedAt: expect.any(String) } },
     });
+    const failedTargets = await caller.query(api.doors.listPlanTargets, { projectId: f.projectId });
+    expect(failedTargets[0]?.hikPlanFailedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(
       (await f.t.run((ctx) => ctx.db.get(f.doorId)))?.hikPlanAppliedAt,
     ).toBeUndefined();
@@ -505,14 +433,13 @@ describe("audit regressions", () => {
     expect(door?.hikDoorHolidaySlots).toBeUndefined();
     expect((await caller.query(api.doors.listPlanTargets, { projectId: f.projectId }))[0]).toMatchObject({ plansPending: false, hikPlanAppliedAt: null });
   });
-  it.each(["unsent", "failed", "resaved"] as const)("O3 unchanged template never warns when %s", async scenario => {
+  it.each(["unsent", "failed", "resaved"] as const)("O3 unapplied door plan remains pending when %s", async scenario => {
     const f = await setup();
     const caller = await f.member("technician");
-    const templateId = await f.t.run(ctx => ctx.db.insert("accessScheduleTemplates", { projectId: f.projectId, name: "Day", week: { Monday: [{ start: "08:00", end: "18:00" }], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] }, version: 1, createdAt: "2026-01-01", updatedAt: "2026-01-01" }));
-    await caller.mutation(api.doors.updatePlans, { doorId: f.doorId, hikDoorStatusPlan: plan, hikDoorStatusTemplateId: templateId });
+    await caller.mutation(api.doors.updatePlans, { doorId: f.doorId, hikDoorStatusPlan: plan });
     if (scenario !== "unsent") await f.t.mutation(internal.doors.recordPlanResult, { doorId: f.doorId, revision: 1, key: "status", ...(scenario === "failed" ? { error: "offline" } : {}) });
-    if (scenario === "resaved") await caller.mutation(api.doors.updatePlans, { doorId: f.doorId, hikDoorStatusPlan: { ...plan, mode: "remainClosed" }, hikDoorStatusTemplateId: templateId });
-    expect((await caller.query(api.doors.listPlanTargets, { projectId: f.projectId }))[0].templateChanged).toBe(false);
+    if (scenario === "resaved") await caller.mutation(api.doors.updatePlans, { doorId: f.doorId, hikDoorStatusPlan: { ...plan, mode: "remainClosed" } });
+    expect((await caller.query(api.doors.listPlanTargets, { projectId: f.projectId }))[0].plansPending).toBe(true);
   });
   it("Y1 returns only changed keys and never waits for untouched legacy verify", async () => {
     const f = await setup();

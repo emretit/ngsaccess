@@ -25,11 +25,9 @@ describe("shared weekly access schedule", () => {
     expect(splitOvernight("Monday", "22:00", "00:00").Tuesday).toEqual([]);
     expect(toHikWeekSchedule(splitOvernight("Monday", "22:00", "24:00"))[0].endTime).toBe("24:00:00");
   });
-  it("closes missing and foreign templates including all 56 Hik segments", async () => {
-    const rule = { scheduleTemplateId: "missing", projectId: "a" };
-    const week = effectiveSchedule(rule, null);
+  it("closes an invalid-day rule including all 56 Hik segments", async () => {
+    const week = effectiveSchedule({ days: ["invalid"] });
     expect(isAllowedAt(week, Date.parse("2026-10-19T09:00:00Z"))).toBe(false);
-    expect(effectiveSchedule(rule, { projectId: "b", week: splitOvernight("Monday", "00:00", "24:00") })).toEqual(emptyWeek());
     await setWeekPlanOnDevice("index", 3, toHikWeekSchedule(week));
     expect(wire.send.mock.calls[0]?.[2]).toMatchObject({ UserRightWeekPlanCfg: { WeekPlanCfg: expect.arrayContaining([expect.objectContaining({ enable: false })]) } });
     const payload: unknown = wire.send.mock.calls[0]?.[2];
@@ -37,7 +35,7 @@ describe("shared weekly access schedule", () => {
   });
   it("matches legacy adapter output and W4.0 cloud minute decisions", () => {
     for (const rule of [{}, { days: [] }, { days: ["Monday"], startTime: "08:00", endTime: "17:00" }, { days: ["bad"] }]) {
-      const week = effectiveSchedule(rule, null);
+      const week = effectiveSchedule(rule);
       expect(toHikWeekSchedule(week)).toEqual(defaultRuleSchedule(rule));
       for (const time of ["04:59", "05:00", "14:00", "14:01", "20:59"]) {
         const now = Date.parse(`2026-10-19T${time}:59Z`);

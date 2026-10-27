@@ -7,10 +7,8 @@ export interface ScheduleRule {
   days?: readonly string[];
   startTime?: string;
   endTime?: string;
-  scheduleTemplateId?: string | null;
   projectId?: string;
 }
-export interface ScheduleTemplate { week: WeekSchedule; projectId?: string }
 export function emptyWeek(): WeekSchedule {
   return { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] };
 }
@@ -45,11 +43,7 @@ export function splitOvernight(day: Weekday, start: string, end: string): WeekSc
   }
   return week;
 }
-export function effectiveSchedule(rule: ScheduleRule, template: ScheduleTemplate | null): WeekSchedule {
-  if (rule.scheduleTemplateId) {
-    if (!template || template.projectId !== rule.projectId) return emptyWeek();
-    return normalizeWeek(template.week);
-  }
+export function effectiveSchedule(rule: ScheduleRule): WeekSchedule {
   const week = emptyWeek();
   const start = rule.startTime?.trim() || "00:00";
   const end = rule.endTime?.trim() || "23:59";

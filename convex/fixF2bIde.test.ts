@@ -67,22 +67,6 @@ describe("IDE user access end", () => {
     expect(ops.find(op => op.opType === "upsertUser")).toMatchObject({ payload: { userRecord: { id: 123, start, end } } });
     expect(ideUserAccessWindow(window, Date.now())).toEqual({ start, end });
   });
-
-  it("template dispatch also writes expiry and fixes start >= end", async () => {
-    const f = await fixture();
-    const targetId = await f.t.run(async ctx => {
-      const templateId = await ctx.db.insert("accessScheduleTemplates", { projectId: f.projectId, name: "Day", version: 1, ...timestamps,
-        week: { Monday: [{ start: "08:00", end: "17:00" }], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] } });
-      await ctx.db.patch(f.ruleId, { scheduleTemplateId: templateId });
-      await ctx.db.patch(f.employeeId, { accessStartsAt: "2026-11-02T00:00:00Z", employmentEndDate: "2026-10-31", accessExpiresAt: undefined });
-      const runId = await ctx.db.insert("deviceSyncRuns", { projectId: f.projectId, templateId, kind: "template_sync", startedBy: f.userId, startedAt: Date.now(), status: "running",
-        counts: { queued: 1, sent: 0, verified: 0, failed: 0, skipped: 0, unknown: 0 } });
-      return ctx.db.insert("deviceSyncRunTargets", { runId, deviceId: f.deviceId, deviceName: "IDE", brand: "ide_smart", status: "queued", updatedAt: Date.now() });
-    });
-    await f.t.mutation(internal.deviceSyncRuns.enqueueTemplateTarget, { targetId, ruleIds: [f.ruleId], changedRuleIds: [f.ruleId] });
-    expect((await f.t.run(ctx => ctx.db.query("idePendingOperations").collect())).find(op => op.opType === "upsertUser"))
-      .toMatchObject({ payload: { userRecord: { start: 0, end: Date.parse("2026-10-31T20:59:59Z") / 1000 } } });
-  });
 });
 
 describe("IDE delayed deletion protects the current credential", () => {
@@ -110,9 +94,7 @@ describe("IDE delayed deletion protects the current credential", () => {
       await ctx.db.insert("doors", { projectId: f.projectId, deviceId: otherDeviceId, name: "Other", ioId: 0, ...timestamps });
     });
     if (state === "emptySchedule") await f.t.run(async ctx => {
-      const templateId = await ctx.db.insert("accessScheduleTemplates", { projectId: f.projectId, name: "Closed", version: 1, ...timestamps,
-        week: { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] } });
-      await ctx.db.patch(f.ruleId, { scheduleTemplateId: templateId });
+      await ctx.db.patch(f.ruleId, { days: ["invalid"] });
     });
     const opId = await f.deletion();
     await f.t.mutation(internal.ideSync.seedPanelUsers, { deviceId: f.deviceId, rawCards: [123] });
@@ -161,7 +143,7 @@ describe("IDE delayed deletion protects the current credential", () => {
     expect(await f.t.mutation(internal.ideSync.markSent, { opId, msxId: 1 })).toBe(status === "failed");
   });
 
-  it("a newer failed template-run upsert also prevents protection", async () => {
+  it("a newer failed sync-run upsert also prevents protection", async () => {
     const f = await fixture();
     const opId = await f.deletion();
     const employeeId = await f.newOwner();
@@ -170,7 +152,7 @@ describe("IDE delayed deletion protects the current credential", () => {
       const first = await ctx.db.get(firstId);
       if (!first) throw new Error("Upsert missing");
       const { _id, _creationTime, ...value } = first;
-      await ctx.db.insert("idePendingOperations", { ...value, status: "failed", idempotencyKey: `${value.idempotencyKey}:template-run` });
+      await ctx.db.insert("idePendingOperations", { ...value, status: "failed", idempotencyKey: `${value.idempotencyKey}:sync-run` });
     });
     expect((await f.t.mutation(internal.ideSync.pollForBridge, {})).ops.map(op => op.opId)).toContain(opId);
   });
@@ -229,9 +211,7 @@ describe("IDE grant projection", () => {
     const f = await fixture();
     await f.t.run(async ctx => {
       await ctx.db.patch(f.doorId, { ioId: undefined });
-      const templateId = await ctx.db.insert("accessScheduleTemplates", { projectId: f.projectId, name: "Closed", version: 1, ...timestamps,
-        week: { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] } });
-      await ctx.db.patch(f.ruleId, { scheduleTemplateId: templateId });
+      await ctx.db.patch(f.ruleId, { days: ["invalid"] });
       const rule = await ctx.db.get(f.ruleId);
       if (!rule) throw new Error("Rule missing");
       expect(await grantRuleScope(ctx, rule)).toMatchObject([{ doors: [], errorCode: undefined }]);

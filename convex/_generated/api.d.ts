@@ -10,7 +10,6 @@
 
 import type * as accessGrantStatus from "../accessGrantStatus.js";
 import type * as accessRules from "../accessRules.js";
-import type * as accessScheduleTemplates from "../accessScheduleTemplates.js";
 import type * as accountAccess from "../accountAccess.js";
 import type * as actions_biometricDestruction from "../actions/biometricDestruction.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
@@ -213,6 +212,7 @@ import type * as lib_reportAttendance from "../lib/reportAttendance.js";
 import type * as lib_reportScope from "../lib/reportScope.js";
 import type * as lib_requestRules from "../lib/requestRules.js";
 import type * as lib_roleCatalog from "../lib/roleCatalog.js";
+import type * as lib_ruleDevices from "../lib/ruleDevices.js";
 import type * as lib_ruleSchedule from "../lib/ruleSchedule.js";
 import type * as lib_sessionRevoke from "../lib/sessionRevoke.js";
 import type * as lib_settingsUx from "../lib/settingsUx.js";
@@ -278,7 +278,6 @@ import type {
 declare const fullApi: ApiFromModules<{
   accessGrantStatus: typeof accessGrantStatus;
   accessRules: typeof accessRules;
-  accessScheduleTemplates: typeof accessScheduleTemplates;
   accountAccess: typeof accountAccess;
   "actions/biometricDestruction": typeof actions_biometricDestruction;
   "actions/getChatData": typeof actions_getChatData;
@@ -481,6 +480,7 @@ declare const fullApi: ApiFromModules<{
   "lib/reportScope": typeof lib_reportScope;
   "lib/requestRules": typeof lib_requestRules;
   "lib/roleCatalog": typeof lib_roleCatalog;
+  "lib/ruleDevices": typeof lib_ruleDevices;
   "lib/ruleSchedule": typeof lib_ruleSchedule;
   "lib/sessionRevoke": typeof lib_sessionRevoke;
   "lib/settingsUx": typeof lib_settingsUx;

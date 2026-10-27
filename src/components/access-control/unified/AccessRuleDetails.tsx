@@ -1,4 +1,3 @@
-import { RuleScheduleSummary } from "./templates/RuleScheduleSummary";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -70,37 +69,85 @@ export function AccessRuleDetails({
   projectId: Id<"projects">;
 }) {
   const rule = useQuery(api.accessRules.getDetails, { ruleId, projectId });
-  if (!rule) return <SectionSkeleton rows={3} label="Kural ayrıntısı yükleniyor" />;
+  if (!rule)
+    return <SectionSkeleton rows={3} label="Kural ayrıntısı yükleniyor" />;
   return (
     <div className="mt-4 space-y-6 min-w-0">
-      {rule.scheduleTemplateId && (
-        <RuleScheduleSummary
-          templateId={rule.scheduleTemplateId}
-          projectId={projectId}
-        />
-      )}
       {rule.targetType === "visitor" && (
         <p className="text-xs text-muted-foreground">
           Ziyaretçiler şablona Ziyaretçiler ekranından eklenir.
         </p>
       )}
-      <Members key={`${ruleId}-people`} ruleId={ruleId} kind="people" />
+      <details>
+        <summary className="cursor-pointer min-h-11 md:min-h-0 font-semibold">
+          Kişileri göster ({rule.groupMembers.length}
+          {rule.membersTruncated ? "+" : ""})
+        </summary>
+        <Members key={`${ruleId}-people`} ruleId={ruleId} kind="people" />
+      </details>
       <section className="space-y-2">
-        <h3 className="font-semibold">Cihazlar ve kapılar</h3>
-        {rule.scopeTruncated && <p role="status">Kapsam çok geniş; tüm cihaz ve kapılar burada gösterilemiyor. Tam seçimleri düzenleme ekranından inceleyin.</p>}
-        <ul className="space-y-3">
-          {rule.panels.map((panel) => (
-            <li key={panel.deviceId} className="break-words">
-              <p className="font-medium">{panel.label}</p>
-              <ul className="ml-4 list-disc">
-                {panel.doors.map((door) => <li key={door.doorId}>{door.name}{door.zoneName ? ` · ${door.zoneName}` : ""}</li>)}
-              </ul>
-              {panel.doorsTruncated && <p className="text-xs text-muted-foreground">Tüm kapılar gösterilemiyor.</p>}
-            </li>
+        {rule.scopeTruncated && (
+          <p role="status">
+            Kapsam çok geniş; tüm cihaz ve kapılar burada gösterilemiyor. Tam
+            seçimleri düzenleme ekranından inceleyin.
+          </p>
+        )}
+        {rule.panels
+          .filter((panel) => panel.doorsTruncated)
+          .map((panel) => (
+            <p
+              key={panel.deviceId}
+              role="status"
+              className="text-xs text-muted-foreground"
+            >
+              {panel.label}: Tüm kapılar gösterilemiyor.
+            </p>
           ))}
-          {rule.unassignedDoors.map((door) => <li key={door.doorId}>{door.name} · Cihaz bağlantısı yok; cihaza uygulanamaz</li>)}
-        </ul>
-        {!rule.scopeTruncated && rule.panels.length === 0 && rule.unassignedDoors.length === 0 && <p className="text-xs text-muted-foreground">Kapı veya cihaz seçilmemiş.</p>}
+        {rule.unassignedDoors.length > 0 && (
+          <ul className="space-y-1">
+            {rule.unassignedDoors.map((door) => (
+              <li key={door.doorId}>
+                {door.name} · Cihaz bağlantısı yok; cihaza uygulanamaz
+              </li>
+            ))}
+          </ul>
+        )}
+        <details>
+          <summary className="cursor-pointer min-h-11 md:min-h-0 font-semibold">
+            Kapıları göster (
+            {rule.panels.reduce(
+              (count, panel) => count + panel.doors.length,
+              0,
+            ) + rule.unassignedDoors.length}
+            {rule.scopeTruncated ||
+            rule.panels.some((panel) => panel.doorsTruncated)
+              ? "+"
+              : ""}
+            )
+          </summary>
+          <ul className="space-y-3">
+            {rule.panels.map((panel) => (
+              <li key={panel.deviceId} className="break-words">
+                <p className="font-medium">{panel.label}</p>
+                <ul className="ml-4 list-disc">
+                  {panel.doors.map((door) => (
+                    <li key={door.doorId}>
+                      {door.name}
+                      {door.zoneName ? ` · ${door.zoneName}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </details>
+        {!rule.scopeTruncated &&
+          rule.panels.length === 0 &&
+          rule.unassignedDoors.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Kapı veya cihaz seçilmemiş.
+            </p>
+          )}
       </section>
       <RuleLastRun ruleId={ruleId} />
     </div>

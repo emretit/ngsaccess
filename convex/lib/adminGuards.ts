@@ -76,7 +76,6 @@ export const projectDeletionMatrix = [
   { table: "alarmSettings", index: "by_project", label: "Alarm ayarları", policy: "delete" },
   { table: "pdksRuleVersions", index: "by_projectId_and_effectiveFrom", label: "PDKS kural sürümleri", policy: "delete" },
   { table: "pdksCheckpointSelections", index: "scan", label: "PDKS kontrol noktaları", policy: "delete" },
-  { table: "accessScheduleTemplates", index: "by_project", label: "Erişim takvim şablonları", policy: "delete" },
   { table: "checkInTokens", index: "scan", label: "Mobil giriş tokenları", policy: "delete" },
   { table: "employeeAuth", index: "scan", label: "Kişi kimlik bilgileri", policy: "delete" },
   { table: "idePanelUsers", index: "scan", label: "Panel kişi kopyaları", policy: "preserve" },

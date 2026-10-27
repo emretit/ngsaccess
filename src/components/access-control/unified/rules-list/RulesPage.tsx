@@ -69,7 +69,6 @@ export function RulesPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Kural</TableHead>
-                <TableHead className="hidden lg:table-cell w-32">Tür</TableHead>
                 <TableHead className="hidden lg:table-cell w-24">Kim</TableHead>
                 <TableHead className="hidden md:table-cell w-[24%]">
                   Nereye
@@ -77,7 +76,7 @@ export function RulesPage({
                 <TableHead className="hidden xl:table-cell w-40">
                   Ne zaman
                 </TableHead>
-                <TableHead className="w-20">Durum</TableHead>
+                <TableHead className="w-24">Kural durumu</TableHead>
                 <TableHead className="w-14">
                   <span className="sr-only">İşlemler</span>
                 </TableHead>

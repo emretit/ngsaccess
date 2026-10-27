@@ -1,3 +1,4 @@
+import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
 import { FilterBar } from "@/components/shared/FilterBar";
 import {
   Select,
@@ -32,61 +33,76 @@ export function RulesFilters({
       hasFilters={status !== "all" || type !== "all" || searchBy !== "rule"}
       onClear={clear}
     >
-      {[
-        {
-          key: "by",
-          label: "Arama alanı",
-          value: searchBy,
-          options: [
-            ["rule", "Kural"],
-            ["person", "Kişi"],
-            ["door", "Kapı"],
-          ],
-        },
-        {
-          key: "durum",
-          label: "Durum",
-          value: status,
-          options: [
-            ["all", "Tüm durumlar"],
-            ["active", "Aktif"],
-            ["inactive", "Pasif"],
-          ],
-        },
-        {
-          key: "tur",
-          label: "Tür",
-          value: type,
-          options: [
-            ["all", "Tüm türler"],
-            ["personnel", "Personel yetkisi"],
-            ["visitor", "Ziyaretçi şablonu"],
-          ],
-        },
-      ].map((filter) => (
-        <Select
-          key={filter.key}
-          value={filter.value}
-          onValueChange={(value) => change(filter.key, value)}
-        >
-          <SelectTrigger
-            aria-label={filter.label}
-            className="w-auto min-w-36 max-w-full max-md:min-h-11"
-          >
-            <span>
-              {filter.key === "by" && "Ara: "}
-              <SelectValue />
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            {filter.options.map(([value, label]) => (
-              <SelectItem key={value} value={value} className="max-md:min-h-11">
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ))}
+      <CollapsibleFilters
+        collapseOn="all"
+        activeCount={
+          Number(status !== "all") +
+          Number(type !== "all") +
+          Number(searchBy !== "rule")
+        }
+      >
+        <div className="flex flex-wrap gap-3">
+          {[
+            {
+              key: "by",
+              label: "Arama alanı",
+              value: searchBy,
+              options: [
+                ["rule", "Kural"],
+                ["person", "Kişi"],
+                ["door", "Kapı"],
+              ],
+            },
+            {
+              key: "durum",
+              label: "Durum",
+              value: status,
+              options: [
+                ["all", "Tüm durumlar"],
+                ["active", "Aktif"],
+                ["inactive", "Pasif"],
+              ],
+            },
+            {
+              key: "tur",
+              label: "Tür",
+              value: type,
+              options: [
+                ["all", "Tüm türler"],
+                ["personnel", "Personel yetkisi"],
+                ["visitor", "Ziyaretçi şablonu"],
+              ],
+            },
+          ].map((filter) => (
+            <Select
+              key={filter.key}
+              value={filter.value}
+              onValueChange={(value) => change(filter.key, value)}
+            >
+              <SelectTrigger
+                aria-label={filter.label}
+                className="w-auto min-w-36 max-w-full max-md:min-h-11"
+              >
+                <span>
+                  {filter.key === "by" && "Ara: "}
+                  <SelectValue />
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {filter.options.map(([value, label]) => (
+                  <SelectItem
+                    key={value}
+                    value={value}
+                    className="max-md:min-h-11"
+                  >
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ))}
+        </div>
+      </CollapsibleFilters>
     </FilterBar>
   );
 }

@@ -189,18 +189,16 @@ describe("grant status queries", () => {
     expect(filtered.page[0]).toMatchObject({ employeeName: "Deniz Test", departmentName: "Arge", doorNames: ["Hik seçili"], ruleNames: ["Mesai"] });
     await expect(admin.query(api.accessGrantStatus.listByProject, { ...args, paginationOpts: { numItems: 51, cursor: null } })).rejects.toThrow("50");
   });
-  it("marks rule/template changes stale without rewriting grant rows, filters template", async () => {
+  it("marks rule changes stale without rewriting grant rows", async () => {
     const { t, ids, admin, write, status } = await fixture();
     await write("effective");
     const original = await status();
-    const templateId = await t.run(async ctx => {
-      const templateId = await ctx.db.insert("accessScheduleTemplates", { projectId: ids.projectId, name: "Şablon", version: 1, week: { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] }, createdAt: now, updatedAt: new Date(Date.now() + 1).toISOString() });
-      await ctx.db.patch(ids.ruleId, { scheduleTemplateId: templateId }); return templateId;
-    });
-    const result = await admin.query(api.accessGrantStatus.listByProject, { projectId: ids.projectId, templateId, paginationOpts: { numItems: 50, cursor: null } });
-    expect(result.page[0]).toMatchObject({ stale: true, templateNames: ["Şablon"] });
+    const args = { projectId: ids.projectId, ruleId: ids.ruleId, paginationOpts: { numItems: 50, cursor: null } };
+    expect((await admin.query(api.accessGrantStatus.listByProject, args)).page[0]?.stale).toBe(false);
+    await t.run(ctx => ctx.db.patch(ids.ruleId, { updatedAt: new Date(Date.now() + 1).toISOString() }));
+    const result = await admin.query(api.accessGrantStatus.listByProject, args);
+    expect(result.page[0]).toMatchObject({ stale: true, ruleNames: ["Mesai"] });
     expect(await status()).toEqual(original);
-    await t.run(ctx => ctx.db.patch(ids.ruleId, { scheduleTemplateId: undefined, updatedAt: new Date(Date.now() + 2).toISOString() }));
     expect((await admin.query(api.accessGrantStatus.byEmployee, { employeeId: ids.employeeId })).rows.find(row => row.deviceId === ids.ideId)?.stale).toBe(true);
   });
   it("byEmployee separates unknown, removalRequired, and unauthorized doors", async () => {

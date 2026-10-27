@@ -70,6 +70,7 @@ export function StatusResults({
         onToggle={toggle}
         onEmployee={setEmployee}
         canManage
+        hideDevice={view === "device"}
       />
       <LoadMoreFooter
         hasMore={Boolean(cursor)}

@@ -236,12 +236,12 @@ export async function syncEmployeeDevices(
           if (isLocalBridgeDevice(t.device)) {
             await enqueueLocalBridgeOp(ctx, t.device, "syncWeekPlan", {
               accessRuleId: rule._id, weekPlanNo: planNo,
-              templateName: rule.name ?? `Rule ${planNo}`, schedule: defaultRuleSchedule(rule, rule.scheduleTemplate ?? null),
+              templateName: rule.name ?? `Rule ${planNo}`, schedule: defaultRuleSchedule(rule),
             }, args.runId);
             return { ok: true };
           }
           if (!t.device.hikDevIndex) return { ok: false, error: "gateway'e kayıtlı değil" };
-          const wp = await setWeekPlanOnDevice(t.device.hikDevIndex, planNo, defaultRuleSchedule(rule, rule.scheduleTemplate ?? null));
+          const wp = await setWeekPlanOnDevice(t.device.hikDevIndex, planNo, defaultRuleSchedule(rule));
           if (!wp.ok) return wp;
           return await setPlanTemplate(t.device.hikDevIndex, planNo, { weekPlanNo: planNo, templateName: rule.name ?? `Rule ${planNo}` });
         };
@@ -453,7 +453,7 @@ export async function syncWeekPlanDevices(
     });
   }
 
-  const schedule = defaultRuleSchedule(rule, rule.scheduleTemplate ?? null);
+  const schedule = defaultRuleSchedule(rule);
 
   const errors: string[] = [];
   const skippedDevices: { device: typeof devices[number]; reason: string }[] = [];

@@ -14,7 +14,6 @@ export type Filters = {
   departmentId?: Id<"departments">;
   deviceId?: Id<"devices">;
   ruleId?: Id<"accessRules">;
-  templateId?: Id<"accessScheduleTemplates">;
   state?: GrantRow["state"];
   search?: string;
 };
@@ -53,6 +52,14 @@ export function togglePair(
 }
 export const confirmationText = (count: number | string) =>
   `${count} kişi–cihaz kaydı için tek gönderim başlatılacak.`;
+/** Keep device diagnostics in the drawer; list reasons stay short and readable. */
+export function shortFailureReason(error?: string): string {
+  if (error?.includes("door_io_unresolved")) return "Kapı eşleştirilemedi";
+  if (/çevrimdışı|offline/i.test(error ?? "")) return "Cihaz çevrimdışı";
+  if (/pasif/i.test(error ?? "")) return "Cihaz pasif";
+  if (/yanıt|timeout|timed out/i.test(error ?? "")) return "Cihaz yanıt vermedi";
+  return "Gönderim başarısız oldu";
+}
 export function grantBadge(
   row: Pick<EmployeeDetail["rows"][number], "state"> & Partial<Pick<GrantRow, "stale" | "lastError" | "doorUnresolved">>,
 ) {
@@ -67,7 +74,7 @@ export function grantBadge(
           : row.state === "effective"
             ? ("success" as const)
             : ("neutral" as const),
-    hint: row.state === "failed" && !row.lastError?.includes("door_io_unresolved") ? row.lastError : undefined,
+    hint: row.state === "failed" ? shortFailureReason(row.lastError) : undefined,
   };
 }
 
@@ -80,8 +87,11 @@ export function failedConfirmationText(failed: number, capped: boolean): string 
   const total = countText(failed, capped);
   if (failed <= 100) return confirmationText(total);
   const remaining = `${failed - 100}${capped && failed >= 1000 ? "+" : ""}`;
-  return `${total} hatalı kişi–cihaz kaydı var. İlk 100 hatalı kişi–cihaz kaydı için tek gönderim başlatılacak; kalan ${remaining} sonraki turda.`;
+  return `İlk 100 kayıt gönderilecek; kalan ${remaining} sonraki turda.`;
 }
 export function redistributionSuccessText(result: Pick<FunctionReturnType<typeof api.accessGrantStatus.redistribute>, "pairCount" | "remainingFailed" | "remainingCapped">): string {
-  return `${result.pairCount ?? "Tüm yetkili"} kişi–cihaz kaydı için gönderim başlatıldı. Kalan ${result.remainingFailed}${result.remainingCapped ? "+" : ""} hatalı kişi–cihaz kaydı sonraki turda.`;
+  const remaining = result.remainingFailed > 0
+    ? ` Kalan ${result.remainingFailed}${result.remainingCapped ? "+" : ""} hatalı kayıt sonraki turda.`
+    : "";
+  return `${result.pairCount ?? "Tüm yetkili"} kayıt gönderime alındı.${remaining}`;
 }

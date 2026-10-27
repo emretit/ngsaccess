@@ -25,14 +25,6 @@ describe("rule diff save feedback", () => {
   });
 });
 
-it("şablon gönderimini kural gönderiminden ayırır", () => {
-  state.runs = [{ _id: "run", kind: "template_sync", status: "done", startedAt: Date.parse("2026-10-22T07:00:00Z"), counts: { queued: 0, sent: 1, verified: 0, failed: 0, skipped: 0, unknown: 0 } }];
-  const html = renderToStaticMarkup(<RecentRuns projectId={"p" as Id<"projects">} />);
-  expect(html).toContain("Şablon gönderimi");
-  expect(html).not.toContain("Kural gönderimi");
-  state.runs = undefined;
-});
-
 it("yalnız son gönderimi sıfır olmayan sayılarla gösterir", () => {
   state.runs = [{ _id: "run", kind: "rule_sync", status: "partial", startedAt: Date.parse("2026-10-22T10:09:00Z"), counts: { queued: 0, sent: 0, verified: 0, failed: 0, skipped: 2, unknown: 0 } }];
   const html = renderToStaticMarkup(<RecentRuns projectId={"p" as Id<"projects">} />);
@@ -51,12 +43,13 @@ vi.mock("@/components/ui/sheet", () => ({
   SheetTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
   SheetDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
 }));
-it("çevrimdışı cihaz için yeniden gönderim yolunu açıklar", () => {
+it("geçmiş çevrimdışı sonucunu deneme tarihiyle gösterir", () => {
   state.detail = { status: "partial", counts: { queued: 0, sent: 0, verified: 0, failed: 0, skipped: 1, unknown: 0 },
-    targets: [{ _id: "target", deviceName: "Giriş", brand: "hikvision", status: "skipped", reason: "Cihaz çevrimdışı" }] };
+    targets: [{ _id: "target", deviceName: "Giriş", brand: "hikvision", status: "skipped", reason: "Cihaz çevrimdışı", updatedAt: Date.parse("2026-10-22T10:09:00Z") }] };
   const html = renderToStaticMarkup(<SyncRunSheet runId={"run" as Id<"deviceSyncRuns">} onClose={() => undefined} />);
   expect(html).toContain("Gönderilemedi");
-  expect(html).toContain("Cihaz bağlanınca yeniden gönderin.");
+  expect(html).toContain("Giriş: Son deneme 22.10.2026 13:09 · cihaz o sırada çevrimdışıydı");
+  expect(html).not.toContain("Cihaz bağlanınca yeniden gönderin.");
   expect(html).toContain("Cihaz aldığını bildirene kadar “Gönderildi” görünür.");
   expect(html).not.toContain("teslim kanıtı değildir");
   expect(html).not.toContain("Kısmi sonuç");
@@ -69,10 +62,12 @@ vi.mock("@/components/shared/ConfirmAction", () => ({
 it("proje gönderim onayını sade dille açıklar", () => {
   const html = renderToStaticMarkup(<ProjectSyncButton projectId={"p" as Id<"projects">} />);
   expect(html).toContain("Cihaz aldığını bildirene kadar “Gönderildi” görünür.");
+  expect(html).toContain("Diğer işlemler");
+  expect(html).toContain("cihaz · tüm proje · filtreler uygulanmaz");
+  expect(html).not.toContain("Marka dağılımı");
   expect(html).not.toContain("Hikvision gönderimi teslim kanıtı");
   expect(html).not.toContain("IDE cihaz onayı");
 });
-
 
 it("son gönderimde sade kayıt sayısını ve ayrı cihaz doğrulamasını gösterir", () => {
   state.runs = [{ _id: "run", kind: "rule_sync", status: "done", startedAt: Date.parse("2026-10-22T10:09:00Z"), counts: { queued: 0, sent: 2, verified: 1, failed: 0, skipped: 0, unknown: 0 } }];
@@ -88,12 +83,12 @@ it("kuralın son gönderimini ayrı sayfa açmadan, yalnız sorunlu cihazları t
     counts: { queued: 0, sent: 1, verified: 0, failed: 0, skipped: 1, unknown: 0 },
     targets: [
       { _id: "t1", deviceName: "NGS0001", brand: "hikvision", status: "sent" },
-      { _id: "t2", deviceName: "NGS0002", brand: "hikvision", status: "skipped", reason: "Cihaz çevrimdışı" },
+      { _id: "t2", deviceName: "NGS0002", brand: "hikvision", status: "skipped", reason: "Cihaz çevrimdışı", updatedAt: Date.parse("2026-10-22T10:09:00Z") },
     ] };
   const html = renderToStaticMarkup(<RuleLastRun ruleId={"rule" as Id<"accessRules">} />);
   expect(html).toContain("Kuralın son gönderimi");
   expect(html).toContain("Proje gönderimi");
-  expect(html).toContain("NGS0002: Atlandı · Cihaz çevrimdışı");
+  expect(html).toContain("NGS0002: Son deneme 22.10.2026 13:09 · cihaz o sırada çevrimdışıydı");
   expect(html).not.toContain("NGS0001");
   expect(html).not.toContain("Ayrıntı");
   expect(html).not.toContain("Hikvision");

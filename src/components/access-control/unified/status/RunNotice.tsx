@@ -11,9 +11,11 @@ import { runDisplay } from "../lib/presentation";
 export function RunNotice({
   runId,
   onComplete,
+  summary,
 }: {
   runId: Id<"deviceSyncRuns">;
   onComplete: () => void;
+  summary?: string;
 }) {
   const run = useQuery(api.deviceSyncRuns.get, { runId });
   const completed = useRef(false);
@@ -28,12 +30,12 @@ export function RunNotice({
   return (
     <section className="flex flex-wrap gap-3 items-center border rounded-md p-3">
       <div role="status">
-        Gönderim başlatıldı · {display ? (
+        Gönderim · {display ? (
           <StatusBadge tone={display.tone}>{display.label}</StatusBadge>
         ) : "Yükleniyor"}.
-        Cihaz gönderiminin sonucu ayrıca izlenir.
+        {summary && <p className="text-sm">{summary}</p>}
       </div>
-      <Button variant="outline" onClick={() => setOpen(true)}>
+      <Button className="min-h-11" variant="outline" onClick={() => setOpen(true)}>
         Gönderim sonucunu aç
       </Button>
       <SyncRunSheet

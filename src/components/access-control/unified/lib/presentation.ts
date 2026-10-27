@@ -69,7 +69,6 @@ export function runTone(status: keyof typeof runLabels) {
 }
 export const runKindLabels = {
   project_resync: "Proje gönderimi",
-  template_sync: "Şablon gönderimi",
   rule_sync: "Kural gönderimi",
 };
 

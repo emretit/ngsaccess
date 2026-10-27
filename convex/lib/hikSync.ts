@@ -4,7 +4,7 @@
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { WeekScheduleEntry } from "./hikGateway";
-import { effectiveSchedule, toHikWeekSchedule, type ScheduleRule, type ScheduleTemplate } from "./accessSchedule";
+import { effectiveSchedule, toHikWeekSchedule, type ScheduleRule } from "./accessSchedule";
 
 /**
  * Hik gateway sync için ortak helper'lar — `actions/hikvisionSync.ts` ve
@@ -52,6 +52,6 @@ export type DeviceDoc = Doc<"devices">;
  * açılmasını önler. Cihaza endTime saniye `:59` gider — DS-K1T8 `23:59:59`
  * (dakikanın son saniyesi) bekler.
  */
-export function defaultRuleSchedule(rule: ScheduleRule, template: ScheduleTemplate | null = null): WeekScheduleEntry[] {
-  return toHikWeekSchedule(effectiveSchedule(rule, template));
+export function defaultRuleSchedule(rule: ScheduleRule): WeekScheduleEntry[] {
+  return toHikWeekSchedule(effectiveSchedule(rule));
 }

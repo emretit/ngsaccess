@@ -150,10 +150,9 @@ export async function resolveActiveMatchingRuleIds(
   const activeRules = rules.filter((r): r is NonNullable<typeof r> => r?.isActive === true);
   const openRuleIds = new Set<Id<"accessRules">>();
   for (const rule of activeRules) {
-    const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
     try {
-      if (isRuleOpenAt(rule, nowMs, template)) openRuleIds.add(rule._id);
-    } catch (error) { console.warn("Geçersiz erişim şablonu; kart erişimi kapatıldı", rule._id, error); }
+      if (isRuleOpenAt(rule, nowMs)) openRuleIds.add(rule._id);
+    } catch (error) { console.warn("Geçersiz kural saatleri; kart erişimi kapatıldı", rule._id, error); }
   }
   return { activeRuleIds: new Set(activeRules.map(r => r._id)), openRuleIds };
 }

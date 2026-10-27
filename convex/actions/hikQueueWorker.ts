@@ -208,7 +208,7 @@ async function executeOperation(
         return { ok: false, error: "Kural veya weekPlanNo eksik" };
       }
       // Saat/gün eksikse defaultRuleSchedule 7/24 fallback uygular.
-      const schedule = defaultRuleSchedule(rule, rule.scheduleTemplate ?? null);
+      const schedule = defaultRuleSchedule(rule);
       return await setWeekPlanOnDevice(devIndex, weekPlanNo, schedule);
     }
     case "syncDoorParam": {

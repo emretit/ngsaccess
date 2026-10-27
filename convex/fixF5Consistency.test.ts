@@ -59,14 +59,13 @@ describe("Y-09 project deletion", () => {
       const deviceId = await ctx.db.insert("devices", { projectId: f.otherProjectId, name: "Other", status: "offline", createdAt: "now", updatedAt: "now" });
       const checkpoint = await ctx.db.insert("pdksCheckpointSelections", { projectId: f.projectId, ruleVersionId: version, targetType: "device", deviceId });
       const alarm = await ctx.db.insert("alarmSettings", { projectId: f.projectId, emailEnabled: false, recipients: [], minSeverity: "warning", updatedAt: "now" });
-      const template = await ctx.db.insert("accessScheduleTemplates", { projectId: f.projectId, name: "Takvim", version: 1, createdAt: "now", updatedAt: "now", week: { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] } });
       const otherAlarm = await ctx.db.insert("alarmSettings", { projectId: f.otherProjectId, emailEnabled: false, recipients: [], minSeverity: "warning", updatedAt: "now" });
       const audit = await ctx.db.insert("auditLog", { projectId: f.projectId, userId: f.userId, action: "create", targetTable: "projects", targetId: String(f.projectId), timestamp: Date.now() });
-      return { deleted: [version, checkpoint, alarm, template], otherAlarm, audit };
+      return { deleted: [version, checkpoint, alarm], otherAlarm, audit };
     });
     const impact = await f.admin.query(api.projects.getDeletionImpact, { projectId: f.projectId });
     expect(impact.canDelete).toBe(true);
-    expect(impact.cleanup.map(row => row.table)).toEqual(expect.arrayContaining(["alarmSettings", "pdksRuleVersions", "pdksCheckpointSelections", "accessScheduleTemplates"]));
+    expect(impact.cleanup.map(row => row.table)).toEqual(expect.arrayContaining(["alarmSettings", "pdksRuleVersions", "pdksCheckpointSelections"]));
     await f.admin.mutation(api.projects.remove, { id: f.projectId });
     await f.t.run(async ctx => {
       for (const id of records.deleted) expect(await ctx.db.get(id)).toBeNull();

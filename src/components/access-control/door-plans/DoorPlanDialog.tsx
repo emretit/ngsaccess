@@ -1,6 +1,5 @@
+import { pastAttemptText } from "@/lib/pastAttempt";
 import { DoorPlanImpactSummary } from "./DoorPlanImpactSummary";
-import { TemplatePicker } from "../unified/templates/TemplatePicker";
-import type { Id } from "../../../../convex/_generated/dataModel";
 import { DoorStatusPlanSection } from "../door-dialog/DoorStatusPlanSection";
 import {
   DoorVerifyPlanSection,
@@ -52,7 +51,8 @@ interface DoorPlanDialogProps {
 }
 
 /** YYYY-MM-DD takvim günü; tarayıcı saat diliminden bağımsız gün.ay.yıl metni. */
-const formatHolidayDate = (date: string) => formatTrDate(new Date(`${date}T12:00:00Z`));
+const formatHolidayDate = (date: string) =>
+  formatTrDate(new Date(`${date}T12:00:00Z`));
 
 // hikDoorStatusPlan form state tipi — schema shape ile birebir
 type DoorStatusPlanState = DoorStatusPlan;
@@ -90,12 +90,6 @@ export function DoorPlanDialog({
   const [verifyPlan, setVerifyPlan] = useState<VerifyPlanState>(
     door.hikVerifyPlan ?? DEFAULT_VERIFY_PLAN,
   );
-  const [useTemplate, setUseTemplate] = useState(
-    !!door.hikDoorStatusTemplateId,
-  );
-  const [templateId, setTemplateId] = useState<string>(
-    door.hikDoorStatusTemplateId ?? "",
-  );
   const [holiday, setHoliday] = useState(
     door.hikDoorHolidayPlan ?? {
       enabled: false,
@@ -104,17 +98,29 @@ export function DoorPlanDialog({
     },
   );
 
-  const holidayRanges = useQuery(api.doors.listPlanHolidays,
-    holiday.enabled ? { projectId: door.projectId, year: holiday.year } : "skip");
-  const statusEdited = JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN) ||
-    useTemplate !== !!door.hikDoorStatusTemplateId || templateId !== (door.hikDoorStatusTemplateId ?? "");
-  const statusChanged = statusEdited || (useTemplate && door.templateChanged);
-  const verifyChanged = JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ?? DEFAULT_VERIFY_PLAN);
-  const holidayChanged = JSON.stringify(holiday) !== JSON.stringify(door.hikDoorHolidayPlan ?? {
-    enabled: false, year: new Date().getFullYear(), mode: "remainClosed",
-  });
-  // Kullanıcının formda yaptığı düzenleme (şablonun dışarıda değişmesi sayılmaz).
-  const formDirty = statusEdited || verifyChanged || holidayChanged;
+  const holidayRanges = useQuery(
+    api.doors.listPlanHolidays,
+    holiday.enabled
+      ? { projectId: door.projectId, year: holiday.year }
+      : "skip",
+  );
+  const statusChanged =
+    JSON.stringify(statusPlan) !==
+    JSON.stringify(door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN);
+  const verifyChanged =
+    JSON.stringify(verifyPlan) !==
+    JSON.stringify(door.hikVerifyPlan ?? DEFAULT_VERIFY_PLAN);
+  const holidayChanged =
+    JSON.stringify(holiday) !==
+    JSON.stringify(
+      door.hikDoorHolidayPlan ?? {
+        enabled: false,
+        year: new Date().getFullYear(),
+        mode: "remainClosed",
+      },
+    );
+  // Kullanıcının formda yaptığı düzenleme.
+  const formDirty = statusChanged || verifyChanged || holidayChanged;
 
   const updateDoor = useMutation(api.doors.updatePlans);
   const applyDoorStatusPlan = useAction(
@@ -126,17 +132,24 @@ export function DoorPlanDialog({
 
   const persistedKeys: PlanKey[] = [];
   // Kaydedilmiş devre dışı planlar da cihazdaki eski planı kaldırmak için gönderilir.
-  if (door.hikDoorStatusPlan || door.hikDoorHolidayPlan?.enabled) persistedKeys.push("status");
+  if (door.hikDoorStatusPlan || door.hikDoorHolidayPlan?.enabled)
+    persistedKeys.push("status");
   if (door.hikVerifyPlan) persistedKeys.push("verify");
   // Gönderilecek kayıtlı plan yoksa eski hata/bekleyen bayrağı için yapılacak bir şey yok.
-  const persistedSendPending = !persistedSendResolved && persistedKeys.length > 0 &&
+  const persistedSendPending =
+    !persistedSendResolved &&
+    persistedKeys.length > 0 &&
     !!(door.plansPending || door.hikPlanApplyError);
   const failedResults = planResults.filter((result) => !result.ok);
   const failedKeys = failedResults.map((result) => result.key);
   const pendingKeys = persistedSendPending ? persistedKeys : [];
   const retryKeys = [...new Set([...failedKeys, ...pendingKeys])];
-  const statusMessage = failedKeys.length > 0 ? "Cihaza gönderilemedi"
-    : door.hikPlanApplyError ? `Son gönderim başarısız: ${door.hikPlanApplyError}` : "Kaydedildi ama cihaza gönderilmedi";
+  const statusMessage =
+    failedKeys.length > 0
+      ? "Cihaza gönderilemedi"
+      : door.hikPlanApplyError
+        ? `Son gönderim başarısız · ${pastAttemptText(door.hikPlanFailedAt, door.hikPlanApplyError)}`
+        : "Kaydedildi ama cihaza gönderilmedi";
 
   const sendPlans = async (keys: PlanKey[]) => {
     const results = await applySelectedDoorPlans(
@@ -158,11 +171,14 @@ export function DoorPlanDialog({
     async () => {
       const keys = await updateDoor({
         doorId: door.doorId,
-        ...(statusChanged ? {
-          hikDoorStatusPlan: useTemplate ? statusPlan : normalizeDoorStatusPlan(statusPlan),
-          hikDoorStatusTemplateId: useTemplate ? (templateId as Id<"accessScheduleTemplates">) : null,
-        } : {}),
-        ...(verifyChanged ? { hikVerifyPlan: normalizeVerifyPlan(verifyPlan) } : {}),
+        ...(statusChanged
+          ? {
+              hikDoorStatusPlan: normalizeDoorStatusPlan(statusPlan),
+            }
+          : {}),
+        ...(verifyChanged
+          ? { hikVerifyPlan: normalizeVerifyPlan(verifyPlan) }
+          : {}),
         ...(holidayChanged ? { hikDoorHolidayPlan: holiday } : {}),
       });
       const keysToSend = [...new Set([...keys, ...pendingKeys])];
@@ -173,7 +189,11 @@ export function DoorPlanDialog({
       setSaved(keys.length > 0);
       setPersistedSendResolved(true);
       if (!(await sendPlans(keysToSend))) return;
-      notify.success(keys.length > 0 ? "Kapı planları kaydedildi ve cihaza uygulandı" : "Zaman planları cihaza uygulandı");
+      notify.success(
+        keys.length > 0
+          ? "Kapı planları kaydedildi ve cihaza uygulandı"
+          : "Zaman planları cihaza uygulandı",
+      );
       onSuccess();
       onOpenChange(false);
     },
@@ -207,7 +227,7 @@ export function DoorPlanDialog({
     const errors: Record<string, string> = {};
     {
       try {
-        if (statusChanged && !useTemplate) normalizeDoorStatusPlan(statusPlan);
+        if (statusChanged) normalizeDoorStatusPlan(statusPlan);
       } catch (error: unknown) {
         errors["status-plan"] = errorMessage(error);
       }
@@ -216,13 +236,15 @@ export function DoorPlanDialog({
       } catch (error: unknown) {
         errors["verify-plan"] = errorMessage(error);
       }
-      if (useTemplate && !templateId)
-        errors["status-plan"] = "Zaman şablonu seçin";
-      if (useTemplate && statusPlan.mode === "normal")
-        errors["status-plan"] =
-          "Şablon için sürekli açık veya sürekli kilitli seçin";
-      if (holiday.enabled && (statusChanged || holidayChanged) && !holidayRanges?.length)
-        errors["holiday-plan"] = holidayRanges === undefined ? "Tatil tarihleri yükleniyor" : "Seçilen yılda uygulanacak tatil yok";
+      if (
+        holiday.enabled &&
+        (statusChanged || holidayChanged) &&
+        !holidayRanges?.length
+      )
+        errors["holiday-plan"] =
+          holidayRanges === undefined
+            ? "Tatil tarihleri yükleniyor"
+            : "Seçilen yılda uygulanacak tatil yok";
       if (holiday.enabled && door.holidaySupported === false)
         errors["holiday-plan"] = "Bu cihaz tatil planını desteklemiyor";
     }
@@ -247,7 +269,8 @@ export function DoorPlanDialog({
           <DialogHeader>
             <DialogTitle>Kapı Planları</DialogTitle>
             <DialogDescription>
-              {door.doorName} · {door.deviceName} kapısının zaman planlarını düzenleyin. Kaydettiğinizde plan hemen cihaza gönderilir.
+              {door.doorName} · {door.deviceName} kapısının zaman planlarını
+              düzenleyin. Kaydettiğinizde plan hemen cihaza gönderilir.
             </DialogDescription>
           </DialogHeader>
 
@@ -255,7 +278,12 @@ export function DoorPlanDialog({
             {retryKeys.length > 0 && (
               <div role="status" className="mb-4 space-y-2 text-sm">
                 <p>{statusMessage}</p>
-                <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => void retryAction.run()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={() => void retryAction.run()}
+                >
                   {isSubmitting ? "Gönderiliyor…" : "Cihaza tekrar gönder"}
                 </Button>
               </div>
@@ -292,76 +320,16 @@ export function DoorPlanDialog({
                         : undefined
                     }
                   >
-                    <label className="flex items-center gap-2 mb-3">
-                      <input
-                        type="checkbox"
-                        checked={useTemplate}
-                        onChange={(event) => {
-                          setUseTemplate(event.target.checked);
-                          if (
-                            event.target.checked &&
-                            statusPlan.mode === "normal"
-                          )
-                            setStatusPlan((p) => ({
-                              ...p,
-                              mode: "remainClosed",
-                            }));
-                        }}
-                      />{" "}
-                      Zaman şablonu kullan
-                    </label>
-                    {useTemplate ? (
-                      <div className="space-y-3">
-                        <TemplatePicker
-                          value={templateId}
-                          currentTemplateId={
-                            door.hikDoorStatusTemplateId ?? undefined
-                          }
-                          onChange={setTemplateId}
-                          onEdit={(navigate) =>
-                            guard.requestClose(() => {
-                              onOpenChange(false);
-                              navigate();
-                            })
-                          }
-                        />
-                        <label className="block">
-                          Kapı modu
-                          <NativeSelect
-                            aria-label="Şablon kapı modu"
-                            value={statusPlan.mode}
-                            onChange={(event) => {
-                              const mode = event.target.value;
-                              if (
-                                mode === "remainOpen" ||
-                                mode === "remainClosed"
-                              )
-                                setStatusPlan((p) => ({ ...p, mode }));
-                            }}
-                          >
-                            <option value="remainOpen">Sürekli açık</option>
-                            <option value="remainClosed">
-                              Sürekli kilitli
-                            </option>
-                          </NativeSelect>
-                        </label>
-                        <p className="text-xs text-muted-foreground">
-                          Şablon değişiklikleri otomatik gönderilmez.
-                          Güncellemek için yeniden kaydedip gönderin.
-                        </p>
-                      </div>
-                    ) : (
-                      <DoorStatusPlanEditor
-                        value={statusPlan}
-                        onChange={setStatusPlan}
-                        invalid={!!timeErrors["status-plan"]}
-                        aria-describedby={
-                          timeErrors["status-plan"]
-                            ? "status-plan-error"
-                            : undefined
-                        }
-                      />
-                    )}
+                    <DoorStatusPlanEditor
+                      value={statusPlan}
+                      onChange={setStatusPlan}
+                      invalid={!!timeErrors["status-plan"]}
+                      aria-describedby={
+                        timeErrors["status-plan"]
+                          ? "status-plan-error"
+                          : undefined
+                      }
+                    />
                     {timeErrors["status-plan"] && (
                       <p
                         id="status-plan-error"
@@ -382,9 +350,6 @@ export function DoorPlanDialog({
                     <input
                       type="checkbox"
                       checked={holiday.enabled}
-                      disabled={
-                        door.holidaySupported === false && !holiday.enabled
-                      }
                       onChange={(event) =>
                         setHoliday((p) => ({
                           ...p,
@@ -394,10 +359,10 @@ export function DoorPlanDialog({
                     />{" "}
                     Proje ve Türkiye geneli tatillerini uygula
                   </label>
-                  {door.holidaySupported === false && (
+                  {holiday.enabled && door.holidaySupported === false && (
                     <p role="alert">Bu cihaz tatil planını desteklemiyor</p>
                   )}
-                  {door.holidaySupported === null && (
+                  {holiday.enabled && door.holidaySupported === null && (
                     <p className="text-xs">
                       Cihaz desteği gönderimden önce denetlenir.
                     </p>
@@ -405,23 +370,43 @@ export function DoorPlanDialog({
                   {holiday.enabled && holidayRanges?.length === 0 && (
                     <div className="space-y-2">
                       <p role="alert">Seçilen yılda uygulanacak tatil yok</p>
-                      <Button type="button" variant="outline" onClick={() => guard.requestClose(() => {
-                        onOpenChange(false);
-                        navigate(PDKS_SETTINGS_PATH);
-                      })}>Tatil takvimini aç</Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          guard.requestClose(() => {
+                            onOpenChange(false);
+                            navigate(PDKS_SETTINGS_PATH);
+                          })
+                        }
+                      >
+                        Tatil takvimini aç
+                      </Button>
                     </div>
                   )}
-                  {holiday.enabled && holidayRanges && holidayRanges.length > 0 && (
-                    <div className="text-sm" aria-label="Uygulanacak tatil tarihleri">
-                      <p className="font-medium">Uygulanacak tatil tarihleri</p>
-                      <ul>
-                        {holidayRanges.slice(0, 10).map((range) => (
-                          <li key={range.beginDate}>{formatHolidayDate(range.beginDate)}–{formatHolidayDate(range.endDate)} · tam gün</li>
-                        ))}
-                      </ul>
-                      {holidayRanges.length > 10 && <p>ve {holidayRanges.length - 10} tarih daha</p>}
-                    </div>
-                  )}
+                  {holiday.enabled &&
+                    holidayRanges &&
+                    holidayRanges.length > 0 && (
+                      <div
+                        className="text-sm"
+                        aria-label="Uygulanacak tatil tarihleri"
+                      >
+                        <p>{holidayRanges.length} tatil aralığı · tam gün</p>
+                        <details>
+                          <summary className="min-h-11 cursor-pointer py-3">
+                            Tümünü göster
+                          </summary>
+                          <ul>
+                            {holidayRanges.map((range) => (
+                              <li key={range.beginDate}>
+                                {formatHolidayDate(range.beginDate)}–
+                                {formatHolidayDate(range.endDate)} · tam gün
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      </div>
+                    )}
                   {holiday.enabled && (
                     <>
                       <label className="block">
@@ -490,13 +475,17 @@ export function DoorPlanDialog({
               <DoorPlanImpactSummary
                 doorName={door.doorName}
                 statusPlan={statusChanged ? statusPlan : undefined}
-                template={useTemplate}
                 verifyPlan={verifyChanged ? verifyPlan : undefined}
                 holiday={holidayChanged ? holiday : undefined}
               />
             )}
             <DialogFooter className="sticky -bottom-4 z-10 gap-2 border-t bg-background py-3 sm:static sm:border-0 sm:pb-0">
-              <Button type="button" variant="outline" disabled={isSubmitting} onClick={close}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={close}
+              >
                 {saved ? "Kapat" : "İptal"}
               </Button>
               {!saved && (

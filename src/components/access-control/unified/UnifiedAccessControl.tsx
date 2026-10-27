@@ -53,7 +53,6 @@ const ProjectAccessControl = () => {
               next.set("tab", value);
             else {
               next.delete("tab");
-              next.delete("template");
             }
             return next;
           })

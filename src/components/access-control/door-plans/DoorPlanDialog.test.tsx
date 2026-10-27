@@ -9,7 +9,6 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { notify } from "@/lib/notify";
 import { DoorPlanImpactSummary } from "./DoorPlanImpactSummary";
 import { DoorStatusPlanEditor } from "../DoorStatusPlanEditor";
-import { TemplatePicker } from "../unified/templates/TemplatePicker";
 import { DoorStatusPlanSection } from "../door-dialog/DoorStatusPlanSection";
 import { DoorVerifyPlanEditor } from "../door-dialog/DoorVerifyPlanEditor";
 import { DoorVerifyPlanSection } from "../door-dialog/DoorVerifyPlanSection";
@@ -97,11 +96,18 @@ function find(
   return found;
 }
 const hasText = (node: ReactNode, text: string) =>
-  nodes(node).some(element => element.props.children === text);
+  nodes(node).some((element) => element.props.children === text);
 const submit = (node: ReactNode) =>
-  (find(node, element => element.type === "form").props.onSubmit as (event: { preventDefault: () => void }) => Promise<void>)({ preventDefault: vi.fn() });
+  (
+    find(node, (element) => element.type === "form").props.onSubmit as (event: {
+      preventDefault: () => void;
+    }) => Promise<void>
+  )({ preventDefault: vi.fn() });
 const retrySend = (node: ReactNode) =>
-  (find(node, element => element.props.children === "Cihaza tekrar gönder").props.onClick as () => Promise<void>)();
+  (
+    find(node, (element) => element.props.children === "Cihaza tekrar gönder")
+      .props.onClick as () => Promise<void>
+  )();
 afterEach(() => vi.unstubAllGlobals());
 beforeEach(() => {
   vi.stubGlobal("document", { getElementById: () => null });
@@ -121,12 +127,10 @@ describe("DoorPlanDialog haftalık kayıt", () => {
   const door: DoorPlanTarget = {
     doorId: "door" as Id<"doors">,
     projectId: "project" as Id<"projects">,
-    hikDoorStatusTemplateId: null,
-    templateName: null,
-    templateChanged: false,
     hikPlanSavedAt: null,
     hikPlanAppliedAt: null,
     hikPlanApplyError: null,
+    hikPlanFailedAt: null,
     plansPending: false,
     hikDoorHolidayPlan: null,
     holidaySupported: null,
@@ -148,80 +152,169 @@ describe("DoorPlanDialog haftalık kayıt", () => {
   }
   it("04-O1 kapalı durum planını gizler, anahtarı açınca eski saatleri gösterir", () => {
     let value = { ...legacy, enabled: false };
-    const render = () => DoorStatusPlanSection({
-      statusPlan: value,
-      setStatusPlan: next => { value = typeof next === "function" ? next(value) : next; },
-      isSubmitting: false, saved: false,
-      children: <input type="time" value={value.beginTime} readOnly />,
-    });
+    const render = () =>
+      DoorStatusPlanSection({
+        statusPlan: value,
+        setStatusPlan: (next) => {
+          value = typeof next === "function" ? next(value) : next;
+        },
+        isSubmitting: false,
+        saved: false,
+        children: <input type="time" value={value.beginTime} readOnly />,
+      });
     const tree = render();
-    expect(nodes(tree).some(node => node.props.type === "time")).toBe(false);
-    expect(renderToStaticMarkup(tree)).toContain("Plan etkin değil");
+    expect(nodes(tree).some((node) => node.props.type === "time")).toBe(false);
+    expect(renderToStaticMarkup(tree)).toContain(
+      "Plan etkin değil. Kapı normal çalışır",
+    );
+    expect(renderToStaticMarkup(tree)).not.toContain("kapatılacak");
     expect(hasText(tree, "Kapalı")).toBe(true);
-    (find(tree, node => node.props.id === "status-enabled").props.onCheckedChange as (enabled: boolean) => void)(true);
-    expect(find(render(), node => node.props.type === "time").props.value).toBe(legacy.beginTime);
+    (
+      find(tree, (node) => node.props.id === "status-enabled").props
+        .onCheckedChange as (enabled: boolean) => void
+    )(true);
+    expect(
+      find(render(), (node) => node.props.type === "time").props.value,
+    ).toBe(legacy.beginTime);
     expect(hasText(render(), "Açık")).toBe(true);
   });
   it("04-O1 kapalı doğrulama planını gizler, açınca eski değerleri korur", () => {
-    let value: VerifyPlan = { enabled: false, beginTime: "09:15:01", endTime: "17:45:02", verifyMode: "face" };
-    const render = () => DoorVerifyPlanSection({
-      verifyPlan: value, setVerifyPlan: next => { value = typeof next === "function" ? next(value) : next; },
-      isSubmitting: false, saved: false, timeErrors: {},
-    });
-    expect(nodes(render()).some(node => node.type === DoorVerifyPlanEditor)).toBe(false);
+    let value: VerifyPlan = {
+      enabled: false,
+      beginTime: "09:15:01",
+      endTime: "17:45:02",
+      verifyMode: "face",
+    };
+    const render = () =>
+      DoorVerifyPlanSection({
+        verifyPlan: value,
+        setVerifyPlan: (next) => {
+          value = typeof next === "function" ? next(value) : next;
+        },
+        isSubmitting: false,
+        saved: false,
+        timeErrors: {},
+      });
+    expect(
+      nodes(render()).some((node) => node.type === DoorVerifyPlanEditor),
+    ).toBe(false);
     expect(renderToStaticMarkup(render())).toContain("Plan etkin değil");
-    (find(render(), node => node.props.id === "verify-enabled").props.onCheckedChange as (enabled: boolean) => void)(true);
-    expect(find(render(), node => node.type === DoorVerifyPlanEditor).props.value).toEqual({
-      enabled: true, beginTime: "09:15:01", endTime: "17:45:02", verifyMode: "face",
+    (
+      find(render(), (node) => node.props.id === "verify-enabled").props
+        .onCheckedChange as (enabled: boolean) => void
+    )(true);
+    expect(
+      find(render(), (node) => node.type === DoorVerifyPlanEditor).props.value,
+    ).toEqual({
+      enabled: true,
+      beginTime: "09:15:01",
+      endTime: "17:45:02",
+      verifyMode: "face",
     });
   });
   it("04-O4 Hafta içi seçimi yalnız Pzt–Cum aralıkları kaydeder ve hafta sonunu özetler", async () => {
-    const editor = find(dialog(), node => node.type === DoorStatusPlanEditor);
-    const tree = DoorStatusPlanEditor(editor.props as Parameters<typeof DoorStatusPlanEditor>[0]);
-    (find(tree, node => node.props.children === "Hafta içi").props.onClick as () => void)();
+    const editor = find(dialog(), (node) => node.type === DoorStatusPlanEditor);
+    const tree = DoorStatusPlanEditor(
+      editor.props as Parameters<typeof DoorStatusPlanEditor>[0],
+    );
+    (
+      find(
+        tree,
+        (node) => node.props["aria-label"] === "Kapı durum planı düzeni",
+      ).props.onChange as (event: { target: { value: string } }) => void
+    )({ target: { value: "weekdays" } });
     const updated = dialog();
-    const summary = find(updated, node => node.type === DoorPlanImpactSummary);
-    expect(renderToStaticMarkup(DoorPlanImpactSummary(summary.props as Parameters<typeof DoorPlanImpactSummary>[0]))).toContain("Cmt–Paz normal çalışır");
+    const summary = find(
+      updated,
+      (node) => node.type === DoorPlanImpactSummary,
+    );
+    expect(
+      renderToStaticMarkup(
+        DoorPlanImpactSummary(
+          summary.props as Parameters<typeof DoorPlanImpactSummary>[0],
+        ),
+      ),
+    ).toContain("Cmt–Paz normal çalışır");
     await submit(updated);
-    const payload = state.save.mock.calls[0][0] as { hikDoorStatusPlan: DoorStatusPlan };
+    const payload = state.save.mock.calls[0][0] as {
+      hikDoorStatusPlan: DoorStatusPlan;
+    };
     const week = payload.hikDoorStatusPlan.weekly ?? [];
-    expect(week.filter(day => day.segments.length).map(day => day.day)).toEqual(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
-    expect(week.slice(5).every(day => day.segments.length === 0)).toBe(true);
+    expect(
+      week.filter((day) => day.segments.length).map((day) => day.day),
+    ).toEqual(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
+    expect(week.slice(5).every((day) => day.segments.length === 0)).toBe(true);
   });
   it("04-O7 mobil eylemler yapışkan ve dokunma hedefleri en az 44px", () => {
     const tree = dialog();
-    expect(nodes(tree).some(node => typeof node.props.className === "string" && node.props.className.includes("sticky -bottom-4"))).toBe(true);
-    expect(nodes(tree).some(node => typeof node.props.className === "string" && node.props.className.includes("max-sm:[&_button:not([role=switch])]:min-h-11"))).toBe(true);
+    expect(
+      nodes(tree).some(
+        (node) =>
+          typeof node.props.className === "string" &&
+          node.props.className.includes("sticky -bottom-4"),
+      ),
+    ).toBe(true);
+    expect(
+      nodes(tree).some(
+        (node) =>
+          typeof node.props.className === "string" &&
+          node.props.className.includes(
+            "max-sm:[&_button:not([role=switch])]:min-h-11",
+          ),
+      ),
+    ).toBe(true);
     // Dalga3 C1-2: masaüstü ve anahtar (switch) 44px'e büyütülmez
-    expect(nodes(tree).some(node => typeof node.props.className === "string" && / \[&_button\]:min-h-11/.test(node.props.className))).toBe(false);
+    expect(
+      nodes(tree).some(
+        (node) =>
+          typeof node.props.className === "string" &&
+          / \[&_button\]:min-h-11/.test(node.props.className),
+      ),
+    ).toBe(false);
   });
   it("04-H1 boş kayıtta başarı bildirmez, bilgi verir ve düzenlemeyi açık tutar", async () => {
     state.save.mockResolvedValue([]);
     await submit(dialog());
     expect(state.apply).not.toHaveBeenCalled();
     expect(notify.success).not.toHaveBeenCalled();
-    expect(notify.info).toHaveBeenCalledWith("Değişiklik yok; cihaza bir şey gönderilmedi.");
+    expect(notify.info).toHaveBeenCalledWith(
+      "Değişiklik yok; cihaza bir şey gönderilmedi.",
+    );
     expect(hasText(dialog(), "Kaydet ve cihaza gönder")).toBe(true);
   });
-  it.each([
-    { plansPending: true },
-    { hikPlanApplyError: "Çevrimdışı" },
-  ])("04-H1 açılışta kaydedilmiş planı değişikliksiz tekrar gönderir (%j)", async overrides => {
-    const tree = dialog(overrides);
-    expect(hasText(tree, "hikPlanApplyError" in overrides ? "Son gönderim başarısız: Çevrimdışı" : "Kaydedildi ama cihaza gönderilmedi")).toBe(true);
-    await retrySend(tree);
-    await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(1));
-    expect(state.save).not.toHaveBeenCalled();
-    expect(hasText(dialog(overrides), "Cihaza tekrar gönder")).toBe(false);
-  });
+  it.each([{ plansPending: true }, { hikPlanApplyError: "Çevrimdışı" }])(
+    "04-H1 açılışta kaydedilmiş planı değişikliksiz tekrar gönderir (%j)",
+    async (overrides) => {
+      const tree = dialog(overrides);
+      expect(
+        hasText(
+          tree,
+          "hikPlanApplyError" in overrides
+            ? "Son gönderim başarısız · Son denemede: Çevrimdışı"
+            : "Kaydedildi ama cihaza gönderilmedi",
+        ),
+      ).toBe(true);
+      await retrySend(tree);
+      await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(1));
+      expect(state.save).not.toHaveBeenCalled();
+      expect(hasText(dialog(overrides), "Cihaza tekrar gönder")).toBe(false);
+    },
+  );
   it("04-H1 boş değişiklik listesinde bekleyen durum, tatil ve doğrulama planlarını gönderir", async () => {
     state.save.mockResolvedValue([]);
-    await submit(dialog({
-      plansPending: true,
-      hikDoorStatusPlan: null,
-      hikDoorHolidayPlan: { enabled: true, year: 2026, mode: "remainClosed" },
-      hikVerifyPlan: { enabled: true, beginTime: "08:00", endTime: "18:00", verifyMode: "card" },
-    }));
+    await submit(
+      dialog({
+        plansPending: true,
+        hikDoorStatusPlan: null,
+        hikDoorHolidayPlan: { enabled: true, year: 2026, mode: "remainClosed" },
+        hikVerifyPlan: {
+          enabled: true,
+          beginTime: "08:00",
+          endTime: "18:00",
+          verifyMode: "card",
+        },
+      }),
+    );
     expect(state.apply).toHaveBeenCalledTimes(2);
     expect(notify.success).toHaveBeenCalledTimes(1);
   });
@@ -229,14 +322,18 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     state.apply.mockResolvedValueOnce({ ok: false, error: "Çevrimdışı" });
     const overrides = { plansPending: true };
     await retrySend(dialog(overrides));
-    await vi.waitFor(() => expect(hasText(dialog(overrides), "Cihaza gönderilemedi")).toBe(true));
+    await vi.waitFor(() =>
+      expect(hasText(dialog(overrides), "Cihaza gönderilemedi")).toBe(true),
+    );
     await retrySend(dialog(overrides));
     await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(2));
     expect(state.save).not.toHaveBeenCalled();
   });
   it("04-H1 kısmi hatada yalnız başarısız türü tekrar gönderir", async () => {
     state.save.mockResolvedValue(["status", "verify"]);
-    state.apply.mockResolvedValueOnce({ ok: true }).mockResolvedValueOnce({ ok: false, error: "Doğrulama gönderilemedi" });
+    state.apply
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, error: "Doğrulama gönderilemedi" });
     await submit(dialog());
     expect(state.apply).toHaveBeenCalledTimes(2);
     expect(notify.success).not.toHaveBeenCalled();
@@ -245,14 +342,22 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     expect(state.save).toHaveBeenCalledTimes(1);
   });
   it("04-H1 devre dışı bırakılıp bekleyen planı cihazdan kaldırmak için gönderir", async () => {
-    const overrides = { plansPending: true, hikDoorStatusPlan: { ...legacy, enabled: false } };
+    const overrides = {
+      plansPending: true,
+      hikDoorStatusPlan: { ...legacy, enabled: false },
+    };
     await retrySend(dialog(overrides));
     await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(1));
     expect(state.save).not.toHaveBeenCalled();
   });
   it("R1 gönderilecek kayıtlı plan yokken eski hata için takılı uyarı göstermez", () => {
-    const tree = dialog({ hikPlanApplyError: "Çevrimdışı", hikDoorStatusPlan: null });
-    expect(nodes(tree).some(element => element.props.role === "status")).toBe(false);
+    const tree = dialog({
+      hikPlanApplyError: "Çevrimdışı",
+      hikDoorStatusPlan: null,
+    });
+    expect(nodes(tree).some((element) => element.props.role === "status")).toBe(
+      false,
+    );
     expect(hasText(tree, "Cihaza tekrar gönder")).toBe(false);
   });
   it("R2 hata metni boş gelirse varsayılan gönderilemedi metnini gösterir", async () => {
@@ -261,15 +366,26 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     expect(hasText(dialog(), "Cihaza gönderilemedi")).toBe(true);
   });
   it("R3 açıklamada kapı ve cihaz adı görünür", () => {
-    expect(nodes(dialog()).some(element => Array.isArray(element.props.children) &&
-      element.props.children.includes("Kapı") && element.props.children.includes("Panel"))).toBe(true);
+    expect(
+      nodes(dialog()).some(
+        (element) =>
+          Array.isArray(element.props.children) &&
+          element.props.children.includes("Kapı") &&
+          element.props.children.includes("Panel"),
+      ),
+    ).toBe(true);
   });
   it("R4 düzenleme yokken başarılı tekrar gönderim dialogu kapatır, düzenleme varken açık tutar", async () => {
     const onOpenChange = vi.fn();
     const onSuccess = vi.fn();
     const render = () => {
       state.cursor = 0;
-      return DoorPlanDialog({ open: true, onOpenChange, onSuccess, door: { ...door, plansPending: true } });
+      return DoorPlanDialog({
+        open: true,
+        onOpenChange,
+        onSuccess,
+        door: { ...door, plansPending: true },
+      });
     };
     await retrySend(render());
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
@@ -277,7 +393,10 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     state.slots = [];
     onOpenChange.mockClear();
     onSuccess.mockClear();
-    const change = find(render(), element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void;
+    const change = find(
+      render(),
+      (element) => element.type === DoorStatusPlanEditor,
+    ).props.onChange as (plan: DoorStatusPlan) => void;
     change({ ...legacy, endTime: "09:00" });
     await retrySend(render());
     await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(2));
@@ -286,45 +405,126 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     expect(onSuccess).not.toHaveBeenCalled();
   });
   it("04-O2 listede devre dışı planları kapı kilit modu ile karıştırmaz ve sekme başlığını gösterir", () => {
-    state.targets = [{ ...door, hikDoorStatusPlan: { ...legacy, enabled: false } }];
+    state.targets = [
+      { ...door, hikDoorStatusPlan: { ...legacy, enabled: false } },
+    ];
     state.cursor = 0;
     const tree = DoorPlansTab();
-    expect(nodes(tree).filter(element => (element.props.children === "Plan etkin değil" || (Array.isArray(element.props.children) && element.props.children.includes("Plan etkin değil"))))).toHaveLength(2);
+    expect(renderToStaticMarkup(tree)).toContain("Plan etkin değil");
     expect(hasText(tree, "Kapalı")).toBe(false);
-    expect(find(tree, element => element.type === "h1").props.children).toBe("Kapı Planları");
+    expect(find(tree, (element) => element.type === "h1").props.children).toBe(
+      "Kapı Planları",
+    );
   });
   it("04-O3 boş tatil takvimine geçişi kaydedilmemiş değişiklik korumasına bırakır", () => {
-    const overrides = { hikDoorHolidayPlan: { enabled: true, year: 2099, mode: "remainClosed" as const } };
+    const overrides = {
+      hikDoorHolidayPlan: {
+        enabled: true,
+        year: 2099,
+        mode: "remainClosed" as const,
+      },
+    };
     const initial = dialog(overrides);
-    (find(initial, element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void)({ ...legacy, endTime: "09:00" });
+    (
+      find(initial, (element) => element.type === DoorStatusPlanEditor).props
+        .onChange as (plan: DoorStatusPlan) => void
+    )({ ...legacy, endTime: "09:00" });
     const tree = dialog(overrides);
-    (find(tree, element => element.props.children === "Tatil takvimini aç").props.onClick as () => void)();
+    (
+      find(tree, (element) => element.props.children === "Tatil takvimini aç")
+        .props.onClick as () => void
+    )();
     expect(state.dirty).toBe(true);
     expect(state.requestClose).toHaveBeenCalledOnce();
     expect(state.navigate).not.toHaveBeenCalled();
-    const [navigateAfterApproval] = state.requestClose.mock.calls[0] as [() => void];
+    const [navigateAfterApproval] = state.requestClose.mock.calls[0] as [
+      () => void,
+    ];
     navigateAfterApproval();
     expect(state.navigate).toHaveBeenCalledWith("/pdks-records/settings");
   });
+  it("geçmiş hatayı tarihli gösterir ve güncel çevrimiçi durumdan ayırır", () => {
+    state.targets = [
+      {
+        ...door,
+        hikPlanApplyError: "Cihaz çevrimdışı",
+        hikPlanFailedAt: "2026-10-22T10:09:00.000Z",
+      },
+    ];
+    state.cursor = 0;
+    const tree = DoorPlansTab();
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain("Son gönderim başarısız");
+    expect(html).toContain(
+      "Son deneme 22.10.2026 13:09 · cihaz o sırada çevrimdışıydı",
+    );
+    expect(html).toContain("Cihaz şu an çevrimiçi");
+    const details = find(
+      tree,
+      (node) =>
+        node.type === "details" &&
+        renderToStaticMarkup(node).includes("Hata ayrıntısı"),
+    );
+    expect(details.props.open).toBeUndefined();
+    expect(renderToStaticMarkup(details)).toContain("Cihaz çevrimdışı");
+    state.slots = [];
+    state.cursor = 0;
+    state.targets = [{ ...state.targets[0], hikPlanFailedAt: null }];
+    expect(renderToStaticMarkup(DoorPlansTab())).toContain(
+      "Son denemede: cihaz o sırada çevrimdışıydı",
+    );
+  });
+  it("toplu işlem çubuğunu ilk seçimden sonra gösterir", () => {
+    state.targets = [door];
+    state.cursor = 0;
+    const tree = DoorPlansTab();
+    expect(hasText(tree, "Planı kopyala")).toBe(false);
+    (
+      find(tree, (node) => node.props["aria-label"] === "Kapı seç").props
+        .onChange as (event: { target: { checked: boolean } }) => void
+    )({ target: { checked: true } });
+    state.cursor = 0;
+    expect(hasText(DoorPlansTab(), "Planı kopyala")).toBe(true);
+  });
   it("04-O3 tatil tarih aralıklarını tam gün gösterir ve ilk ondan sonrasını sayar", () => {
-    state.holidays = Array.from({ length: 11 }, (_, index) => ({ beginDate: `2026-01-${String(index + 1).padStart(2, "0")}`, endDate: `2026-01-${String(index + 2).padStart(2, "0")}` }));
-    const tree = dialog({ hikDoorHolidayPlan: { enabled: true, year: 2026, mode: "remainClosed" } });
-    const preview = find(tree, element => element.props["aria-label"] === "Uygulanacak tatil tarihleri");
+    state.holidays = Array.from({ length: 11 }, (_, index) => ({
+      beginDate: `2026-01-${String(index + 1).padStart(2, "0")}`,
+      endDate: `2026-01-${String(index + 2).padStart(2, "0")}`,
+    }));
+    const tree = dialog({
+      hikDoorHolidayPlan: { enabled: true, year: 2026, mode: "remainClosed" },
+    });
+    const preview = find(
+      tree,
+      (element) =>
+        element.props["aria-label"] === "Uygulanacak tatil tarihleri",
+    );
     const html = renderToStaticMarkup(preview);
-    expect(nodes(preview).filter(element => element.type === "li")).toHaveLength(10);
+    expect(
+      nodes(preview).filter((element) => element.type === "li"),
+    ).toHaveLength(11);
     expect(html).toContain("01.01.2026–02.01.2026 · tam gün");
-    expect(html).toContain("ve 1 tarih daha");
-    expect(html).not.toContain("12.01.2026");
+    expect(html).toContain("11 tatil aralığı · tam gün");
+    expect(html).toContain("Tümünü göster");
+    expect(html).toContain("12.01.2026");
     expect(hasText(tree, "Tatil takvimini aç")).toBe(false);
   });
   it("tekrar gönderim sonucunda kaydedilmemiş düzenlemeyi kaydedildi olarak göstermez", async () => {
     const overrides = { plansPending: true };
     const initial = dialog(overrides);
-    (find(initial, element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void)({ ...legacy, endTime: "09:00" });
+    (
+      find(initial, (element) => element.type === DoorStatusPlanEditor).props
+        .onChange as (plan: DoorStatusPlan) => void
+    )({ ...legacy, endTime: "09:00" });
     await retrySend(dialog(overrides));
     await vi.waitFor(() => expect(notify.success).toHaveBeenCalledOnce());
-    const result = find(dialog(overrides), element => element.type === DoorSaveResults);
-    const html = renderToStaticMarkup(DoorSaveResults(result.props as Parameters<typeof DoorSaveResults>[0]));
+    const result = find(
+      dialog(overrides),
+      (element) => element.type === DoorSaveResults,
+    );
+    const html = renderToStaticMarkup(
+      DoorSaveResults(result.props as Parameters<typeof DoorSaveResults>[0]),
+    );
     expect(html).toContain("Cihaza uygulandı");
     expect(html).not.toContain("veritabanına kaydedildi");
     expect(html).not.toContain("Kaydedildi");
@@ -334,71 +534,119 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     state.apply.mockResolvedValue({ ok: false, error: "Bağlantı kurulamadı" });
     await submit(dialog());
     const tree = dialog();
-    const result = find(tree, element => element.type === DoorSaveResults);
-    const html = renderToStaticMarkup(DoorSaveResults(result.props as Parameters<typeof DoorSaveResults>[0]));
+    const result = find(tree, (element) => element.type === DoorSaveResults);
+    const html = renderToStaticMarkup(
+      DoorSaveResults(result.props as Parameters<typeof DoorSaveResults>[0]),
+    );
     expect(html).toContain("Ayarlar veritabanına kaydedildi.");
     expect(html.match(/Bağlantı kurulamadı/g)).toHaveLength(1);
-    expect(hasText(tree, "Son gönderim başarısız: Bağlantı kurulamadı")).toBe(false);
+    expect(hasText(tree, "Son gönderim başarısız: Bağlantı kurulamadı")).toBe(
+      false,
+    );
     expect(hasText(tree, "Cihaza gönderilemedi")).toBe(true);
   });
   it("04-H2 yalnız değişiklikte etki özeti ve açık gönderim düğmesi gösterir", () => {
     const tree = dialog();
-    expect(nodes(tree).some(element => element.type === DoorPlanImpactSummary)).toBe(false);
-    const change = find(tree, element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void;
+    expect(
+      nodes(tree).some((element) => element.type === DoorPlanImpactSummary),
+    ).toBe(false);
+    const change = find(
+      tree,
+      (element) => element.type === DoorStatusPlanEditor,
+    ).props.onChange as (plan: DoorStatusPlan) => void;
     change({ ...legacy, endTime: "09:00" });
     const updated = dialog();
-    expect(find(updated, element => element.type === DoorPlanImpactSummary).props).toMatchObject({ doorName: "Kapı", statusPlan: { mode: "remainOpen", endTime: "09:00" } });
+    expect(
+      find(updated, (element) => element.type === DoorPlanImpactSummary).props,
+    ).toMatchObject({
+      doorName: "Kapı",
+      statusPlan: { mode: "remainOpen", endTime: "09:00" },
+    });
     expect(hasText(updated, "Kaydet ve cihaza gönder")).toBe(true);
   });
   it("Y1 status-only edit omits untouched verify payload and send", async () => {
     state.save.mockResolvedValue(["status"]);
-    const onChange = find(dialog(), element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void;
+    const onChange = find(
+      dialog(),
+      (element) => element.type === DoorStatusPlanEditor,
+    ).props.onChange as (plan: DoorStatusPlan) => void;
     onChange({ ...legacy, mode: "remainClosed" });
     await submit(dialog());
     expect(state.save.mock.calls[0][0]).not.toHaveProperty("hikVerifyPlan");
     expect(state.apply).toHaveBeenCalledTimes(1);
   });
   it("O4 UI blocks enabling holidays for a year without dates", async () => {
-    const checkbox = nodes(dialog()).find(element => element.type === "input" && element.props.type === "checkbox" && element.props.disabled !== undefined);
+    const checkbox = nodes(dialog()).find(
+      (element) =>
+        element.type === "input" &&
+        element.props.type === "checkbox",
+    );
     if (!checkbox) throw new Error("Tatil checkbox bulunamadı");
-    (checkbox.props.onChange as (event: { target: { checked: boolean } }) => void)({ target: { checked: true } });
+    (
+      checkbox.props.onChange as (event: {
+        target: { checked: boolean };
+      }) => void
+    )({ target: { checked: true } });
     await submit(dialog());
     expect(state.save).not.toHaveBeenCalled();
     expect(state.apply).not.toHaveBeenCalled();
     expect(hasText(dialog(), "Seçilen yılda uygulanacak tatil yok")).toBe(true);
   });
   it("Y1 leaves a legacy enabled verify plan untouched during status edits", async () => {
-    const overrides = { hikVerifyPlan: { enabled: true, beginTime: "08:00", endTime: "18:00", verifyMode: "cardAndFace" } };
-    const onChange = find(dialog(overrides), element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void;
+    const overrides = {
+      hikVerifyPlan: {
+        enabled: true,
+        beginTime: "08:00",
+        endTime: "18:00",
+        verifyMode: "cardAndFace",
+      },
+    };
+    const onChange = find(
+      dialog(overrides),
+      (element) => element.type === DoorStatusPlanEditor,
+    ).props.onChange as (plan: DoorStatusPlan) => void;
     onChange({ ...legacy, mode: "remainClosed" });
     await submit(dialog(overrides));
     expect(state.save.mock.calls[0][0]).not.toHaveProperty("hikVerifyPlan");
     expect(state.apply).toHaveBeenCalledTimes(1);
   });
-  it.each([null, { enabled: true, beginTime: "08:00", endTime: "18:00", verifyMode: "card" }])("Y1 copying absent or identical verify never includes it in the save (%j)", async verify => {
-    const source = { ...door, hikVerifyPlan: verify };
-    const target = { ...source, doorId: "target" as Id<"doors"> };
-    state.cursor = 0;
-    const tree = CopyDoorPlansDialog({ targets: [source, target], selectedIds: [target.doorId], onClose: vi.fn() });
-    (find(tree, element => element.props.children === "Kaydet ve gönder").props.onClick as () => void)();
-    await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(1));
-    expect(state.save.mock.calls[0][0]).not.toHaveProperty("hikVerifyPlan");
-  });
-  it("Y1 template copy saves and sends status only", async () => {
-    const targets = [door];
-    const render = () => { state.cursor = 0; return CopyDoorPlansDialog({ targets, selectedIds: [door.doorId], onClose: vi.fn() }); };
-    (find(render(), element => element.props["aria-label"] === "Kaynak türü").props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "template" } });
-    (find(render(), element => element.type === TemplatePicker).props.onChange as (id: string) => void)("template");
-    (find(render(), element => element.props.children === "Kaydet ve gönder").props.onClick as () => void)();
-    await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(1));
-    expect(state.save.mock.calls[0][0]).toMatchObject({ hikDoorStatusTemplateId: "template" });
-    expect(state.save.mock.calls[0][0]).not.toHaveProperty("hikVerifyPlan");
-  });
+  it.each([
+    null,
+    { enabled: true, beginTime: "08:00", endTime: "18:00", verifyMode: "card" },
+  ])(
+    "Y1 copying absent or identical verify never includes it in the save (%j)",
+    async (verify) => {
+      const source = { ...door, hikVerifyPlan: verify };
+      const target = { ...source, doorId: "target" as Id<"doors"> };
+      state.cursor = 0;
+      const tree = CopyDoorPlansDialog({
+        targets: [source, target],
+        selectedIds: [target.doorId],
+        onClose: vi.fn(),
+      });
+      (
+        find(tree, (element) => element.props.children === "Kaydet ve gönder")
+          .props.onClick as () => void
+      )();
+      await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(1));
+      expect(state.save.mock.calls[0][0]).not.toHaveProperty("hikVerifyPlan");
+    },
+  );
   it("O4 UI blocks bulk copies of an empty holiday year", () => {
-    const source: DoorPlanTarget = { ...door, hikDoorHolidayPlan: { enabled: true, year: 2099, mode: "remainClosed" } };
+    const source: DoorPlanTarget = {
+      ...door,
+      hikDoorHolidayPlan: { enabled: true, year: 2099, mode: "remainClosed" },
+    };
     state.cursor = 0;
-    const tree = CopyDoorPlansDialog({ targets: [source], selectedIds: [source.doorId], onClose: vi.fn() });
-    const button = find(tree, element => element.props.children === "Kaydet ve gönder");
+    const tree = CopyDoorPlansDialog({
+      targets: [source],
+      selectedIds: [source.doorId],
+      onClose: vi.fn(),
+    });
+    const button = find(
+      tree,
+      (element) => element.props.children === "Kaydet ve gönder",
+    );
     expect(button.props.disabled).toBe(true);
     (button.props.onClick as () => void)();
     expect(state.save).not.toHaveBeenCalled();
@@ -466,32 +714,8 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     await retrySend(dialog());
     expect(state.save).toHaveBeenCalledTimes(1);
     expect(state.apply).toHaveBeenCalledTimes(2);
-    await vi.waitFor(() => expect(hasText(dialog(), "Cihaza tekrar gönder")).toBe(false));
-  });
-  it("saves a selected template binding and holiday configuration", async () => {
-    const initial = dialog();
-    const checkbox = find(
-      initial,
-      (element) =>
-        element.type === "input" && element.props.type === "checkbox",
-    );
-    (
-      checkbox.props.onChange as (event: {
-        target: { checked: boolean };
-      }) => void
-    )({ target: { checked: true } });
-    const picker = find(dialog(), (element) => element.type === TemplatePicker);
-    (picker.props.onChange as (id: string) => void)("template-id");
-    const tree = dialog();
-    await (
-      find(tree, (element) => element.type === "form").props
-        .onSubmit as (event: { preventDefault: () => void }) => Promise<void>
-    )({ preventDefault: vi.fn() });
-    expect(state.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        hikDoorStatusTemplateId: "template-id",
-
-      }),
+    await vi.waitFor(() =>
+      expect(hasText(dialog(), "Cihaza tekrar gönder")).toBe(false),
     );
   });
   it("saves weekly verify changes with modes and seconds intact", async () => {

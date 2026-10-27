@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { applyBulkPlans, bulkFailed } from "./bulk";
+import { applyBulkPlans, bulkFailed, bulkResultLabel } from "./bulk";
 const ids = ["a", "b"] as Id<"doors">[];
 describe("bulk door plan copy", () => {
   it("saves per door, isolates failures and retries only failed plan keys", async () => {
@@ -47,11 +47,44 @@ describe("bulk door plan copy", () => {
   });
 });
 
-it("Y1 bulk sends only keys returned by each save including template-only and unchanged copies", async () => {
-  const save = vi.fn().mockResolvedValueOnce(["status"]).mockResolvedValueOnce([]);
+it("Y1 bulk sends only keys returned by each save including changed and unchanged copies", async () => {
+  const save = vi
+    .fn()
+    .mockResolvedValueOnce(["status"])
+    .mockResolvedValueOnce([]);
   const status = vi.fn().mockResolvedValue({ ok: true });
   const verify = vi.fn().mockResolvedValue({ ok: true });
   await applyBulkPlans(ids, save, { status, verify });
   expect(status).toHaveBeenCalledTimes(1);
   expect(verify).not.toHaveBeenCalled();
+});
+
+it("değişiklik yoksa gönderildi demez ve yeniden denemede durumu korur", async () => {
+  const apply = vi.fn().mockResolvedValue({ ok: true });
+  const first = await applyBulkPlans(ids, vi.fn().mockResolvedValue([]), {
+    status: apply,
+    verify: apply,
+  });
+  expect(first.map(bulkResultLabel)).toEqual([
+    "Değişiklik yok, gönderilmedi",
+    "Değişiklik yok, gönderilmedi",
+  ]);
+  const retried = await applyBulkPlans(
+    ids,
+    vi.fn(),
+    { status: apply, verify: apply },
+    first,
+  );
+  expect(retried.map(bulkResultLabel)).toEqual(first.map(bulkResultLabel));
+  expect(apply).not.toHaveBeenCalled();
+  expect(bulkResultLabel({ doorId: ids[0], saved: false, plans: [] })).toBe(
+    "Gönderilemedi",
+  );
+  expect(
+    bulkResultLabel({
+      doorId: ids[0],
+      saved: true,
+      plans: [{ key: "status", ok: true }],
+    }),
+  ).toBe("Gönderildi");
 });

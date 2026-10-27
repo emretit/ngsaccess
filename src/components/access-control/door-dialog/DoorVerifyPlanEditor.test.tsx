@@ -14,50 +14,35 @@ const initial: VerifyPlan = {
   endTime: "18:00:02",
   verifyMode: "face",
 };
-describe("weekly verify editor", () => {
-  it("converts legacy window to weekdays without losing mode or seconds", () => {
-    const change = vi.fn();
-    const tree = DoorVerifyPlanEditor({ value: initial, onChange: change });
-    const select = nodes(tree).find(
-      (node) => node.props["aria-label"] === "Doğrulama planı düzeni",
-    );
-    (select?.props.onChange as (event: { target: { value: string } }) => void)({
-      target: { value: "weekly" },
-    });
-    expect(change).toHaveBeenCalledWith({
-      ...initial,
-      weekly: expect.arrayContaining([
-        {
-          day: "Monday",
-          segments: [
-            { beginTime: "08:00:01", endTime: "18:00:02", verifyMode: "face" },
-          ],
-        },
-      ]),
-    });
-    const plan = change.mock.calls[0][0] as VerifyPlan;
-    expect(plan.weekly).toHaveLength(7);
-    expect(plan.weekly?.slice(5).every(day => day.segments.length === 0)).toBe(true);
+vi.mock("react", async (original) => ({
+  ...(await original<typeof import("react")>()),
+  useState: () => [false, vi.fn()],
+}));
+function change(value: VerifyPlan, layout: string) {
+  const onChange = vi.fn();
+  const tree = DoorVerifyPlanEditor({ value, onChange });
+  const select = nodes(tree).find(
+    (node) => node.props["aria-label"] === "Doğrulama planı düzeni",
+  );
+  (select?.props.onChange as (event: { target: { value: string } }) => void)({
+    target: { value: layout },
   });
-  it("04-O4 Hafta içi sets only five days and collapses daily sections", () => {
-    const change = vi.fn();
-    const tree = DoorVerifyPlanEditor({ value: initial, onChange: change });
-    const button = nodes(tree).find(node => node.props.children === "Hafta içi");
-    (button?.props.onClick as () => void)();
-    const plan = change.mock.calls[0][0] as VerifyPlan;
-    expect(plan.weekly?.slice(0, 5).every(day => day.segments[0]?.verifyMode === "face")).toBe(true);
-    expect(plan.weekly?.slice(5).every(day => day.segments.length === 0)).toBe(true);
-    const days = nodes(DoorVerifyPlanEditor({ value: plan, onChange: change })).filter(node => node.type === "details");
-    expect(days).toHaveLength(7);
-    expect(days.filter(node => node.props.open)).toHaveLength(1);
+  return onChange;
+}
+describe("verify plan layout", () => {
+  it("Hafta içi yalnız beş günü doldurur ve saniyeleri korur", () => {
+    const onChange = change(initial, "weekdays");
+    const result = onChange.mock.calls[0][0] as VerifyPlan;
+    expect(
+      result.weekly
+        ?.slice(0, 5)
+        .every((day) => day.segments[0]?.beginTime === initial.beginTime),
+    ).toBe(true);
+    expect(
+      result.weekly?.slice(5).every((day) => day.segments.length === 0),
+    ).toBe(true);
   });
-  it("Dalga3 C1-1 does not offer Hafta içi on a per-day plan", () => {
-    const value: VerifyPlan = { ...initial, weekly: [{ day: "Saturday", segments: [{ ...initial, verifyMode: "card" }] }] };
-    const tree = DoorVerifyPlanEditor({ value, onChange: vi.fn() });
-    expect(nodes(tree).some(node => node.props.children === "Hafta içi")).toBe(false);
-  });
-  it("copies Monday to weekdays and preserves weekend", () => {
-    const change = vi.fn();
+  it("farklı günler onaysız silinmez; onayla Pazartesi kullanılır", () => {
     const value: VerifyPlan = {
       ...initial,
       weekly: [
@@ -65,18 +50,11 @@ describe("weekly verify editor", () => {
         { day: "Saturday", segments: [{ ...initial, verifyMode: "card" }] },
       ],
     };
-    const tree = DoorVerifyPlanEditor({ value, onChange: change });
-    const button = nodes(tree).find(
-      (node) =>
-        node.props.children === "Pazartesiyi hafta içine (Salı–Cuma) kopyala",
-    );
-    (button?.props.onClick as () => void)();
-    expect(change.mock.calls[0][0].weekly[1].segments[0].verifyMode).toBe(
-      "face",
-    );
-    expect(change.mock.calls[0][0].weekly[5].segments[0].verifyMode).toBe(
-      "card",
-    );
-    expect(change.mock.calls[0][0].weekly[6].segments).toEqual([]);
+    const confirm = vi.fn().mockReturnValue(false);
+    vi.stubGlobal("confirm", confirm);
+    expect(change(value, "daily")).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    expect(change(value, "daily")).toHaveBeenCalledWith(initial);
+    vi.unstubAllGlobals();
   });
 });

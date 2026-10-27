@@ -28,8 +28,6 @@ async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map
   const department = rawDepartment?.projectId === row.projectId ? rawDepartment : null;
   const rules = (await Promise.all(row.ruleIds.map(id => ctx.db.get(id))))
     .filter((rule): rule is NonNullable<typeof rule> => rule !== null && rule.projectId === row.projectId);
-  const templates = (await Promise.all(rules.map(rule => rule.scheduleTemplateId ? ctx.db.get(rule.scheduleTemplateId) : null)))
-    .filter((template): template is NonNullable<typeof template> => template !== null && template.projectId === row.projectId);
   const doors = new Map<Id<"doors">, Doc<"doors">>();
   let unresolvedDoor = false;
   for (const rule of rules) {
@@ -44,16 +42,15 @@ async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map
   return { ...row, ...currentDepartment, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : "Silinmiş kişi",
     departmentName: department?.name ?? null, deviceName: device?.name ?? "Silinmiş cihaz", brand: device?.brand ?? "other",
     doorIds: [...doors.keys()], doorNames: [...doors.values()].map(door => door.name),
-    ruleNames: rules.map(rule => rule.name), templateIds: [...new Set(templates.map(template => template._id))],
-    templateNames: [...new Map(templates.map(template => [template._id, template.name])).values()],
-    stale: grantStale(row.appliedAt, [...rules.map(rule => rule.updatedAt), ...templates.map(template => template.updatedAt)]),
+    ruleNames: rules.map(rule => rule.name),
+    stale: grantStale(row.appliedAt, rules.map(rule => rule.updatedAt)),
     doorUnresolved: unresolvedDoor,
   };
 }
 
 export const listByProject = authedQuery({
   args: { projectId: v.id("projects"), state: v.optional(grantState), departmentId: v.optional(v.id("departments")),
-    deviceId: v.optional(v.id("devices")), ruleId: v.optional(v.id("accessRules")), templateId: v.optional(v.id("accessScheduleTemplates")),
+    deviceId: v.optional(v.id("devices")), ruleId: v.optional(v.id("accessRules")),
     search: v.optional(v.string()), paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
     await authorize(ctx, args.projectId);
@@ -63,7 +60,7 @@ export const listByProject = authedQuery({
     const base = () => deviceId
       ? ctx.db.query("accessGrantStatus").withIndex("by_project_device", q => q.eq("projectId", args.projectId).eq("deviceId", deviceId))
       : ctx.db.query("accessGrantStatus").withIndex("by_project_state", q => args.state ? q.eq("projectId", args.projectId).eq("state", args.state) : q.eq("projectId", args.projectId));
-    const scanRequired = !!(args.departmentId || args.ruleId || args.templateId || args.search?.trim() || (args.deviceId && args.state));
+    const scanRequired = !!(args.departmentId || args.ruleId || args.search?.trim() || (args.deviceId && args.state));
     if (!scanRequired) {
       const result = await base().paginate(args.paginationOpts);
       const employees = await grantEmployees(ctx, result.page);
@@ -82,10 +79,6 @@ export const listByProject = authedQuery({
       const employee = employees.get(row.employeeId);
       if (args.departmentId && (employee?.projectId !== args.projectId || employee.departmentId !== args.departmentId)) continue;
       if ((args.deviceId !== undefined && row.deviceId !== args.deviceId) || args.state && row.state !== args.state || args.ruleId && !row.ruleIds.includes(args.ruleId)) continue;
-      if (args.templateId) {
-        const rules = await Promise.all(row.ruleIds.map(id => ctx.db.get(id)));
-        if (!rules.some(rule => rule?.projectId === args.projectId && rule.scheduleTemplateId === args.templateId)) continue;
-      }
       if (search) {
         const name = employee?.projectId === row.projectId ? `${employee.firstName} ${employee.lastName}` : "Silinmiş kişi";
         if (!name.toLocaleLowerCase("tr").includes(search)) continue;

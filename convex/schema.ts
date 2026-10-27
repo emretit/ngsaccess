@@ -330,15 +330,13 @@ export default defineSchema({
     hikVerifyPlanReaderNos: v.optional(v.array(v.number())),
     hikDoorHolidayPlan: v.optional(holidayPlanValidator),
     hikDoorHolidaySlots: v.optional(v.array(v.number())),
-    hikDoorStatusTemplateId: v.optional(v.id("accessScheduleTemplates")),
-    hikDoorStatusTemplateUpdatedAt: v.optional(v.string()),
     hikPlanSavedAt: v.optional(v.string()),
     hikPlanRevision: v.optional(v.number()),
     hikPlanAppliedAt: v.optional(v.string()),
     hikPlanApplyError: v.optional(v.string()),
     hikPlanResults: v.optional(v.object({
-      status: v.optional(v.object({ revision: v.number(), appliedAt: v.optional(v.string()), error: v.optional(v.string()) })),
-      verify: v.optional(v.object({ revision: v.number(), appliedAt: v.optional(v.string()), error: v.optional(v.string()) })),
+      status: v.optional(v.object({ revision: v.number(), appliedAt: v.optional(v.string()), error: v.optional(v.string()), failedAt: v.optional(v.string()) })),
+      verify: v.optional(v.object({ revision: v.number(), appliedAt: v.optional(v.string()), error: v.optional(v.string()), failedAt: v.optional(v.string()) })),
     })),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
@@ -501,20 +499,6 @@ export default defineSchema({
     .index("by_project", ["projectId"]),
 
   // ═══════ 4 · ERİŞİM KURALLARI · GRUP BAĞLARI ══════════════════════════
-  accessScheduleTemplates: defineTable({
-    projectId: v.id("projects"), name: v.string(), description: v.optional(v.string()),
-    week: v.object({
-      Monday: v.array(v.object({ start: v.string(), end: v.string() })),
-      Tuesday: v.array(v.object({ start: v.string(), end: v.string() })),
-      Wednesday: v.array(v.object({ start: v.string(), end: v.string() })),
-      Thursday: v.array(v.object({ start: v.string(), end: v.string() })),
-      Friday: v.array(v.object({ start: v.string(), end: v.string() })),
-      Saturday: v.array(v.object({ start: v.string(), end: v.string() })),
-      Sunday: v.array(v.object({ start: v.string(), end: v.string() })),
-    }),
-    version: v.number(), pendingSyncJobId: v.optional(v.id("_scheduled_functions")),
-    isArchived: v.optional(v.boolean()), createdAt: v.string(), updatedAt: v.string(),
-  }).index("by_project", ["projectId"]).index("by_project_name", ["projectId", "name"]),
   accessTransfers: defineTable({
     kind: v.union(v.literal("employee"), v.literal("ide_panel")),
     status: v.union(v.literal("requested"), v.literal("revoking"), v.literal("revoked"), v.literal("provisioning"), v.literal("done"), v.literal("stuck"), v.literal("cancelled")),
@@ -553,7 +537,6 @@ export default defineSchema({
     .index("by_project_department_state", ["projectId", "departmentId", "state"]),
 
   accessRules: defineTable({
-    scheduleTemplateId: v.optional(v.id("accessScheduleTemplates")),
     ideExtraPermissionNos: v.optional(v.array(v.number())),
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -579,7 +562,6 @@ export default defineSchema({
     .index("by_project_targetType", ["projectId", "targetType"])
     .index("by_project_targetType_isActive", ["projectId", "targetType", "isActive"])
     .index("by_active", ["isActive"])
-    .index("by_template", ["scheduleTemplateId"])
     .index("by_hikWeekPlanNo", ["hikWeekPlanNo"])
     .searchIndex("search_name", { searchField: "name", filterFields: ["projectId", "isActive", "targetType"] }),
 
@@ -897,8 +879,7 @@ export default defineSchema({
   /** Cihazlara gönderim çalıştırması (proje geneli veya tek kural); hedef satırları deviceSyncRunTargets'ta. */
   deviceSyncRuns: defineTable({
     projectId: v.id("projects"),
-    kind: v.union(v.literal("project_resync"), v.literal("rule_sync"), v.literal("template_sync")),
-    templateId: v.optional(v.id("accessScheduleTemplates")),
+    kind: v.union(v.literal("project_resync"), v.literal("rule_sync")),
     ruleId: v.optional(v.id("accessRules")),
     startedBy: v.id("users"),
     startedAt: v.number(),

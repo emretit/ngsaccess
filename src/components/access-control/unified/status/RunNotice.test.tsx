@@ -32,6 +32,7 @@ it.each(["done", "partial", "failed"] as const)(
         <RunNotice
           runId={"run" as Id<"deviceSyncRuns">}
           onComplete={refresh}
+          summary="100 kayıt gönderime alındı. Kalan 1+ hatalı kayıt sonraki turda."
         />,
       );
       state.effect?.();
@@ -51,6 +52,8 @@ it.each(["done", "partial", "failed"] as const)(
       expect(html).not.toContain("Kısmi sonuç");
     }
     expect(html).toContain("Gönderim sonucunu aç");
-    expect(html).toContain("Cihaz gönderiminin sonucu ayrıca izlenir");
+    expect(html).not.toContain("Gönderim başlatıldı");
+    expect(html).toContain("100 kayıt gönderime alındı. Kalan 1+ hatalı kayıt sonraki turda.");
+    expect(html.match(/role="status"/g)).toHaveLength(1);
   },
 );

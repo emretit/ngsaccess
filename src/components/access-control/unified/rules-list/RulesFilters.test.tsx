@@ -15,6 +15,8 @@ describe("01-O3: kurallar arama alanı", () => {
     expect(trigger).toContain("max-md:min-h-11");
     expect(trigger).toContain("w-auto min-w-36 max-w-full");
     expect(html).toContain("Ara: ");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('class="hidden"');
     expect(html).toContain('placeholder="Kural adı ara"');
   });
 
@@ -27,7 +29,9 @@ describe("01-O3: kurallar arama alanı", () => {
       ["rule", "Kural", "Kural adı ara"],
     ]) {
       const tree = RulesFilters({ ...readRuleFilters(params), change, clear: vi.fn() });
-      const select = Children.toArray(tree.props.children)[0];
+      const panel = Children.toArray(tree.props.children)[0];
+      if (!isValidElement<{ children: React.ReactElement<{ children: React.ReactNode }> }>(panel)) throw new Error("Filtre paneli bulunamadı");
+      const select = Children.toArray(panel.props.children.props.children)[0];
       if (!isValidElement<{ onValueChange: (value: string) => void; children: React.ReactNode }>(select)) {
         throw new Error("Arama alanı seçicisi bulunamadı");
       }
@@ -52,4 +56,10 @@ describe("01-O3: kurallar arama alanı", () => {
     }
     expect(readRuleFilters(params)).toEqual({ search: "Giriş", searchBy: "rule", status: "active", type: "personnel" });
   });
+});
+
+it("arama açık kalır ve etkin ikincil filtreleri sayar", () => {
+  const html = renderToStaticMarkup(<RulesFilters {...readRuleFilters(new URLSearchParams("q=Ali&by=person&durum=active&tur=personnel"))} change={vi.fn()} clear={vi.fn()} />);
+  expect(html).toContain("Filtreler (3)");
+  expect(html).toContain('type="search"');
 });

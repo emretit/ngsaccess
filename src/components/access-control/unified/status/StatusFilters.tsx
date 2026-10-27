@@ -1,5 +1,4 @@
-import { useId, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
 import { FilterBar } from "@/components/shared/FilterBar";
 import {
   Select,
@@ -8,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { labels, type Filters } from "./model";
+import type { Filters } from "./model";
 import type { Options } from "./useStatusData";
 
 export function StatusFilter({
@@ -62,70 +61,52 @@ export function StatusFilters({
   change: (patch: Partial<Filters>) => void;
   clear: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const panelId = useId();
-  const activeCount = Object.entries(filters).filter(([key, value]) => key !== "search" && Boolean(value)).length;
+  const activeCount = Object.entries(filters).filter(
+    ([key, value]) => key !== "search" && key !== "state" && Boolean(value),
+  ).length;
   return (
-    <div className="min-w-0 max-lg:[&_input]:min-h-11 max-lg:[&_button]:min-h-11 [&>[role=search]>div:last-of-type]:order-first lg:[&>[role=search]>div:last-of-type]:order-none">
-      <FilterBar layout="grid" search={search} onSearchChange={setSearch} searchLabel="Ad ara" placeholder="Ad ara" onClear={clear} hasFilters={activeCount > 0}>
-        <Button variant="outline" className="min-h-11 w-full lg:hidden" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)}>Filtreler ({activeCount})</Button>
-        <div id={panelId} className={open ? "contents" : "hidden lg:contents"}>
-          <StatusFilter
-            label="Departman"
-            value={filters.departmentId}
-            options={options.departments}
-            onChange={(v) =>
-              change({
-                departmentId: options.departments.find((d) => d._id === v)?._id,
-              })
-            }
-          />
-          <StatusFilter
-            label="Cihaz"
-            value={filters.deviceId}
-            options={options.devices}
-            onChange={(v) =>
-              change({ deviceId: options.devices.find((d) => d._id === v)?._id })
-            }
-          />
-          <StatusFilter
-            label="Kural"
-            value={filters.ruleId}
-            options={options.rules}
-            onChange={(v) =>
-              change({ ruleId: options.rules.find((d) => d._id === v)?._id })
-            }
-          />
-          <StatusFilter
-            label="Şablon"
-            value={filters.templateId}
-            options={options.templates}
-            onChange={(v) =>
-              change({
-                templateId: options.templates.find((d) => d._id === v)?._id,
-              })
-            }
-          />
-          <StatusFilter
-            label="Durum"
-            value={filters.state}
-            options={["effective", "pending", "failed", "removed"].map((s) => ({
-              _id: s,
-              name: labels[s as keyof typeof labels],
-            }))}
-            onChange={(v) =>
-              change({
-                state:
-                  v === "effective" ||
-                  v === "pending" ||
-                  v === "failed" ||
-                  v === "removed"
-                    ? v
-                    : undefined,
-              })
-            }
-          />
-        </div>
+    <div className="min-w-0 max-lg:[&_input]:min-h-11 max-lg:[&_button]:min-h-11">
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        searchLabel="Ad ara"
+        placeholder="Ad ara"
+        onClear={clear}
+        hasFilters={activeCount > 0 || Boolean(filters.state)}
+      >
+        <CollapsibleFilters collapseOn="all" activeCount={activeCount}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <StatusFilter
+              label="Departman"
+              value={filters.departmentId}
+              options={options.departments}
+              onChange={(v) =>
+                change({
+                  departmentId: options.departments.find((d) => d._id === v)
+                    ?._id,
+                })
+              }
+            />
+            <StatusFilter
+              label="Cihaz"
+              value={filters.deviceId}
+              options={options.devices}
+              onChange={(v) =>
+                change({
+                  deviceId: options.devices.find((d) => d._id === v)?._id,
+                })
+              }
+            />
+            <StatusFilter
+              label="Kural"
+              value={filters.ruleId}
+              options={options.rules}
+              onChange={(v) =>
+                change({ ruleId: options.rules.find((d) => d._id === v)?._id })
+              }
+            />
+          </div>
+        </CollapsibleFilters>
       </FilterBar>
     </div>
   );

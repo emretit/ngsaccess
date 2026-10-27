@@ -2,7 +2,6 @@ import { requirePermission } from "./lib/permissions";
 import { listAccessRules, listAccessRuleMemberships } from "./lib/accessRuleRead";
 import { createAccessRuleWithGroups } from "./lib/accessRuleWrite";
 import { planRemovedEmployeeHik, reconcileRemovedEmployeeHik, snapshotRuleHikEmployees, resolveRuleDeviceTargets, hikSnapshotValidator, type HikSnapshot } from "./lib/peopleHikSnapshot";
-import { validateScheduleBinding, assertIdeScheduleCapacity } from "./accessScheduleTemplates";
 import { resolveProjectScope } from "./lib/projectScope";
 import { assertAccessProjectUnchanged } from "./lib/accessScope";
 import { validateRuleAccessRelations } from "./lib/accessScopeRelations";
@@ -676,7 +675,6 @@ export const listRuleMembers = authedQuery({
 
 export const create = authedMutation({
   args: {
-    scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     targetType: v.optional(v.string()),
@@ -694,18 +692,15 @@ export const create = authedMutation({
     await requirePermission(ctx, ctx.user, args.projectId, "accessRules.manage");
     await resolveProjectScope(ctx, args.projectId);
     if (!args.projectId) throw new Error("Önce bir proje seçin");
-    await validateScheduleBinding(ctx, args.projectId, args.scheduleTemplateId);
     assertAccessSchedule(args);
     if (!args.name.trim()) throw new Error("Kural adı zorunludur");
     const now = new Date().toISOString();
     const ruleId = await ctx.db.insert("accessRules", {
       ...args,
-      scheduleTemplateId: args.scheduleTemplateId ?? undefined,
       isActive: args.isActive ?? true,
       createdAt: now,
       updatedAt: now,
     });
-    if (args.scheduleTemplateId) await assertIdeScheduleCapacity(ctx, args.projectId, undefined, [ruleId]);
     return ruleId;
   },
 });
@@ -713,7 +708,6 @@ export const create = authedMutation({
 export const update = authedMutation({
   args: {
     ruleId: v.id("accessRules"),
-    scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
     name: v.optional(v.string()),
     targetType: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -739,7 +733,6 @@ export const update = authedMutation({
     await validateRuleAccessRelations(ctx, rule);
     const { ruleId, ...updates } = args;
     const clean = { ...toPatch(updates), updatedAt: new Date().toISOString() };
-    await validateScheduleBinding(ctx, rule.projectId, updates.scheduleTemplateId, rule.scheduleTemplateId);
     assertAccessScheduleUpdate(rule, updates);
     if (updates.name !== undefined && !updates.name.trim()) throw new Error("Kural adı zorunludur");
     const hikMembers = updates.isActive === false ? await ctx.db.query("groupMembers").withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", ruleId)).take(4097) : [];
@@ -747,11 +740,9 @@ export const update = authedMutation({
     const hikSnapshots = await snapshotRuleHikEmployees(ctx, hikMembers.map(member => member.employeeId), rule.projectId, hikMembers.length ? await ruleHikDevices(ctx, rule) : []);
     await ctx.db.patch(ruleId, clean);
     await reconcileRuleSnapshots(ctx, hikSnapshots);
-    if (updates.scheduleTemplateId !== undefined) await assertIdeScheduleCapacity(ctx, rule.projectId, undefined, [ruleId]);
 
     // Plan-ilişkili alanlardan biri değiştiyse week plan'ı cihazlara yeniden yaz.
     const planAffected =
-      updates.scheduleTemplateId !== undefined ||
       updates.startTime !== undefined ||
       updates.endTime !== undefined ||
       updates.days !== undefined ||
@@ -780,7 +771,7 @@ export const update = authedMutation({
     // tek başına çalışması kullanıcı kartlarını panele döndürmez (R6). Push hattı cihaz bağını
     // yazar; salt kapı bağıyla yetkili üye getEmployeeWithDevices kapsamı dışında kalır
     // (sistem geneli, bilinçli asimetri).
-    if (updates.isActive === true || updates.scheduleTemplateId !== undefined) {
+    if (updates.isActive === true) {
       // Önce kuralın IDE paneli var mı çöz (deaktivasyon dalıyla simetrik). Hikvision-only
       // kuralda atla: aksi halde her üye için syncEmployeeToIdePanels boşa schedule edilir
       // (action zaten panelsiz no-op'tur ama N kuyruk işi üretmemek için erken çıkıyoruz).
@@ -873,7 +864,6 @@ export const remove = authedMutation({
 
 export const createWithGroups = authedMutation({
   args: {
-    scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     targetType: v.optional(v.string()),
@@ -896,7 +886,6 @@ export const createWithGroups = authedMutation({
 
 const updateWithGroupsArgs = {
     ruleId: v.id("accessRules"),
-    scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
     name: v.optional(v.string()),
     targetType: v.optional(v.string()),
     description: v.optional(v.string()),
@@ -968,7 +957,6 @@ async function saveWithGroups(
     }
     await validateRuleAccessRelations(ctx, rule, { employeeIds, deviceIds, doorIds });
     const now = new Date().toISOString();
-    await validateScheduleBinding(ctx, rule.projectId, updates.scheduleTemplateId, rule.scheduleTemplateId);
     assertAccessScheduleUpdate(rule, updates);
     if (updates.name !== undefined && !updates.name.trim()) throw new Error("Kural adı zorunludur");
     // Member removals affect only those members. Scope removals affect only old
@@ -1056,7 +1044,6 @@ async function saveWithGroups(
       );
     }
 
-    if (updates.scheduleTemplateId !== undefined || rule.scheduleTemplateId) await assertIdeScheduleCapacity(ctx, rule.projectId, undefined, [ruleId]);
     // Düzenleme-SONRASI: kalan ve çıkarılan üyeler.
     const survivingMemberIds =
       employeeIds !== undefined && rule.targetType !== "visitor" ? employeeIds : oldEmployeeIds;
@@ -1112,7 +1099,7 @@ async function saveWithGroups(
     // Kalan üyeler: güncel kuralla yeniden sync + (varsa) çıkarılan cihazlardan orphan reconcile.
     // Yalnız üye listesi değiştiğinde veya bir IDE paneli çıkarıldığında gerek var (sadece
     // saat/gün değişiminde syncPermissionToIdePanels yeterli).
-    if (relationDiff || employeeIds !== undefined || removedIdePanels.length > 0 || updates.scheduleTemplateId !== undefined) {
+    if (relationDiff || employeeIds !== undefined || removedIdePanels.length > 0) {
       for (const empId of relationDiff ? diffPlan.syncMembers : survivingMemberIds) {
         syncJobs.push(
           ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {

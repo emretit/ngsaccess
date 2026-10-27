@@ -7,7 +7,6 @@ import { Id } from "../../../convex/_generated/dataModel";
 
 interface CreateRuleWithMembersParams {
   rule: {
-    scheduleTemplateId?: Id<"accessScheduleTemplates"> | null;
     name: string;
     description?: string;
     targetType: string;
@@ -26,7 +25,6 @@ interface CreateRuleWithMembersParams {
 interface UpdateRuleWithMembersParams {
   id: Id<"accessRules">;
   updates: {
-    scheduleTemplateId?: Id<"accessScheduleTemplates"> | null;
     name?: string;
     description?: string;
     targetType?: string;

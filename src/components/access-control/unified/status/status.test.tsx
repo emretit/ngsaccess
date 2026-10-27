@@ -47,7 +47,6 @@ vi.mock("../AccessRulesList", () => ({
   default: () => <p>Kurallar listesi</p>,
 }));
 vi.mock("../CreateRuleDialog", () => ({ default: () => null }));
-vi.mock("../templates/TemplatesPage", () => ({ default: () => null }));
 import StatusPage from "./StatusPage";
 import { StatusCounters } from "./StatusCounters";
 import UnifiedAccessControl from "../UnifiedAccessControl";
@@ -71,8 +70,6 @@ const row: GrantRow = {
   doorIds: [],
   doorNames: ["Ana kapı"],
   ruleNames: ["Mesai"],
-  templateIds: [],
-  templateNames: ["Hafta içi"],
   stale: true,
   doorUnresolved: false,
   lastError: "Cihaz yanıt vermedi",
@@ -94,7 +91,6 @@ describe("yetki durumu saf model", () => {
       departmentId: "dep" as Id<"departments">,
       deviceId: pair.deviceId,
       ruleId: "r" as Id<"accessRules">,
-      templateId: "t" as Id<"accessScheduleTemplates">,
       state: "failed" as const,
       search: " Deniz ",
     };
@@ -123,11 +119,10 @@ describe("yetki durumu saf model", () => {
   it("hatalı dağıtım onayı tur sınırını ve capped sayıları açıklar", () => {
     expect(failedConfirmationText(3, false)).toBe(confirmationText(3));
     expect(failedConfirmationText(100, false)).toBe(confirmationText(100));
-    expect(failedConfirmationText(250, false)).toContain("İlk 100 hatalı kişi–cihaz kaydı için tek gönderim başlatılacak; kalan 150 sonraki turda.");
-    expect(failedConfirmationText(1000, true)).toContain("1000+ hatalı");
+    expect(failedConfirmationText(250, false)).toBe("İlk 100 kayıt gönderilecek; kalan 150 sonraki turda.");
     expect(failedConfirmationText(1000, true)).toContain("kalan 900+ sonraki turda");
     expect(redistributionSuccessText({ pairCount: 100, remainingFailed: 1, remainingCapped: true })).toContain("Kalan 1+ hatalı");
-    expect(redistributionSuccessText({ pairCount: 3, remainingFailed: 0, remainingCapped: false })).toContain("Kalan 0 hatalı");
+    expect(redistributionSuccessText({ pairCount: 3, remainingFailed: 0, remainingCapped: false })).not.toContain("sonraki turda");
   });
   it("ilk boş arama debounce'u liste yükleyicisini ikinci kez çağırmaz", () => {
     let filters: Filters = {};
@@ -184,7 +179,7 @@ describe("yetki durumu SSR", () => {
     expect(searched).toContain("Proje özeti · 4 kişi–cihaz kaydı · 2 kişi");
     expect(searched).toMatch(/aria-pressed="true"[^>]*>Hata/);
     expect(searched).toMatch(/aria-pressed="false"[^>]*>Tümü/);
-    expect(searched.match(/aria-pressed=/g)).toHaveLength(6);
+    expect(searched.match(/aria-pressed=/g)).toHaveLength(4);
     expect(render({ departmentId: "dep" as Id<"departments"> })).toContain("Departman özeti · 4 kişi–cihaz kaydı · 2 kişi");
     expect(renderToStaticMarkup(<StatusCounters counts={{ ...counts, capped: true }} filters={{}} change={() => undefined} />)).toContain("2+ kişi");
   });
@@ -194,16 +189,14 @@ describe("yetki durumu SSR", () => {
     expect(html).toContain("Proje özeti · 4 kişi–cihaz kaydı");
     expect(html).not.toContain("undefined");
   });
-  it("şablonsuz kuralın kendi saatini tablo ve kişi ayrıntısında belirtir", () => {
-    const ownTime = { ...row, templateNames: [] };
-    expect(renderToStaticMarkup(<GrantRows rows={[ownTime]} selected={[]} onToggle={() => undefined} onEmployee={() => undefined} canManage />)).toContain("Kuralın kendi saati");
-    expect(renderToStaticMarkup(<EmployeeStatus detail={{ rows: [{ ...ownTime, authorized: true, removalRequired: false }], unauthorizedDoors: [] }} />)).toContain("Kuralın kendi saati");
+  it("kuralın kendi saatini kişi ayrıntısında belirtir", () => {
+    expect(renderToStaticMarkup(<EmployeeStatus detail={{ rows: [{ ...row, authorized: true, removalRequired: false }], unauthorizedDoors: [] }} />)).toContain("Kuralın kendi saati");
   });
   it("güncellik uyarısını saklanan durumdan ayrı gösterir", () => {
     const html = renderToStaticMarkup(<GrantBadge row={{ state: "effective", stale: true }} />);
     expect(html).toContain("Etkin");
-    expect(html).toContain("Güncel değil");
-    expect(html).toContain('title="Kural veya şablon cihaza gönderildikten sonra değişti; yeniden dağıtın."');
+    expect(html).toContain("Yeniden gönderilmeli");
+    expect(html).toContain('title="Kural cihaza gönderildikten sonra değişti; yeniden dağıtın."');
     expect(html).not.toContain("Bekliyor");
   });
   it.each(["effective", "failed"] as const)("kapı uyarısını %s durumundan ayrı gösterir, teknik hatayı gizler", (grantState) => {
@@ -212,10 +205,44 @@ describe("yetki durumu SSR", () => {
         selected={[]} onToggle={() => undefined} onEmployee={() => undefined} canManage={false} />,
     );
     expect(html).toContain(grantState === "effective" ? "Etkin" : "Hata");
-    expect(html).toContain("Kapı eşleşmedi");
+    expect(html).toContain("Kapı seçimi düzeltilmeli");
     expect(html).toContain('title="Kuralın kapı seçimini düzeltin; yeniden göndermek bunu çözmez."');
     expect(html).not.toContain("door_io_unresolved");
     expect(html).not.toContain("ioId");
+  });
+  it("kapı düzeltmesini güncellik uyarısına tercih eder ve en çok iki rozet sunar", () => {
+    const html = renderToStaticMarkup(<GrantBadge row={{ ...row, doorUnresolved: true }} />);
+    expect(html).toContain("Kapı seçimi düzeltilmeli");
+    expect(html).not.toContain("Yeniden gönderilmeli");
+    expect(html.match(/status-(?:danger|warning)-badge/g)).toHaveLength(2);
+  });
+  it("eski hatayı tarihle geçmiş zamanda gösterir; ham hata yalnız çekmecede kalır", () => {
+    const failed = { ...row, lastError: "Cihaz çevrimdışı: raw diagnostics 99" };
+    const html = renderToStaticMarkup(<GrantRows rows={[failed]} selected={[]} onToggle={() => {}} onEmployee={() => {}} canManage={false} />);
+    expect(html).toContain("Son deneme 22.10.2026 12:15 · cihaz o sırada çevrimdışıydı");
+    expect(html).not.toContain("raw diagnostics 99");
+    const detail = renderToStaticMarkup(<EmployeeStatus detail={{ rows: [{ ...failed, authorized: true, removalRequired: false }], unauthorizedDoors: [] }} />);
+    expect(detail).toMatch(/<details><summary[^>]*>Hata ayrıntısı<\/summary><p[^>]*>Son deneme 22.10.2026 12:15 · Cihaz çevrimdışı: raw diagnostics 99/);
+    expect(detail).toContain("Departman: Arge");
+    expect(detail).toContain("Son güncelleme: 22.10.2026 12:15");
+    expect(detail).toContain("Mesai");
+    expect(detail).toContain("Kural dışında kalan kapı yok.");
+  });
+  it("cihaz iç satırları cihaz adını tekrar etmeden kapıları korur", () => {
+    const html = renderToStaticMarkup(<GrantRows hideDevice rows={[row]} selected={[]} onToggle={() => {}} onEmployee={() => {}} canManage={false} />);
+    expect(html).not.toContain(row.deviceName);
+    expect(html).not.toContain("Cihaz/kapı");
+    expect(html).toContain("Ana kapı");
+  });
+  it("ikincil sıfır sayaçları gizler ve pozitif olanları gösterir", () => {
+    const counts = { all: 4, effective: 1, pending: 0, failed: 1, removed: 1, unknown: 1, capped: false, personCount: 2 };
+    const html = renderToStaticMarkup(<StatusCounters counts={counts} filters={{}} change={() => {}} />);
+    expect(html).toContain("Kaldırıldı: 1");
+    expect(html).toContain("Bilinmiyor: 1");
+    const empty = renderToStaticMarkup(<StatusCounters counts={{ ...counts, removed: 0, unknown: 0 }} filters={{}} change={() => {}} />);
+    expect(empty).not.toContain("Kaldırıldı");
+    expect(empty).not.toContain("Bilinmiyor");
+    expect(empty).toContain("Bekliyor: 0");
   });
   it("okuyucuya status sekmesi ve dağıtım aksiyonlarını sunmaz, deep link de açılmaz", () => {
     state.admin = false;
@@ -246,17 +273,13 @@ describe("yetki durumu SSR", () => {
     );
     for (const title of [
       "Kişi",
-      "Departman",
-      "Cihaz",
-      "Kapı(lar)",
-      "Kural",
-      "Şablon",
+      "Cihaz/kapı",
       "Durum",
-      "Son güncelleme",
     ])
       expect(html).toContain(title);
-    expect(html).toContain("Güncel değil");
-    expect(html).toContain('title="Cihaz yanıt vermedi"');
+    expect(html).toContain("Yeniden gönderilmeli");
+    expect(html).toContain("Son deneme 22.10.2026 12:15 · Cihaz yanıt vermedi");
+    for (const hidden of ["Departman", "Son güncelleme", "Mesai", "Arge"]) expect(html).not.toContain(hidden);
     expect(html).toContain("12:15");
     expect(html).toContain("lg:hidden");
     expect(html).toContain("Tüm kapılar (cihaz)");
@@ -306,10 +329,12 @@ describe("yetki durumu SSR", () => {
       ],
     };
     const html = renderToStaticMarkup(<EmployeeStatus detail={detail} />);
+    expect(html).toMatch(/<details><summary[^>]*>Kural dışında kalan 1 kapı/);
+    expect(html).not.toContain("<details open");
     for (const text of [
       "Bilinmiyor",
       "Kaldırılacak",
-      "Yetkisiz kapılar",
+      "Kural dışında kalan 1 kapı",
       "Depo",
     ])
       expect(html).toContain(text);
@@ -317,7 +342,7 @@ describe("yetki durumu SSR", () => {
   it("ilk SSR abonelik açmaz; grants yalnız tek seferlik query kullanır", () => {
     const html = renderToStaticMarkup(<StatusPage />);
     expect(html).toContain("Kişi yetkilerinin cihazlara ulaşıp ulaşmadığını kontrol edin.");
-    expect(html).toContain("Son yenileme");
+    expect(html).toContain("Liste okundu");
     expect(html).toContain("Yenile");
     expect(state.subscribe).not.toHaveBeenCalled();
     const source = readFileSync(

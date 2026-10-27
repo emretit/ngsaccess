@@ -19,7 +19,9 @@ export function StatusCounters({
         {typeof counts?.personCount === "number" && ` · ${counts.personCount}${counts.capped ? "+" : ""} kişi`}
       </p>
       <div className="flex flex-wrap gap-2" aria-label="Durum sayaçları">
-        {(Object.keys(labels) as (keyof typeof labels)[]).map((state) => {
+        {(Object.keys(labels) as (keyof typeof labels)[]).filter((state) =>
+          (state !== "removed" && state !== "unknown") || (counts?.[state] ?? 0) > 0,
+        ).map((state) => {
           const active = state === "all" ? !filters.state : filters.state === state;
           return (
             <Button

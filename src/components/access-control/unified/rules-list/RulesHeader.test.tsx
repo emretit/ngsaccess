@@ -18,14 +18,16 @@ it("sekme adını ve açıklamayı gösterir, sayacı yalnız sayfalama satırı
 });
 
 vi.mock("convex/react", () => ({
-  useQuery: () => ({ targetType: "personnel", panels: [], unassignedDoors: [{ doorId: "door", name: "Giriş" }] }),
+  useQuery: () => ({ targetType: "personnel", groupMembers: [], panels: [], unassignedDoors: [{ doorId: "door", name: "Giriş" }] }),
   usePaginatedQuery: () => ({ results: [], status: "Exhausted", loadMore: vi.fn() }),
 }));
 import { AccessRuleDetails } from "../AccessRuleDetails";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 it("kural ayrıntısında cihaz terimini kullanır", () => {
   const html = renderToStaticMarkup(<AccessRuleDetails ruleId={"r" as Id<"accessRules">} projectId={"p" as Id<"projects">} />);
-  expect(html).toContain("Cihazlar ve kapılar");
+  expect(html).toContain("Kişileri göster (0)");
+  expect(html).toContain("Kapıları göster (1)");
+  expect(html).not.toContain("<details open");
   expect(html).toContain("Cihaz bağlantısı yok; cihaza uygulanamaz");
   expect(html).not.toMatch(/panel/i);
 });

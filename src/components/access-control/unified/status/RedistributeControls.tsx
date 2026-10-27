@@ -1,5 +1,5 @@
-import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -41,49 +41,28 @@ export function RedistributeBar({
   RedistributeControlsProps,
   "selected" | "sending" | "projectCounts" | "setError" | "setAction" | "canManageDevices"
 >) {
-  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
-  const maintenanceId = useId();
   return (
-    <div className="contents lg:flex lg:flex-wrap lg:gap-2">
-    <div className={`${selected.length ? "flex sticky bottom-2 z-10 bg-background border rounded-md p-2 lg:static lg:border-0 lg:p-0" : "hidden lg:flex"} flex-wrap gap-2`} aria-label="Seçili kayıt işlemleri">
-      <Button
-        className={`${selected.length ? "" : "hidden lg:inline-flex"} whitespace-normal h-auto min-h-11`}
-        disabled={!selected.length || sending}
-        onClick={() => {
-          setError("");
-          setAction("selected");
-        }}
-      >
-        Seçili {selected.length} kaydı yeniden gönder
-      </Button>
-    </div>
-    <div className="order-last lg:order-none space-y-2">
-      <Button className="min-h-11 lg:hidden" variant="ghost" aria-expanded={maintenanceOpen} aria-controls={maintenanceId} onClick={() => setMaintenanceOpen(!maintenanceOpen)}>Diğer gönderim işlemleri</Button>
-      <div id={maintenanceId} className={`${maintenanceOpen ? "flex" : "hidden lg:flex"} flex-wrap gap-2`}>
-      <Button
-        className="whitespace-normal h-auto min-h-11"
-        variant="outline"
-        disabled={sending || !projectCounts?.failed}
-        onClick={() => {
-          setError("");
-          setAction("failed");
-        }}
-      >
-        Hatalıları yeniden dağıt ({countText(projectCounts?.failed ?? 0, projectCounts?.capped ?? false)})
-      </Button>
-      {canManageDevices && <Button
-        className="whitespace-normal h-auto min-h-11"
-        variant="outline"
-        disabled={sending || !projectCounts}
-        onClick={() => {
-          setError("");
-          setAction("all");
-        }}
-      >
-        Tümünü yeniden dağıt
-      </Button>}
-      </div>
-    </div>
+    <div className="flex flex-wrap gap-2">
+      {selected.length > 0 && (
+        <div className="flex sticky bottom-2 z-10 bg-background border rounded-md p-2 lg:static lg:border-0 lg:p-0" aria-label="Seçili kayıt işlemleri">
+          <Button className="whitespace-normal h-auto min-h-11" disabled={sending} onClick={() => { setError(""); setAction("selected"); }}>
+            Seçili {selected.length} kaydı yeniden gönder
+          </Button>
+        </div>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button className="min-h-11" variant="ghost" disabled={sending}>Diğer gönderim işlemleri</Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem className="min-h-11" disabled={sending || !projectCounts?.failed} onSelect={() => { setError(""); setAction("failed"); }}>
+            Hatalıları yeniden dağıt ({countText(projectCounts?.failed ?? 0, projectCounts?.capped ?? false)})
+          </DropdownMenuItem>
+          {canManageDevices && <DropdownMenuItem className="min-h-11" disabled={sending || !projectCounts} onSelect={() => { setError(""); setAction("all"); }}>
+            Tümünü yeniden dağıt
+          </DropdownMenuItem>}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -114,13 +93,9 @@ export function RedistributeDialog({
         <DialogHeader>
           <DialogTitle>Yeniden dağıtım onayı</DialogTitle>
           <DialogDescription>
-            {action === "failed"
-              ? failedConfirmationText(projectCounts?.failed ?? 0, projectCounts?.capped ?? false)
-              : confirmationText(
-                  action === "selected"
-                    ? selected.length
-                    : countText(projectCounts?.all ?? 0, projectCounts?.capped ?? false),
-                )}
+            {action === "selected"
+              ? confirmationText(selected.length)
+              : `Tüm proje · filtreler uygulanmaz · ${countText(action === "failed" ? projectCounts?.failed ?? 0 : projectCounts?.all ?? 0, projectCounts?.capped ?? false)} kayıt`}
           </DialogDescription>
         </DialogHeader>
         {action === "selected" && (
@@ -133,12 +108,15 @@ export function RedistributeDialog({
           </div>
         )}
         {action !== "selected" && (
-          <p className="text-sm">
-            {action === "failed"
-              ? "Projedeki hatalı kayıtlar sırayla gönderilir (her seferinde en fazla 100 kayıt)."
-              : "Projenin tüm yetkili kişi ve cihazları değerlendirilir. Görünen sayı, gönderim bilgisi olmayanlar dahil kişi–cihaz kayıtlarının toplamıdır. Gönderilecek kişiler ve cihazlar güncel kurallara göre belirlenir."}{" "}
-            Liste filtreleri gönderim kapsamını daraltmaz.
-          </p>
+          <div className="text-sm space-y-2">
+            {action === "failed" && (projectCounts?.failed ?? 0) > 100 && <p>{failedConfirmationText(projectCounts?.failed ?? 0, projectCounts?.capped ?? false)}</p>}
+            <details>
+              <summary className="min-h-11 py-3 cursor-pointer">Ayrıntı</summary>
+              <p>{action === "failed"
+                ? "Projedeki hatalı kayıtlar sırayla gönderilir (her seferinde en fazla 100 kayıt)."
+                : "Projenin tüm yetkili kişi ve cihazları değerlendirilir. Görünen sayı, gönderim bilgisi olmayanlar dahil kişi–cihaz kayıtlarının toplamıdır. Gönderilecek kişiler ve cihazlar güncel kurallara göre belirlenir."}</p>
+            </details>
+          </div>
         )}
         {error && (
           <p role="alert" className="text-danger break-words">

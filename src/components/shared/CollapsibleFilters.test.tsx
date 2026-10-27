@@ -27,6 +27,14 @@ describe("CollapsibleFilters", () => {
     expect(html).toContain('class="block w-full min-w-0 md:contents"');
   });
 
+  it("collapseOn=all folds on desktop too", () => {
+    const html = renderToStaticMarkup(<CollapsibleFilters collapseOn="all" activeCount={1}>Fields</CollapsibleFilters>);
+    expect(html).not.toContain("md:hidden");
+    expect(html).not.toContain("md:block");
+    expect(html).toContain('class="hidden"');
+    expect(html).toContain("Filtreler (1)");
+  });
+
   it("assigns separate content ids to multiple instances", () => {
     const html = renderToStaticMarkup(<><CollapsibleFilters>First</CollapsibleFilters><CollapsibleFilters>Second</CollapsibleFilters></>);
     const ids = [...html.matchAll(/aria-controls="([^"]+)"/g)].map(match => match[1]);

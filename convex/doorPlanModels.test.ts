@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildVerifySegments,
   normalizeVerifyPlan,
-  templateToDoorStatusPlan,
   holidayRanges,
 } from "./lib/doorStatusPlan";
-import { emptyWeek } from "./lib/accessSchedule";
 const verify = {
   enabled: true,
   beginTime: "08:00",
@@ -13,33 +11,6 @@ const verify = {
   verifyMode: "card",
 };
 describe("door plan phase 2 models", () => {
-  it("splits Sunday overnight to Monday and handles 24:00", () => {
-    const plan = templateToDoorStatusPlan(
-      {
-        ...emptyWeek(),
-        Sunday: [{ start: "22:00", end: "02:00" }],
-        Friday: [{ start: "00:00", end: "24:00" }],
-      },
-      "remainClosed",
-    );
-    expect(plan.weekly?.[0].segments).toEqual([
-      { beginTime: "00:00:00", endTime: "02:00:00", mode: "remainClosed" },
-    ]);
-    expect(plan.weekly?.[4].segments[0].endTime).toBe("23:59:59");
-    expect(plan.weekly?.[6].segments[0].endTime).toBe("23:59:59");
-  });
-  it("rejects more than eight expanded daily segments without truncation", () => {
-    const Monday = Array.from({ length: 8 }, (_, i) => ({
-      start: `${String(i * 2 + 2).padStart(2, "0")}:00`,
-      end: `${String(i * 2 + 3).padStart(2, "0")}:00`,
-    }));
-    expect(() =>
-      templateToDoorStatusPlan(
-        { ...emptyWeek(), Monday, Sunday: [{ start: "22:00", end: "01:00" }] },
-        "remainOpen",
-      ),
-    ).toThrow("8");
-  });
   it("keeps empty days empty and legacy windows on every day", () => {
     expect(buildVerifySegments(verify)).toHaveLength(7);
     expect(buildVerifySegments({ ...verify, weekly: [] })).toEqual([]);

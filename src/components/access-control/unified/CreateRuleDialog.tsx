@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { effectiveDoorIds } from "./components/selectionHelpers";
 import { useRuleForm } from "./hooks/useRuleForm";
 import { RuleBasicInfo } from "./components/RuleBasicInfo";
 import { DepartmentTree } from "./components/DepartmentTree";
@@ -43,6 +45,17 @@ export default function CreateRuleDialog({
     isDirty,
     projectId,
   } = useRuleForm(editingRule, open, onClose, onDiffSaved);
+  const { doors, loading: doorsLoading } = useZonesAndDoors();
+  const doorCount = effectiveDoorIds(doors, formData).length;
+  const wholeDeviceCount = formData.selected_devices.filter(
+    (id) => !doors.some((door) => door.deviceId === id),
+  ).length;
+  const doorScope = [
+    doorCount > 0 || wholeDeviceCount === 0 ? `${doorCount} kapı` : "",
+    wholeDeviceCount > 0 ? `${wholeDeviceCount} cihazın tümü` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState("");
   const guard = useUnsavedChangesGuard(isDirty);
@@ -73,7 +86,7 @@ export default function CreateRuleDialog({
       return;
     }
     if (
-      step === 1 &&
+      step === 0 &&
       formData.target_type === "individual" &&
       formData.selected_employees.length === 0
     ) {
@@ -94,11 +107,11 @@ export default function CreateRuleDialog({
       formData.target_type === "individual" &&
       formData.selected_employees.length === 0
     ) {
-      go(1);
+      go(0);
       setStepError("En az bir kişi seçin.");
       return;
     }
-    if (step !== 2) {
+    if (step !== 1) {
       advance();
       return;
     }
@@ -132,16 +145,14 @@ export default function CreateRuleDialog({
               {editingRule ? "Kuralı düzenle" : "Yeni kural"}
             </DialogTitle>
             <DialogDescription>
-              {editingRule
-                ? "Yalnız değiştirdiğiniz ilişkiler kaydedilir. Cihaz işlemleri arka planda yürütülür; kayıt, cihazda teslim onayı değildir."
-                : "Kayıt başarılı olduğunda cihaz gönderimi ayrıca başlatılır ve izlenir."}
+              Kaydedince cihazlara gönderilir.
             </DialogDescription>
           </DialogHeader>
           <nav
             aria-label="Kural adımları"
             className="flex flex-wrap gap-1 border-b p-3"
           >
-            {["Temel", "Kimler", "Nerede / Ne zaman"].map((label, index) => (
+            {["Kimler", "Nerede / Ne zaman"].map((label, index) => (
               <Button
                 key={label}
                 type="button"
@@ -162,11 +173,7 @@ export default function CreateRuleDialog({
             className="flex-1 min-h-0 min-w-0 overflow-y-auto px-4 py-4 space-y-4"
           >
             <h2 id="rule-step-heading" tabIndex={-1} className="font-semibold">
-              {
-                ["Temel bilgiler", "Kimler erişebilir?", "Nerede ve ne zaman?"][
-                  step
-                ]
-              }
+              {["Kimler erişebilir?", "Nerede ve ne zaman?"][step]}
             </h2>
             {projectChanged ? (
               <p role="alert">
@@ -181,11 +188,13 @@ export default function CreateRuleDialog({
                     setFormData={setFormData}
                     errors={{
                       ...errors,
-                      ...(stepError ? { name: stepError } : {}),
+                      ...(!formData.name.trim() && stepError
+                        ? { name: stepError }
+                        : {}),
                     }}
                   />
                 )}
-                {step === 1 && (
+                {step === 0 && (
                   <div
                     id="rule-employees"
                     tabIndex={-1}
@@ -222,7 +231,7 @@ export default function CreateRuleDialog({
                     )}
                   </div>
                 )}
-                {step === 2 && (
+                {step === 1 && (
                   <>
                     <div
                       id="rule-devices"
@@ -261,7 +270,7 @@ export default function CreateRuleDialog({
                 )}
               </fieldset>
             )}
-            {stepError && step !== 0 && (
+            {stepError && (
               <p role="alert" className="text-danger text-xs">
                 {stepError}
               </p>
@@ -271,7 +280,7 @@ export default function CreateRuleDialog({
             {formData.target_type === "visitor"
               ? "Ziyaretçi üyelikleri korunur"
               : `${formData.selected_employees.length} kişi`}{" "}
-            · {formData.selected_doors.length} kapı ·{" "}
+            · {doorsLoading ? "Kapılar yükleniyor…" : doorScope} ·{" "}
             {`${ruleDaysSummary(formData.days)} ${formData.start_time || formData.end_time ? `${formData.start_time}–${formData.end_time}` : "tüm gün"}`}
           </div>
           <DialogFooter className="px-4 py-3 border-t flex-wrap">
@@ -294,7 +303,7 @@ export default function CreateRuleDialog({
               </Button>
             )}
             {/* Ayrı key: aynı DOM düğmesi tıklama sırasında type="submit"e dönüp formu göndermesin. */}
-            {step < 2 ? (
+            {step < 1 ? (
               <Button
                 key="next"
                 type="button"

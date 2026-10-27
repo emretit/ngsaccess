@@ -1,10 +1,8 @@
 import { requirePermission } from "./lib/permissions";
 import type { HikSnapshot } from "./lib/peopleHikSnapshot";
 import { hikSnapshotValidator } from "./lib/peopleHikSnapshot";
-import { templateRules, scheduleRuleDevices, boundedScheduleRows, ideScheduleImpact } from "./accessScheduleTemplates";
-import { effectiveSchedule, toHikWeekSchedule } from "./lib/accessSchedule";
-import { pendingPersonDeletions, enqueueLocalBridgeOperationInTransaction } from "./hikvisionSync";
-import { allocateIdePermissionNos, ideRuleSegments, ruleIoIdsForPanel, buildIdePermissionRecord, enqueueIdeOpInTransaction, capPermissionNos, ideUserAccessWindow } from "./ideSync";
+import { scheduleRuleDevices } from "./lib/ruleDevices";
+import { pendingPersonDeletions } from "./hikvisionSync";
 import { resolvePanelAuthorizedCards } from "./lib/accessGraph";
 import { normalizeIdeCard } from "./ideSync";
 import { ConvexError, v } from "convex/values";
@@ -332,10 +330,6 @@ export const finishTarget = internalMutation({
     const reason = (args.skipped ?? args.failure)?.slice(0, 2000);
     if (target.dispatchFinished === true && target.status === status && target.reason === reason) return;
     await ctx.db.patch(target._id, { dispatchFinished: true, status, reason, updatedAt: Date.now() });
-    const run = await ctx.db.get(target.runId);
-    if (run?.kind === "template_sync") {
-      await refreshRun(ctx, run._id);
-    }
   },
 });
 
@@ -391,7 +385,7 @@ export const listRecent = authedQuery({
     }));
   },
 });
-/** A rule's newest delivery: project/template sends also carry an active rule, so they count;
+/** A rule's newest delivery: project sends also carry an active rule, so they count;
  * their targets are narrowed to the rule's own devices. */
 export const latestForRule = authedQuery({
   args: { ruleId: v.id("accessRules") },
@@ -405,8 +399,7 @@ export const latestForRule = authedQuery({
       .find(candidate => candidate.projectId === projectId);
     const recent = rule.isActive === false ? [] : await ctx.db.query("deviceSyncRuns")
       .withIndex("by_project_started", q => q.eq("projectId", projectId)).order("desc").take(20);
-    const shared = recent.find(run => run.kind === "project_resync"
-      || (run.kind === "template_sync" && rule.scheduleTemplateId !== undefined && run.templateId === rule.scheduleTemplateId));
+    const shared = recent.find(run => run.kind === "project_resync");
     const run = shared && (!own || shared.startedAt > own.startedAt) ? shared : own;
     if (!run) return null;
     let targets = await ctx.db.query("deviceSyncRunTargets")
@@ -626,145 +619,6 @@ export const executeRuleDiffTarget = internalAction({
       skipped: !worked && !failures.length ? "Bu cihaz için değişen yetki yok" : undefined,
       directSent: device.brand === "hikvision" && device.hikTransport !== "localBridge",
     });
-  },
-});
-
-/** Debounced template changes produce one run and one target per affected device. */
-export const createTemplateRun = internalMutation({
-  args: { templateId: v.id("accessScheduleTemplates"), startedBy: v.id("users") },
-  handler: async (ctx, args): Promise<Id<"deviceSyncRuns"> | null> => {
-    const template = await ctx.db.get(args.templateId);
-    if (!template) return null;
-    const rules = await templateRules(ctx, template._id);
-    const byDevice = new Map<Id<"devices">, Doc<"devices">>();
-    for (const rule of rules) for (const device of await scheduleRuleDevices(ctx, rule)) byDevice.set(device._id, device);
-    if (byDevice.size > MAX_DEVICES) throw new ConvexError("Çok büyük kapsam: 200 cihaz sınırı");
-    const now = Date.now();
-    const runId = await ctx.db.insert("deviceSyncRuns", {
-      projectId: template.projectId, templateId: template._id, kind: "template_sync",
-      startedBy: args.startedBy, startedAt: now, status: "running", dispatchFinished: true,
-      counts: summarizeRun([], false).counts,
-    });
-    let maxPlan = (await ctx.db.query("accessRules").withIndex("by_hikWeekPlanNo").order("desc").first())?.hikWeekPlanNo ?? 1;
-    const changedRuleIds: Id<"accessRules">[] = [];
-    for (const rule of rules) {
-      if (rule.projectId !== template.projectId) throw new ConvexError("Şablon başka proje kuralına bağlı");
-      const devices = await scheduleRuleDevices(ctx, rule);
-      if (devices.some(d => d.brand === "hikvision") && !rule.hikWeekPlanNo) {
-        if (++maxPlan > 65535) throw new ConvexError("Hik plan numarası kapasitesi aşıldı");
-        await ctx.db.patch(rule._id, { hikWeekPlanNo: maxPlan });
-      }
-      if (devices.some(d => d.brand === "ide_smart")) {
-        const k = ideRuleSegments(rule, template).length;
-        if ((await allocateIdePermissionNos(ctx, rule, k, runId)).changed) changedRuleIds.push(rule._id);
-      }
-    }
-    for (const device of byDevice.values()) {
-      const reason = skippedReason(device, now);
-      const targetId = await ctx.db.insert("deviceSyncRunTargets", {
-        runId, deviceId: device._id, deviceName: device.name, brand: device.brand ?? "other",
-        status: reason ? "skipped" : "queued", reason, updatedAt: now,
-      });
-      if (!reason) await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.executeTemplateTarget, { targetId, ruleIds: rules.map(r => r._id), changedRuleIds });
-    }
-    await ctx.db.patch(template._id, { pendingSyncJobId: undefined });
-    const status = await updateSummary(ctx, runId);
-    // Reuse the existing run watchdog/evidence loop; no per-device timer or cron.
-    await ctx.scheduler.runAfter(RUN_TIMEOUT_MS, internal.deviceSyncRuns.expireRun, { runId });
-    if (status === "running") await ctx.scheduler.runAfter(refreshDelay(0), internal.deviceSyncRuns.refreshSummary, { runId, pollAttempt: 1 });
-    return runId;
-  },
-});
-
-export const loadTemplateTarget = internalQuery({
-  args: { targetId: v.id("deviceSyncRunTargets"), ruleIds: v.array(v.id("accessRules")) },
-  handler: async (ctx, args) => {
-    const target = await ctx.db.get(args.targetId);
-    if (!target || target.status !== "queued") return null;
-    const run = await ctx.db.get(target.runId);
-    const device = await ctx.db.get(target.deviceId);
-    if (!run || !device || device.projectId !== run.projectId) return null;
-    const plans = [];
-    for (const ruleId of args.ruleIds) {
-      const rule = await ctx.db.get(ruleId);
-      if (!rule || rule.projectId !== run.projectId || rule.scheduleTemplateId !== run.templateId) continue;
-      if (!(await scheduleRuleDevices(ctx, rule)).some(d => d._id === device._id)) continue;
-      const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
-      plans.push({ rule, schedule: toHikWeekSchedule(effectiveSchedule(rule, template)) });
-    }
-    return { target, run, device, plans };
-  },
-});
-
-/** One transaction queues every schedule for this target, and users only when K changes. */
-export const enqueueTemplateTarget = internalMutation({
-  args: { targetId: v.id("deviceSyncRunTargets"), ruleIds: v.array(v.id("accessRules")), changedRuleIds: v.array(v.id("accessRules")) },
-  handler: async (ctx, args): Promise<void> => {
-    const target = await ctx.db.get(args.targetId);
-    if (!target || target.status !== "queued") return;
-    const run = await ctx.db.get(target.runId);
-    const device = await ctx.db.get(target.deviceId);
-    if (!run || !device || device.projectId !== run.projectId) throw new ConvexError("Gönderim hedefi bulunamadı");
-    const overLimit = device.brand === "ide_smart"
-      ? await ideScheduleImpact(ctx, run.projectId, undefined, args.ruleIds, device._id) : [];
-    const overLimitEmployees = new Set(overLimit.map(entry => entry.employeeId));
-    const failures: string[] = [];
-    for (const entry of overLimit) {
-      const employee = await ctx.db.get(entry.employeeId);
-      failures.push(`${employee ? `${employee.firstName} ${employee.lastName}` : entry.employeeId}: IDE 16 izin sınırı aşıldı`);
-    }
-    const changedEmployees = new Set<Id<"employees">>();
-    for (const ruleId of args.ruleIds) {
-      const rule = await ctx.db.get(ruleId);
-      if (!rule || rule.projectId !== run.projectId || rule.scheduleTemplateId !== run.templateId) continue;
-      if (!(await scheduleRuleDevices(ctx, rule)).some(d => d._id === device._id)) continue;
-      const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
-      if (device.brand === "hikvision") {
-        await enqueueLocalBridgeOperationInTransaction(ctx, {
-          deviceId: device._id, projectId: run.projectId, runId: run._id, operation: "syncWeekPlan",
-          payload: { accessRuleId: ruleId, weekPlanNo: rule.hikWeekPlanNo, templateName: rule.name, schedule: toHikWeekSchedule(effectiveSchedule(rule, template)) },
-        });
-        continue;
-      }
-      const segments = ideRuleSegments(rule, template);
-      const allocation = await allocateIdePermissionNos(ctx, rule, segments.length, run._id);
-      const io = await ruleIoIdsForPanel(ctx, { ruleId, deviceId: device._id });
-      for (const [index, schedule] of segments.entries()) {
-        const no = allocation.nos[index];
-        if (no === undefined) continue;
-        await enqueueIdeOpInTransaction(ctx, { deviceId: device._id, projectId: run.projectId, runId: run._id, opType: "upsertPermission",
-          payload: { mode: "create", permissionRecord: { ...buildIdePermissionRecord(no, io, {}), schedule } } });
-      }
-      if (allocation.changed || args.changedRuleIds.includes(ruleId)) {
-        const members = boundedScheduleRows(await ctx.db.query("groupMembers").withIndex("by_project_group", q => q.eq("projectId", run.projectId).eq("groupId", ruleId)).take(MAX_MEMBERS + 1), MAX_MEMBERS);
-        for (const member of members) changedEmployees.add(member.employeeId);
-      }
-    }
-    if (changedEmployees.size > MAX_MEMBERS) throw new ConvexError("Çok büyük kapsam: 500 kişi sınırı");
-    for (const employeeId of changedEmployees) {
-      const employee = await ctx.db.get(employeeId);
-      if (!employee || employee.projectId !== run.projectId || !employee.isActive) continue;
-      if (overLimitEmployees.has(employeeId)) continue;
-      const card = Number(employee.cardNumber);
-      if (!Number.isSafeInteger(card) || card < 1) throw new ConvexError("IDE kart numarası sayısal olmalı");
-      const memberships = boundedScheduleRows(await ctx.db.query("groupMembers").withIndex("by_project_employee", q => q.eq("projectId", run.projectId).eq("employeeId", employeeId)).take(101), 100);
-      const nos: number[] = [];
-      const ruleIds: Id<"accessRules">[] = [];
-      for (const ruleId of new Set(memberships.map(m => m.groupId))) {
-        const rule = await ctx.db.get(ruleId);
-        if (!rule || rule.projectId !== run.projectId || rule.isActive === false) continue;
-        if (!(await scheduleRuleDevices(ctx, rule)).some(d => d._id === device._id)) continue;
-        ruleIds.push(ruleId);
-        nos.push(...[rule.idePermissionNo, ...(rule.ideExtraPermissionNos ?? [])].filter((no): no is number => no !== undefined));
-      }
-      if (new Set(nos).size > 16) {
-        failures.push(`${employee.firstName} ${employee.lastName}: IDE 16 izin sınırı aşıldı`);
-        continue;
-      }
-      await enqueueIdeOpInTransaction(ctx, { deviceId: device._id, projectId: run.projectId, runId: run._id, opType: "upsertUser",
-        payload: { employeeId, ruleIds, mode: "create", userRecord: { id: card, status: 1, ...ideUserAccessWindow(employee, Date.now()), permissions: capPermissionNos(nos) } } });
-    }
-    if (failures.length) await ctx.db.patch(target._id, { status: "failed", dispatchFinished: true, reason: failures.join("; ").slice(0, 2000), updatedAt: Date.now() });
   },
 });
 

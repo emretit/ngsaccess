@@ -1,5 +1,4 @@
 import { usePermissions } from "@/hooks/usePermissions";
-import { RuleScheduleSummary } from "../templates/RuleScheduleSummary";
 import { useState } from "react";
 import { useConvex } from "convex/react";
 import type { Id } from "../../../../../convex/_generated/dataModel";
@@ -65,38 +64,31 @@ export function RuleRow({
         onClick={onRowActivate(() => setOpen(true))}
       >
         <TableCell className="min-w-0">
-          <Button
-            variant="link"
-            className="h-auto min-h-11 md:min-h-0 w-full max-w-full whitespace-normal break-words p-0 text-left justify-start text-foreground hover:no-underline"
-            onClick={() => setOpen(true)}
-          >
-            {rule.name}
-          </Button>
+          <div className="flex flex-wrap items-center gap-x-2">
+            <Button
+              variant="link"
+              className="h-auto min-h-11 md:min-h-0 max-w-full whitespace-normal break-words p-0 text-left justify-start text-foreground hover:no-underline"
+              onClick={() => setOpen(true)}
+            >
+              {rule.name}
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {rule.targetType === "visitor"
+                ? "Ziyaretçi şablonu"
+                : "Personel yetkisi"}
+            </span>
+          </div>
           <p className="md:hidden text-xs text-muted-foreground break-words">
             {scopeText(rule)}
           </p>
           <p className="xl:hidden text-xs text-muted-foreground break-words">
-            {rule.scheduleTemplateId ? (
-              <RuleScheduleSummary
-                templateId={rule.scheduleTemplateId}
-                projectId={projectId}
-              />
-            ) : (
-              <>
-                {formatWeekdaysAbbr(rule.days ?? [])} ·{" "}
-                {rule.startTime && rule.endTime
-                  ? `${rule.startTime}–${rule.endTime}`
-                  : rule.startTime || rule.endTime
-                    ? "Eksik saat aralığı"
-                    : "Tüm gün"}
-              </>
-            )}
+            {formatWeekdaysAbbr(rule.days ?? [])} ·{" "}
+            {rule.startTime && rule.endTime
+              ? `${rule.startTime}–${rule.endTime}`
+              : rule.startTime || rule.endTime
+                ? "Eksik saat aralığı"
+                : "Tüm gün"}
           </p>
-        </TableCell>
-        <TableCell className="hidden lg:table-cell">
-          {rule.targetType === "visitor"
-            ? "Ziyaretçi şablonu"
-            : "Personel yetkisi"}
         </TableCell>
         <TableCell className="hidden lg:table-cell tabular-nums">
           {rule.memberCount}
@@ -108,23 +100,14 @@ export function RuleRow({
           </p>
         </TableCell>
         <TableCell className="hidden xl:table-cell">
-          {rule.scheduleTemplateId ? (
-            <RuleScheduleSummary
-              templateId={rule.scheduleTemplateId}
-              projectId={projectId}
-            />
-          ) : (
-            <>
-              <p>{formatWeekdaysAbbr(rule.days ?? [])}</p>
-              <p className="text-xs text-muted-foreground">
-                {rule.startTime && rule.endTime
-                  ? `${rule.startTime}–${rule.endTime}`
-                  : rule.startTime || rule.endTime
-                    ? "Eksik saat aralığı"
-                    : "Tüm gün"}
-              </p>
-            </>
-          )}
+          <p>{formatWeekdaysAbbr(rule.days ?? [])}</p>
+          <p className="text-xs text-muted-foreground">
+            {rule.startTime && rule.endTime
+              ? `${rule.startTime}–${rule.endTime}`
+              : rule.startTime || rule.endTime
+                ? "Eksik saat aralığı"
+                : "Tüm gün"}
+          </p>
         </TableCell>
         <TableCell className="px-2">
           <StatusBadge tone={(rule.isActive ?? true) ? "success" : "neutral"}>
@@ -165,7 +148,9 @@ export function RuleRow({
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
-              <SheetTitle className="min-w-0 break-words">{rule.name}</SheetTitle>
+              <SheetTitle className="min-w-0 break-words">
+                {rule.name}
+              </SheetTitle>
               {canManage && (
                 <Button
                   variant="outline"
@@ -182,22 +167,13 @@ export function RuleRow({
                 ? "Ziyaretçi şablonu"
                 : "Personel yetkisi"}{" "}
               · {(rule.isActive ?? true) ? "Aktif" : "Pasif"} ·{" "}
-              {rule.scheduleTemplateId ? (
-                <RuleScheduleSummary
-                  templateId={rule.scheduleTemplateId}
-                  projectId={projectId}
-                />
-              ) : (
-                <>
-                  {formatWeekdaysAbbr(rule.days ?? [])} ·{" "}
-                  {rule.startTime && rule.endTime
-                    ? `${rule.startTime}–${rule.endTime}`
-                    : rule.startTime || rule.endTime
-                      ? "Eksik saat aralığı · düzenleyin"
-                      : "Tüm gün"}{" "}
-                  (Türkiye saati)
-                </>
-              )}
+              {formatWeekdaysAbbr(rule.days ?? [])} ·{" "}
+              {rule.startTime && rule.endTime
+                ? `${rule.startTime}–${rule.endTime}`
+                : rule.startTime || rule.endTime
+                  ? "Eksik saat aralığı · düzenleyin"
+                  : "Tüm gün"}{" "}
+              (Türkiye saati)
             </SheetDescription>
           </SheetHeader>
           {rule.description?.trim() && (

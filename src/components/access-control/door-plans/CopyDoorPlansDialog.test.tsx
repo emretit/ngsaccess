@@ -4,7 +4,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CopyDoorPlansDialog } from "./CopyDoorPlansDialog";
 import { copyPlanFields } from "./bulk";
 import { DoorPlansTab } from "./DoorPlansTab";
-import { TemplatePicker } from "../unified/templates/TemplatePicker";
 import type { DoorPlanTarget } from "./DoorPlanDialog";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
@@ -67,9 +66,6 @@ vi.mock("@/components/shared/UnsavedChangesDialog", () => ({
     return { requestClose: state.requestClose, dialog: null };
   },
 }));
-vi.mock("../unified/templates/TemplatePicker", () => ({
-  TemplatePicker: () => null,
-}));
 
 type Props = Record<string, unknown> & { children?: ReactNode };
 function nodes(node: ReactNode): ReactElement<Props>[] {
@@ -93,12 +89,10 @@ const target = (index: number): DoorPlanTarget => ({
   deviceName: `Cihaz ${index}`,
   deviceOnline: true,
   zoneName: null,
-  hikDoorStatusTemplateId: null,
-  templateName: null,
-  templateChanged: false,
   hikPlanSavedAt: null,
   hikPlanAppliedAt: null,
   hikPlanApplyError: null,
+  hikPlanFailedAt: null,
   plansPending: false,
   hikDoorHolidayPlan: { enabled: false, year: 2026, mode: "remainClosed" },
   holidaySupported: null,
@@ -124,12 +118,6 @@ function render() {
     onClose: close,
   });
 }
-function change(tree: ReactNode, label: string, value: string) {
-  (
-    find(tree, (node) => node.props["aria-label"] === label).props
-      .onChange as (event: { target: { value: string } }) => void
-  )({ target: { value } });
-}
 beforeEach(() => {
   state.slots = [];
   state.cursor = 0;
@@ -142,7 +130,7 @@ beforeEach(() => {
   close.mockReset();
 });
 describe("04-O5 kopyalama kapsamı", () => {
-  it("kaynağı hedeflerden çıkarır ve ilk beş hedeften sonrasını sayar", () => {
+  it("kaynağı çıkarır ve tüm hedefleri açılır listede gösterir", () => {
     const tree = render();
     const preview = find(
       tree,
@@ -152,15 +140,9 @@ describe("04-O5 kopyalama kapsamı", () => {
     expect(html).not.toContain("Kapı 0");
     expect(html).toContain("Kapı 1");
     expect(html).toContain("Kapı 5");
-    expect(html).not.toContain("Kapı 6");
-    expect(
-      nodes(tree).some(
-        (node) =>
-          node.type === "p" &&
-          renderToStaticMarkup(node).includes("ve 2 kapı daha"),
-      ),
-    ).toBe(true);
-    expect(nodes(preview).filter((node) => node.type === "li")).toHaveLength(5);
+    expect(html).toContain("Kapı 7");
+    expect(nodes(tree).some((node) => node.type === "details")).toBe(true);
+    expect(nodes(preview).filter((node) => node.type === "li")).toHaveLength(7);
   });
   it("yalnız doğrulama seçildiğinde diğer hedef ayarlarına dokunmadan doğrulamayı kaydeder ve gönderir", async () => {
     for (const label of ["Durum planı", "Tatil planı"]) {
@@ -228,32 +210,6 @@ describe("04-O5 kopyalama kapsamı", () => {
           node.props.children === "Kaynak dışında en az bir hedef kapı seçin.",
       ),
     ).toBe(true);
-  });
-  it("GK-4 şablona geçişte seçimi korumaya bırakır, onay sonrası önce kapanır sonra gider", () => {
-    change(render(), "Kaynak türü", "template");
-    const picker = find(render(), (node) => node.type === TemplatePicker);
-    (picker.props.onChange as (id: string) => void)("template");
-    const navigate = vi.fn(() => expect(close).toHaveBeenCalledOnce());
-    (
-      find(render(), (node) => node.type === TemplatePicker).props.onEdit as (
-        navigate: () => void,
-      ) => void
-    )(navigate);
-    expect(state.dirty).toBe(true);
-    expect(state.requestClose).toHaveBeenCalledOnce();
-    expect(close).not.toHaveBeenCalled();
-    expect(navigate).not.toHaveBeenCalled();
-    (state.requestClose.mock.calls[0]?.[0] as () => void)();
-    expect(navigate).toHaveBeenCalledOnce();
-  });
-  it("04-D1 kapı modu tam genişlik ve 44px dokunma hedefi taşır", () => {
-    change(render(), "Kaynak türü", "template");
-    expect(
-      find(
-        render(),
-        (node) => node.props["aria-label"] === "Kopyalanacak kapı modu",
-      ).props.className,
-    ).toContain("w-full min-h-11");
   });
   it("04-O6 her kapıda mobil kart ve aynı satırda gönderim bilgisini sunar", () => {
     state.cursor = 0;

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -18,6 +19,7 @@ const DAY_LABELS = [
   "Cumartesi",
   "Pazar",
 ];
+const hasSeconds = (time: string) => time.length > 5 && time.slice(6) !== "00";
 function IntervalEditor({
   value,
   onChange,
@@ -34,26 +36,34 @@ function IntervalEditor({
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
       <Label className="space-y-1">
-        Başlangıç (TR saati)
+        Başlangıç
         <Input
           aria-invalid={invalid}
           aria-describedby={describedBy}
           aria-label={`${label} başlangıç`}
           type="time"
-          step={1}
-          value={value.beginTime}
+          step={hasSeconds(value.beginTime) ? 1 : 60}
+          value={
+            hasSeconds(value.beginTime)
+              ? value.beginTime
+              : value.beginTime.slice(0, 5)
+          }
           onChange={(e) => onChange({ ...value, beginTime: e.target.value })}
         />
       </Label>
       <Label className="space-y-1">
-        Bitiş (TR saati)
+        Bitiş
         <Input
           aria-invalid={invalid}
           aria-describedby={describedBy}
           aria-label={`${label} bitiş`}
           type="time"
-          step={1}
-          value={value.endTime}
+          step={hasSeconds(value.endTime) ? 1 : 60}
+          value={
+            hasSeconds(value.endTime)
+              ? value.endTime
+              : value.endTime.slice(0, 5)
+          }
           onChange={(e) => onChange({ ...value, endTime: e.target.value })}
         />
       </Label>
@@ -102,21 +112,119 @@ export function DoorVerifyPlanEditor({
   invalid?: boolean;
   "aria-describedby"?: string;
 }) {
+  const [customLayout, setCustomLayout] = useState(false);
+  const [layoutError, setLayoutError] = useState<string | null>(null);
+  const monday =
+    value.weekly?.find((entry) => entry.day === "Monday")?.segments ?? [];
+  const weekdays =
+    value.weekly !== undefined &&
+    DOOR_STATUS_DAYS.every(
+      (day, index) =>
+        JSON.stringify(
+          value.weekly?.find((entry) => entry.day === day)?.segments ?? [],
+        ) === JSON.stringify(index < 5 ? monday : []),
+    );
+  const layout =
+    value.weekly === undefined
+      ? "daily"
+      : weekdays && !customLayout
+        ? "weekdays"
+        : "weekly";
+  const changeLayout = (next: string) => {
+    const { weekly, ...daily } = value;
+    setLayoutError(null);
+    if (next === "weekly") {
+      setCustomLayout(true);
+      onChange({
+        ...value,
+        weekly:
+          weekly ??
+          DOOR_STATUS_DAYS.map((day, index) => ({
+            day,
+            segments:
+              index < 5
+                ? [
+                    {
+                      beginTime: daily.beginTime,
+                      endTime: daily.endTime,
+                      verifyMode: daily.verifyMode,
+                    },
+                  ]
+                : [],
+          })),
+      });
+      return;
+    }
+    const base = weekly
+      ? monday
+      : [
+          {
+            beginTime: daily.beginTime,
+            endTime: daily.endTime,
+            verifyMode: daily.verifyMode,
+          },
+        ];
+    const first = base[0];
+    if (next === "daily" && !first) {
+      setLayoutError("Önce Pazartesiye en az bir aralık ekleyin.");
+      return;
+    }
+    const nextWeek = DOOR_STATUS_DAYS.map((day, index) => ({
+      day,
+      segments:
+        next === "daily" || index < 5
+          ? (next === "daily" ? base.slice(0, 1) : base).map((segment) => ({
+              ...segment,
+            }))
+          : [],
+    }));
+    const losesData =
+      weekly &&
+      DOOR_STATUS_DAYS.some((day) => {
+        const oldSegments =
+          weekly.find((entry) => entry.day === day)?.segments ?? [];
+        const newSegments =
+          nextWeek.find((entry) => entry.day === day)?.segments ?? [];
+        return (
+          oldSegments.length > 0 &&
+          JSON.stringify(oldSegments) !== JSON.stringify(newSegments)
+        );
+      });
+    if (
+      losesData &&
+      !globalThis.confirm(
+        "Farklı günlerdeki aralıklar silinecek. Pazartesi aralıklarıyla devam edilsin mi?",
+      )
+    )
+      return;
+    setCustomLayout(false);
+    onChange(
+      next === "daily"
+        ? { ...daily, ...first }
+        : { ...daily, weekly: nextWeek },
+    );
+  };
   const setDay = (
     day: (typeof DOOR_STATUS_DAYS)[number],
     segments: VerifyInterval[],
-  ) =>
+  ) => {
+    // Günlere göre düzenlerken günler hafta içi kalıbına denk gelse de panel çökmesin.
+    if (layout === "weekly") setCustomLayout(true);
     onChange({
       ...value,
       weekly: DOOR_STATUS_DAYS.map((dayName) => ({
         day: dayName,
-        segments:
-          dayName === day
-            ? segments
-            : (value.weekly?.find((entry) => entry.day === dayName)?.segments ??
-              []),
+        segments: (
+          layout === "weekdays"
+            ? DOOR_STATUS_DAYS.indexOf(dayName) < 5
+            : dayName === day
+        )
+          ? segments
+          : (value.weekly?.find((entry) => entry.day === dayName)?.segments ??
+            []),
       })),
     });
+  };
   return (
     <div className="min-w-0 space-y-3 max-sm:[&_input:not([type=checkbox])]:min-h-11 [&_input]:min-w-0 [&_input]:max-w-full [&_label]:min-w-0 [&_select]:max-w-full max-sm:[&_select]:min-h-11 max-sm:[&_button]:min-h-11">
       <Label className="block space-y-1">
@@ -125,57 +233,20 @@ export function DoorVerifyPlanEditor({
           aria-invalid={invalid}
           aria-describedby={describedBy}
           aria-label="Doğrulama planı düzeni"
-          value={value.weekly === undefined ? "daily" : "weekly"}
-          onChange={(e) => {
-            const { weekly, ...daily } = value;
-            onChange(
-              e.target.value === "weekly"
-                ? {
-                    ...daily,
-                    weekly: DOOR_STATUS_DAYS.map((day, index) => ({
-                      day,
-                      segments: index < 5 ? [
-                        {
-                          beginTime: daily.beginTime,
-                          endTime: daily.endTime,
-                          verifyMode: daily.verifyMode,
-                        },
-                      ] : [],
-                    })),
-                  }
-                : {
-                    ...daily,
-                    ...weekly?.flatMap((entry) => entry.segments)[0],
-                  },
-            );
-          }}
+          value={layout}
+          onChange={(e) => changeLayout(e.target.value)}
         >
-          <option value="daily">Her gün aynı</option>
-          <option value="weekly">Gün bazında</option>
+          <option value="daily">Her gün</option>
+          <option value="weekdays">Hafta içi</option>
+          <option value="weekly">Günlere göre</option>
         </NativeSelect>
       </Label>
-      {value.weekly === undefined && (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            onChange({
-              ...value,
-              weekly: DOOR_STATUS_DAYS.map((day, index) => ({
-                day,
-                segments: index < 5 ? [{
-                  beginTime: value.beginTime,
-                  endTime: value.endTime,
-                  verifyMode: value.verifyMode,
-                }] : [],
-              })),
-            });
-          }}
-        >
-          Hafta içi
-        </Button>
+      {layoutError && (
+        <p role="alert" className="text-sm text-destructive">
+          {layoutError}
+        </p>
       )}
-      {value.weekly && <p className="text-xs text-muted-foreground">Hafta sonu dahil her günü aşağıdan kontrol edebilirsiniz. Aralık olmayan günler normal çalışır.</p>}
+      <p className="text-xs text-muted-foreground">TR saati</p>
       {value.weekly === undefined ? (
         <IntervalEditor
           invalid={invalid}
@@ -186,44 +257,25 @@ export function DoorVerifyPlanEditor({
         />
       ) : (
         <>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-auto whitespace-normal"
-            onClick={() => {
-              const monday =
-                value.weekly?.find((entry) => entry.day === "Monday")
-                  ?.segments ?? [];
-              // Hafta sonu korunur: kapı Cumartesi/Pazar istemeden açık kalmasın.
-              const weekdays = new Set([
-                "Tuesday",
-                "Wednesday",
-                "Thursday",
-                "Friday",
-              ]);
-              onChange({
-                ...value,
-                weekly: DOOR_STATUS_DAYS.map((day) => ({
-                  day,
-                  segments: (weekdays.has(day)
-                    ? monday
-                    : (value.weekly?.find((entry) => entry.day === day)
-                        ?.segments ?? [])
-                  ).map((segment) => ({ ...segment })),
-                })),
-              });
-            }}
-          >
-            Pazartesiyi hafta içine (Salı–Cuma) kopyala
-          </Button>
           {DOOR_STATUS_DAYS.map((day, dayIndex) => {
+            if (layout === "weekdays" && dayIndex > 0) return null;
             const segments =
               value.weekly?.find((entry) => entry.day === day)?.segments ?? [];
-            const label = DAY_LABELS[dayIndex] ?? day;
+            const label =
+              layout === "weekdays"
+                ? "Hafta içi"
+                : (DAY_LABELS[dayIndex] ?? day);
             return (
-              <details key={day} open={dayIndex === 0 || invalid || undefined} className="min-w-0 space-y-2 rounded-md border p-2">
+              <details
+                key={day}
+                open={dayIndex === 0 || invalid || undefined}
+                className="min-w-0 space-y-2 rounded-md border p-2"
+              >
                 <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
-                  {label} · {segments.length ? `${segments.length} aralık` : "Normal çalışır"}
+                  {label} ·{" "}
+                  {segments.length
+                    ? `${segments.length} aralık`
+                    : "Normal çalışır"}
                 </summary>
                 {segments.length === 0 && (
                   <p className="text-xs text-muted-foreground">
@@ -270,8 +322,8 @@ export function DoorVerifyPlanEditor({
                     setDay(day, [
                       ...segments,
                       {
-                        beginTime: "08:00:00",
-                        endTime: "18:00:00",
+                        beginTime: "08:00",
+                        endTime: "18:00",
                         verifyMode: "card",
                       },
                     ])
@@ -284,10 +336,17 @@ export function DoorVerifyPlanEditor({
           })}
         </>
       )}
-      <p className="text-xs text-muted-foreground">
-        Gün başına en fazla 8 aralık. Gece yarısını geçen aralıkları iki güne
-        bölün.
-      </p>
+      <details>
+        <summary className="min-h-11 cursor-pointer py-3 text-sm">
+          Plan nasıl çalışır?
+        </summary>
+        <p className="text-xs text-muted-foreground">
+          Gün başına en fazla 8 aralık. Gece yarısını geçen aralıkları iki güne
+          bölün. Aralık olmayan günlerde kişi yetkileri geçerlidir. Düzen
+          değiştirirken Pazartesi aralıkları kullanılır; plan kapatıldığında
+          kayıtlı saatler korunur.
+        </p>
+      </details>
     </div>
   );
 }

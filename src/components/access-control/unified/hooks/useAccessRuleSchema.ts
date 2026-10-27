@@ -14,8 +14,6 @@ const dayEnum = z.enum([
 
 export const accessRuleSchema = z
   .object({
-    scheduleMode: z.enum(["custom", "template"]).default("custom"),
-    scheduleTemplateId: z.string().optional(),
     name: z.string().trim().min(1, "Lütfen kural adı girin."),
     description: z.string().optional(),
     targetType: z.enum([
@@ -56,15 +54,6 @@ export const accessRuleSchema = z
         message: "Lütfen en az bir cihaz, bölge veya kapı seçin.",
         path: ["selectedDevices"],
       });
-    }
-    if (data.scheduleMode === "template") {
-      if (!data.scheduleTemplateId)
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Bir zaman şablonu seçin",
-          path: ["scheduleTemplateId"],
-        });
-      return;
     }
     for (const field of ["startTime", "endTime"] as const) {
       if (data[field] && !HHMM.test(data[field]))

@@ -1,7 +1,9 @@
-vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
+vi.mock("@/hooks/usePermissions", () => ({
+  usePermissions: () => ({ can: () => true, loading: false }),
+}));
 import { isValidElement, type ReactNode, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DoorStatusPlanEditor } from "./DoorStatusPlanEditor";
 import { EditDoorDialog } from "./EditDoorDialog";
 import type { DoorStatusPlan } from "../../../convex/lib/doorStatusPlan";
@@ -80,18 +82,21 @@ function edit(initial = legacy) {
   const onChange = (next: DoorStatusPlan) => {
     value = next;
   };
-  return {
-    tree: () => DoorStatusPlanEditor({ value, onChange }),
+  const editor = {
+    tree: () => {
+      state.cursor = 0;
+      return DoorStatusPlanEditor({ value, onChange });
+    },
     value: () => value,
+    layout: (next: string) =>
+      (
+        find(
+          editor.tree(),
+          (node) => node.props["aria-label"] === "Kapı durum planı düzeni",
+        ).props.onChange as (event: { target: { value: string } }) => void
+      )({ target: { value: next } }),
   };
-}
-function click(tree: ReactNode, label: string) {
-  const button = find(
-    tree,
-    (element) =>
-      element.props["aria-label"] === label || element.props.children === label,
-  );
-  (button.props.onClick as () => void)();
+  return editor;
 }
 beforeEach(() => {
   state.slots = [];
@@ -100,6 +105,7 @@ beforeEach(() => {
   state.save.mockReset().mockResolvedValue(undefined);
   state.apply.mockReset().mockResolvedValue({ ok: true });
 });
+afterEach(() => vi.unstubAllGlobals());
 describe("DoorStatusPlanEditor", () => {
   it("04-O2 modları sürekli açık ve sürekli kilitli olarak adlandırır", () => {
     const html = renderToStaticMarkup(edit().tree());
@@ -110,95 +116,95 @@ describe("DoorStatusPlanEditor", () => {
   });
   it("Gün bazına geçiş yalnız hafta içini doldurur, hafta sonu normal kalır", () => {
     const editor = edit();
-    const change = (value: string) =>
-      (
-        find(
-          editor.tree(),
-          (element) =>
-            element.props["aria-label"] === "Kapı durum planı düzeni",
-        ).props.onChange as (event: { target: { value: string } }) => void
-      )({ target: { value } });
-    change("weekly");
+    editor.layout("weekly");
     expect(editor.value().weekly).toHaveLength(7);
     expect(
       editor
         .value()
-        .weekly?.slice(0, 5).every((day) => day.segments[0]?.beginTime === "08:00:00"),
+        .weekly?.slice(0, 5)
+        .every((day) => day.segments[0]?.beginTime === "08:00:00"),
     ).toBe(true);
-    expect(editor.value().weekly?.slice(5).every(day => day.segments.length === 0)).toBe(true);
-    change("daily");
+    expect(
+      editor
+        .value()
+        .weekly?.slice(5)
+        .every((day) => day.segments.length === 0),
+    ).toBe(true);
+    editor.layout("daily");
     expect(editor.value().weekly).toBeUndefined();
     expect(editor.value().beginTime).toBe("08:00:00");
   });
-  it("Dalga3 C1-1 gün bazında haftalıkta Hafta içi sunulmaz; mevcut aralıklar silinmez", () => {
-    const editor = edit({ ...legacy, weekly: [{ day: "Saturday", segments: [legacy] }] });
-    expect(nodes(editor.tree()).some(node => node.props?.children === "Hafta içi")).toBe(false);
-  });
-  it("04-O4 Hafta içi seçimi hafta sonunu boşaltır ve saniyeleri korur", () => {
-    const editor = edit(legacy);
-    click(editor.tree(), "Hafta içi");
-    expect(editor.value().weekly?.slice(0, 5).every(day => day.segments[0]?.beginTime === legacy.beginTime)).toBe(true);
-    expect(editor.value().weekly?.slice(5).every(day => day.segments.length === 0)).toBe(true);
-    const days = nodes(editor.tree()).filter(node => node.type === "details");
-    expect(days).toHaveLength(7);
-    expect(days.filter(node => node.props.open)).toHaveLength(1);
-    expect(renderToStaticMarkup(editor.tree())).toContain("Cumartesi · Normal çalışır");
-  });
-  it("boş gün, ekle/sil, sekiz aralık sınırı ve pazartesi kopyası", () => {
+  it("Hafta içi Pazartesiyi temel alır; farklı günler onaysız silinmez", () => {
     const editor = edit({
       ...legacy,
       weekly: [
-        {
-          day: "Monday",
-          segments: [
-            { beginTime: "09:00", endTime: "12:00", mode: "remainClosed" },
-          ],
-        },
+        { day: "Monday", segments: [legacy] },
+        { day: "Saturday", segments: [{ ...legacy, mode: "remainClosed" }] },
       ],
     });
-    click(editor.tree(), "Salı aralık ekle");
+    const confirm = vi.fn().mockReturnValue(false);
+    vi.stubGlobal("confirm", confirm);
+    editor.layout("weekdays");
     expect(
-      editor.value().weekly?.find((day) => day.day === "Tuesday")?.segments,
+      editor.value().weekly?.find((day) => day.day === "Saturday")?.segments,
     ).toHaveLength(1);
-    click(editor.tree(), "Salı 1. aralığı sil");
-    expect(
-      editor.value().weekly?.find((day) => day.day === "Tuesday")?.segments,
-    ).toEqual([]);
-    click(editor.tree(), "Pazartesiyi hafta içine (Salı–Cuma) kopyala");
-    const weekend = new Set(["Saturday", "Sunday"]);
+    confirm.mockReturnValue(true);
+    editor.layout("weekdays");
     expect(
       editor
         .value()
-        .weekly?.filter((day) => !weekend.has(day.day))
-        .every((day) => day.segments[0]?.mode === "remainClosed"),
+        .weekly?.slice(0, 5)
+        .every((day) => day.segments[0]?.beginTime === legacy.beginTime),
     ).toBe(true);
     expect(
       editor
         .value()
-        .weekly?.filter((day) => weekend.has(day.day))
+        .weekly?.slice(5)
         .every((day) => day.segments.length === 0),
     ).toBe(true);
-    for (let i = 1; i < 8; i++) click(editor.tree(), "Salı aralık ekle");
-    expect(
-      find(
-        editor.tree(),
-        (element) => element.props["aria-label"] === "Salı aralık ekle",
-      ).props.disabled,
-    ).toBe(true);
-    const html = renderToStaticMarkup(editor.tree());
-    expect(html).toContain('aria-label="Pazartesi 1. aralık başlangıç"');
-    expect(html).toContain('aria-label="Cuma 1. aralık mod"');
-    expect(html).not.toContain('aria-label="Pazar 1. aralık mod"');
+    expect(confirm).toHaveBeenCalledTimes(2);
   });
-  it("boş pazartesiyi Salı–Cuma'ya kopyalar, hafta sonunu korur", () => {
+  it("Günlere göre düzenlerken günler hafta içine denk gelse de paneller çökmez", () => {
+    const second = { ...legacy, beginTime: "19:00:00", endTime: "20:00:00" };
     const editor = edit({
       ...legacy,
-      weekly: [{ day: "Tuesday", segments: [legacy] }, { day: "Saturday", segments: [legacy] }],
+      weekly: [
+        { day: "Monday", segments: [legacy] },
+        { day: "Tuesday", segments: [legacy, second] },
+        { day: "Wednesday", segments: [legacy] },
+        { day: "Thursday", segments: [legacy] },
+        { day: "Friday", segments: [legacy] },
+      ],
     });
-    click(editor.tree(), "Pazartesiyi hafta içine (Salı–Cuma) kopyala");
-    const weekly = editor.value().weekly ?? [];
-    expect(weekly.filter((day) => day.day !== "Saturday").every((day) => day.segments.length === 0)).toBe(true);
-    expect(weekly.find((day) => day.day === "Saturday")?.segments).toHaveLength(1);
+    (
+      find(
+        editor.tree(),
+        (node) => node.props["aria-label"] === "Salı 2. aralığı sil",
+      ).props.onClick as () => void
+    )();
+    const html = renderToStaticMarkup(editor.tree());
+    expect(html).toContain("Salı ·");
+    expect(html).not.toContain("Hafta içi ·");
+  });
+  it("Pazartesi boşken Her gün'e geçmez, satır içi uyarı gösterir", () => {
+    const editor = edit({
+      ...legacy,
+      weekly: [{ day: "Saturday", segments: [legacy] }],
+    });
+    const before = editor.value();
+    editor.layout("daily");
+    expect(editor.value()).toBe(before);
+    const html = renderToStaticMarkup(editor.tree());
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Önce Pazartesiye en az bir aralık ekleyin.");
+  });
+  it("saniyeli kayıtları korur, dakika kayıtlarında saniye alanını gizler", () => {
+    const html = renderToStaticMarkup(
+      edit({ ...legacy, beginTime: "08:00:01" }).tree(),
+    );
+    expect(html).toContain('step="1" value="08:00:01"');
+    expect(html).toContain('step="60" value="18:00"');
+    expect(html.match(/TR saati/g)).toHaveLength(1);
   });
 });
 describe("EditDoorDialog (Cihazlar)", () => {
@@ -224,13 +230,20 @@ describe("EditDoorDialog (Cihazlar)", () => {
   }
   it("kapı durum/doğrulama planlarını göstermez, kaydederken planlara dokunmaz", async () => {
     const initial = dialog();
-    expect(() => find(initial, (element) => element.type === DoorStatusPlanEditor)).toThrow();
+    expect(() =>
+      find(initial, (element) => element.type === DoorStatusPlanEditor),
+    ).toThrow();
     expect(state.dirty).toBe(false);
     await (
       find(initial, (element) => element.type === "form").props
         .onSubmit as (event: { preventDefault: () => void }) => Promise<void>
     )({ preventDefault: vi.fn() });
-    expect(state.save).toHaveBeenCalledWith({ doorId: door._id, name: "Kapı", doorCode: undefined, hikDoorNo: 2 });
+    expect(state.save).toHaveBeenCalledWith({
+      doorId: door._id,
+      name: "Kapı",
+      doorCode: undefined,
+      hikDoorNo: 2,
+    });
     expect(state.apply).not.toHaveBeenCalled();
   });
 });

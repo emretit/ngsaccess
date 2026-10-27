@@ -4,8 +4,8 @@ import { employeeTransfer, transferBlocksAddition, TRANSFER_INVALID_OPERATION, t
 import { employeeGrantGraph, grantStatusForOperation } from "./lib/grantStatus";
 import { cardNumericKey } from "./lib/cardIdentity";
 import { accessEndsAtMs } from "./lib/accessEnd";
-import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule, type ScheduleTemplate } from "./lib/accessSchedule";
-import { boundedScheduleRows, scheduleRuleDevices } from "./accessScheduleTemplates";
+import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule } from "./lib/accessSchedule";
+import { boundedScheduleRows, scheduleRuleDevices } from "./lib/ruleDevices";
 import { mobileOperationId, mobileQueueAllowed, accessError } from "./lib/mobileAccess";
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
@@ -288,7 +288,7 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
     }
 
     let payload = (args.payload ?? {}) as Record<string, unknown>;
-    // Fail closed centrally, including template dispatch callers outside the actions.
+    // Fail closed centrally, including mutation callers outside the actions.
     let doorError = false;
     if (args.opType === "upsertPermission") {
       const record = payload.permissionRecord;
@@ -390,7 +390,7 @@ async function currentCredentialProtected(ctx: QueryCtx, op: Doc<"idePendingOper
       const upsertKey = `${op.deviceId}:upsertUser:user:${key}`;
       const latestUnscoped = await ctx.db.query("idePendingOperations")
         .withIndex("by_idempotency", q => q.eq("idempotencyKey", upsertKey)).order("desc").first();
-      // Template runs append runId to the same key; their failures also block protection.
+      // Sync runs append runId to the same key; their failures also block protection.
       const runUpserts = await ctx.db.query("idePendingOperations")
         .withIndex("by_idempotency", q => q.gte("idempotencyKey", `${upsertKey}:`).lt("idempotencyKey", `${upsertKey};`)).take(1001);
       if (runUpserts.length > 1000) throw new Error("IDE yazım geçmişi sınırı aşıldı; panel işlerini temizleyin");
@@ -402,8 +402,7 @@ async function currentCredentialProtected(ctx: QueryCtx, op: Doc<"idePendingOper
       for (const ruleId of scope.ruleIds) {
         const rule = await ctx.db.get(ruleId);
         if (!rule) continue;
-        const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
-        if (!ideRuleSegments(rule, template).length) continue;
+        if (!ideRuleSegments(rule).length) continue;
         if (!(await cachedRuleIoIds(ctx, ruleId, op.deviceId)).length) {
           unresolved = true;
           break;
@@ -751,8 +750,8 @@ export const requeueTimedOut = internalMutation({
  * iki eşzamanlı sync'in aynı no'yu atamasına yol açan read-modify-write yarışını kapatır
  * (getMaxIdePermissionNo + ayrı assign çağrısı yerine).
  */
-export function ideRuleSegments(rule: ScheduleRule, template: ScheduleTemplate | null) {
-  return toIdePermissionSegments(effectiveSchedule(rule, template));
+export function ideRuleSegments(rule: ScheduleRule) {
+  return toIdePermissionSegments(effectiveSchedule(rule));
 }
 export async function allocateIdePermissionNos(ctx: MutationCtx, rule: Doc<"accessRules">, count: number, runId?: Id<"deviceSyncRuns">) {
   const old = [rule.idePermissionNo, ...(rule.ideExtraPermissionNos ?? [])].filter((n): n is number => n !== undefined);
@@ -802,8 +801,7 @@ export const ensureIdePermissionPlan = internalMutation({
   handler: async (ctx, args) => {
     const rule = await ctx.db.get(args.accessRuleId);
     if (!rule) throw new Error("Kural bulunamadı");
-    const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
-    const segments = ideRuleSegments(rule, template);
+    const segments = ideRuleSegments(rule);
     return { ...await allocateIdePermissionNos(ctx, rule, segments.length, args.runId), segments };
   },
 });

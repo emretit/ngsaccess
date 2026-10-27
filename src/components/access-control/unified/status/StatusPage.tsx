@@ -75,12 +75,9 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Son yenileme:{" "}
-        {refreshedAt ? formatTrDateTime(refreshedAt).split(" ")[1] : "—"} ·
-        İstanbul saati
+        Liste okundu: {refreshedAt ? formatTrDateTime(refreshedAt) : "—"}
       </p>
-      {success && <p role="status">{success}</p>}
-      {runId && <RunNotice key={runId} runId={runId} onComplete={refresh} />}
+      {runId && <RunNotice key={runId} runId={runId} summary={success} onComplete={refresh} />}
       <div className="flex flex-col gap-4">
         <div className="order-2 lg:order-1 space-y-4">
           <StatusCounters filters={filters} counts={counts} change={change} />
@@ -254,7 +251,7 @@ function useStatusRows({
       if (request !== generation.current) return;
       setRows(page?.page ?? []);
       setCursor(page && !page.isDone ? page.continueCursor : null);
-      setRefreshedAt(Date.now());
+      setRefreshedAt(page ? Date.now() : undefined);
     };
     void load()
       .catch((e) => {

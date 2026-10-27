@@ -1,11 +1,5 @@
 import { ConvexError, v } from "convex/values";
 import type { Infer } from "convex/values";
-import {
-  emptyWeek,
-  normalizeWeek,
-  splitOvernight,
-  type WeekSchedule,
-} from "./accessSchedule";
 import type { DoorStatusSegment, VerifySegment } from "./gateway/plans";
 import { snapshotProbeSupported } from "./capabilitySnapshot";
 
@@ -131,44 +125,6 @@ export function buildDoorStatusSegments(
       endTime: segment.endTime,
     })),
   );
-}
-
-/** Convert a template snapshot; no subscription or automatic device send. */
-export function templateToDoorStatusPlan(
-  week: WeekSchedule,
-  mode: "remainOpen" | "remainClosed",
-  enabled = true,
-): DoorStatusPlan {
-  const expanded = emptyWeek();
-  let normalized: WeekSchedule;
-  // accessSchedule düz Error atar; istemci mesajı görebilsin diye ConvexError'a çevrilir.
-  try {
-    for (const day of DOOR_STATUS_DAYS)
-      for (const range of week[day]) {
-        const split = splitOvernight(day, range.start, range.end);
-        for (const target of DOOR_STATUS_DAYS)
-          expanded[target].push(...split[target]);
-      }
-    normalized = normalizeWeek(expanded);
-  } catch (error: unknown) {
-    throw new ConvexError(
-      error instanceof Error ? error.message : "Zaman şablonu kapı planına çevrilemedi",
-    );
-  }
-  return normalizeDoorStatusPlan({
-    enabled,
-    beginTime: "08:00",
-    endTime: "18:00",
-    mode,
-    weekly: DOOR_STATUS_DAYS.map((day) => ({
-      day,
-      segments: normalized[day].map((range) => ({
-        beginTime: `${range.start}:00`,
-        endTime: range.end === "24:00" ? "23:59:59" : `${range.end}:00`,
-        mode,
-      })),
-    })),
-  });
 }
 
 export const verifyPlanValidator = v.object({

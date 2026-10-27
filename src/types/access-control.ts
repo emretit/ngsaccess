@@ -93,7 +93,6 @@ export interface GroupDoor {
 }
 
 export interface AccessRule {
-  scheduleTemplateId?: Id<"accessScheduleTemplates">;
   _id: Id<"accessRules">;
   name: string;
   description?: string;
@@ -105,7 +104,6 @@ export interface AccessRule {
   priority?: number;
   isActive?: boolean;
   isTemplate?: boolean;
-  templateName?: string;
   projectId?: Id<"projects">;
   hikWeekPlanNo?: number;
   createdAt?: string;

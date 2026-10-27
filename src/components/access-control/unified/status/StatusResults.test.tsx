@@ -19,7 +19,7 @@ function render(cursor: string | null, busy = false, rows: GrantRow[] = []) {
       cursor={cursor}
       busy={busy}
       more={async () => {}}
-      options={{ departments: [], devices: [], rules: [], templates: [] }}
+      options={{ departments: [], devices: [], rules: [] }}
       filters={{}}
       expanded={undefined}
       setExpanded={() => {}}

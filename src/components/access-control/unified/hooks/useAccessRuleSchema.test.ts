@@ -38,37 +38,3 @@ describe("kullanılan erişim kuralı form şeması", () => {
     );
   });
 });
-
-describe("şablon modu doğrulaması", () => {
-  it("gömülü gün ve saatleri zorunlu tutmaz", () => {
-    expect(
-      accessRuleSchema.safeParse({
-        ...input,
-        scheduleMode: "template",
-        scheduleTemplateId: "t",
-        days: [],
-        startTime: "",
-        endTime: "bad",
-      }).success,
-    ).toBe(true);
-  });
-  it("şablon seçimi zorunludur", () => {
-    expect(
-      accessRuleSchema.safeParse({
-        ...input,
-        scheduleMode: "template",
-        scheduleTemplateId: "",
-      }).success,
-    ).toBe(false);
-  });
-  it("özel saate dönünce gün ve saat kurallarını tekrar uygular", () => {
-    expect(
-      accessRuleSchema.safeParse({
-        ...input,
-        scheduleMode: "custom",
-        scheduleTemplateId: "t",
-        days: [],
-      }).success,
-    ).toBe(false);
-  });
-});

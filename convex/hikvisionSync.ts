@@ -5,7 +5,6 @@ import { writeAudit } from "./lib/audit";
 import { internal } from "./_generated/api";
 import { snapshotEmployeeHikDevices, resolveRuleDeviceTargets, hasWritableHikCredential } from "./lib/peopleHikSnapshot";
 import { grantStatusForOperation } from "./lib/grantStatus";
-import type { ScheduleTemplate } from "./lib/accessSchedule";
 import { mobileOperationId, mobileQueueAllowed } from "./lib/mobileAccess";
 import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } from "./lib/biometricGate";
 import { isBiometricEnabled } from "./lib/privacySettings";
@@ -66,8 +65,6 @@ type EmployeeDeviceRule = {
     name?: string;
     hikWeekPlanNo?: number;
     idePermissionNo?: number;
-    scheduleTemplateId?: Id<"accessScheduleTemplates">;
-    scheduleTemplate?: ScheduleTemplate | null;
     projectId?: Id<"projects">;
     ideExtraPermissionNos?: number[];
     startTime?: string;
@@ -146,8 +143,6 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
               hikWeekPlanNo: rule.hikWeekPlanNo,
               idePermissionNo: rule.idePermissionNo,
               ideExtraPermissionNos: rule.ideExtraPermissionNos,
-              scheduleTemplateId: rule.scheduleTemplateId,
-              scheduleTemplate: rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null,
               projectId: rule.projectId,
               startTime: rule.startTime,
               endTime: rule.endTime,
@@ -274,8 +269,6 @@ export const getAccessRuleWithDevices = internalQuery({
         hikWeekPlanNo: rule.hikWeekPlanNo,
         idePermissionNo: rule.idePermissionNo,
         ideExtraPermissionNos: rule.ideExtraPermissionNos,
-        scheduleTemplateId: rule.scheduleTemplateId,
-        scheduleTemplate: rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null,
         projectId: rule.projectId,
       },
       devices,
@@ -873,12 +866,12 @@ export const listRetryCandidates = internalMutation({
           const employee = employeeId ? await ctx.db.get(employeeId) : null;
           if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, employee?.projectId))) return await defer(true);
 
-          let accessRule: (Doc<"accessRules"> & { scheduleTemplate: ScheduleTemplate | null }) | null = null;
+          let accessRule: Doc<"accessRules"> | null = null;
           const accessRuleId = payload.accessRuleId as Id<"accessRules"> | undefined;
           if (accessRuleId) {
             const r = await ctx.db.get(accessRuleId);
             if (r) {
-              accessRule = { ...r, scheduleTemplate: r.scheduleTemplateId ? await ctx.db.get(r.scheduleTemplateId) : null };
+              accessRule = r;
             }
           }
 

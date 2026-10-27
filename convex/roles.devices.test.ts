@@ -30,7 +30,7 @@ async function setup() {
     return { userId, as: t.withIdentity({ subject: `${userId}|${sessionId}` }) };
   }
   const snapshot = () => t.run(async ctx => ({
-    zones: await ctx.db.query("zones").collect(), templates: await ctx.db.query("accessScheduleTemplates").collect(),
+    zones: await ctx.db.query("zones").collect(), rules: await ctx.db.query("accessRules").collect(),
     events: await ctx.db.query("deviceEvents").collect(), queue: await ctx.db.query("hikPendingOperations").collect(),
     settings: await ctx.db.query("alarmSettings").collect(),
   }));
@@ -41,7 +41,7 @@ type Fixture = Awaited<ReturnType<typeof setup>>;
 type Member = Awaited<ReturnType<Fixture["member"]>>;
 const cases: { permission: Permission; allowed: Exclude<ProjectRole, "admin">; denied: ProjectRole; run: (f: Fixture, m: Member) => Promise<unknown> }[] = [
   { permission: "devices.manage", allowed: "technician", denied: "viewer", run: (f, m) => m.as.mutation(api.zones.create, { projectId: f.projectId, name: "Bölge" }) },
-  { permission: "accessRules.manage", allowed: "technician", denied: "security", run: (f, m) => m.as.mutation(api.accessScheduleTemplates.create, { projectId: f.projectId, name: "Mesai", week: { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] } }) },
+  { permission: "accessRules.manage", allowed: "technician", denied: "security", run: (f, m) => m.as.mutation(api.accessRules.create, { projectId: f.projectId, name: "Mesai", days: ["Monday"] }) },
   { permission: "doors.open", allowed: "viewer", denied: "hr", run: (f, m) => m.as.action(api.actions.hikGatewayDevice.remoteOpenDoor, { deviceId: f.deviceId }) },
   { permission: "alarms.ack", allowed: "security", denied: "viewer", run: (f, m) => m.as.mutation(api.alarms.acknowledge, { ids: [f.eventId] }) },
   { permission: "employees.manage", allowed: "hr", denied: "technician", run: (f, m) => m.as.action(api.actions.hikGatewayDevice.captureCardFromDevice, { deviceId: f.deviceId }) },

@@ -1,4 +1,3 @@
-import { initialScheduleMode, scheduleBinding } from "../templates/model";
 import { useState, useEffect, useRef } from "react";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { accessRuleSchema } from "./useAccessRuleSchema";
@@ -15,8 +14,6 @@ import { DEFAULT_WORKDAYS } from "../components/weekdays";
 import { buildRelationDiff } from "../../../../../convex/lib/accessRuleDiff";
 
 interface RuleFormData {
-  scheduleMode: "custom" | "template";
-  scheduleTemplateId: string;
   name: string;
   description: string;
   target_type: "all" | "department" | "position" | "individual" | "visitor";
@@ -45,8 +42,6 @@ export const useRuleForm = (
     useComplexAccessRuleMutations(onDiffSaved);
 
   const [formData, setFormData] = useState<RuleFormData>({
-    scheduleMode: "custom",
-    scheduleTemplateId: "",
     name: "",
     description: "",
     target_type: "individual",
@@ -89,8 +84,6 @@ export const useRuleForm = (
           doors: doorIds as Id<"doors">[],
         };
         const initial: RuleFormData = {
-          scheduleMode: initialScheduleMode(editingRule.scheduleTemplateId),
-          scheduleTemplateId: editingRule.scheduleTemplateId ?? "",
           name: editingRule.name || "",
           description: editingRule.description || "",
           target_type:
@@ -117,8 +110,6 @@ export const useRuleForm = (
         setFormData(initial);
       } else {
         const initial: RuleFormData = {
-          scheduleMode: "custom",
-          scheduleTemplateId: "",
           name: "",
           description: "",
           target_type: "individual",
@@ -141,8 +132,6 @@ export const useRuleForm = (
   const action = useAsyncAction(
     async () => {
       const parsed = accessRuleSchema.safeParse({
-        scheduleMode: formData.scheduleMode,
-        scheduleTemplateId: formData.scheduleTemplateId,
         name: formData.name,
         description: formData.description,
         targetType: formData.target_type,
@@ -158,10 +147,6 @@ export const useRuleForm = (
       });
       if (!parsed.success) throw new Error(parsed.error.issues[0]?.message);
       const ruleData = {
-        scheduleTemplateId: scheduleBinding(
-          formData.scheduleMode,
-          formData.scheduleTemplateId,
-        ),
         name: parsed.data.name,
         description: formData.description,
         targetType: formData.target_type,
@@ -177,11 +162,6 @@ export const useRuleForm = (
           id: editingRule._id as Id<"accessRules">,
           updates: {
             projectId,
-            scheduleTemplateId: scheduleBinding(
-              formData.scheduleMode,
-              formData.scheduleTemplateId,
-              editingRule.scheduleTemplateId,
-            ),
             name: formData.name !== openingForm.current.name ? parsed.data.name : undefined,
             description: formData.description !== openingForm.current.description ? formData.description : undefined,
             targetType: formData.target_type !== openingForm.current.target_type ? formData.target_type : undefined,
@@ -218,8 +198,6 @@ export const useRuleForm = (
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = accessRuleSchema.safeParse({
-      scheduleMode: formData.scheduleMode,
-      scheduleTemplateId: formData.scheduleTemplateId,
       name: formData.name,
       description: formData.description,
       targetType: formData.target_type,
@@ -243,7 +221,6 @@ export const useRuleForm = (
         startTime: "start_time",
         endTime: "end_time",
         days: "rule-days",
-        scheduleTemplateId: "rule-schedule-template",
         selectedEmployees: "rule-employees",
         selectedDevices: "rule-devices",
       };

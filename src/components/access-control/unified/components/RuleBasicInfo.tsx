@@ -33,16 +33,21 @@ export const RuleBasicInfo = <T extends RuleBasicInfoFormData>({
         />
       </FormFieldWrapper>
 
-      <FormFieldWrapper htmlFor="description" label="Açıklama">
-        <Input
-          id="description"
-          value={formData.description}
-          onChange={(e) =>
-            setFormData((prev) => ({ ...prev, description: e.target.value }))
-          }
-          placeholder="Kural açıklaması (opsiyonel)"
-        />
-      </FormFieldWrapper>
+      <details>
+        <summary className="cursor-pointer text-sm min-h-11 md:min-h-0">
+          Açıklama ekle
+        </summary>
+        <FormFieldWrapper htmlFor="description" label="Açıklama">
+          <Input
+            id="description"
+            value={formData.description}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, description: e.target.value }))
+            }
+            placeholder="Kural açıklaması (opsiyonel)"
+          />
+        </FormFieldWrapper>
+      </details>
     </div>
   );
 };

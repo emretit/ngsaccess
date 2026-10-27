@@ -16,13 +16,11 @@ export type Options = {
   departments: FunctionReturnType<typeof api.departments.list>;
   devices: FunctionReturnType<typeof api.devices.list>;
   rules: { _id: Id<"accessRules">; name: string }[];
-  templates: FunctionReturnType<typeof api.accessScheduleTemplates.list>;
 };
 const emptyOptions: Options = {
   departments: [],
   devices: [],
   rules: [],
-  templates: [],
 };
 
 // Status UI reads only _id/name from devices; keeping the old array when those
@@ -44,13 +42,9 @@ export function useStatusOptions({
   useEffect(() => {
     let alive = true;
     async function loadOptions() {
-      const [departments, devices, templates] = await Promise.all([
+      const [departments, devices] = await Promise.all([
         convex.query(api.departments.list, { projectId }),
         convex.query(api.devices.list, { projectId }),
-        convex.query(api.accessScheduleTemplates.list, {
-          projectId,
-          includeArchived: true,
-        }),
       ]);
       const rules: Options["rules"] = [];
       let next: string | null = null;
@@ -67,7 +61,6 @@ export function useStatusOptions({
         setOptions((prev) => ({
           departments,
           devices: keepSameDevices(prev.devices, devices),
-          templates,
           rules,
         }));
     }

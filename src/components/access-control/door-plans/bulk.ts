@@ -30,7 +30,6 @@ export function copyPlanFields(
   return {
     ...(types.includes("status") && source.hikDoorStatusPlan
       ? {
-          hikDoorStatusTemplateId: source.hikDoorStatusTemplateId ?? null,
           hikDoorStatusPlan: source.hikDoorStatusPlan,
         }
       : {}),
@@ -102,3 +101,10 @@ export async function applyBulkPlans(
 }
 export const bulkFailed = (row: BulkResult) =>
   !row.saved || row.plans.some((plan) => !plan.ok);
+
+export const bulkResultLabel = (row: BulkResult) =>
+  bulkFailed(row)
+    ? "Gönderilemedi"
+    : row.plans.length
+      ? "Gönderildi"
+      : "Değişiklik yok, gönderilmedi";

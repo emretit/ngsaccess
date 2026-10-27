@@ -1,7 +1,9 @@
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-export function CollapsibleFilters({ label = "Filtreler", activeCount = 0, forceOpen = false, children, desktopDisplay = "block", buttonVariant = "outline", buttonClassName }: {
+/** `collapseOn="all"` keeps the panel folded on desktop too (default: folds only on mobile). */
+export function CollapsibleFilters({ label = "Filtreler", activeCount = 0, forceOpen = false, children, desktopDisplay = "block", buttonVariant = "outline", buttonClassName, collapseOn = "mobile" }: {
   label?: string;
   activeCount?: number;
   forceOpen?: boolean;
@@ -9,15 +11,16 @@ export function CollapsibleFilters({ label = "Filtreler", activeCount = 0, force
   desktopDisplay?: "block" | "contents";
   buttonVariant?: "outline" | "ghost";
   buttonClassName?: string;
+  collapseOn?: "mobile" | "all";
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const expanded = forceOpen || open;
   return <>
-    <Button type="button" variant={buttonVariant} className={`md:hidden${buttonClassName ? ` ${buttonClassName}` : ""}`} aria-expanded={expanded} aria-controls={id} onClick={() => setOpen(value => !value)}>
+    <Button type="button" variant={buttonVariant} className={cn(collapseOn !== "all" && "md:hidden", buttonClassName)} aria-expanded={expanded} aria-controls={id} onClick={() => setOpen(value => !value)}>
       {`${label}${activeCount > 0 ? ` (${activeCount})` : ""}`}
     </Button>
-    <div id={id} className={`${expanded ? "block" : "hidden"} ${desktopDisplay === "contents" ? "w-full min-w-0 md:contents" : "md:block"}`}>
+    <div id={id} className={collapseOn === "all" ? (expanded ? "block w-full min-w-0" : "hidden") : `${expanded ? "block" : "hidden"} ${desktopDisplay === "contents" ? "w-full min-w-0 md:contents" : "md:block"}`}>
       {children}
     </div>
   </>;

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { pastAttemptText } from "@/lib/pastAttempt";
 import { formatTrDateTime } from "@/lib/date";
 import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import {
@@ -12,24 +12,19 @@ import {
   type EmployeeDetail,
 } from "./model";
 
-export function GrantBadge({ row }: { row: Parameters<typeof grantBadge>[0] }) {
+export function GrantBadge({ row }: { row: Parameters<typeof grantBadge>[0] & { updatedAt?: number } }) {
   const badge = grantBadge(row);
   return (
-    <span className="inline-flex flex-wrap gap-1" title={badge.hint}>
-      <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
-      {badge.stale && (
-        <StatusBadge tone="warning" title="Kural veya şablon cihaza gönderildikten sonra değişti; yeniden dağıtın.">
-          Güncel değil
-        </StatusBadge>
-      )}
-      {row.doorUnresolved && (
-        <StatusBadge tone="warning" title="Kuralın kapı seçimini düzeltin; yeniden göndermek bunu çözmez.">
-          Kapı eşleşmedi
-        </StatusBadge>
-      )}
-      {badge.hint && (
-        <span className="text-xs text-danger break-words">{badge.hint}</span>
-      )}
+    <span className="inline-flex flex-col gap-1">
+      <span className="inline-flex flex-wrap gap-1">
+        <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+        {row.doorUnresolved ? (
+          <StatusBadge tone="warning" title="Kuralın kapı seçimini düzeltin; yeniden göndermek bunu çözmez.">Kapı seçimi düzeltilmeli</StatusBadge>
+        ) : badge.stale ? (
+          <StatusBadge tone="warning" title="Kural cihaza gönderildikten sonra değişti; yeniden dağıtın.">Yeniden gönderilmeli</StatusBadge>
+        ) : null}
+      </span>
+      {badge.hint && <span className="text-xs text-danger break-words">{pastAttemptText(row.updatedAt, badge.hint)}</span>}
     </span>
   );
 }
@@ -42,28 +37,21 @@ export function EmptyStatus({ unknownCount }: { unknownCount: number }) {
     </p>
   );
 }
-export const columns = [
-  "Kişi",
-  "Departman",
-  "Cihaz",
-  "Kapı(lar)",
-  "Kural",
-  "Şablon",
-  "Durum",
-  "Son güncelleme",
-];
+export const columns = ["Kişi", "Cihaz/kapı", "Durum"];
 export function GrantRows({
   rows,
   selected,
   onToggle,
   onEmployee,
   canManage,
+  hideDevice = false,
 }: {
   rows: GrantRow[];
   selected: Pair[];
   onToggle: (row: Pair) => void;
   onEmployee: (row: GrantRow, trigger?: HTMLElement) => void;
   canManage: boolean;
+  hideDevice?: boolean;
 }) {
   const cells = (row: GrantRow) => [
     <Button
@@ -74,15 +62,13 @@ export function GrantRows({
     >
       {row.employeeName}
     </Button>,
-    row.departmentName ?? "—",
-    row.deviceName,
-    row.brand === "hikvision"
-      ? `Tüm kapılar (cihaz)${row.doorNames.length ? ` · ${row.doorNames.join(", ")}` : ""}`
-      : row.doorNames.join(", ") || "—",
-    row.ruleNames.join(", ") || "—",
-    row.templateNames.join(", ") || (row.ruleNames.length ? "Kuralın kendi saati" : "—"),
+    <span className="space-y-1 block">
+      {!hideDevice && <span className="block">{row.deviceName}</span>}
+      <span className="block text-xs text-muted-foreground">{row.brand === "hikvision"
+        ? `Tüm kapılar (cihaz)${row.doorNames.length ? ` · ${row.doorNames.join(", ")}` : ""}`
+        : row.doorNames.join(", ") || "—"}</span>
+    </span>,
     <GrantBadge row={row} />,
-    row.updatedAt ? formatTrDateTime(row.updatedAt) : "—",
   ];
   const checkbox = (row: GrantRow, mobile = false) => (
     <Checkbox
@@ -101,7 +87,7 @@ export function GrantRows({
               {canManage && <th className="p-2">Seç</th>}
               {columns.map((c) => (
                 <th key={c} className="p-2 text-left">
-                  {c}
+                  {hideDevice && c === "Cihaz/kapı" ? "Kapı" : c}
                 </th>
               ))}
             </tr>
@@ -120,7 +106,7 @@ export function GrantRows({
                 )}
                 {cells(row).map((cell, i) => (
                   <td
-                    key={columns[i]}
+                    key={hideDevice && i === 1 ? "Kapı" : columns[i]}
                     className="p-2 align-top break-words max-w-48"
                   >
                     {cell}
@@ -151,11 +137,11 @@ export function GrantRows({
             <dl className="space-y-2">
               {cells(row).map((cell, i) => (
                 <div
-                  key={columns[i]}
+                  key={hideDevice && i === 1 ? "Kapı" : columns[i]}
                   className="grid grid-cols-[6rem_minmax(0,1fr)] gap-2"
                 >
                   <dt className="text-muted-foreground text-xs">
-                    {columns[i]}
+                    {hideDevice && i === 1 ? "Kapı" : columns[i]}
                   </dt>
                   <dd className="min-w-0 break-words text-sm">{cell}</dd>
                 </div>
@@ -193,28 +179,34 @@ export function EmployeeStatus({ detail }: { detail: EmployeeDetail }) {
           className="border rounded-md p-3 space-y-2 break-words"
         >
           <h3>{row.deviceName}</h3>
+          <p className="text-xs text-muted-foreground">Departman: {row.departmentName ?? "—"}</p>
           <GrantBadge row={row} />
-          {row.removalRequired && <Badge variant="outline">Kaldırılacak</Badge>}
+          <p className="text-xs text-muted-foreground">Son güncelleme: {row.updatedAt ? formatTrDateTime(row.updatedAt) : "—"}</p>
+          {row.state === "failed" && row.lastError && (
+            <details>
+              <summary className="cursor-pointer min-h-11 py-3 text-sm">Hata ayrıntısı</summary>
+              <p className="text-xs break-words">{pastAttemptText(row.updatedAt, row.lastError)}</p>
+            </details>
+          )}
+          {row.removalRequired && <p className="text-sm font-medium text-warning">Kaldırılacak</p>}
           <p>{row.doorNames.join(", ") || "Kapı bilgisi yok"}</p>
           <p className="text-xs">
             {row.ruleNames.join(", ") || "Kural yok"} ·{" "}
-            {row.templateNames.join(", ") || (row.ruleNames.length ? "Kuralın kendi saati" : "Kural yok")}
+            {row.ruleNames.length ? "Kuralın kendi saati" : "Kural yok"}
           </p>
         </article>
       ))}
       {detail.rows.length === 0 && <p>Cihaz kaydı yok.</p>}
-      <h3 className="font-medium">Yetkisiz kapılar</h3>
       {detail.unauthorizedDoors.length ? (
-        <ul>
-          {detail.unauthorizedDoors.map((door) => (
-            <li key={door.doorId} className="break-words">
-              {door.doorName} · Yetkisiz
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>Yetkisiz kapı yok.</p>
-      )}
+        <details>
+          <summary className="font-medium cursor-pointer min-h-11 py-3">Kural dışında kalan {detail.unauthorizedDoors.length} kapı</summary>
+          <ul>
+            {detail.unauthorizedDoors.map((door) => (
+              <li key={door.doorId} className="break-words">{door.doorName}</li>
+            ))}
+          </ul>
+        </details>
+      ) : <p>Kural dışında kalan kapı yok.</p>}
     </div>
   );
 }

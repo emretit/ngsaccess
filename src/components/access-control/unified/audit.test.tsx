@@ -14,7 +14,7 @@ vi.mock("convex/react", () => ({
     if (name === "accessRules:listSummaries") return { page: [{ _id: "r", name: "NGS", targetType: "visitor", memberCount: 0, panels: [{ deviceId: "p", label: "Panel — tüm kapılar" }], unassignedDoors: [] }], isDone: true, continueCursor: "" };
     if (name === "accessRules:projectDeviceCounts") return { total: 4, brands: { hikvision: 2, ide_smart: 1, other: 1 } };
     if (name === "deviceSyncRuns:latestForRule") return null;
-    if (name === "accessRules:getDetails") return { targetType: state.detailType, panels: [{ deviceId: "p", label: "Panel X — 1/4 kapı", doors: [{ doorId: "d", name: "Giriş", zoneName: "Kat 1" }] }], unassignedDoors: [] };
+    if (name === "accessRules:getDetails") return { targetType: state.detailType, groupMembers: [], panels: [{ deviceId: "p", label: "Panel X — 1/4 kapı", doors: [{ doorId: "d", name: "Giriş", zoneName: "Kat 1" }] }], unassignedDoors: [] };
     return [];
   },
   usePaginatedQuery: () => ({ results: [], status: "Exhausted", loadMore: vi.fn() }),
@@ -28,7 +28,7 @@ vi.mock("@/hooks/useEmployees", () => ({ useEmployees: () => ({ employees: [{ _i
 vi.mock("@/hooks/useDepartments", () => ({ useDepartments: () => ({ departments: [] }) }));
 import AccessRulesList from "./AccessRulesList";
 import { AccessRuleDetails } from "./AccessRuleDetails";
-import { ProjectSyncButton, brandDistribution } from "./SyncRuns";
+import { ProjectSyncButton } from "./SyncRuns";
 import { DepartmentTree } from "./components/DepartmentTree";
 import { ZoneDeviceTree } from "./components/ZoneDeviceTree";
 
@@ -49,9 +49,9 @@ describe("05 denetim düzeltmeleri", () => {
   it("proje gönderimi yalnız sunucu sayımını ister ve kapsamı dürüst belirtir", () => {
     state.queries.length = 0;
     const html = renderToStaticMarkup(<ProjectSyncButton projectId={projectId} />);
-    expect(html).toContain("Tüm proje cihazlarına gönder");
+    expect(html).toContain("Diğer işlemler");
+    expect(html).not.toContain("Tüm proje cihazlarına gönder");
     expect(state.queries.map(q => q.name)).toEqual(["accessRules:projectDeviceCounts"]);
-    expect(brandDistribution({ hikvision: 2, ide_smart: 1, other: 1, legacy: 1 })).toBe("Hikvision: 2, IDE Smart: 1, Diğer: 2");
   });
   it("personelde ziyaretçi notu göstermez, kapıyı panel altında bir kez gösterir", () => {
     state.detailType = "personnel";

@@ -25,33 +25,51 @@ export function DoorVerifyPlanSection({
       <div className="flex min-h-11 items-center justify-between gap-2">
         <Label htmlFor="verify-enabled">Doğrulama Modu Planı</Label>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="text-sm">{verifyPlan.enabled ? "Açık" : "Kapalı"}</span>
+          <span className="text-sm">
+            {verifyPlan.enabled ? "Açık" : "Kapalı"}
+          </span>
           <Switch
-          id="verify-enabled"
-          checked={verifyPlan.enabled}
-          onCheckedChange={(enabled) =>
-            setVerifyPlan((p) => ({ ...p, enabled }))
-          }
-        />
+            id="verify-enabled"
+            checked={verifyPlan.enabled}
+            onCheckedChange={(enabled) =>
+              setVerifyPlan((p) => ({ ...p, enabled }))
+            }
+          />
         </div>
       </div>
-      {verifyPlan.enabled ? <div
-        id="verify-plan"
-        tabIndex={-1}
-        aria-invalid={!!timeErrors["verify-plan"]}
-      >
-        <DoorVerifyPlanEditor
-          value={verifyPlan}
-          onChange={setVerifyPlan}
-          invalid={Boolean(timeErrors["verify-plan"])}
-          aria-describedby={timeErrors["verify-plan"] ? "verify-plan-error" : undefined}
-        />
-        {timeErrors["verify-plan"] && (
-          <p id="verify-plan-error" role="alert" className="text-sm text-destructive">
-            {timeErrors["verify-plan"]}
+      {verifyPlan.enabled ? (
+        <div
+          id="verify-plan"
+          tabIndex={-1}
+          aria-invalid={!!timeErrors["verify-plan"]}
+        >
+          <p className="text-xs text-muted-foreground">
+            Saatler dışında kişi yetkileri geçerlidir.
           </p>
-        )}
-      </div> : <p className="text-sm">Plan etkin değil. Geçerli doğrulama yöntemi kullanılır; kayıtlı saatler korunur.</p>}
+          <DoorVerifyPlanEditor
+            value={verifyPlan}
+            onChange={setVerifyPlan}
+            invalid={Boolean(timeErrors["verify-plan"])}
+            aria-describedby={
+              timeErrors["verify-plan"] ? "verify-plan-error" : undefined
+            }
+          />
+          {timeErrors["verify-plan"] && (
+            <p
+              id="verify-plan-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {timeErrors["verify-plan"]}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm">
+          Plan etkin değil. Geçerli doğrulama yöntemi kullanılır; kayıtlı
+          saatler korunur.
+        </p>
+      )}
     </fieldset>
   );
 }

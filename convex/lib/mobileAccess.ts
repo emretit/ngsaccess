@@ -1,4 +1,3 @@
-import { effectiveSchedule, isAllowedAt, type ScheduleTemplate } from "./accessSchedule";
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
@@ -31,11 +30,7 @@ export function accessError(code: string) {
 }
 
 /** Legacy overnight/malformed schedules fail closed, matching the write validator. */
-export function mobileRuleAllows(rule: Doc<"accessRules">, now: number, template: ScheduleTemplate | null = null): boolean {
-  if (rule.scheduleTemplateId) {
-    try { return rule.isActive !== false && isAllowedAt(effectiveSchedule(rule, template), now); }
-    catch (error) { console.warn("Geçersiz erişim şablonu; mobil erişim kapatıldı", rule._id, error); return false; }
-  }
+export function mobileRuleAllows(rule: Doc<"accessRules">, now: number): boolean {
   if (rule.isActive === false || accessScheduleError(rule)) return false;
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Istanbul", weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
@@ -84,7 +79,7 @@ export async function listMobileTargets(ctx: QueryCtx, employee: Doc<"employees"
   if (!project || project.isActive === false) return [];
   const memberships: Doc<"groupMembers">[] = bounded<Doc<"groupMembers">>(await ctx.db.query("groupMembers")
     .withIndex("by_project_employee", q => q.eq("projectId", projectId).eq("employeeId", employee._id)).take(GRAPH_LIMIT + 1));
-  const grants = new Map<Id<"devices">, Array<{ rule: Doc<"accessRules">; template: Doc<"accessScheduleTemplates"> | null; doors: Set<Id<"doors">> | null }>>();
+  const grants = new Map<Id<"devices">, Array<{ rule: Doc<"accessRules">; doors: Set<Id<"doors">> | null }>>();
   for (const groupId of new Set(memberships.map(value => value.groupId))) {
     const rule = await ctx.db.get(groupId);
     if (!rule || rule.projectId !== projectId) continue;
@@ -114,8 +109,7 @@ export async function listMobileTargets(ctx: QueryCtx, employee: Doc<"employees"
       const hasDoorRestriction = doorLinks.some(link => link.deviceId === deviceId) || doorsByDevice.has(deviceId);
       const restricted = hasDoorRestriction ? doorsByDevice.get(deviceId) ?? new Set<Id<"doors">>() : null;
       const entries = grants.get(deviceId) ?? [];
-      const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
-      entries.push({ rule, template, doors: restricted });
+      entries.push({ rule, doors: restricted });
       grants.set(deviceId, entries);
     }
   }
@@ -143,7 +137,7 @@ export async function listMobileTargets(ctx: QueryCtx, employee: Doc<"employees"
       const reason = device.isActive === false ? "DEVICE_INACTIVE"
         : door?.status && door.status !== "active" ? "DOOR_INACTIVE"
         : !employeeWithinAccessEpoch(employee, now) ? "ACCESS_EPOCH_DENIED"
-        : !applicable.some(entry => mobileRuleAllows(entry.rule, now, entry.template)) ? "SCHEDULE_DENIED"
+        : !applicable.some(entry => mobileRuleAllows(entry.rule, now)) ? "SCHEDULE_DENIED"
         : !validSlot || duplicateSlot || (!door && count !== 1) ? "TARGET_UNSUPPORTED"
         : transport === "unsupported" ? "TRANSPORT_UNSUPPORTED" : null;
       result.push({

@@ -31,7 +31,6 @@ vi.mock("@/hooks/useAsyncAction", () => ({
 }));
 vi.mock("../lib/loadRuleEditor", () => ({ loadRuleEditor: state.load }));
 vi.mock("../AccessRuleDetails", () => ({ AccessRuleDetails: () => <div>Kural ayrıntıları</div> }));
-vi.mock("../templates/RuleScheduleSummary", () => ({ RuleScheduleSummary: () => <span>Şablon saatleri</span> }));
 vi.mock("@/components/shared/ConfirmDestructive", () => ({ ConfirmDestructive: () => null }));
 vi.mock("@/components/shared/RowActions", () => ({ RowActions: () => null }));
 vi.mock("@/components/ui/button", () => ({

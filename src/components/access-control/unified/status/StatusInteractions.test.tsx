@@ -21,6 +21,10 @@ vi.mock("react", async original => ({ ...await original<typeof import("react")>(
   return [runner.states[index], (next: unknown) => { runner.states[index] = typeof next === "function" ? next(runner.states[index]) : next; }];
 } }));
 vi.mock("convex/react", () => ({ useMutation: () => runner.mutate }));
+vi.mock("@/components/ui/dropdown-menu", () => {
+  const Part = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
+  return { DropdownMenu: Part, DropdownMenuTrigger: Part, DropdownMenuContent: Part, DropdownMenuItem: Part };
+});
 vi.mock("@/components/ui/dialog", () => {
   const Part = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   return { Dialog: Part, DialogContent: Part, DialogHeader: Part, DialogTitle: Part, DialogDescription: Part };
@@ -43,7 +47,7 @@ const row: GrantRow = {
   _id: "grant" as Id<"accessGrantStatus">, _creationTime: 0, projectId,
   employeeId: "employee" as Id<"employees">, deviceId: "device" as Id<"devices">,
   employeeName: "Deniz Yılmaz", departmentName: null, deviceName: "Ana giriş", state: "effective", updatedAt: 0,
-  ruleIds: [], templateIds: [], ruleNames: [], templateNames: [], doorIds: [], doorNames: [],
+  ruleIds: [], ruleNames: [], doorIds: [], doorNames: [],
   stale: false, doorUnresolved: false, brand: "hikvision",
 };
 const counts = { all: 7, effective: 7, pending: 0, failed: 0, removed: 0, unknown: 0, capped: false, personCount: 7 };
@@ -59,10 +63,10 @@ beforeEach(() => { runner.states = []; runner.cursor = 0; vi.clearAllMocks(); })
 describe("Yetki Durumu etkileşimleri", () => {
   it("tek temizle işlemi bütün filtreleri ve aramayı sıfırlar", () => {
     const initial = filters();
-    initial.change({ departmentId: "dep" as Id<"departments">, deviceId: row.deviceId, ruleId: "r" as Id<"accessRules">, templateId: "t" as Id<"accessScheduleTemplates">, state: "failed", search: "Deniz" });
+    initial.change({ departmentId: "dep" as Id<"departments">, deviceId: row.deviceId, ruleId: "r" as Id<"accessRules">, state: "failed", search: "Deniz" });
     initial.setSearch("Deniz");
     const active = filters();
-    render(<StatusFilters {...active} options={{ departments: [], devices: [], rules: [], templates: [] }} />);
+    render(<StatusFilters {...active} options={{ departments: [], devices: [], rules: [] }} />);
     runner.clear?.();
     expect(filters().filters).toEqual({});
     expect(filters().search).toBe("");
@@ -91,6 +95,23 @@ describe("Yetki Durumu etkileşimleri", () => {
     expect(render(<RedistributeBar {...props} canManageDevices={false} />)).not.toContain("Tümünü yeniden dağıt");
     expect(render(<RedistributeBar {...props} canManageDevices />)).toContain("Tümünü yeniden dağıt");
   });
+  it("seçim yokken seçili gönderimi gizler; bakım işlemlerini menüye toplar", () => {
+    const html = render(<RedistributeBar selected={[]} sending={false} projectCounts={counts} setError={() => {}} setAction={() => {}} canManageDevices />);
+    expect(html).not.toContain("Seçili 0");
+    expect(html).toContain("Diğer gönderim işlemleri");
+    expect(html).toContain("Hatalıları yeniden dağıt");
+    expect(html).toContain("Tümünü yeniden dağıt");
+  });
+  it("genel onayı kısa kapsamla açar; teknik açıklamayı kapalı ayrıntıda tutar", () => {
+    const props = { selected: [], sending: false, send: async () => {}, setAction: () => {}, projectCounts: { ...counts, failed: 250 }, error: "", setError: () => {} };
+    const html = render(<RedistributeDialog {...props} action="all" />);
+    expect(html).toContain("Tüm proje · filtreler uygulanmaz · 7 kayıt");
+    expect(html).toMatch(/<details><summary[^>]*>Ayrıntı/);
+    expect(html).not.toContain("<details open");
+    const failed = render(<RedistributeDialog {...props} action="failed" />);
+    expect(failed).toContain("Tüm proje · filtreler uygulanmaz · 250 kayıt");
+    expect(failed).toMatch(/<p>İlk 100 kayıt gönderilecek; kalan 150 sonraki turda.<\/p><details>/);
+  });
   it("yetki kaybedilirse açık tümünü gönder onayı mutation başlatamaz; seçili gönderim korunur", async () => {
     let current: ReturnType<typeof useRedistribution> | undefined;
     function Harness() { current = useRedistribution({ projectId, selected: [row], setSelected: vi.fn(), setError: vi.fn(), canManageDevices: false }); return null; }
@@ -110,8 +131,10 @@ describe("Yetki Durumu etkileşimleri", () => {
     const html = render(<GrantRows rows={[row]} selected={[]} onToggle={() => {}} onEmployee={() => {}} canManage />);
     expect(html).toMatch(/<label[^>]*for="mobile-employee:device"[^>]*class="[^"]*min-h-11/);
     expect(html).toContain('id="mobile-employee:device"');
-    const filterHtml = render(<StatusFilters filters={{ state: "failed", deviceId: row.deviceId, search: "Deniz" }} search="Deniz" setSearch={() => {}} change={() => {}} clear={() => {}} options={{ departments: [], devices: [], rules: [], templates: [] }} />);
-    expect(filterHtml).toContain("Filtreler (2)");
+    const filterHtml = render(<StatusFilters filters={{ state: "failed", deviceId: row.deviceId, search: "Deniz" }} search="Deniz" setSearch={() => {}} change={() => {}} clear={() => {}} options={{ departments: [], devices: [], rules: [] }} />);
+    expect(filterHtml).toContain("Filtreler (1)");
     expect(filterHtml).toContain('aria-expanded="false"');
+    expect(filterHtml).not.toContain('aria-label="Durum"');
+    expect(filterHtml).not.toContain("last-of-type");
   });
 });

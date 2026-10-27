@@ -1,7 +1,7 @@
 import { hasReadingPermission, MONITORING_READING_PERMISSIONS } from "./lib/readingAccess";
 import { deviceConnection } from "./lib/deviceConnection";
 import { hasPermission, requirePermission } from "./lib/permissions";
-import { doorStatusPlanValidator, normalizeDoorStatusPlan, normalizeVerifyPlan, verifyPlanValidator, templateToDoorStatusPlan, holidayPlanValidator, holidayRanges, holidaySupportFromSnapshot } from "./lib/doorStatusPlan";
+import { doorStatusPlanValidator, normalizeDoorStatusPlan, normalizeVerifyPlan, verifyPlanValidator, holidayPlanValidator, holidayRanges, holidaySupportFromSnapshot } from "./lib/doorStatusPlan";
 
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
@@ -319,7 +319,6 @@ export const update = authedMutation({
     await ctx.db.patch(doorId, { ...updates, updatedAt: now, ...(plansChanged ? {
       hikPlanSavedAt: now, hikPlanRevision: (door.hikPlanRevision ?? 0) + 1,
       hikPlanResults: undefined, hikPlanApplyError: undefined,
-      ...(updates.hikDoorStatusPlan ? { hikDoorStatusTemplateId: undefined, hikDoorStatusTemplateUpdatedAt: undefined } : {}),
     } : {}), ...(targetChanged ? {
       hikPlanRevision: (door.hikPlanRevision ?? 0) + 1,
       hikPlanResults: undefined, hikPlanApplyError: undefined, hikPlanAppliedAt: undefined,
@@ -579,7 +578,6 @@ export const updatePlans = authedMutation({
     hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
     hikVerifyPlan: v.optional(verifyPlanValidator),
     hikDoorHolidayPlan: v.optional(holidayPlanValidator),
-    hikDoorStatusTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
   },
   handler: async (ctx, args) => {
     const door = await ctx.db.get(args.doorId);
@@ -589,25 +587,13 @@ export const updatePlans = authedMutation({
     if (!device || device.projectId !== door.projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway") {
       throw new ConvexError("Planlar yalnız Hikvision gateway kapılarında desteklenir");
     }
-    let statusPlan = args.hikDoorStatusPlan;
-    const templateId = args.hikDoorStatusTemplateId;
-    let templateUpdatedAt: string | undefined;
-    if (templateId) {
-      const template = await ctx.db.get(templateId);
-      if (!template || template.projectId !== door.projectId || (template.isArchived && templateId !== door.hikDoorStatusTemplateId))
-        throw new ConvexError("Zaman şablonu bulunamadı veya kullanılamıyor");
-      if (!statusPlan || statusPlan.mode === "normal") throw new ConvexError("Şablon için sürekli açık veya sürekli kilitli seçin");
-      statusPlan = templateToDoorStatusPlan(template.week, statusPlan.mode, statusPlan.enabled);
-      templateUpdatedAt = template.updatedAt;
-    }
     if (args.hikDoorHolidayPlan && (!Number.isInteger(args.hikDoorHolidayPlan.year) || args.hikDoorHolidayPlan.year < 2000 || args.hikDoorHolidayPlan.year > 2100))
       throw new ConvexError("Tatil yılı 2000–2100 arasında olmalıdır");
-    const normalizedStatus = statusPlan === undefined ? undefined : normalizeDoorStatusPlan(statusPlan);
+    const normalizedStatus = args.hikDoorStatusPlan === undefined ? undefined : normalizeDoorStatusPlan(args.hikDoorStatusPlan);
     const normalizedVerify = args.hikVerifyPlan === undefined ? undefined : normalizeVerifyPlan(args.hikVerifyPlan);
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
     const statusChanged = normalizedStatus !== undefined &&
-      (!same(normalizedStatus, door.hikDoorStatusPlan && normalizeDoorStatusPlan(door.hikDoorStatusPlan)) ||
-        (templateId ?? undefined) !== door.hikDoorStatusTemplateId || templateUpdatedAt !== door.hikDoorStatusTemplateUpdatedAt);
+      !same(normalizedStatus, door.hikDoorStatusPlan && normalizeDoorStatusPlan(door.hikDoorStatusPlan));
     const holidayChanged = args.hikDoorHolidayPlan !== undefined &&
       !same(args.hikDoorHolidayPlan, door.hikDoorHolidayPlan) &&
       (!!door.hikDoorHolidayPlan || args.hikDoorHolidayPlan.enabled);
@@ -630,8 +616,7 @@ export const updatePlans = authedMutation({
     };
     await ctx.db.patch(door._id, {
       ...(holidayChanged ? { hikDoorHolidayPlan: args.hikDoorHolidayPlan } : {}),
-      ...(statusChanged ? { hikDoorStatusPlan: normalizedStatus,
-        hikDoorStatusTemplateId: templateId ?? undefined, hikDoorStatusTemplateUpdatedAt: templateUpdatedAt } : {}),
+      ...(statusChanged ? { hikDoorStatusPlan: normalizedStatus } : {}),
       ...(verifyChanged ? { hikVerifyPlan: normalizedVerify, hikVerifyPlanSavedAt: now } : {}),
       hikPlanSavedAt: now, hikPlanRevision: revision,
       hikPlanResults: results, hikPlanApplyError: [results.status?.error, results.verify?.error].filter((e): e is string => !!e).join("; ") || undefined, updatedAt: now,
@@ -649,16 +634,13 @@ export const listPlanTargets = authedQuery({
       const device = door.deviceId ? await ctx.db.get(door.deviceId) : null;
       if (!device || device.projectId !== projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway") return null;
       const zone = door.zoneId ? await ctx.db.get(door.zoneId) : null;
-      const template = door.hikDoorStatusTemplateId ? await ctx.db.get(door.hikDoorStatusTemplateId) : null;
-      const ownTemplate = template?.projectId === projectId ? template : null;
       return {
         projectId, hikDoorHolidayPlan: door.hikDoorHolidayPlan ?? null,
         holidaySupported: holidaySupportFromSnapshot(device.hikCapabilitiesSnapshot),
-        hikDoorStatusTemplateId: door.hikDoorStatusTemplateId ?? null,
-        templateName: ownTemplate?.name ?? null,
-        templateChanged: !!ownTemplate && ownTemplate.updatedAt !== door.hikDoorStatusTemplateUpdatedAt,
         hikPlanSavedAt: door.hikPlanSavedAt ?? null, hikPlanAppliedAt: door.hikPlanAppliedAt ?? null,
         hikPlanApplyError: door.hikPlanApplyError ?? null,
+        hikPlanFailedAt: [door.hikPlanResults?.status, door.hikPlanResults?.verify]
+          .filter(result => result?.error && result.failedAt).map(result => result?.failedAt ?? "").sort().pop() ?? null,
         plansPending: !!door.hikPlanSavedAt && !["status", "verify"].every(key => {
           const result = key === "status" ? door.hikPlanResults?.status : door.hikPlanResults?.verify;
           const plan = key === "status" ? door.hikDoorStatusPlan : door.hikVerifyPlanSavedAt && door.hikVerifyPlan;
@@ -685,12 +667,16 @@ export const recordPlanResult = internalMutation({
     if ((door.hikPlanRevision ?? 0) !== args.revision) {
       // An old request may have reached the device after a newer save/send.
       // Conservatively require a resend instead of displaying a false success.
-      await ctx.db.patch(door._id, { hikPlanResults: undefined, hikPlanApplyError: "Gönderim sırasında plan değişti; yeniden gönderin" });
+      const error = "Gönderim sırasında plan değişti; yeniden gönderin";
+      await ctx.db.patch(door._id, {
+        hikPlanResults: { [args.key]: { revision: door.hikPlanRevision ?? 0, error, failedAt: new Date().toISOString() } },
+        hikPlanApplyError: error,
+      });
       return;
     }
     const now = new Date().toISOString();
     const results = { ...door.hikPlanResults, [args.key]: { revision: args.revision,
-      ...(args.error ? { error: args.error.slice(0, 500) } : { appliedAt: now }) } };
+      ...(args.error ? { error: args.error.slice(0, 500), failedAt: now } : { appliedAt: now }) } };
     const error = [results.status?.error, results.verify?.error].filter((e): e is string => !!e).join("; ");
     const complete = (!(door.hikDoorStatusPlan || door.hikDoorHolidayPlan?.enabled) || !!results.status?.appliedAt) && (!(door.hikVerifyPlanSavedAt && door.hikVerifyPlan) || !!results.verify?.appliedAt);
     await ctx.db.patch(door._id, { hikPlanResults: results, hikPlanApplyError: error || undefined,

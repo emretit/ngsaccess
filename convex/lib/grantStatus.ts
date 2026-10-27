@@ -36,8 +36,7 @@ export async function grantRuleScope(ctx: QueryCtx, rule: Doc<"accessRules">) {
     deviceIds.add(door.deviceId);
     selected.set(door.deviceId, [...selected.get(door.deviceId) ?? [], door]);
   }
-  const template = rule.scheduleTemplateId ? await ctx.db.get(rule.scheduleTemplateId) : null;
-  const hasSegments = toIdePermissionSegments(effectiveSchedule(rule, template)).length > 0;
+  const hasSegments = toIdePermissionSegments(effectiveSchedule(rule)).length > 0;
   const scopes = [];
   for (const deviceId of deviceIds) {
     const device = await ctx.db.get(deviceId);
