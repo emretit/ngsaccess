@@ -88,7 +88,8 @@ export function FormDialog({
           aria-busy={pending}
           className="flex min-h-0 flex-col gap-4"
         >
-          <div className="min-h-0 space-y-4 overflow-y-auto">{children}</div>
+          {/* -m-1 p-1: scroll kutusu focus ring'ini (ring-2) kırpmasın */}
+          <div className="-m-1 min-h-0 space-y-4 overflow-y-auto p-1">{children}</div>
           <div className="shrink-0">{footer}</div>
         </form>
       </DialogContent>

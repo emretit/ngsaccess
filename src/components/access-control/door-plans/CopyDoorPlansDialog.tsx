@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 import { TemplatePicker } from "../unified/templates/TemplatePicker";
 import type { DoorPlanTarget } from "./DoorPlanDialog";
@@ -116,22 +117,22 @@ export function CopyDoorPlansDialog({
         >
           <label className="block">
             Kaynak türü{" "}
-            <select
+            <NativeSelect
               aria-label="Kaynak türü"
-              className="w-full border bg-background rounded p-2"
+              className="w-full"
               value={sourceType}
               onChange={(event) => setSourceType(event.target.value)}
             >
               <option value="door">Kapının tüm planları</option>
               <option value="template">Zaman şablonu (durum planı)</option>
-            </select>
+            </NativeSelect>
           </label>
           {sourceType === "door" ? (
             <label className="block">
               Kaynak kapı{" "}
-              <select
+              <NativeSelect
                 aria-label="Kaynak kapı"
-                className="w-full border bg-background rounded p-2"
+                className="w-full"
                 value={sourceId}
                 onChange={(event) => setSourceId(event.target.value)}
               >
@@ -140,14 +141,14 @@ export function CopyDoorPlansDialog({
                     {door.doorName}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
           ) : (
             <>
               <TemplatePicker value={templateId} onChange={setTemplateId} />
               <label className="block">
                 Kapı modu{" "}
-                <select
+                <NativeSelect
                   aria-label="Kopyalanacak kapı modu"
                   value={mode}
                   onChange={(event) => {
@@ -157,7 +158,7 @@ export function CopyDoorPlansDialog({
                 >
                   <option value="remainClosed">Sürekli kilitli</option>
                   <option value="remainOpen">Sürekli açık</option>
-                </select>
+                </NativeSelect>
               </label>
             </>
           )}

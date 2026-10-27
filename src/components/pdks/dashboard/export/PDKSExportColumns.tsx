@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -37,10 +38,10 @@ export function PDKSExportColumns({ records, preferences, canSeePay, disabled, o
       })}
     </div>
     {preferences.format === 'CSV' && <label className="flex items-center gap-2 text-sm">CSV ayracı
-      <select className="h-9 rounded-md border border-input bg-background px-3" value={preferences.delimiter} disabled={disabled} onChange={event => {
+      <NativeSelect className="w-auto" value={preferences.delimiter} disabled={disabled} onChange={event => {
         const delimiter = event.target.value;
         if (delimiter === ',' || delimiter === ';' || delimiter === '\t') onChange({ ...preferences, delimiter });
-      }}><option value=",">Virgül (,)</option><option value=";">Noktalı virgül (;)</option><option value={'\t'}>TAB (sekme)</option></select>
+      }}><option value=",">Virgül (,)</option><option value=";">Noktalı virgül (;)</option><option value={'\t'}>TAB (sekme)</option></NativeSelect>
     </label>}
     <h3 className="text-sm font-medium">Önizleme (ilk 5 satır)</h3>
     <div className="max-w-full overflow-x-auto rounded-md border">

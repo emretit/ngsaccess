@@ -377,10 +377,22 @@ describe("PDKS kural ayarları", () => {
     );
     expect(state.actions.find(action => action.label === "Sürümü sil")?.disabled).toBe(false);
   });
+  it("alan hatalarını tarih ve tekrar okutma kontrollerine bağlar", () => {
+    render(<PdksRulesSettings />);
+    state.values[3] = {
+      effectiveFrom: "Geçerli bir tarih seçin.",
+      minPunchIntervalMinutes: "Aralık 0–60 dakika olmalıdır.",
+    };
+    const html = render(<PdksRulesSettings />);
+    expect(html).toMatch(/<button[^>]*id="pdks-effective-from"[^>]*aria-invalid="true"[^>]*aria-describedby="pdks-effective-from-error"/);
+    expect(html).toMatch(/<input[^>]*id="pdks-min-punch-interval"[^>]*aria-invalid="true"[^>]*aria-describedby="pdks-min-punch-interval-error"/);
+    expect(html).toContain('id="pdks-effective-from-error"');
+    expect(html).toContain('id="pdks-min-punch-interval-error"');
+  });
   it("aynı tarih onayında kayda alınmış payloadı yayınlar", async () => {
     render(<PdksRulesSettings />);
     const data = { ...values(), effectiveFrom: "2026-11-01" };
-    state.values[4] = { kind: "publish", values: data };
+    state.values[5] = { kind: "publish", values: data };
     expect(render(<PdksRulesSettings />)).toContain(
       "o tarihteki sürümün yerine geçer",
     );

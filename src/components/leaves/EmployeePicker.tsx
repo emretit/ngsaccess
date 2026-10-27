@@ -8,8 +8,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
-export const selectClass =
-  "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50";
 export function EmployeePicker({ projectId, value, onChange, control, disabled, allowAll = false }: {
   projectId: Id<"projects">; value: string; onChange: (value: string) => void;
   control: FieldControlProps; disabled?: boolean; allowAll?: boolean;

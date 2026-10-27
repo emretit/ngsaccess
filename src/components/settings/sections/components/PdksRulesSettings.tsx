@@ -85,9 +85,11 @@ function RulesEditor({
   }));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof PdksRuleValues, string>>>({});
   const [success, setSuccess] = useState("");
   const [confirmation, setConfirmation] = useState<RuleConfirmation>(null);
   const change = (patch: Partial<PdksRuleValues>) => {
+    setFieldErrors({});
     setValues((previous) => ({ ...previous, ...patch }));
     setError("");
     setSuccess("");
@@ -186,11 +188,18 @@ function RulesEditor({
           if (pending) return;
           const parsed = pdksRuleSchema.safeParse(values);
           if (!parsed.success) {
+            const next: Partial<Record<keyof PdksRuleValues, string>> = {};
+            for (const issue of parsed.error.issues) {
+              const key = issue.path[0];
+              if (typeof key === "string" && key in values) next[key as keyof PdksRuleValues] = issue.message;
+            }
+            setFieldErrors(next);
             setError(
               parsed.error.issues[0]?.message ?? "Alanları kontrol edin.",
             );
             return;
           }
+          setFieldErrors({});
           if (
             rules.future.some(
               (rule) => rule.effectiveFrom === parsed.data.effectiveFrom,
@@ -202,7 +211,7 @@ function RulesEditor({
       >
         <h3 className="font-medium">Yeni sürüm</h3>
         <fieldset disabled={pending} className="space-y-4">
-          <PdksRulesPunchFields values={values} change={change} />
+          <PdksRulesPunchFields values={values} change={change} errors={fieldErrors} />
           <PdksRulesCheckpointFields
             values={values}
             targets={targets}

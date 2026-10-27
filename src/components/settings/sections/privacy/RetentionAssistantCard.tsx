@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useState } from "react";
 import { z } from "zod";
 import { useMutation, useQuery } from "convex/react";
@@ -51,9 +52,9 @@ function RetentionForm({ projectId, days }: { projectId: Id<"projects">; days: n
     }}>
       <fieldset disabled={save.pending || confirmPending} className="min-w-0 space-y-4">
         <FormFieldWrapper htmlFor="retention-mode" label="Saklama seçimi">
-          <select id="retention-mode" className="h-9 w-full rounded-md border border-control bg-background px-3 text-sm" value={draft.values.unlimited ? "unlimited" : "custom"} onChange={event => draft.change({ unlimited: event.target.value === "unlimited" })}>
+          <NativeSelect id="retention-mode" className="w-full" value={draft.values.unlimited ? "unlimited" : "custom"} onChange={event => draft.change({ unlimited: event.target.value === "unlimited" })}>
             <option value="unlimited">Süresiz</option><option value="custom">Özel gün sayısı</option>
-          </select>
+          </NativeSelect>
         </FormFieldWrapper>
         {!draft.values.unlimited && <FormFieldWrapper htmlFor="retention-days" label="Gün sayısı" hint="1825–3650 arasında tam gün sayısı. Puantaj kaynağı olduğu için yasal saklama süresi en az 5 yıldır." error={!parsed.success ? parsed.error.issues[0]?.message : undefined}>
           <Input id="retention-days" type="number" min={1825} max={3650} step={1} value={draft.values.days} onChange={event => draft.change({ days: event.target.value })} />

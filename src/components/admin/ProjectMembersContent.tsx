@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { PasswordResetDialog, type PasswordResetTarget } from "./components/PasswordResetDialog";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -19,11 +20,11 @@ export function MemberRoleSelect({ member, projectId }: { member: Member; projec
     if (members) store.setQuery(api.roles.listProjectMembers, { projectId: args.projectId }, members.map(item => item.userId === args.userId ? { ...item, role: args.role } : item));
   });
   const { run, pending } = useAsyncAction(save, { success: "Proje rolü güncellendi", error: "Proje rolü değiştirilemedi" });
-  return <label className="space-y-1"><span className="sr-only">{member.name ?? member.email ?? "Kullanıcı"} proje rolü</span><select className="h-9 rounded-md border bg-background px-3 text-sm" value={member.role} disabled={pending || member.isSuperAdmin} onChange={async event => {
+  return <label className="space-y-1"><span className="sr-only">{member.name ?? member.email ?? "Kullanıcı"} proje rolü</span><NativeSelect className="w-auto" value={member.role} disabled={pending || member.isSuperAdmin} onChange={async event => {
     const role = event.target.value;
     if (!isProjectRole(role)) return;
     await run({ projectId, userId: member.userId, role });
-  }}>{PROJECT_ROLES.map(role => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select>{member.isSuperAdmin && <span className="ml-2 text-xs text-muted-foreground">Süper Admin · değiştirilemez</span>}</label>;
+  }}>{PROJECT_ROLES.map(role => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</NativeSelect>{member.isSuperAdmin && <span className="ml-2 text-xs text-muted-foreground">Süper Admin · değiştirilemez</span>}</label>;
 }
 
 export function ProjectMembersContent() {

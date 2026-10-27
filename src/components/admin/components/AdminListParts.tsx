@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PaginationBar } from "@/components/shared/PaginationBar";
 import { useState, type ReactNode } from "react";
@@ -19,15 +20,15 @@ export function AdminSelect({
   return (
     <label className="flex min-w-0 max-w-full items-center gap-2 text-xs text-muted-foreground">
       {label}
-      <select
+      <NativeSelect
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="h-9 min-w-0 max-w-[210px] rounded-md border border-input bg-background px-2 text-foreground focus-visible:outline-primary"
+        className="min-w-0 max-w-[210px]"
       >
         {children}
-      </select>
+      </NativeSelect>
     </label>
   );
 }

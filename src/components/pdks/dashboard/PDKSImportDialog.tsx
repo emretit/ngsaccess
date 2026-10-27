@@ -116,7 +116,7 @@ function ImportForm({ onOpenChange }: Props) {
               <label htmlFor="pdks-import-csv" className="block text-sm">CSV içeriği</label>
               <Textarea id="pdks-import-csv" value={csvText} disabled={pending}
                 onChange={(event) => setCsvText(event.target.value)}
-                className="min-h-[200px] font-mono text-xs" />
+                className="min-h-[200px] font-mono text-xs md:text-xs" />
             </>
           )}
           {preview && (

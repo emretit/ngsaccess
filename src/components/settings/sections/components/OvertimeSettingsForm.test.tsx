@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OvertimeSettingsForm, overtimeSettingsSchema } from "./OvertimeSettingsForm";
@@ -9,7 +9,7 @@ vi.mock("@/hooks/useAsyncAction", () => ({ useAsyncAction: () => ({ run: vi.fn()
 // Expose portal content in the server renderer so all option text can be asserted.
 vi.mock("@/components/ui/select", () => ({
   Select: ({ children, value, disabled }: { children: ReactNode; value: string; disabled?: boolean }) => <div data-select-value={value} data-disabled={disabled}>{children}</div>,
-  SelectTrigger: ({ children, id }: { children: ReactNode; id: string }) => <button id={id} role="combobox">{children}</button>,
+  SelectTrigger: ({ children, ...props }: ComponentProps<"button">) => <button {...props} role="combobox">{children}</button>,
   SelectValue: () => null,
   SelectContent: ({ children }: { children: ReactNode }) => <div role="listbox">{children}</div>,
   SelectItem: ({ children, value }: { children: ReactNode; value: string }) => <div role="option" data-value={value}>{children}</div>,
@@ -24,6 +24,9 @@ describe("13-H1 night overtime rate policy", () => {
     expect(html).toContain('Gece fazla mesaisinde çarpan');
     expect(html).toContain(`data-select-value="${mode ?? "max"}"`);
     expect(html).toContain('role="combobox"');
+    expect(html).toMatch(/id="overtimeBasis"[^>]*aria-describedby="overtimeBasis-hint"/);
+    expect(html).toMatch(/id="nightShiftDayMode"[^>]*aria-describedby="nightShiftDayMode-hint"/);
+    expect(html).toMatch(/id="nightCombineMode"[^>]*aria-describedby="nightCombineMode-hint"/);
     expect(html.match(/role="option"/g)).toHaveLength(7);
     for (const label of ["Büyük olan", "Çarpım", "Ek prim", "büyük olan 2; çarpım 3; ek prim 2,5", "Normal gece çalışmasına ek prim verilmez."]) expect(html).toContain(label);
   });

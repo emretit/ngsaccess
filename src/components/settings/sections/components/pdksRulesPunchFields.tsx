@@ -12,8 +12,10 @@ import {
 export function PdksRulesPunchFields({
   values,
   change,
+  errors = {},
 }: {
   values: PdksRuleValues;
+  errors?: Partial<Record<keyof PdksRuleValues, string>>;
   change: (patch: Partial<PdksRuleValues>) => void;
 }) {
   return (
@@ -24,10 +26,13 @@ export function PdksRulesPunchFields({
           <DateInput
             id="pdks-effective-from"
             required
+            aria-invalid={Boolean(errors.effectiveFrom)}
+            aria-describedby={errors.effectiveFrom ? "pdks-effective-from-error" : undefined}
             min={tomorrowInTurkey()}
             value={values.effectiveFrom}
             onChange={(effectiveFrom) => change({ effectiveFrom })}
           />
+          {errors.effectiveFrom && <p id="pdks-effective-from-error" role="alert" className="text-xs text-destructive">{errors.effectiveFrom}</p>}
           <p className="text-xs text-muted-foreground">
             Türkiye saatine göre en erken yarın.
           </p>
@@ -57,8 +62,11 @@ export function PdksRulesPunchFields({
         <div className="space-y-2">
           <Label htmlFor="pdks-min-punch-interval">Tekrar okutma aralığı (dk)</Label>
           <Input id="pdks-min-punch-interval" type="number" min={0} max={60} step="any"
+            aria-invalid={Boolean(errors.minPunchIntervalMinutes)}
+            aria-describedby={errors.minPunchIntervalMinutes ? "pdks-min-punch-interval-error" : undefined}
             value={values.minPunchIntervalMinutes ?? 1}
             onChange={event => change({ minPunchIntervalMinutes: event.target.value === "" ? NaN : Number(event.target.value) })} />
+          {errors.minPunchIntervalMinutes && <p id="pdks-min-punch-interval-error" role="alert" className="text-xs text-destructive">{errors.minPunchIntervalMinutes}</p>}
           <p className="text-xs text-muted-foreground">0–60 dakika. Her giriş-çıkışı topla modunda aynı yönlü tekrarları eler.</p>
         </div>
       </div>

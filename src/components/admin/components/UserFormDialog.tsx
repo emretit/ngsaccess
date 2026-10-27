@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { PROJECT_ROLES, ROLE_LABELS } from "../../../../convex/lib/roleCatalog";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -150,8 +151,8 @@ export function UserFormDialog({
               label="Rol"
               hint={currentUser ? "Platform hesap rolü; proje rolleri Ayarlar → Kullanıcılar bölümündedir." : "Rol yalnız davet edilen proje için geçerlidir."}
             >
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              <NativeSelect
+                className="w-full"
                 disabled={
                   isSaving ||
                   (currentUser !== null && !editReady) ||
@@ -175,7 +176,7 @@ export function UserFormDialog({
                 {currentUser ? <>
                   <option value="project_user">Normal</option>
                 </> : PROJECT_ROLES.map(role => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
-              </select>
+              </NativeSelect>
             </FormFieldWrapper>
             {currentUser && "isSelf" in currentUser && currentUser.isSelf && (
               <p className="text-xs text-muted-foreground">
@@ -261,8 +262,8 @@ export function UserFormDialog({
                       : undefined
                   }
                 >
-                  <select
-                    className="h-9 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
+                  <NativeSelect
+                    className="w-full min-w-0"
                     disabled={isSaving || !editReady || projects.length === 0}
                     value={formData.projectId ?? ""}
                     onChange={(event) =>
@@ -281,7 +282,7 @@ export function UserFormDialog({
                         {!project.isActive ? " · Pasif" : ""}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </FormFieldWrapper>
                 {editReady && projects.length === 0 && (
                   <p className="text-sm">

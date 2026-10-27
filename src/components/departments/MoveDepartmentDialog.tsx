@@ -6,6 +6,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import type { Company } from "@/hooks/useOrgUnits";
 import type { Department } from "@/types/department";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { NativeSelect } from "@/components/ui/native-select";
 
 /** Üst seviye departmanı alt departmanları ve kişileriyle başka şirkete taşır. */
 export function MoveDepartmentDialog({ department, companies, onOpenChange, onMove }: {
@@ -39,11 +40,10 @@ export function MoveDepartmentDialog({ department, companies, onOpenChange, onMo
       footer={<FormActions layout="dialog" className="pt-2" isLoading={pending} onClose={close} cancelLabel="İptal" submitLabel="Taşı" busyLabel="Taşınıyor…" />}
     >
       <FormFieldWrapper htmlFor={id} label="Şirket *" error={error}>
-        <select id={id} value={companyId} disabled={pending} onChange={e => setCompanyId(e.target.value)}
-          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+        <NativeSelect id={id} value={companyId} disabled={pending} onChange={e => setCompanyId(e.target.value)}>
           <option value="">Şirket seçin</option>
           {companies.map(company => <option key={company._id} value={company._id}>{company.name}</option>)}
-        </select>
+        </NativeSelect>
       </FormFieldWrapper>
     </FormDialog>
   );

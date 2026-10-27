@@ -67,7 +67,7 @@ describe("FormDialog", () => {
   it("keeps the submit footer inside the form and scrolls only the body", () => {
     const { html } = render();
     expect(html).toContain("max-h-[90dvh]");
-    expect(html).toContain("min-h-0 space-y-4 overflow-y-auto");
+    expect(html).toContain("-m-1 min-h-0 space-y-4 overflow-y-auto p-1");
     expect(html).toContain("Yeni kayıt");
     expect(html).toContain("Bilgileri girin");
     expect(html.indexOf('<button type="submit"')).toBeLessThan(

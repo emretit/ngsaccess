@@ -1,3 +1,5 @@
+import type { AriaAttributes } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery } from "convex/react";
 import { useSearchParams } from "react-router-dom";
@@ -10,11 +12,15 @@ export function TemplatePicker({
   currentTemplateId,
   onChange,
   onEdit,
+  "aria-invalid": invalid,
+  "aria-describedby": describedBy,
 }: {
   value: string;
   currentTemplateId?: string;
   onChange: (value: string) => void;
   onEdit?: (navigate: () => void) => void;
+  "aria-invalid"?: AriaAttributes["aria-invalid"];
+  "aria-describedby"?: string;
 }) {
   const { projectId } = useActiveProject();
   const { can } = usePermissions();
@@ -30,9 +36,11 @@ export function TemplatePicker({
       <label htmlFor="rule-schedule-template" className="text-sm font-medium">
         Zaman şablonu
       </label>
-      <select
+      <NativeSelect
         id="rule-schedule-template"
-        className="w-full min-w-0 h-11 border rounded bg-background px-2"
+        className="w-full min-w-0"
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
@@ -45,7 +53,7 @@ export function TemplatePicker({
               {t.isArchived ? " (arşivli)" : ""}
             </option>
           ))}
-      </select>
+      </NativeSelect>
       {selected && (
         <>
           <WeekPreview week={selected.week} />

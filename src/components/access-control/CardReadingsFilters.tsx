@@ -13,6 +13,7 @@ function FilterSelect({ label, value, change, children }: { label: string; value
   return <div className={FIELD}><span>{label}</span><Select value={value || "all"} onValueChange={change}><SelectTrigger aria-label={label} className="w-full min-w-0"><SelectValue /></SelectTrigger><SelectContent>{children}</SelectContent></Select></div>;
 }
 function Options({ projectId, filters, change }: { projectId: Id<"projects">; filters: Filters; change: (next: Partial<Filters>) => void }) {
+  const badDate = Boolean(filters.start && filters.end && filters.start > filters.end);
   const devices = useQuery(api.devices.list, { projectId });
   const doors = useQuery(api.doors.list, { projectId });
   useEffect(() => {
@@ -27,8 +28,8 @@ function Options({ projectId, filters, change }: { projectId: Id<"projects">; fi
     <div className={FIELD}><span>Kişi</span><MonitoringPersonPicker projectId={projectId} value={filters.employee} allowClear onChange={person => change({ employee: person?._id ?? "" })} /></div>
     <FilterSelect label="Sonuç" value={filters.result} change={result => { if (result === "all" || result === "granted" || result === "denied" || result === "unknown") change({ result }); }}><SelectItem value="all">Tüm sonuçlar</SelectItem><SelectItem value="granted">İzin verildi</SelectItem><SelectItem value="denied">Reddedildi</SelectItem><SelectItem value="unknown">Sonuç bilinmiyor</SelectItem></FilterSelect>
     <FilterSelect label="Kaynak" value={filters.source} change={source => { if (source === "all" || source === "card" || source === "qr" || source === "mobile" || source === "biometric") change({ source }); }}><SelectItem value="all">Tüm kaynaklar</SelectItem><SelectItem value="card">Kart</SelectItem><SelectItem value="qr">QR</SelectItem><SelectItem value="mobile">Mobil</SelectItem><SelectItem value="biometric">Biyometrik</SelectItem></FilterSelect>
-    <label className={FIELD}>Başlangıç (TR günü)<DateInput className="min-w-0" value={filters.start} onChange={start => change({ start })} /></label>
-    <label className={FIELD}>Bitiş (TR günü)<DateInput className="min-w-0" value={filters.end} aria-describedby="reading-date-error" onChange={end => change({ end })} /></label>
+    <label className={FIELD}>Başlangıç (TR günü)<DateInput className="min-w-0" value={filters.start} aria-invalid={badDate} aria-describedby={badDate ? "reading-date-error" : undefined} onChange={start => change({ start })} /></label>
+    <label className={FIELD}>Bitiş (TR günü)<DateInput className="min-w-0" value={filters.end} aria-invalid={badDate} aria-describedby={badDate ? "reading-date-error" : undefined} onChange={end => change({ end })} /></label>
   </>;
 }
 export function CardReadingsFilters({ projectId, filters, change }: { projectId: Id<"projects">; filters: Filters; change: (next: Partial<Filters>) => void }) {

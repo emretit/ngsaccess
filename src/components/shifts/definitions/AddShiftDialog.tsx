@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import type { FixedShiftRules } from "../../../../convex/lib/pdksFixedRules";
 import { shortDate } from "../lib/planning";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
@@ -397,14 +398,14 @@ function FlexibleFields({ value, error, onChange }: {
         </FormFieldWrapper>)}
     </div>
     <FormFieldWrapper htmlFor="flex-dayOffset" label="En geç çıkış günü">
-      <select id="flex-dayOffset" className="w-full rounded-md border bg-surface p-2" value={value.checkOutEndDayOffset} onChange={e => onChange({ ...value, checkOutEndDayOffset: e.target.value === "1" ? 1 : 0 })}>
+      <NativeSelect id="flex-dayOffset" aria-invalid={!!error} aria-describedby={error ? "flexible-error" : undefined} value={value.checkOutEndDayOffset} onChange={e => onChange({ ...value, checkOutEndDayOffset: e.target.value === "1" ? 1 : 0 })}>
         <option value={0}>Giriş günü</option><option value={1}>Ertesi gün (+1)</option>
-      </select>
+      </NativeSelect>
     </FormFieldWrapper>
     <FormFieldWrapper htmlFor="flex-breakMode" label="Mola modu">
-      <select id="flex-breakMode" className="w-full rounded-md border bg-surface p-2" value={value.breakMode} onChange={e => onChange({ ...value, breakMode: e.target.value === "duration" ? "duration" : "existingLegal" })}>
+      <NativeSelect id="flex-breakMode" aria-invalid={!!error} aria-describedby={error ? "flexible-error" : undefined} value={value.breakMode} onChange={e => onChange({ ...value, breakMode: e.target.value === "duration" ? "duration" : "existingLegal" })}>
         <option value="duration">Süre molası</option><option value="existingLegal">Mevcut otomatik mola</option>
-      </select>
+      </NativeSelect>
     </FormFieldWrapper>
     {value.breakMode === "duration" && <FormFieldWrapper htmlFor="flex-breakMinutes" label="Mola süresi (dk)">
       <Input id="flex-breakMinutes" type="number" min={0} max={1439} step={1} aria-invalid={!!error} value={value.breakMinutes ?? ""} onChange={e => onChange({ ...value, breakMinutes: e.target.value === "" ? undefined : Number(e.target.value) })} />
@@ -479,10 +480,10 @@ function AdvancedFields({ values, errors, onChange }: {
           </div>
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">En geç çıkış</span>
-            <select id="fixed-exit-day" className="h-9 rounded-md border bg-background px-2" value={window.checkOutEndDayOffset}
+            <NativeSelect id="fixed-exit-day" className="w-auto" aria-invalid={!!errors.validWindow} value={window.checkOutEndDayOffset}
               onChange={event => onChange({ ...values, validWindow: { ...window, checkOutEndDayOffset: event.target.value === "1" ? 1 : 0 } })}>
               <option value="0">aynı gün</option><option value="1">ertesi gün (+1)</option>
-            </select>
+            </NativeSelect>
           </label>
           <FieldError message={errors.validWindow} />
         </div>}

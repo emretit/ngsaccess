@@ -1,3 +1,5 @@
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { SegmentedViewControl } from "@/components/shared/SegmentedViewControl";
 import { LoadMoreFooter } from "@/components/shared/LoadMoreFooter";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -66,8 +68,8 @@ function AlarmSettingsDialog({ projectId, open, onOpenChange }: { projectId: Id<
     <DialogHeader><DialogTitle>Alarm bildirim ayarları</DialogTitle><DialogDescription>Bu proje için e-posta alıcılarını ve gönderim eşiğini yönetin.</DialogDescription></DialogHeader>
     {!values ? <SectionSkeleton rows={3} label="Bildirim ayarları yükleniyor." /> : <div className="space-y-4">
       <label className="flex items-center gap-2"><input type="checkbox" checked={values.emailEnabled} onChange={event => setEnabled(event.target.checked)} />E-posta bildirimleri açık</label>
-      <label className="block text-sm">Minimum önem <select className="ml-2 rounded border bg-background p-2" value={values.minSeverity} onChange={event => setMinimum(event.target.value as Settings["minSeverity"])}><option value="warning">Uyarı</option><option value="critical">Kritik</option></select></label>
-      <div><label className="block text-sm" htmlFor="alarm-recipient">Alıcılar (en fazla 8)</label><div className="mt-1 flex gap-2"><input id="alarm-recipient" className="min-w-0 flex-1 rounded border bg-background p-2" type="email" value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addRecipient(); } }} placeholder="ornek@sirket.com" /><Button type="button" variant="outline" onClick={addRecipient}>Ekle</Button></div>
+      <label className="block text-sm">Minimum önem <NativeSelect className="ml-2 w-auto" value={values.minSeverity} onChange={event => setMinimum(event.target.value as Settings["minSeverity"])}><option value="warning">Uyarı</option><option value="critical">Kritik</option></NativeSelect></label>
+      <div><label className="block text-sm" htmlFor="alarm-recipient">Alıcılar (en fazla 8)</label><div className="mt-1 flex gap-2"><Input id="alarm-recipient" className="min-w-0 flex-1" type="email" value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addRecipient(); } }} placeholder="ornek@sirket.com" /><Button type="button" variant="outline" onClick={addRecipient}>Ekle</Button></div>
         <ul className="mt-2 flex flex-wrap gap-2">{values.recipients.map(email => <li key={email} className="flex items-center gap-1 rounded-full border px-3 py-1 text-sm">{email}<button type="button" aria-label={`${email} alıcısını kaldır`} onClick={() => setRecipients(values.recipients.filter(item => item !== email))}>×</button></li>)}</ul>
       </div>
     </div>}

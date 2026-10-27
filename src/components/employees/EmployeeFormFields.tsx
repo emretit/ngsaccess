@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -138,10 +139,10 @@ export default function EmployeeFormFields({
   ) => (
     <div>
       <Label htmlFor={`employee-${key}`}>{label}</Label>
-      <select
+      <NativeSelect
         id={`employee-${key}`}
         name={key}
-        className="mt-1 h-9 max-sm:min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
+        className="mt-1 max-sm:min-h-11 w-full min-w-0"
         disabled={key === "accessRuleId" && !canManageAccessRules}
         aria-describedby={[
           options.length === 0 && `employee-${key}-empty`,
@@ -158,7 +159,7 @@ export default function EmployeeFormFields({
             {option.name}
           </option>
         ))}
-      </select>
+      </NativeSelect>
       {key === "accessRuleId" && !canManageAccessRules && (
         <p id="employee-accessRuleId-permission" className="mt-1 text-xs text-muted-foreground">
           Kural eklemek için erişim kurallarını yönetme yetkisi gerekir.

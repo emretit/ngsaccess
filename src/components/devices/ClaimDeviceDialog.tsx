@@ -351,7 +351,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                         <Input
                           {...control}
                           aria-invalid={
-                            newZoneName
+                            control["aria-invalid"] || newZoneName
                               .trim()
                               .toLocaleLowerCase("tr-TR") ===
                             name.trim().toLocaleLowerCase("tr-TR")

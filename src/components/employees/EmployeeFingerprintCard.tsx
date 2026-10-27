@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useId, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -74,10 +75,10 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
       <div className="space-y-1.5">
         <label htmlFor={deviceInputId} className="block text-sm">Cihaz</label>
         <div className="flex gap-2">
-          <select id={deviceInputId} className="max-sm:min-h-11 h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2" value={device?._id ?? ""} disabled={pending} onChange={event => setDeviceId(event.target.value)}>
+          <NativeSelect id={deviceInputId} className="max-sm:min-h-11 min-w-0 flex-1" value={device?._id ?? ""} disabled={pending} onChange={event => setDeviceId(event.target.value)}>
             {!device && <option value="">Uygun cihaz yok</option>}
             {data?.devices.map(item => <option key={item._id} value={item._id}>{item.name}</option>)}
-          </select>
+          </NativeSelect>
           {pending
             ? <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={!attempt || cancellation.pending} onClick={() => void cancellation.run()}>İptal</Button>
             : <Button className="max-sm:min-h-11" type="button" aria-describedby={reasonId} disabled={!!reason} onClick={() => setConfirmOpen(true)}>Kaydı başlat</Button>}

@@ -30,8 +30,9 @@ interface DatePickerProps {
 }
 
 const TRIGGER_CLASS = cn(
-  "h-9 w-full justify-between text-left text-xs font-normal",
+  "h-9 w-full justify-between text-left text-sm font-normal",
   "border-input hover:border-primary/50 hover:bg-accent/30",
+  "focus-visible:ring-offset-0 aria-invalid:focus-visible:ring-destructive",
   "transition-all duration-200"
 );
 const POPOVER_CONTENT_CLASS =

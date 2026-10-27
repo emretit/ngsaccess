@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Label } from "@/components/ui/label";
 import {
   DOOR_STATUS_DAYS,
@@ -21,16 +22,22 @@ function IntervalEditor({
   value,
   onChange,
   label,
+  invalid,
+  describedBy,
 }: {
   value: VerifyInterval;
   onChange: (value: VerifyInterval) => void;
   label: string;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
       <Label className="space-y-1">
         Başlangıç (TR saati)
         <Input
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           aria-label={`${label} başlangıç`}
           type="time"
           step={1}
@@ -41,6 +48,8 @@ function IntervalEditor({
       <Label className="space-y-1">
         Bitiş (TR saati)
         <Input
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           aria-label={`${label} bitiş`}
           type="time"
           step={1}
@@ -50,8 +59,9 @@ function IntervalEditor({
       </Label>
       <Label className="space-y-1">
         Mod
-        <select
-          className="h-10 w-full rounded-md border bg-background px-2 text-sm"
+        <NativeSelect
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           aria-label={`${label} mod`}
           value={value.verifyMode}
           onChange={(e) => {
@@ -75,7 +85,7 @@ function IntervalEditor({
           ].includes(value.verifyMode) && (
             <option value={value.verifyMode}>{value.verifyMode}</option>
           )}
-        </select>
+        </NativeSelect>
       </Label>
     </div>
   );
@@ -84,9 +94,13 @@ function IntervalEditor({
 export function DoorVerifyPlanEditor({
   value,
   onChange,
+  invalid,
+  "aria-describedby": describedBy,
 }: {
   value: VerifyPlan;
   onChange: (value: VerifyPlan) => void;
+  invalid?: boolean;
+  "aria-describedby"?: string;
 }) {
   const setDay = (
     day: (typeof DOOR_STATUS_DAYS)[number],
@@ -107,9 +121,10 @@ export function DoorVerifyPlanEditor({
     <div className="space-y-3">
       <Label className="block space-y-1">
         Plan düzeni
-        <select
+        <NativeSelect
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           aria-label="Doğrulama planı düzeni"
-          className="h-10 w-full rounded-md border bg-background px-2"
           value={value.weekly === undefined ? "daily" : "weekly"}
           onChange={(e) => {
             const { weekly, ...daily } = value;
@@ -137,10 +152,12 @@ export function DoorVerifyPlanEditor({
         >
           <option value="daily">Her gün aynı</option>
           <option value="weekly">Gün bazında</option>
-        </select>
+        </NativeSelect>
       </Label>
       {value.weekly === undefined ? (
         <IntervalEditor
+          invalid={invalid}
+          describedBy={describedBy}
           value={value}
           label="Her gün"
           onChange={(segment) => onChange({ ...value, ...segment })}
@@ -192,6 +209,8 @@ export function DoorVerifyPlanEditor({
                 {segments.map((segment, index) => (
                   <div key={index} className="space-y-2">
                     <IntervalEditor
+                      invalid={invalid}
+                      describedBy={describedBy}
                       value={segment}
                       label={`${label} ${index + 1}. aralık`}
                       onChange={(next) =>

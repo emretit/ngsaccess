@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useForm, useWatch } from "react-hook-form";
@@ -28,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { FormActions } from "@/components/shared/FormActions";
-import { EmployeePicker, selectClass } from "./EmployeePicker";
+import { EmployeePicker } from "./EmployeePicker";
 import {
   calendarDays,
   dateLabel,
@@ -299,13 +300,13 @@ export function LeaveForm({
             label="İzin türü"
             error={form.formState.errors.leaveType?.message}
           >
-            <select className={selectClass} {...form.register("leaveType")}>
+            <NativeSelect className="min-w-0" {...form.register("leaveType")}>
               {Object.entries(leaveTypes).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </FormFieldWrapper>
           <DateRangeFields
             idPrefix="leave"

@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useRef, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -87,15 +88,15 @@ export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees
       {rows.length === 0 ? <p role="status">Seçili kişilerin hepsinde kart var.</p> : <>
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="batch-card-reader" className="text-sm">Okuyucu</label>
-          <select id="batch-card-reader" className="h-9 rounded-md border bg-background px-3 text-sm" value={readerId} onChange={(event) => { setReaderId(event.target.value as Id<"devices"> | ""); setSinceTime(null); }}>
+          <NativeSelect id="batch-card-reader" className="w-auto" value={readerId} onChange={(event) => { setReaderId(event.target.value as Id<"devices"> | ""); setSinceTime(null); }}>
             <option value="">Okuyucu seçin</option>
             {readers.map((device) => <option key={device._id} value={device._id}>{visitorReaderLabel(device)}</option>)}
-          </select>
+          </NativeSelect>
           <Button type="button" variant="outline" disabled={!readerId || !!sinceTime} onClick={() => { setMessage(null); lastReading.current = null; setSinceTime(new Date().toISOString()); }}> {sinceTime ? "Kart bekleniyor…" : "Okut"}</Button>
         </div>
         {rows.map((row) => <div key={row.employeeId} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 rounded border p-3">
           <span className="text-sm font-medium">{row.employeeName}</span>
-          <div><Input aria-label={`${row.employeeName} kart numarası`} value={row.cardNumber} disabled={busy || row.status === "assigned"} onChange={(event) => updateCard(row.employeeId, event.target.value)} onPaste={(event) => { const pasted = event.clipboardData.getData("text"); if (pasted.includes("\n")) { event.preventDefault(); pasteCards(pasted); } }} />{row.message && <p className={row.status === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{row.message}</p>}</div>
+          <div><Input aria-invalid={row.status === "error"} aria-describedby={row.message ? `batch-card-${row.employeeId}-message` : undefined} aria-label={`${row.employeeName} kart numarası`} value={row.cardNumber} disabled={busy || row.status === "assigned"} onChange={(event) => updateCard(row.employeeId, event.target.value)} onPaste={(event) => { const pasted = event.clipboardData.getData("text"); if (pasted.includes("\n")) { event.preventDefault(); pasteCards(pasted); } }} />{row.message && <p id={`batch-card-${row.employeeId}-message`} className={row.status === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{row.message}</p>}</div>
         </div>)}
         {message && <p role="status" className="text-sm">{message}</p>}
         {saved && <p role="status">Atanan: {rows.filter((row) => row.status === "assigned").length} · Hatalı: {rows.filter((row) => row.status === "error").length}</p>}

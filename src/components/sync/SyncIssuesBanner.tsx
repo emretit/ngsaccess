@@ -1,3 +1,5 @@
+import { Textarea } from "@/components/ui/textarea";
+import { NativeSelect } from "@/components/ui/native-select";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -99,8 +101,8 @@ function SyncIssueRow({ item, canManage, isSuperAdmin }: { item: UnifiedItem; ca
       }}>
         <label className="block space-y-1">
           <span>Kapatma gerekçesi (zorunlu)</span>
-          <textarea autoFocus required value={closeReason} onChange={event => setCloseReason(event.target.value)}
-            className="block min-h-20 w-full min-w-0 rounded-md border bg-background p-2" />
+          <Textarea autoFocus required value={closeReason} onChange={event => setCloseReason(event.target.value)}
+            className="block min-h-20 w-full min-w-0" />
         </label>
         <p className="text-xs text-muted-foreground">Cihazı silinmiş, proje kapsamından çıkmış, gateway kaydı veya eski kart kimliği eksik işlem kapatılabilir. Gerekçe denetim kaydına yazılır; cihazdan silindiği anlamına gelmez.</p>
         <div className="flex flex-wrap gap-2">
@@ -162,10 +164,10 @@ export function SyncIssuesBanner() {
       </Button>
       {scope.projectIds.length > 1 && <label className="ml-auto flex items-center gap-2 text-xs">
         Proje kapsamı
-        <select className="rounded border bg-background p-1" value={showAll ? "all" : "active"}
+        <NativeSelect className="w-auto" value={showAll ? "all" : "active"}
           onChange={(event) => { setAllProjects(event.target.value === "all"); setOpenDevices(new Set()); }}>
           <option value="active">Aktif proje</option><option value="all">Tüm projeler</option>
-        </select>
+        </NativeSelect>
       </label>}
       <Button variant="ghost" size="sm" disabled={refreshing} onClick={() => setRefreshing(true)}>
         <RefreshCw className="h-4 w-4" />Yenile

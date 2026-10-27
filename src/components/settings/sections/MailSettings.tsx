@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { SettingsSection } from "@/components/shared/SettingsSection";
 import { useState } from "react";
 import { z } from "zod";
@@ -19,7 +20,6 @@ import { Switch } from "@/components/ui/switch";
 import { SettingsSaveBar } from "../SettingsSaveBar";
 import { DraftNotice, useSettingsDraft, useSettingsFormState } from "../SettingsFormState";
 
-const selectStyle = "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 
 type SavedMail = NonNullable<FunctionReturnType<typeof api.mailSettings.get>>;
 
@@ -93,9 +93,9 @@ function MailSettingsForm({ projectId }: { projectId: Id<"projects"> }) {
             <Input value={values.host} autoComplete="off" placeholder="smtp.firmaniz.com" onChange={event => draft.change({ host: event.target.value })} />
           </FormFieldWrapper>
           <FormFieldWrapper htmlFor="mail-port" label="Port">
-            <select className={selectStyle} value={values.port} onChange={event => draft.change({ port: event.target.value === "587" ? 587 : 465 })}>
+            <NativeSelect className="min-w-0" value={values.port} onChange={event => draft.change({ port: event.target.value === "587" ? 587 : 465 })}>
               <option value={465}>465 (SSL)</option><option value={587}>587 (STARTTLS)</option>
-            </select>
+            </NativeSelect>
           </FormFieldWrapper>
         </div>
         <FormFieldWrapper htmlFor="mail-username" label="Kullanıcı adı *" hint={google ? "Google hesabınızın tam e-posta adresi." : undefined} error={fieldError("username")}>

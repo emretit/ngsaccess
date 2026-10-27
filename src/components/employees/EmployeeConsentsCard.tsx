@@ -239,14 +239,14 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
               </div>
               <div className="space-y-2">
                 <label htmlFor={documentInputId} className="text-xs font-medium">İmzalı rıza formu (önerilir)</label>
-                <Input id={documentInputId} type="file" accept="application/pdf,image/jpeg,image/png" disabled={document.pending || submitting} className="max-sm:min-h-11" onChange={event => {
+                <Input id={documentInputId} aria-invalid={Boolean(document.error)} aria-describedby={document.error ? `${documentInputId}-error` : undefined} type="file" accept="application/pdf,image/jpeg,image/png" disabled={document.pending || submitting} className="max-sm:min-h-11" onChange={event => {
                   const file = event.target.files?.[0];
                   event.target.value = "";
                   if (file) void document.upload(file);
                 }} />
                 <p className="text-xs text-muted-foreground">PDF, JPEG veya PNG; en çok 10 MB.</p>
                 {document.pending && <p role="status" className="text-xs">Belge yükleniyor…</p>}
-                {document.error && <p role="alert" className="text-xs">{document.error}</p>}
+                {document.error && <p id={`${documentInputId}-error`} role="alert" className="text-xs">{document.error}</p>}
                 {document.storageId && <p role="status" className="text-xs">Belge yüklendi.</p>}
                 {(document.storageId || document.error) && <Button type="button" variant="outline" size="sm" className="max-sm:min-h-11" disabled={document.pending || submitting} onClick={document.reset}>Belgeyi kaldır</Button>}
               </div>

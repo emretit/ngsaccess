@@ -1,4 +1,5 @@
 import React from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemberRoleSelect } from "./ProjectMembersContent";
@@ -13,7 +14,7 @@ function control() {
   let tree: React.ReactElement<{ children?: React.ReactNode }> | undefined;
   function Harness() { tree = MemberRoleSelect({ member, projectId }); return null; }
   renderToStaticMarkup(<Harness />);
-  const select = React.Children.toArray(tree?.props.children).find(child => React.isValidElement(child) && child.type === "select");
+  const select = React.Children.toArray(tree?.props.children).find(child => React.isValidElement(child) && child.type === NativeSelect);
   if (!React.isValidElement<{ onChange: (event: { target: { value: string } }) => Promise<void> }>(select)) throw new Error("Missing role control");
   return select;
 }

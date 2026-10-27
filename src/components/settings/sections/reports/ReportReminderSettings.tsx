@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useState } from "react";
 import { z } from "zod";
 import { useQuery, useMutation } from "convex/react";
@@ -19,7 +20,6 @@ const reminderSchema = z.object({ enabled: z.boolean(), email: z.string(), repor
     if (value.enabled && !z.string().email().safeParse(value.email.trim()).success) ctx.addIssue({ code: "custom", path: ["email"], message: "Geçerli bir e-posta adresi girin" });
   });
 type ReminderValues = z.infer<typeof reminderSchema>;
-const selectStyle = "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 
 export function ReportReminderSettings() {
   const [scope, setScope] = useState("active");
@@ -46,10 +46,10 @@ function ReminderForm({ scope, setScope }: { scope: string; setScope: (scope: st
     <div><h3 className="text-base font-semibold">Kişisel e-posta hatırlatması</h3>
       <p className="mt-1 text-sm text-muted-foreground">Her ayın ilk günü size rapor hatırlatması ve kapsam bilgisi gönderilir. Dosya eki gönderilmez; raporu bu ekrandan indirirsiniz. Proje için <strong>E-posta gönderimi</strong> bölümünde hesap kayıtlıysa e-posta o adresten, değilse NGS+ adresinden gelir.</p></div>
     <FormFieldWrapper htmlFor="reminder-scope" label="Hatırlatma kapsamı">
-      <select className={selectStyle} value={scope} disabled={action.pending} onChange={event => { const next = event.target.value; if (draft.dirty) setNextScope(next); else setScope(next); }}>
+      <NativeSelect className="min-w-0" value={scope} disabled={action.pending} onChange={event => { const next = event.target.value; if (draft.dirty) setNextScope(next); else setScope(next); }}>
         <option value="active">{activeProject?.name ?? "Aktif proje"}</option>
         {projectIds.length > 1 && <option value="all">Tüm erişilebilir projeler</option>}
-      </select>
+      </NativeSelect>
     </FormFieldWrapper>
     {saved === undefined ? <SectionSkeleton label="Hatırlatma ayarları yükleniyor" /> : <form className="space-y-4" noValidate onSubmit={async event => {
       event.preventDefault();
@@ -62,9 +62,9 @@ function ReminderForm({ scope, setScope }: { scope: string; setScope: (scope: st
           <Switch checked={draft.values.enabled} onCheckedChange={enabled => draft.change({ enabled })} />
         </FormFieldWrapper>
         <FormFieldWrapper htmlFor="reminder-type" label="Hatırlatılacak rapor türü">
-          <select className={selectStyle} value={draft.values.reportType} onChange={event => {
+          <NativeSelect className="min-w-0" value={draft.values.reportType} onChange={event => {
             const type = reminderSchema.shape.reportType.safeParse(event.target.value); if (type.success) draft.change({ reportType: type.data });
-          }}>{REPORT_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.label}</option>)}</select>
+          }}>{REPORT_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.label}</option>)}</NativeSelect>
         </FormFieldWrapper>
         {draft.values.enabled && <FormFieldWrapper htmlFor="reminder-email" label="Alıcı e-posta adresi *" error={error}>
           <Input type="email" value={draft.values.email} onChange={event => draft.change({ email: event.target.value })} />

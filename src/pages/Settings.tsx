@@ -55,7 +55,7 @@ export default function Settings() {
     switch (activeTab) {
       case "roles": return <RolesSettings />;
       case "general": return <GeneralSettings />;
-      case "users": return <div className="min-w-0 max-w-full overflow-x-auto"><AdminUsersPanel projectScoped /></div>;
+      case "users": return <div className="-mx-1 min-w-0 overflow-x-auto p-1"><AdminUsersPanel projectScoped /></div>;
       case "reports": return <ReportsSettings requestedReport={searchParams.get("report")} />;
       case "integrations": return <IntegrationsSettings />;
       case "privacy": return <PrivacySettings />;

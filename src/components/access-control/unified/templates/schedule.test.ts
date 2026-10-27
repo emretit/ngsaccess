@@ -4,6 +4,7 @@ import {
   emptyWeek,
   formatSchedule,
   inspectSchedule,
+  invalidTimeField,
   WEEKDAYS,
 } from "./schedule";
 import {
@@ -169,5 +170,16 @@ describe("denetim düzeltmeleri", () => {
     const calls: string[] = [];
     requestTemplateEdit(fn => { guard.request(false, fn); }, () => calls.push("close"), () => calls.push("navigate"));
     expect(calls).toEqual(["close", "navigate"]);
+  });
+});
+
+describe("invalidTimeField", () => {
+  it("biçimi bozuk alanı ve eşit başlangıç/bitişi işaretler", () => {
+    expect(invalidTimeField({ start: "08:00", end: "17:00" }, "start")).toBe(false);
+    expect(invalidTimeField({ start: "8", end: "17:00" }, "start")).toBe(true);
+    expect(invalidTimeField({ start: "8", end: "17:00" }, "end")).toBe(false);
+    expect(invalidTimeField({ start: "22:00", end: "24:00" }, "end")).toBe(false);
+    expect(invalidTimeField({ start: "24:00", end: "08:00" }, "start")).toBe(true);
+    expect(invalidTimeField({ start: "09:00", end: "09:00" }, "end")).toBe(true);
   });
 });

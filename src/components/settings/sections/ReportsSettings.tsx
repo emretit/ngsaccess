@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useState, useEffect, useRef } from "react";
@@ -36,7 +37,6 @@ const MONTHS = [
   { value: 12, label: "Aralık" },
 ];
 
-const selectStyle = "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 const currentDate = todayInTurkey();
 const currentYear = Number(currentDate.slice(0, 4));
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
@@ -138,23 +138,23 @@ function ReportDownloadSettings({ requestedReport }: { requestedReport?: string 
           <p className="text-sm font-medium" role="status">Kapsam: {currentData?.scopeLabel ?? scopeLabel}</p>
           <fieldset disabled={excelAction.pending || pdfAction.pending} className="grid min-w-0 grid-cols-1 gap-4 min-[761px]:grid-cols-2">
             {projectIds.length > 1 && <FormFieldWrapper htmlFor="report-scope" label="İndirme kapsamı">
-              <select className={selectStyle} value={scopeSelection} onChange={event => setScopeSelection(event.target.value)}>
+              <NativeSelect className="min-w-0" value={scopeSelection} onChange={event => setScopeSelection(event.target.value)}>
                 <option value="active">{activeProject?.name ?? "Aktif proje"}</option><option value="all">Tüm erişilebilir projeler</option>
-              </select>
+              </NativeSelect>
             </FormFieldWrapper>}
             <FormFieldWrapper htmlFor="report-type" label="Rapor türü">
-              <select className={selectStyle} value={reportType} onChange={event => {
+              <NativeSelect className="min-w-0" value={reportType} onChange={event => {
                 const value = event.target.value;
                 if (value === "sgk" || value === "overtime" || value === "attendance" || value === "department") setReportType(value);
-              }}>{REPORT_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.label}</option>)}</select>
+              }}>{REPORT_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.label}</option>)}</NativeSelect>
             </FormFieldWrapper>
             {reportType === "overtime" && overtimePeriod === "year" ? <FormFieldWrapper htmlFor="report-year" label="Yıl">
-              <select className={selectStyle} value={year} onChange={event => setYear(Number(event.target.value))}>{YEARS.map(value => <option key={value} value={value}>{value}</option>)}</select>
+              <NativeSelect className="min-w-0" value={year} onChange={event => setYear(Number(event.target.value))}>{YEARS.map(value => <option key={value} value={value}>{value}</option>)}</NativeSelect>
             </FormFieldWrapper> : <FormFieldWrapper htmlFor="report-month" label="Ay">
               <MonthPicker className="text-sm" date={new Date(year, month - 1, 1)} onSelect={date => { setYear(date.getFullYear()); setMonth(date.getMonth() + 1); }} />
             </FormFieldWrapper>}
             {reportType === "overtime" && <FormFieldWrapper htmlFor="report-period" label="Dönem">
-              <select className={selectStyle} value={overtimePeriod} onChange={event => { if (event.target.value === "month" || event.target.value === "year") setOvertimePeriod(event.target.value); }}><option value="month">Aylık</option><option value="year">Yıllık</option></select>
+              <NativeSelect className="min-w-0" value={overtimePeriod} onChange={event => { if (event.target.value === "month" || event.target.value === "year") setOvertimePeriod(event.target.value); }}><option value="month">Aylık</option><option value="year">Yıllık</option></NativeSelect>
             </FormFieldWrapper>}
             {canSeePay && reportType === "department" && <FormFieldWrapper htmlFor="report-hourly-rate" label="Ücret bilgisi olmayanlar için saatlik ücret (₺)" error={hourlyRateError}>
               <Input type="number" min={0} value={hourlyRate ?? ""} onChange={event => setHourlyRate(event.target.value === "" ? undefined : Number(event.target.value))} placeholder="Çalışan ücreti yoksa" />

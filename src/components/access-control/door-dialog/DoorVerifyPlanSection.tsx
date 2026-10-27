@@ -37,9 +37,14 @@ export function DoorVerifyPlanSection({
         tabIndex={-1}
         aria-invalid={!!timeErrors["verify-plan"]}
       >
-        <DoorVerifyPlanEditor value={verifyPlan} onChange={setVerifyPlan} />
+        <DoorVerifyPlanEditor
+          value={verifyPlan}
+          onChange={setVerifyPlan}
+          invalid={Boolean(timeErrors["verify-plan"])}
+          aria-describedby={timeErrors["verify-plan"] ? "verify-plan-error" : undefined}
+        />
         {timeErrors["verify-plan"] && (
-          <p role="alert" className="text-sm text-destructive">
+          <p id="verify-plan-error" role="alert" className="text-sm text-destructive">
             {timeErrors["verify-plan"]}
           </p>
         )}

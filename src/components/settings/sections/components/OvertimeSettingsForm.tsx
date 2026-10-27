@@ -92,41 +92,41 @@ export function OvertimeSettingsForm() {
     }}>
       <fieldset disabled={pending} className="grid grid-cols-1 gap-4 min-[761px]:grid-cols-2">
         <FormFieldWrapper htmlFor="overtimeBasis" label="Fazla mesai esası" hint={overtimeHints.overtimeBasis} error={visibleErrors.overtimeBasis}>
-          <Select disabled={pending} value={values.overtimeBasis} onValueChange={basis => {
+          {(control) => <Select disabled={pending} value={values.overtimeBasis} onValueChange={basis => {
             if (basis === "weekly45" || basis === "dailyShift") change({ overtimeBasis: basis });
           }}>
-            <SelectTrigger id="overtimeBasis"><SelectValue /></SelectTrigger>
+            <SelectTrigger {...control}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="weekly45">Haftalık 45 saat (İş Kanunu)</SelectItem>
               <SelectItem value="dailyShift">Günlük vardiya aşımı</SelectItem>
             </SelectContent>
-          </Select>
+          </Select>}
         </FormFieldWrapper>
         <FormFieldWrapper htmlFor="nightShiftDayMode" label="Gece yarısını geçen vardiya" hint={overtimeHints.nightShiftDayMode} error={visibleErrors.nightShiftDayMode}>
-          <Select disabled={pending} value={values.nightShiftDayMode} onValueChange={mode => {
+          {(control) => <Select disabled={pending} value={values.nightShiftDayMode} onValueChange={mode => {
             if (mode === "shiftStart" || mode === "splitAtMidnight") change({ nightShiftDayMode: mode });
           }}>
-            <SelectTrigger id="nightShiftDayMode"><SelectValue /></SelectTrigger>
+            <SelectTrigger {...control}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="shiftStart">Başladığı günün ücreti</SelectItem>
               <SelectItem value="splitAtMidnight">Gece yarısında böl</SelectItem>
             </SelectContent>
-          </Select>
+          </Select>}
         </FormFieldWrapper>
         {numbers.map(([key, label, min]) => <FormFieldWrapper key={key} htmlFor={key} label={label} hint={overtimeHints[key]} error={visibleErrors[key]}>
           <Input id={key} type="number" min={min} step="any" value={Number.isNaN(values[key]) ? "" : values[key]} onChange={event => change({ [key]: event.target.value === "" ? NaN : Number(event.target.value) })} />
         </FormFieldWrapper>)}
         <FormFieldWrapper htmlFor="nightCombineMode" label="Gece fazla mesaisinde çarpan" hint="Gün türü çarpanı 2, gece çarpanı 1,5 ise: büyük olan 2; çarpım 3; ek prim 2,5 olur." error={visibleErrors.nightCombineMode}>
-          <Select disabled={pending} value={values.nightCombineMode} onValueChange={mode => {
+          {(control) => <Select disabled={pending} value={values.nightCombineMode} onValueChange={mode => {
             if (mode === "max" || mode === "multiply" || mode === "additive") change({ nightCombineMode: mode });
           }}>
-            <SelectTrigger id="nightCombineMode"><SelectValue /></SelectTrigger>
+            <SelectTrigger {...control}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="max">Büyük olan</SelectItem>
               <SelectItem value="multiply">Çarpım</SelectItem>
               <SelectItem value="additive">Ek prim</SelectItem>
             </SelectContent>
-          </Select>
+          </Select>}
         </FormFieldWrapper>
         {(["nightShiftStart", "nightShiftEnd"] as const).map(key => <FormFieldWrapper key={key} htmlFor={key} label={key === "nightShiftStart" ? "Gece başlangıcı" : "Gece bitişi"} error={visibleErrors[key]}>
           <Input id={key} type="time" value={values[key]} onChange={event => change({ [key]: event.target.value })} />

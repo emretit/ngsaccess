@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
@@ -14,7 +15,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { EmployeePicker, selectClass } from "./EmployeePicker";
+import { EmployeePicker } from "./EmployeePicker";
 import {
   dateLabel,
   leaveTypes,
@@ -40,7 +41,7 @@ export function LeaveFilters({
     start: filters.rangeStart,
     end: filters.rangeEnd,
   });
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<{ start?: string; end?: string; range?: boolean }>({});
   return (
     <>
       <CollapsibleFilters activeCount={Number(Boolean(filters.employeeId)) + Number(Boolean(filters.leaveType))}>
@@ -52,8 +53,8 @@ export function LeaveFilters({
         </QuerySectionBoundary>
         <div className="w-full min-w-0 md:w-[180px]">
           <FormFieldWrapper htmlFor="leave-filter-type" label="İzin türü">
-            <select
-              className={selectClass}
+            <NativeSelect
+              className="min-w-0"
               value={filters.leaveType ?? ""}
               onChange={(event) => onChange({ type: event.target.value })}
             >
@@ -63,7 +64,7 @@ export function LeaveFilters({
                   {label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </FormFieldWrapper>
         </div>
         <div className="w-full min-w-0 space-y-1.5 md:w-auto">
@@ -74,7 +75,7 @@ export function LeaveFilters({
               const period = formatDateString(date).slice(0, 7);
               if (monthRange(period)) onChange({ period, from: undefined, to: undefined });
             }} />
-            <Button variant="outline" onClick={() => { setRange({ start: filters.rangeStart, end: filters.rangeEnd }); setError(""); setCustom(true); }}>
+            <Button variant="outline" onClick={() => { setRange({ start: filters.rangeStart, end: filters.rangeEnd }); setErrors({}); setCustom(true); }}>
               {filters.period === "custom" ? `${dateLabel(filters.rangeStart)} – ${dateLabel(filters.rangeEnd)}` : "Özel aralık…"}
             </Button>
           </div>
@@ -94,11 +95,14 @@ export function LeaveFilters({
             onSubmit={(event) => {
               event.preventDefault();
               if (!validDate(range.start) || !validDate(range.end)) {
-                setError("Geçerli bir tarih girin.");
+                setErrors({
+                  start: !validDate(range.start) ? "Geçerli bir tarih girin." : undefined,
+                  end: !validDate(range.end) ? "Geçerli bir tarih girin." : undefined,
+                });
                 return;
               }
               if (range.start > range.end) {
-                setError("Bitiş tarihi başlangıçtan önce olamaz.");
+                setErrors({ end: "Bitiş tarihi başlangıçtan önce olamaz.", range: true });
                 return;
               }
               onChange({ period: "custom", from: range.start, to: range.end });
@@ -108,9 +112,11 @@ export function LeaveFilters({
             <FormFieldWrapper
               htmlFor="leave-range-start"
               label="Başlangıç tarihi"
+              error={errors.start}
             >
               <DateInput
                 className="min-w-0 max-w-full"
+                aria-invalid={errors.range}
                 value={range.start}
                 onChange={(start) => setRange((value) => ({ ...value, start }))}
               />
@@ -118,7 +124,7 @@ export function LeaveFilters({
             <FormFieldWrapper
               htmlFor="leave-range-end"
               label="Bitiş tarihi"
-              error={error}
+              error={errors.end}
             >
               <DateInput
                 className="min-w-0 max-w-full"

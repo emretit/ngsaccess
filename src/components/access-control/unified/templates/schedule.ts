@@ -33,6 +33,16 @@ export function formatSchedule(week: WeekSchedule): string {
   }
   return groups.join(" · ") || "Erişim yok";
 }
+const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+/** Aralıktaki tek saat alanı geçersiz mi: HH:MM değil (bitişte 24:00 serbest) ya da başlangıç = bitiş. */
+export function invalidTimeField(
+  interval: { start: string; end: string },
+  field: "start" | "end",
+): boolean {
+  const value = interval[field];
+  if (!(TIME.test(value) || (field === "end" && value === "24:00"))) return true;
+  return interval.start === interval.end;
+}
 export function inspectSchedule(raw: WeekSchedule) {
   const expanded = emptyWeek();
   const overnight: string[] = [];

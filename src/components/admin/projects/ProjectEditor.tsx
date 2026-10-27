@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { FormFeedback } from "@/components/shared/FormFeedback";
 import { useState } from "react";
 import { ConvexError } from "convex/values";
@@ -114,9 +115,9 @@ export function ProjectEditor({
           label="Durum"
           hint="Pasif proje, aktif proje seçicisinde listelenmez. Veriler ve mevcut erişimler korunur."
         >
-          <select
+          <NativeSelect
             disabled={pending}
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            className="w-full"
             value={form.isActive ? "active" : "inactive"}
             onChange={(event) =>
               setForm({
@@ -127,7 +128,7 @@ export function ProjectEditor({
           >
             <option value="active">Aktif</option>
             <option value="inactive">Pasif</option>
-          </select>
+          </NativeSelect>
         </FormFieldWrapper>
         {error && <FormFeedback tone="error">{error}</FormFeedback>}
       </FormDialog>

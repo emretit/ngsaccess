@@ -87,7 +87,7 @@ describe("çalışan rıza kartı", () => {
     expect(html.match(/>Kapalı</g)).toHaveLength(2);
     expect(html).toContain('/settings?tab=privacy');
     expect(html).toContain("Ayarlar › Gizlilik ve KVKK");
-    expect(html).not.toContain("destructive");
+    expect(html).not.toMatch(/class="(?:[^"]* )?(?:text|bg|border)-destructive(?: |")/);
     for (const label of ["Yüz tanıma", "Parmak izi", "Kart verisi"]) expect(mocks.buttons.find(button => button["aria-label"] === `${label} rızası al`)).toBeUndefined();
     expect(mocks.buttons.find(button => button["aria-label"] === "Fotoğraf rızası al")?.disabled).toBe(false);
     expect(html).toContain("İsteğe bağlı");
@@ -122,7 +122,13 @@ describe("çalışan rıza kartı", () => {
     expect(mocks.buttons.find(button => button.children === "Rızayı kaydet")?.disabled).toBe(true);
     mocks.document.pending = false;
     mocks.document.error = "Yükleme başarısız";
-    expect(render()).toContain('role="alert"');
+    const html = render();
+    expect(html).toContain('role="alert"');
+    const fileInput = html.match(/<input[^>]*type="file"[^>]*>/)?.[0];
+    expect(fileInput).toContain('aria-invalid="true"');
+    const errorId = fileInput?.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(errorId).toBeTruthy();
+    expect(html).toContain(`id="${errorId}" role="alert"`);
   });
   it("parmak izi iptalinde cihaz silme etkisi açıklanır", async () => {
     mocks.consents = [{ _id: "fp-a", consentType: "biometric_fingerprint", grantedAt: "2026-10-19T06:00:00Z" }];
@@ -177,7 +183,7 @@ it("açık modülde eksik biyometri rızası nötrdür ve belgesiz satırda belg
   mocks.enabled = true;
   const html = render();
   expect(html.match(/>Rıza yok</g)).toHaveLength(2);
-  expect(html).not.toContain("destructive");
+  expect(html).not.toMatch(/class="(?:[^"]* )?(?:text|bg|border)-destructive(?: |")/);
   expect(html).not.toContain("Belgeyi aç");
 });
 

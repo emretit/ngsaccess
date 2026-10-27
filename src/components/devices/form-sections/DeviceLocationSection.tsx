@@ -59,6 +59,7 @@ export function DeviceLocationSection({
   const userChangedZone = useRef(false);
   const [zoneDialogOpen, setZoneDialogOpen] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
+  const [zoneNameError, setZoneNameError] = useState("");
   const isCreatingZone = false;
 
   // Hikvision'da kapı sayısı modelden türetilir (DeviceHikvisionSection) → generic
@@ -70,6 +71,7 @@ export function DeviceLocationSection({
     const trimmedName = newZoneName.trim();
     const deviceName = form.getValues("name").trim();
     if (!trimmedName) {
+      setZoneNameError("Bölge adı gereklidir.");
       notify.error("Bölge adı gereklidir.");
       return;
     }
@@ -78,6 +80,7 @@ export function DeviceLocationSection({
       trimmedName.toLocaleLowerCase("tr-TR") ===
         deviceName.toLocaleLowerCase("tr-TR")
     ) {
+      setZoneNameError("Bölge adı cihaz adıyla aynı olamaz.");
       notify.error("Bölge adı cihaz adıyla aynı olamaz.");
       return;
     }
@@ -104,6 +107,7 @@ export function DeviceLocationSection({
               onValueChange={(value) => {
                 if (!value) return;
                 if (value === NEW_ZONE_VALUE) {
+                  setZoneNameError("");
                   setZoneDialogOpen(true);
                   return;
                 }
@@ -169,6 +173,7 @@ export function DeviceLocationSection({
         open={zoneDialogOpen}
         onOpenChange={(open) => {
           setZoneDialogOpen(open);
+          setZoneNameError("");
           if (!open) setNewZoneName("");
         }}
       >
@@ -187,7 +192,9 @@ export function DeviceLocationSection({
                 autoFocus
                 placeholder="Örn. Ana Giriş"
                 value={newZoneName}
-                onChange={(event) => setNewZoneName(event.target.value)}
+                aria-invalid={Boolean(zoneNameError)}
+                aria-describedby={zoneNameError ? "new-device-zone-name-error" : undefined}
+                onChange={(event) => { setNewZoneName(event.target.value); setZoneNameError(""); }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -195,6 +202,7 @@ export function DeviceLocationSection({
                   }
                 }}
               />
+              {zoneNameError && <p id="new-device-zone-name-error" role="alert" className="text-xs text-destructive">{zoneNameError}</p>}
             </div>
             <DialogFooter>
               <Button

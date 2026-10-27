@@ -1,3 +1,4 @@
+import { NativeSelect } from "@/components/ui/native-select";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,9 +18,9 @@ export function CompanyInfoForm({ values, change, errors }: {
         <Input name={key} type={type} value={values[key]} required={key === "companyName"} onChange={e => change({ [key]: e.target.value })} />}
     </FormFieldWrapper>)}
     <FormFieldWrapper htmlFor="currency" label="Para birimi" error={errors.currency}>
-      <select name="currency" value={values.currency} onChange={e => change({ currency: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+      <NativeSelect name="currency" value={values.currency} onChange={e => change({ currency: e.target.value })} className="w-full">
         <option value="TRY">Türk Lirası (₺)</option><option value="USD">ABD Doları ($)</option><option value="EUR">Euro (€)</option>
-      </select>
+      </NativeSelect>
     </FormFieldWrapper>
   </div>;
 }
