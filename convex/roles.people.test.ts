@@ -43,7 +43,7 @@ const cases = [
 async function invoke(f: Fixture, permission: Permission) {
   switch (permission) {
     case "employees.view": return f.caller.query(api.employees.getById, { employeeId: f.employeeId });
-    case "employees.manage": return f.caller.mutation(api.departments.create, { projectId: f.projectId, name: "HR" });
+    case "employees.manage": return f.caller.mutation(api.companies.create, { projectId: f.projectId, name: "HR" });
     case "biometrics.manage": return f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "biometric_fingerprint" });
     case "pay.view": return f.caller.query(api.employees.getById, { employeeId: f.employeeId });
     case "schedule.manage": return f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: "Day", startTime: "08:00", endTime: "17:00" });
@@ -55,7 +55,7 @@ async function invoke(f: Fixture, permission: Permission) {
 }
 async function snapshot(f: Fixture) {
   return f.t.run(async ctx => Promise.all([
-    ctx.db.query("employees").collect(), ctx.db.query("departments").collect(),
+    ctx.db.query("employees").collect(), ctx.db.query("departments").collect(), ctx.db.query("companies").collect(),
     ctx.db.query("employeeConsents").collect(), ctx.db.query("shifts").collect(),
     ctx.db.query("leaves").collect(), ctx.db.query("reportScheduleSettings").collect(), ctx.db.query("auditLog").collect(),
   ]));

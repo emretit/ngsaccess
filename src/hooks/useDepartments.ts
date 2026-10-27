@@ -56,7 +56,7 @@ export function useDepartments() {
   const setCompany = useMutation(api.departments.setCompany);
   const moveDepartmentToCompany = async (
     departmentId: Id<"departments">,
-    companyId: Id<"companies"> | null,
+    companyId: Id<"companies">,
   ) => {
     await setCompany({ departmentId, companyId });
     return true;

@@ -12,12 +12,13 @@ export function MoveDepartmentDialog({ department, companies, onOpenChange, onMo
   department: Department | null;
   companies: Company[];
   onOpenChange: (open: boolean) => void;
-  onMove: (departmentId: Id<"departments">, companyId: Id<"companies"> | null) => Promise<unknown>;
+  onMove: (departmentId: Id<"departments">, companyId: Id<"companies">) => Promise<unknown>;
 }) {
   const [companyId, setCompanyId] = useState<string>(department?.companyId ?? "");
   const id = useId();
+  const [error, setError] = useState<string>();
   const { run, pending } = useAsyncAction(
-    async (target: Id<"companies"> | null) => { if (department) await onMove(department._id, target); },
+    async (target: Id<"companies">) => { if (department) await onMove(department._id, target); },
     { success: "Departman taşındı", error: "Departman taşınamadı" },
   );
   const close = () => { if (!pending) onOpenChange(false); };
@@ -31,15 +32,16 @@ export function MoveDepartmentDialog({ department, companies, onOpenChange, onMo
       description={`${department?.name ?? ""} alt departmanları ve bağlı kişileriyle birlikte taşınır; kişilerin şirketi de değişir.`}
       onSubmit={async (event) => {
         event.preventDefault();
-        const target = companies.find(company => company._id === companyId)?._id ?? null;
-        if (await run(target)) onOpenChange(false);
+        const target = companies.find(company => company._id === companyId)?._id;
+        setError(target ? undefined : "Şirket seçin");
+        if (target && await run(target)) onOpenChange(false);
       }}
       footer={<FormActions layout="dialog" className="pt-2" isLoading={pending} onClose={close} cancelLabel="İptal" submitLabel="Taşı" busyLabel="Taşınıyor…" />}
     >
-      <FormFieldWrapper htmlFor={id} label="Şirket">
+      <FormFieldWrapper htmlFor={id} label="Şirket *" error={error}>
         <select id={id} value={companyId} disabled={pending} onChange={e => setCompanyId(e.target.value)}
           className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
-          <option value="">Şirketsiz</option>
+          <option value="">Şirket seçin</option>
           {companies.map(company => <option key={company._id} value={company._id}>{company.name}</option>)}
         </select>
       </FormFieldWrapper>

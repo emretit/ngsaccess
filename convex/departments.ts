@@ -41,7 +41,9 @@ export const create = authedMutation({
       assertPeopleProject(args.projectId, parent.projectId, "Departman ve üst departman");
       // Alt departman her zaman üstünün şirketinde açılır.
       companyId = parent.companyId;
-    } else if (companyId) {
+    } else {
+      // Üst seviye departman bir şirkete (şubeye) bağlı açılır.
+      if (!companyId) throw new ConvexError("Departman için şirket seçin");
       const company = await ctx.db.get(companyId);
       if (!company) throw new Error("Şirket bulunamadı");
       assertPeopleProject(args.projectId, company.projectId, "Departman ve şirket");
@@ -116,21 +118,19 @@ export const remove = authedMutation({
 
 const COMPANY_MOVE_LIMIT = 500;
 
-/** Üst seviye departmanı alt departmanları ve bağlı kişileriyle birlikte bir şirkete (ya da şirketsize) taşır. */
+/** Üst seviye departmanı alt departmanları ve bağlı kişileriyle birlikte başka şirkete taşır. */
 export const setCompany = authedMutation({
-  args: { departmentId: v.id("departments"), companyId: v.union(v.id("companies"), v.null()) },
+  args: { departmentId: v.id("departments"), companyId: v.id("companies") },
   returns: v.null(),
   handler: async (ctx, args) => {
     const dept = await ctx.db.get(args.departmentId);
     if (!dept?.projectId) throw new ConvexError("Departman bulunamadı");
     await requirePermission(ctx, ctx.user, dept.projectId, "employees.manage");
     if (dept.parentId) throw new ConvexError("Yalnız üst seviye departman şirkete taşınabilir; alt departmanlar üstüyle birlikte taşınır");
-    if (args.companyId) {
-      const company = await ctx.db.get(args.companyId);
-      if (!company) throw new ConvexError("Şirket bulunamadı");
-      assertPeopleProject(dept.projectId, company.projectId, "Departman ve şirket");
-    }
-    const companyId = args.companyId ?? undefined;
+    const company = await ctx.db.get(args.companyId);
+    if (!company) throw new ConvexError("Şirket bulunamadı");
+    assertPeopleProject(dept.projectId, company.projectId, "Departman ve şirket");
+    const companyId = args.companyId;
     const subtree: Doc<"departments">[] = [dept];
     for (let index = 0; index < subtree.length; index++) {
       const children = await ctx.db.query("departments").withIndex("by_parent", q => q.eq("parentId", subtree[index]._id)).take(COMPANY_MOVE_LIMIT);

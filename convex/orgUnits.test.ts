@@ -51,6 +51,11 @@ describe("şirketler (şubeler)", () => {
 });
 
 describe("departman ↔ şirket", () => {
+  it("üst seviye departman şirketsiz açılamaz", async () => {
+    const f = await fixture();
+    await expect(f.caller.mutation(api.departments.create, { projectId: f.projectId, name: "Yönetim" })).rejects.toThrow("şirket seçin");
+  });
+
   it("alt departman üstünün şirketini alır, başka şirketin altına taşınamaz", async () => {
     const f = await fixture();
     const merkez = await f.caller.mutation(api.companies.create, { projectId: f.projectId, name: "Merkez" });
@@ -65,15 +70,14 @@ describe("departman ↔ şirket", () => {
   it("şirkete taşıma alt departmanları ve kişileri birlikte taşır", async () => {
     const f = await fixture();
     const gebze = await f.caller.mutation(api.companies.create, { projectId: f.projectId, name: "Gebze" });
-    const top = await f.caller.mutation(api.departments.create, { projectId: f.projectId, name: "Yönetim" });
+    // Şirket zorunluluğundan önce açılmış şirketsiz departman.
+    const top = await f.t.run(ctx => ctx.db.insert("departments", { projectId: f.projectId, name: "Yönetim" }));
     const child = await f.caller.mutation(api.departments.create, { projectId: f.projectId, name: "Muhasebe", parentId: top });
     const employeeId = await f.caller.mutation(api.employees.create, { ...person, projectId: f.projectId, departmentId: child });
     await expect(f.caller.mutation(api.departments.setCompany, { departmentId: child, companyId: gebze })).rejects.toThrow("üst seviye");
     await f.caller.mutation(api.departments.setCompany, { departmentId: top, companyId: gebze });
     const rows = await f.t.run(async ctx => [await ctx.db.get(top), await ctx.db.get(child), await ctx.db.get(employeeId)]);
     expect(rows.map(row => row?.companyId)).toEqual([gebze, gebze, gebze]);
-    await f.caller.mutation(api.departments.setCompany, { departmentId: top, companyId: null });
-    expect((await f.t.run(ctx => ctx.db.get(employeeId)))?.companyId).toBeUndefined();
   });
 
   it("kişinin şirketi departmanından gelir; çelişen şirket reddedilir", async () => {
@@ -81,7 +85,7 @@ describe("departman ↔ şirket", () => {
     const merkez = await f.caller.mutation(api.companies.create, { projectId: f.projectId, name: "Merkez" });
     const gebze = await f.caller.mutation(api.companies.create, { projectId: f.projectId, name: "Gebze" });
     const uretim = await f.caller.mutation(api.departments.create, { projectId: f.projectId, name: "Üretim", companyId: gebze });
-    const loose = await f.caller.mutation(api.departments.create, { projectId: f.projectId, name: "Genel" });
+    const loose = await f.t.run(ctx => ctx.db.insert("departments", { projectId: f.projectId, name: "Genel" }));
     const employeeId = await f.caller.mutation(api.employees.create, { ...person, projectId: f.projectId, departmentId: uretim });
     expect((await f.t.run(ctx => ctx.db.get(employeeId)))?.companyId).toBe(gebze);
     await expect(f.caller.mutation(api.employees.update, { employeeId, companyId: merkez })).rejects.toThrow("başka şirkete ait");

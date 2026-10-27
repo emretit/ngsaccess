@@ -122,8 +122,8 @@ function OrgTree({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setDialog({ type: "addCompany" })}>Şirket ekle</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setDialog({ type: "addDepartment", parent: null, company: null })}>
-                  {companies.length ? "Şirketsiz departman ekle" : "Departman ekle"}
+                <DropdownMenuItem disabled={companies.length === 0} onSelect={() => setDialog({ type: "addDepartment", parent: null, company: null })}>
+                  {companies.length ? "Departman ekle" : "Departman ekle (önce şirket ekleyin)"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -183,6 +183,11 @@ function OrgTree({
                 </CompanyTreeItem>
               );
             })}
+            {looseDepartments.length > 0 && companies.length > 0 && (
+              <li role="presentation" className="px-2 pb-0.5 pt-2 text-[11px] font-medium text-muted-foreground">
+                Şirkete bağlanmamış · menüden "Şirkete taşı"
+              </li>
+            )}
             {looseDepartments}
           </ul>
         )}
@@ -215,14 +220,19 @@ function OrgTree({
         key={addingDepartment ? `${addingDepartment.parent?._id ?? addingDepartment.company?._id ?? "top"}` : "closed"}
         isOpen={addingDepartment !== null}
         onOpenChange={(open) => { if (!open) close(); }}
-        onAdd={(name) => addDepartment(name, addingDepartment?.parent?._id ?? null, addingDepartment?.company?._id ?? null)}
+        // Alt departman üstünün şirketini alır; üst seviyede şirket seçimi zorunlu.
+        companies={addingDepartment?.parent ? undefined : companies}
+        initialCompanyId={addingDepartment?.company?._id}
+        onAdd={(name, companyId) => addDepartment(
+          name,
+          addingDepartment?.parent?._id ?? null,
+          companies.find((company) => company._id === companyId)?._id ?? null,
+        )}
         title="Yeni Departman Ekle"
         description={
           addingDepartment?.parent
             ? `${addingDepartment.parent.name} altına eklenecek departmanın adını girin`
-            : addingDepartment?.company
-              ? `${addingDepartment.company.name} şirketine eklenecek departmanın adını girin`
-              : companies.length ? "Şirkete bağlı olmayan departmanın adını girin" : "Üst seviye departmanın adını girin"
+            : "Departmanın bağlı olacağı şirketi seçip adını girin"
         }
       />
       <AddDepartmentDialog

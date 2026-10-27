@@ -8,7 +8,10 @@ import { useId, useState } from "react";
 interface AddDepartmentDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (name: string) => Promise<boolean | void>;
+  onAdd: (name: string, companyId: string | null) => Promise<boolean | void>;
+  /** Verilirse şirket seçimi zorunlu alan olarak gösterilir. */
+  companies?: ReadonlyArray<{ _id: string; name: string }>;
+  initialCompanyId?: string;
   title?: string;
   successMessage?: string;
   description?: string;
@@ -32,13 +35,17 @@ export function AddDepartmentDialog({
   submitLabel = "Ekle",
   busyLabel = "Ekleniyor…",
   initialName = "",
+  companies,
+  initialCompanyId = "",
 }: AddDepartmentDialogProps) {
   const [departmentName, setDepartmentName] = useState(initialName);
+  const [companyId, setCompanyId] = useState(initialCompanyId);
   const [nameError, setNameError] = useState<string>();
+  const [companyError, setCompanyError] = useState<string>();
   const inputId = useId();
   const { run, pending } = useAsyncAction(
     async (name: string) => {
-      if ((await onAdd(name)) === false)
+      if ((await onAdd(name, companies ? companyId : null)) === false)
         throw new Error(errorMessage);
     },
     { success: successMessage, error: errorMessage },
@@ -61,11 +68,11 @@ export function AddDepartmentDialog({
       description={description}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!departmentName.trim()) {
-          setNameError(`${fieldLabel} zorunludur`);
-          return;
-        }
-        setNameError(undefined);
+        const missingName = !departmentName.trim();
+        const missingCompany = Boolean(companies) && !companyId;
+        setNameError(missingName ? `${fieldLabel} zorunludur` : undefined);
+        setCompanyError(missingCompany ? "Şirket seçin" : undefined);
+        if (missingName || missingCompany) return;
         if (await run(departmentName.trim())) {
           setDepartmentName("");
           onOpenChange(false);
@@ -83,6 +90,20 @@ export function AddDepartmentDialog({
         />
       }
     >
+      {companies && (
+        <FormFieldWrapper htmlFor={`${inputId}-company`} label="Şirket *" error={companyError}>
+          <select
+            id={`${inputId}-company`}
+            value={companyId}
+            disabled={pending}
+            onChange={(event) => setCompanyId(event.target.value)}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Şirket seçin</option>
+            {companies.map((company) => <option key={company._id} value={company._id}>{company.name}</option>)}
+          </select>
+        </FormFieldWrapper>
+      )}
       <FormFieldWrapper
         htmlFor={inputId}
         label={fieldLabel}
