@@ -62,6 +62,16 @@ export function displayDuration(minutes: number, status: PdksCell["status"], dur
   if (durationMeasured === false) return "Süre hesaplanamadı";
   return minutes === 0 && status !== "present" && status !== "late" || status === "future" || status === "noData" || status === "notEmployed" ? "—" : formatDuration(minutes);
 }
+type FlexibleTarget = Pick<PdksCell, "scheduleType" | "requiredNetMinutes" | "shortfallMinutes" | "excessMinutes">;
+/** Esnek gün/satır: net hedef ve eksik ya da fazla süre. Sabit veya hedefsiz (tatil, izin) günde null. */
+export function flexibleTargetLabel(day: FlexibleTarget): { text: string; shortfall: boolean } | null {
+  if (day.scheduleType !== "flexible" || !day.requiredNetMinutes) return null;
+  // Dönem toplamında eksik ve fazla birlikte olabilir; ikisi de yazılır.
+  const parts = [`Hedef ${formatDuration(day.requiredNetMinutes, true)}`,
+    ...(day.shortfallMinutes ? [`eksik ${formatDuration(day.shortfallMinutes, true)}`] : []),
+    ...(day.excessMinutes ? [`fazla ${formatDuration(day.excessMinutes, true)}`] : [])];
+  return { text: parts.join(" · "), shortfall: !!day.shortfallMinutes };
+}
 export function timeMinutes(value: string | null): number | null {
   if (!value || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
   const [h, m] = value.split(":").map(Number);

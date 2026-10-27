@@ -25,20 +25,27 @@ export function calendarDayResolver(
   );
 }
 
+/** Sunucu o gün eski sürümü çözdüyse saatleri o sürümden alır; yoksa güncel tanım. */
+function shiftOnDay(shifts: Shift[], cell: PlanCell | undefined, id: Shift["_id"]): Shift | undefined {
+  const shift = shifts.find(item => item._id === id);
+  const version = cell?.versionedShifts?.find(item => item.shiftId === id);
+  return shift && version ? { ...shift, startTime: version.startTime, endTime: version.endTime,
+    scheduleType: version.scheduleType, flexible: version.flexible ?? undefined } : shift;
+}
 /** Hydrate the server's decision; priority and cycle resolution belong to planCells. */
 export function resolvedCalendarDay(
   employee: Employee, date: string, cell: PlanCell | undefined, assignments: Assignment[], shifts: Shift[],
   departmentAssignments: DepartmentAssignment[], departments: Department[], leaves: Leave[], holidays: Holiday[], previousCell?: PlanCell,
 ): DayData {
   const assignment = assignments.find(row => row._id === cell?.assignmentId);
-  const resolvedShifts = cell?.shiftIds.flatMap(id => { const shift = shifts.find(item => item._id === id); return shift ? [shift] : []; }) ?? [];
+  const resolvedShifts = cell?.shiftIds.flatMap(id => { const shift = shiftOnDay(shifts, cell, id); return shift ? [shift] : []; }) ?? [];
   const previousAssignment = assignments.find(row => row._id === previousCell?.assignmentId);
   const previousNightShifts = (previousCell?.shiftIds ?? []).flatMap(id => {
-    const shift = shifts.find(item => item._id === id);
+    const shift = shiftOnDay(shifts, previousCell, id);
     return shift && shift.scheduleType !== "flexible" && shift.endTime < shift.startTime ? [shift] : [];
   });
   const continuations = previousAssignment ? previousNightShifts.map(shift => ({ assignment: previousAssignment, shift, continuation: true })) : [];
-  const shiftMap = new Map(shifts.map(shift => [String(shift._id), shift]));
+  const shiftMap = new Map(shifts.map(shift => [String(shift._id), shiftOnDay(shifts, cell, shift._id) ?? shift]));
   const dayStart = Date.parse(date) / 60000;
   // Keep the existing personal-layer conflict marker without choosing a winner on the client.
   const intervals = assignments.map(row => {

@@ -1,5 +1,6 @@
 import { ConvexError, v, type Infer } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
+import { flexibleSchedule, flexibleSessionEnd } from "./pdksFlexible";
 
 export const MAX_SHIFTS_PER_DAY = 8;
 export const MIN_SPLIT_GAP_MINUTES = 30;
@@ -99,7 +100,17 @@ export function validateShiftPlan(row: PlanRow & { projectId?: Id<"projects"> },
     const firstId = next[0];
     const last = lastId ? shifts.get(lastId) : undefined;
     const first = firstId ? shifts.get(firstId) : undefined;
-    if (!last || !first || last.scheduleType === "flexible") return;
+    if (!last || !first) return;
+    const flex = flexibleSchedule(last);
+    if (flex) {
+      // Ardışık esnek günlerin pencere çakışmasını hesap motoru çözer; sabite geçişte okutma sahipsiz kalmamalı.
+      const nextEntry = 1440 + Math.min(minute(first.startTime), first.validWindow ? minute(first.validWindow.checkInStart) : Infinity);
+      if (first.scheduleType !== "flexible" && nextEntry - flexibleSessionEnd(flex) < MIN_SPLIT_GAP_MINUTES) {
+        throw new ConvexError("Esnek vardiyanın en geç çıkışı ile ertesi günün ilk vardiyası arasında en az 30 dakika olmalıdır");
+      }
+      return;
+    }
+    if (last.scheduleType === "flexible") return;
     const end = minute(last.endTime);
     if (end < minute(last.startTime) && minute(first.startTime) - end < MIN_SPLIT_GAP_MINUTES) {
       throw new ConvexError("Gece vardiyası ile ertesi günün ilk vardiyası arasında en az 30 dakika olmalıdır");

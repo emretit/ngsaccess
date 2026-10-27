@@ -38,8 +38,8 @@ vi.mock('./ShiftSelect', () => ({ ShiftSelect: ({ label, onChange, value }: { la
 const personPreview: Preview = { summary: { total: 1, willAssign: 1, conflict: 0, onLeave: 0, holiday: 0, skipped: 0 }, results: [{ employeeId: 'employee' as Id<'employees'>, employeeName: 'Ada Test', status: 'will_assign', reason: 'Uygun', occurrenceCount: 13, conflict: null, leave: null, holiday: null }] };
 const projectId = 'project' as Id<'projects'>;
 const employee = { _id: 'employee', projectId, firstName: 'Ada', lastName: 'Test' } as Employee;
-const morning = { _id: 'morning', projectId, name: 'Sabah', startTime: '08:00', endTime: '12:00', color: 'blue', isActive: true } as Shift;
-const evening = { ...morning, _id: 'evening', name: 'Akşam', startTime: '12:30', endTime: '16:00', color: 'teal' } as Shift;
+const morning = { _id: 'morning', projectId, name: 'Sabah', startTime: '08:00', endTime: '12:00', isActive: true } as Shift;
+const evening = { ...morning, _id: 'evening', name: 'Akşam', startTime: '12:30', endTime: '16:00' } as Shift;
 const night = { ...morning, _id: 'night', name: 'Gece', startTime: '16:30', endTime: '20:00' } as Shift;
 const shifts = [morning, evening, night];
 const values: BulkAssignmentFormValues = { employeeIds: [employee._id], shiftId: morning._id, startDate: '2026-10-19', endDate: '2026-10-31', specificDays: false, weekPattern: [] };
@@ -185,6 +185,13 @@ describe('Departman ve takvim', () => {
     const html = renderToStaticMarkup(<ShiftCalendarCell data={data} date={baseCell.date} employeeName="Ada" onOpen={() => {}} />);
     expect(html).toContain('Önceki günden · 00:00–06:00');
     expect(data.records[0]?.continuation).toBe(true);
+  });
+  it('geçmiş sürümle çözülen gün o günün saatlerini ve gece devamını gösterir', () => {
+    const versioned = { ...baseCell, versionedShifts: [{ shiftId: morning._id, startTime: '22:00', endTime: '06:00', scheduleType: 'fixed' as const, flexible: null }] };
+    expect(dataFor(versioned).records[0]?.shift).toMatchObject({ _id: morning._id, startTime: '22:00', endTime: '06:00' });
+    expect(dataFor(baseCell).records[0]?.shift).toMatchObject({ startTime: '08:00', endTime: '12:00' });
+    const next = resolvedCalendarDay(employee, '2026-10-20', { ...baseCell, date: '2026-10-20', kind: 'none', source: 'project', shiftIds: [], assignmentId: undefined }, [assignment], shifts, [], [], [], [], versioned);
+    expect(next.records[0]).toMatchObject({ continuation: true, shift: { startTime: '22:00', endTime: '06:00' } });
   });
   it('sunucunun boş kararı kişisel satır ve vardiya mevcut olsa da bozulmaz', () => {
     const data = dataFor({ ...baseCell, kind: 'rest', shiftIds: [] });

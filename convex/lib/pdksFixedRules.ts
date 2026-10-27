@@ -8,21 +8,25 @@ export type FixedShiftRules = Pick<Doc<"shifts">,
   "validWindow" | "absentAfterLateMinutes" | "minWorkMinutes" | "missingCheckInLateMinutes" | "holidayWorkRequired">;
 type Window = NonNullable<FixedShiftRules["validWindow"]>;
 export const FIXED_RULE_KEYS = ["validWindow", "absentAfterLateMinutes", "minWorkMinutes", "missingCheckInLateMinutes", "holidayWorkRequired"] as const;
+/** Esnek vardiyada da geçerli gün kuralları; diğerleri sabit saate bağlıdır. */
+const FLEXIBLE_RULE_KEYS: readonly string[] = ["minWorkMinutes", "holidayWorkRequired"];
 
-export function hasFixedShiftRules(shift: (FixedShiftRules & { scheduleType?: string }) | null | undefined): boolean {
+export function hasFixedShiftRules(shift: (FixedShiftRules & { scheduleType?: string; versionedUntil?: string }) | null | undefined): boolean {
+  // Geçmiş sürümü olan tanımın eski günlerinde kural olabilir; ortak motordan geçmesi güvenli yoldur.
   return shift?.scheduleType !== "flexible" && !!(shift?.validWindow || shift?.absentAfterLateMinutes !== undefined
-    || shift?.minWorkMinutes !== undefined || shift?.missingCheckInLateMinutes !== undefined || shift?.holidayWorkRequired);
+    || shift?.minWorkMinutes !== undefined || shift?.missingCheckInLateMinutes !== undefined || shift?.holidayWorkRequired
+    || shift?.versionedUntil !== undefined);
 }
 
 /** Schedules that must use the shared PDKS day engine, including legacy policies. */
-export function usesShiftDayRules(shift: (FixedShiftRules & { scheduleType?: string }) | null | undefined): boolean {
+export function usesShiftDayRules(shift: (FixedShiftRules & { scheduleType?: string; versionedUntil?: string }) | null | undefined): boolean {
   return shift?.scheduleType === "flexible" || hasFixedShiftRules(shift);
 }
 
 export function validateFixedRules(shift: FixedShiftRules & { scheduleType?: string; startTime: string; endTime: string }) {
-  if (shift.scheduleType === "flexible") {
-    if (FIXED_RULE_KEYS.some(key => shift[key] !== undefined)) throw new ConvexError("Gelişmiş sabit vardiya kuralları esnek vardiyada kullanılamaz");
-    return;
+  const flexible = shift.scheduleType === "flexible";
+  if (flexible && FIXED_RULE_KEYS.some(key => shift[key] !== undefined && !FLEXIBLE_RULE_KEYS.includes(key))) {
+    throw new ConvexError("Giriş penceresi, geç kalma eşiği ve eksik giriş kuralı esnek vardiyada kullanılamaz");
   }
   for (const key of ["absentAfterLateMinutes", "minWorkMinutes", "missingCheckInLateMinutes"] as const) {
     const value = shift[key];
@@ -30,6 +34,7 @@ export function validateFixedRules(shift: FixedShiftRules & { scheduleType?: str
       throw new ConvexError("Gelişmiş kural süresi 0–1440 arasında tam sayı dakika olmalıdır");
     }
   }
+  if (flexible) return;
   const window = shift.validWindow;
   if (!window) return;
   try {

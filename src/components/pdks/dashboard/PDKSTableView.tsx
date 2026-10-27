@@ -1,5 +1,6 @@
 import { PdksPlanSummary } from "./PdksPlanSummary";
 import { singleRowDay } from "../lib/presentation";
+import { PdksFlexibleTarget } from "./PdksFlexibleTarget";
 import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -160,6 +161,7 @@ export function PDKSTableView({
                 <td className="px-2 tabular-nums">{displayTime(r.lastExit)}</td>
                 <td className="px-2 tabular-nums">
                   {r.noShift ? "—" : <DurationCell minutes={r.totalMinutes} status={r.status} measured={r.durationMeasured} />}
+                  {!r.noShift && <PdksFlexibleTarget day={r} />}
                   {(r.nightMinutes ?? 0) > 0 && <span className="block text-muted-foreground">Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}</span>}
                 </td>
                 <td className="px-2 tabular-nums">

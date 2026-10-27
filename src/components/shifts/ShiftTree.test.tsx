@@ -12,7 +12,7 @@ vi.mock("@/components/shared/TreePanel", async original => ({ ...await original<
 vi.mock("@/components/shared/RowActions", () => ({ RowActions: ({ label, children }: { label: string; children: ReactNode }) => <div aria-label={label}>{children}</div> }));
 vi.mock("@/components/ui/dropdown-menu", () => ({ DropdownMenuItem: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
 const projectId = "project" as Id<"projects">;
-const day = { _id: "day", projectId, name: "Gündüz", color: "blue", startTime: "09:00", endTime: "18:00" } as Shift;
+const day = { _id: "day", projectId, name: "Gündüz", startTime: "09:00", endTime: "18:00" } as Shift;
 const night = { ...day, _id: "night", name: "Gece", startTime: "22:00", endTime: "06:00", isActive: false } as Shift;
 function buttons(node: ReactNode): ButtonHTMLAttributes<HTMLButtonElement>[] {
   return Children.toArray(node).flatMap(child => {
@@ -23,7 +23,8 @@ function buttons(node: ReactNode): ButtonHTMLAttributes<HTMLButtonElement>[] {
 beforeEach(() => { state.manage = true; state.shifts = [night, day]; });
 it("renders all shifts in time order, their hours and inactive state without counters", () => {
   const html = renderToStaticMarkup(<ShiftTree projectId={projectId} onSelectShift={vi.fn()} />);
-  for (const label of ["Tüm vardiyalar", "Gündüz", "09:00–18:00", "22:00–06:00 (+1 gün)", "Pasif", "bg-blue-400"]) expect(html).toContain(label);
+  for (const label of ["Tüm vardiyalar", "Gündüz", "09:00–18:00", "22:00–06:00 (+1 gün)", "Pasif"]) expect(html).toContain(label);
+  expect(html).not.toContain("rounded-full");
   expect(html.indexOf(">Gündüz<")).toBeLessThan(html.indexOf(">Gece<"));
   expect(html).not.toContain("Atama serisi");
   for (const label of ["Vardiya ekle", "Düzenle", "Kişi ata", ">Sil<"]) expect(html).toContain(label);

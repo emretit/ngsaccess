@@ -1,7 +1,6 @@
 import { errorMessage } from "@/lib/notify";
 import { validateShift } from "../../../../convex/lib/shiftUx";
 import { z } from "zod";
-import { SHIFT_COLOR_KEYS } from "../../../../convex/lib/shiftColors";
 
 export const flexibleFormSchema = z.object({
   requiredNetMinutes: z.number({ message: "Hedef süre dakika olmalıdır" }),
@@ -17,7 +16,6 @@ const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 const rawShiftFormSchema = z
   .object({
     name: z.string().trim().min(1, "Vardiya adı gereklidir").max(100),
-    color: z.enum(SHIFT_COLOR_KEYS).optional(),
     scheduleType: z.enum(["fixed", "flexible"]).optional(),
     flexible: flexibleFormSchema.optional(),
     validWindow: z.object({
@@ -91,7 +89,7 @@ const rawShiftFormSchema = z
 export const shiftFormSchema = z.preprocess((input: unknown) => {
   if (typeof input === "object" && input !== null && "scheduleType" in input && input.scheduleType === "flexible") {
     // Hidden fixed fields never block a switch to a flexible definition.
-    return { ...input, validWindow: undefined, absentAfterLateMinutes: undefined, minWorkMinutes: undefined, missingCheckInLateMinutes: undefined, holidayWorkRequired: undefined, startTime: "00:00", endTime: "00:00", breakStart: "", breakEnd: "", lateToleranceMinutes: undefined, earlyExitToleranceMinutes: undefined };
+    return { ...input, validWindow: undefined, absentAfterLateMinutes: undefined, missingCheckInLateMinutes: undefined, startTime: "00:00", endTime: "00:00", breakStart: "", breakEnd: "", lateToleranceMinutes: undefined, earlyExitToleranceMinutes: undefined };
   }
   return input;
 }, rawShiftFormSchema);
@@ -99,8 +97,10 @@ export type ShiftFormValues = z.infer<typeof shiftFormSchema>;
 
 export const shiftPayloadSchema = shiftFormSchema.transform(data => ({
   ...data,
-  color: data.color ?? null,
-  ...(data.scheduleType === "flexible" ? {} : {
+  ...(data.scheduleType === "flexible" ? {
+    minWorkMinutes: data.minWorkMinutes ?? null,
+    holidayWorkRequired: data.holidayWorkRequired ?? null,
+  } : {
     validWindow: data.validWindow ?? null,
     absentAfterLateMinutes: data.absentAfterLateMinutes ?? null,
     minWorkMinutes: data.minWorkMinutes ?? null,

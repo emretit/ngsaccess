@@ -8,7 +8,6 @@ import { WeekdaySelection } from './WeekdaySelection';
 import type { BulkAssignmentFormValues } from './assignmentFormSchema';
 import { mondayOf, planPreview, withPlan } from './lib/planForm';
 import { istanbulToday, shortDate, type Shift } from './lib/planning';
-import { shiftColorClasses } from './lib/shiftColors';
 
 export function AssignmentPatternEditor({ values, shifts, onChange, errors = {}, errorRef }: {
   values: BulkAssignmentFormValues; shifts: Shift[]; onChange: (values: BulkAssignmentFormValues) => void; errors?: Record<string, string>; errorRef?: Ref<HTMLParagraphElement>;
@@ -37,7 +36,7 @@ export function AssignmentPatternEditor({ values, shifts, onChange, errors = {},
         {planPreview(values).map(({ date, shiftIds, outsideRange }) => {
           const selected = shifts.filter(shift => shiftIds?.includes(shift._id));
           const label = shiftIds === null ? 'Uygulanmaz' : selected.map(shift => shift.name).join(' + ') || 'Boş';
-          return <div key={date} aria-label={`${shortDate(date)}, ${label}`} title={`${shortDate(date)} · ${label}`} className={`rounded border p-1 text-[10px] ${outsideRange ? 'opacity-40' : ''} ${selected.length ? shiftColorClasses(selected[0]?.color)?.bar ?? '' : 'bg-subtle text-muted-foreground'}`}>
+          return <div key={date} aria-label={`${shortDate(date)}, ${label}`} title={`${shortDate(date)} · ${label}`} className={`rounded border p-1 text-[10px] ${outsideRange ? 'opacity-40' : ''} ${selected.length ? '' : 'bg-subtle text-muted-foreground'}`}>
             <span className="block">{shortDate(date).slice(0, 5)}</span><span className="line-clamp-2">{label}</span>
           </div>;
         })}

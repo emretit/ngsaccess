@@ -16,7 +16,7 @@ vi.mock("react", async original => ({ ...await original<typeof import("react")>(
 }));
 vi.mock("convex/react", () => ({ useQuery: () => ({ asOfDate: istanbulToday(), assignmentCount: 0, employeeCount: 0, skippedAssignments: 0, truncated: false, countLabel: "Toplam" }) }));
 vi.mock("@/components/shared/UnsavedChangesDialog", () => ({ useUnsavedChangesGuard: () => ({ requestClose: (run: () => void) => run(), dialog: null }) }));
-const shift: EditingShift = { _id: "shift" as Id<"shifts">, name: "Gündüz", color: "teal", startTime: "09:00", endTime: "18:00", overtimeEnabled: true, isActive: true };
+const shift: EditingShift = { _id: "shift" as Id<"shifts">, name: "Gündüz", startTime: "09:00", endTime: "18:00", overtimeEnabled: true, isActive: true };
 type NodeProps = {
   children?: ReactNode; "aria-label"?: string; "aria-describedby"?: string; checked?: boolean;
   onChange?: () => void; onSubmit?: (event: { preventDefault: () => void }) => Promise<void>;
@@ -38,22 +38,13 @@ function setup(editingShift: EditingShift | null = shift) {
   return { onUpdate, onAdd, render };
 }
 beforeEach(() => { state.values = []; state.cursor = 0; });
-it("hydrates existing color and sends the selected swatch in the update payload", async () => {
+it("has no color picker and saves an existing fixed definition without color", async () => {
   const f = setup();
   const tree = f.render();
-  expect(find(tree, props => props["aria-label"] === "Turkuaz")?.checked).toBe(true);
-  find(tree, props => props["aria-label"] === "Mor")?.onChange?.();
-  const updated = f.render();
-  expect(find(updated, props => props["aria-label"] === "Mor")?.checked).toBe(true);
-  await find(updated, (_, type) => type === "form")?.onSubmit?.({ preventDefault: vi.fn() });
-  expect(f.onUpdate).toHaveBeenCalledWith(shift._id, expect.objectContaining({ color: "violet" }));
+  expect(find(tree, props => props["aria-label"] === "Renksiz")).toBeUndefined();
+  await find(tree, (_, type) => type === "form")?.onSubmit?.({ preventDefault: vi.fn() });
+  expect(f.onUpdate).toHaveBeenCalledWith(shift._id, expect.not.objectContaining({ color: expect.anything() }), istanbulToday());
   expect(f.onAdd).not.toHaveBeenCalled();
-});
-it("Renksiz sends null to remove an existing color", async () => {
-  const f = setup();
-  find(f.render(), props => props["aria-label"] === "Renksiz")?.onChange?.();
-  await find(f.render(), (_, type) => type === "form")?.onSubmit?.({ preventDefault: vi.fn() });
-  expect(f.onUpdate).toHaveBeenCalledWith(shift._id, expect.objectContaining({ color: null }));
 });
 it("overtime hint is attached to its checkbox and schedule type uses pressed buttons", () => {
   const tree = setup().render();
@@ -66,5 +57,22 @@ it("preserves hydrated advanced rules when saving an existing fixed definition",
   const rules = { validWindow: { checkInStart: "08:00", checkInEnd: "10:00", checkOutStart: "17:00", checkOutEnd: "19:00", checkOutEndDayOffset: 0 as const }, absentAfterLateMinutes: 30, minWorkMinutes: 360, missingCheckInLateMinutes: 15, holidayWorkRequired: true };
   const f = setup({ ...shift, ...rules });
   await find(f.render(), (_, type) => type === "form")?.onSubmit?.({ preventDefault: vi.fn() });
-  expect(f.onUpdate).toHaveBeenCalledWith(shift._id, expect.objectContaining(rules));
+  expect(f.onUpdate).toHaveBeenCalledWith(shift._id, expect.objectContaining(rules), istanbulToday());
+});
+
+it("asks for an effective date only when a rule changes and blocks a date before the last change", async () => {
+  vi.stubGlobal("requestAnimationFrame", () => 0);
+  const f = setup({ ...shift, versionedUntil: "2026-01-09" });
+  expect(find(f.render(), props => (props as { id?: string }).id === "shift-effectiveFrom")).toBeUndefined();
+  (find(f.render(), props => (props as { id?: string }).id === "shift-startTime") as { onChange?: (event: { target: { value: string } }) => void } | undefined)?.onChange?.({ target: { value: "10:00" } });
+  const tree = f.render();
+  const field = find(tree, props => (props as { id?: string }).id === "shift-effectiveFrom") as { min?: string; max?: string; onChange?: (event: { target: { value: string } }) => void } | undefined;
+  expect(field).toMatchObject({ min: "2026-01-10", max: istanbulToday() });
+  field?.onChange?.({ target: { value: "2026-01-05" } });
+  await find(f.render(), (_, type) => type === "form")?.onSubmit?.({ preventDefault: vi.fn() });
+  expect(f.onUpdate).not.toHaveBeenCalled();
+  (find(f.render(), props => (props as { id?: string }).id === "shift-effectiveFrom") as typeof field)?.onChange?.({ target: { value: "2026-01-10" } });
+  await find(f.render(), (_, type) => type === "form")?.onSubmit?.({ preventDefault: vi.fn() });
+  expect(f.onUpdate).toHaveBeenCalledWith(shift._id, expect.objectContaining({ startTime: "10:00" }), "2026-01-10");
+  vi.unstubAllGlobals();
 });

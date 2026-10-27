@@ -1,5 +1,6 @@
 import { PdksDaySegments } from "./PdksDaySegments";
 import { PdksPlanSummary } from "./PdksPlanSummary";
+import { PdksFlexibleTarget } from "./PdksFlexibleTarget";
 import { planDayLabel } from "../lib/presentation";
 import { usePermissions } from "@/hooks/usePermissions";
 import { restorePdksFocus } from "../lib/focus";
@@ -141,6 +142,7 @@ function Detail({
             </span>
           </div>
           <PdksPlanSummary day={day} />
+          {!day.noShift && <PdksFlexibleTarget day={day} className="block text-sm tabular-nums" />}
           {reviewHint(day) && <p className="text-sm text-muted-foreground">{reviewHint(day)}</p>}
           <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
             {[

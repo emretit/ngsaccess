@@ -39,7 +39,7 @@
 | Absent If Late > X / Early > X | Vardiyada geç > X dk → devamsız | 🟡 | `absentAfterLateMinutes` (`8f57a2d9`); **erken çıkış > X yok** |
 | Calculated by: First In & Last Out | İlk–son (brüt) | ✅ | `convex/lib/pdksDay.ts:112` |
 | Calculated by: Each Check-In/Out + Min. Interval (ara çıkışları düş) | "Her giriş-çıkışı topla" + tekrar okutma aralığı 0–60 dk | ✅ | `6e69b6fb` |
-| Min. Work Hours → Absent (normal vardiya) | Esnekte `requiredNetMinutes`, normal vardiyada `minWorkMinutes` | ✅ | `8f57a2d9` (eksik çıkışta İncelenecek) |
+| Min. Work Hours → Absent | Sabit ve esnekte `minWorkMinutes` (esnekte `requiredNetMinutes` yalnız eksik/fazla süre hesaplar, devamsız yapmaz) | ✅ | `8f57a2d9` sabit; esnek 2026-10-26 (eksik çıkışta İncelenecek) |
 | Day Change Settings (gün dönüm saati) | `nightShiftDayMode`: vardiya başlangıcı / gece yarısı böl | 🟡 | Serbest saat seçilemiyor |
 | Manuel / otomatik hesap zamanı + yeniden hesapla | Her sorguda canlı hesap | ➕ | Yeniden hesaplama gerekmiyor |
 | Hafta sonu tanımı (Define Weekends) | PDKS Ayarları › Çalışma günleri | ✅ | `8f142ea8` |

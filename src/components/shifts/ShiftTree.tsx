@@ -14,7 +14,6 @@ import { AddShiftDialog } from "./definitions/AddShiftDialog";
 import { AssignShiftDialog } from "./AssignShiftDialog";
 import { DeleteImpact } from "./ShiftDeleteImpact";
 import { shiftTimeLabel, type Shift } from "./lib/planning";
-import { shiftColorClasses } from "./lib/shiftColors";
 import { useShiftDefinitionActions } from "./useShiftDefinitionActions";
 
 export function ShiftTree({ projectId, selectedShiftId, onSelectShift, createOpen: controlledCreateOpen, onCreateOpenChange }: {
@@ -27,7 +26,7 @@ export function ShiftTree({ projectId, selectedShiftId, onSelectShift, createOpe
   const { can } = usePermissions();
   const canManage = can("schedule.manage");
   const shifts = useQuery(api.shifts.list, { projectId });
-  const { add, edit } = useShiftDefinitionActions(projectId, shifts ?? []);
+  const { add, edit } = useShiftDefinitionActions(projectId);
   const [localCreateOpen, setLocalCreateOpen] = useState(false);
   const createOpen = controlledCreateOpen ?? localCreateOpen;
   const setCreateOpen = onCreateOpenChange ?? setLocalCreateOpen;
@@ -47,12 +46,10 @@ export function ShiftTree({ projectId, selectedShiftId, onSelectShift, createOpe
         <p>Henüz vardiya yok</p>
         {canManage && <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>Vardiya ekle</Button>}
       </div> : [...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime)).map(shift => {
-        const dot = shiftColorClasses(shift.color)?.dot;
         return <div key={shift._id} className={cn("group flex min-w-0 items-center rounded-sm pl-2 hover:bg-muted", selectedShiftId === shift._id && "bg-selected text-primary")}>
           <button type="button" className={cn(TREE_NAME_BUTTON, "py-1")} aria-pressed={selectedShiftId === shift._id}
             onClick={() => onSelectShift(selectedShiftId === shift._id ? undefined : shift._id)}>
             <span className="flex min-w-0 items-center gap-2">
-              {dot && <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full", dot)} />}
               <span className="truncate">{shift.name}</span>
               {shift.isActive === false && <span className="text-[10px] text-muted-foreground">Pasif</span>}
             </span>

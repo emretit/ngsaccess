@@ -90,6 +90,7 @@ describe("denetim sorgusu", () => {
       "projectPrivacySettings",
       "projectRolePermissions",
       "shiftAssignments",
+      "shifts",
       "userProjects",
       "users",
     ]);

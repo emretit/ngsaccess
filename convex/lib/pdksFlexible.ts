@@ -22,6 +22,10 @@ export function flexibleBreak(schedule: FlexibleSchedule, gross: number) {
 export function flexibleExitEnd(schedule: FlexibleSchedule) {
   return clockMinute(schedule.checkOutEnd) + 1440 * schedule.checkOutEndDayOffset;
 }
+/** Giriş gününün 00:00'ından itibaren bir esnek oturumun en geç bitebileceği dakika. */
+export function flexibleSessionEnd(schedule: FlexibleSchedule) {
+  return Math.min(flexibleExitEnd(schedule), clockMinute(schedule.checkInEnd) + schedule.maxSpanMinutes);
+}
 export function validateFlexible(schedule: FlexibleSchedule | undefined) {
   if (!schedule) throw new Error("Esnek vardiya bilgileri gereklidir");
   const { requiredNetMinutes: target, maxSpanMinutes: span, breakMinutes: pause, breakMode } = schedule;

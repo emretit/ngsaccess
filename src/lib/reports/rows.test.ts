@@ -164,3 +164,12 @@ it('filters all breaks and preserves exactly the former violation day list', () 
   expect(dailyRowsForReport(rows, 'mola').map(row => row.cell.date)).toEqual(['2026-10-01', '2026-10-02']);
   expect(dailyRowsForReport(rows, 'mola', true)).toEqual(flattenDailyRows(rows, cell => Boolean(cell.detail?.breakViolation)));
 });
+
+it('lists a flexible day short of its net target as an exception with the missing minutes', () => {
+  const short = dailyCell({ date: '2026-10-05', scheduleType: 'flexible', requiredNetMinutes: 480, shortfallMinutes: 90, excessMinutes: 0 });
+  const met = dailyCell({ date: '2026-10-06', scheduleType: 'flexible', requiredNetMinutes: 480, shortfallMinutes: 0, excessMinutes: 30 });
+  expect(DAILY_PREDICATES.istisnalar(short)).toBe(true);
+  expect(DAILY_PREDICATES.istisnalar(met)).toBe(false);
+  expect(formatDailyExceptions(short)).toBe('Eksik 90 dk');
+  expect(formatDailyExceptions({ ...short, status: 'absent' })).toBe('Devamsız');
+});

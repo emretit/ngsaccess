@@ -5,6 +5,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 import { shiftColorValidator } from "./lib/shiftColors";
+import { shiftRuleFields, shiftRulesValidator } from "./lib/shiftVersions";
 
 /**
  * NGS Access - Convex Schema
@@ -1033,39 +1034,22 @@ export default defineSchema({
     name: v.string(),
     color: v.optional(shiftColorValidator),
     projectId: v.optional(v.id("projects")),
-    scheduleType: v.optional(v.union(v.literal("fixed"), v.literal("flexible"))),
-    flexible: v.optional(v.object({
-      requiredNetMinutes: v.number(),
-      checkInStart: v.string(),
-      checkInEnd: v.string(),
-      checkOutStart: v.string(),
-      checkOutEnd: v.string(),
-      checkOutEndDayOffset: v.union(v.literal(0), v.literal(1)),
-      maxSpanMinutes: v.number(),
-      breakMode: v.union(v.literal("duration"), v.literal("existingLegal")),
-      breakMinutes: v.optional(v.number()),
-    })),
-    validWindow: v.optional(v.object({
-      checkInStart: v.string(), checkInEnd: v.string(),
-      checkOutStart: v.string(), checkOutEnd: v.string(),
-      checkOutEndDayOffset: v.union(v.literal(0), v.literal(1)),
-    })),
-    absentAfterLateMinutes: v.optional(v.number()),
-    minWorkMinutes: v.optional(v.number()),
-    missingCheckInLateMinutes: v.optional(v.number()),
-    holidayWorkRequired: v.optional(v.boolean()),
-    startTime: v.string(),
-    endTime: v.string(),
-    breakStart: v.optional(v.string()),
-    breakEnd: v.optional(v.string()),
-    lateToleranceMinutes: v.optional(v.number()),
-    earlyExitToleranceMinutes: v.optional(v.number()),
-    overtimeStartToleranceMinutes: v.optional(v.number()),
-    overtimeEnabled: v.optional(v.boolean()),
+    ...shiftRuleFields,
+    /** Son geçmiş sürümün bitiş günü; varsa hesaplar tarihe göre `shiftVersions`'tan okunur. */
+    versionedUntil: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     createdAt: v.string(),
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),
+
+  /** Vardiya hesap alanlarının eski sürümleri: `validUntil` dahil o güne kadar geçerli. Tanım silinince silinir. */
+  shiftVersions: defineTable({
+    shiftId: v.id("shifts"),
+    validUntil: v.string(),
+    rules: shiftRulesValidator,
+    createdAt: v.string(),
+    createdBy: v.optional(v.id("users")),
+  }).index("by_shift_until", ["shiftId", "validUntil"]),
 
   shiftAssignments: defineTable({
     employeeId: v.id("employees"),

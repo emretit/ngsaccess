@@ -6,6 +6,8 @@ export interface PersonMonthTotals {
   absentDays: number; leaveDays: number; leaveByType: Record<string, number>;
   workdays: number; weekendDays: number; holidayDays: number; holidayWorkedDays: number;
   breakMinutes: number; incompleteDays: number;
+  /** Yalnız esnek günler: net hedefin altında/üstünde kalan süre. */
+  shortfallDays: number; shortfallMinutes: number; excessMinutes: number;
 }
 export interface PersonMonthReportRow {
   kind: 'personMonth'; id: string; name: string; department: string; payrollCode: string;
@@ -17,7 +19,8 @@ export function countedMonthDay(cell: DailyCell): boolean {
 export function personMonthTotals(days: readonly DailyCell[]): PersonMonthTotals {
   const totals: PersonMonthTotals = { workedDays: 0, totalMinutes: 0, overtimeMinutes: 0, lateDays: 0, lateMinutes: 0,
     earlyExitDays: 0, earlyExitMinutes: 0, absentDays: 0, leaveDays: 0, leaveByType: {},
-    workdays: 0, weekendDays: 0, holidayDays: 0, holidayWorkedDays: 0, breakMinutes: 0, incompleteDays: 0 };
+    workdays: 0, weekendDays: 0, holidayDays: 0, holidayWorkedDays: 0, breakMinutes: 0, incompleteDays: 0,
+    shortfallDays: 0, shortfallMinutes: 0, excessMinutes: 0 };
   for (const cell of days) {
     if (!countedMonthDay(cell)) continue;
     totals.totalMinutes += cell.totalMinutes;
@@ -33,6 +36,10 @@ export function personMonthTotals(days: readonly DailyCell[]): PersonMonthTotals
     if ((dayType === 'weekend' || dayType === 'holiday') && cell.totalMinutes > 0) totals.holidayWorkedDays += 1;
     if (dayType === 'workday' && cell.isLate) { totals.lateDays += 1; totals.lateMinutes += cell.lateMinutes; }
     if (dayType === 'workday' && cell.detail?.isEarlyExit) { totals.earlyExitDays += 1; totals.earlyExitMinutes += cell.detail.earlyExitMinutes; }
+    if (cell.scheduleType === 'flexible') {
+      if (cell.shortfallMinutes) { totals.shortfallDays += 1; totals.shortfallMinutes += cell.shortfallMinutes; }
+      totals.excessMinutes += cell.excessMinutes ?? 0;
+    }
     if (cell.payrollCode === 'DV') totals.absentDays += 1;
     if (cell.payrollCode === 'İZN') {
       totals.leaveDays += 1;
@@ -41,6 +48,9 @@ export function personMonthTotals(days: readonly DailyCell[]): PersonMonthTotals
     }
   }
   return totals;
+}
+export function hasFlexibleDays(rows: readonly { days: readonly DailyCell[] }[]): boolean {
+  return rows.some(row => row.days.some(cell => cell.scheduleType === 'flexible'));
 }
 export function buildPersonMonthRows(rows: readonly DailySourceRow[]): PersonMonthReportRow[] {
   return rows.map(row => ({ kind: 'personMonth', id: row.id, name: row.name, department: departmentLabel(row.department),

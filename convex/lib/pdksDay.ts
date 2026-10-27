@@ -204,7 +204,7 @@ export function computePdksDay(params: {
     return rawTotalMinutes > 0 ? (raw * totalMinutes) / rawTotalMinutes : 0;
   };
   const wholeMinutes = eachPunch ? Math.floor : Math.round;
-  const holidayFor = (holiday: Doc<"holidays"> | null | undefined) => fixedRules?.holidayWorkRequired ? undefined : holiday;
+  const holidayFor = (holiday: Doc<"holidays"> | null | undefined) => shift?.holidayWorkRequired ? undefined : holiday;
   // A cycle shift owns its whole work day, including the next calendar day after midnight.
   // dayKind therefore stays anchored to the shift-start date even in splitAtMidnight mode.
   const classify = (day: string, holiday: Doc<"holidays"> | null | undefined) => {
@@ -321,9 +321,10 @@ export function computePdksDay(params: {
   );
   const multiplier =
     overtimeMinutes > 0 ? weightedOvertimeMinutes / overtimeMinutes : 0;
-  const absentByFixedRule = !!fixedRules && classification === "workday" && !params.hasLeave && (
-    (fixedRules.absentAfterLateMinutes !== undefined && lateMinutes > fixedRules.absentAfterLateMinutes) ||
-    (fixedRules.minWorkMinutes !== undefined && (evidence?.durationMeasured ?? (!!firstISO && !!lastISO)) && totalMinutes < fixedRules.minWorkMinutes)
+  // En az net çalışma sabit ve esnekte ortak; geç kalma eşiği yalnız sabit saatte anlamlı.
+  const absentByFixedRule = !!shift && classification === "workday" && !params.hasLeave && (
+    (fixedRules?.absentAfterLateMinutes !== undefined && lateMinutes > fixedRules.absentAfterLateMinutes) ||
+    (shift.minWorkMinutes !== undefined && (evidence?.durationMeasured ?? (!!firstISO && !!lastISO)) && totalMinutes < shift.minWorkMinutes)
   );
   const attendanceDecision = fixedEvidence?.outsideWindow ? "incomplete" as const
     : absentByFixedRule && evidence ? "absent" as const : evidence?.decision;

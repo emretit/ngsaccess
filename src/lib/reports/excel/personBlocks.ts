@@ -1,15 +1,16 @@
 import type ExcelJS from 'exceljs';
-import { countedMonthDay, type PersonMonthReportRow, type PersonMonthTotals } from '../personMonth';
+import { countedMonthDay, hasFlexibleDays, type PersonMonthReportRow, type PersonMonthTotals } from '../personMonth';
 import type { DailyCell } from '../rows';
 import { addLegendSheet, addReportHeadings, dayFill, dayHeading, fillCell, formatShortMinutes, HEADER_FILL, leaveTypeLabel, reportDays, setCell, setupPrint, statusLabel, THIN_BORDER, type ExcelLayoutInput } from './common';
 
 type TotalColumn = { label: string; value: (totals: PersonMonthTotals) => string | number };
 export function personTotalColumns(rows: readonly PersonMonthReportRow[]): TotalColumn[] {
   const number = (label: string, key: Exclude<keyof PersonMonthTotals, 'leaveByType'>): TotalColumn => ({ label, value: totals => totals[key] });
-  const minutes = (label: string, key: 'totalMinutes' | 'overtimeMinutes' | 'lateMinutes' | 'earlyExitMinutes' | 'breakMinutes'): TotalColumn => ({ label, value: totals => formatShortMinutes(totals[key]) });
+  const minutes = (label: string, key: 'totalMinutes' | 'overtimeMinutes' | 'lateMinutes' | 'earlyExitMinutes' | 'breakMinutes' | 'shortfallMinutes' | 'excessMinutes'): TotalColumn => ({ label, value: totals => formatShortMinutes(totals[key]) });
   const leaveTypes = [...new Set(rows.flatMap(row => Object.keys(row.totals.leaveByType)))].sort((a, b) => a.localeCompare(b, 'tr'));
   return [number('Çalışılan gün', 'workedDays'), minutes('Çalışma', 'totalMinutes'), minutes('Fazla mesai', 'overtimeMinutes'),
     number('Geç (gün)', 'lateDays'), minutes('Geç', 'lateMinutes'), number('Erken çıkış (gün)', 'earlyExitDays'), minutes('Erken çıkış', 'earlyExitMinutes'),
+    ...(hasFlexibleDays(rows) ? [number('Eksik (gün, esnek)', 'shortfallDays'), minutes('Eksik (esnek)', 'shortfallMinutes'), minutes('Fazla süre (esnek)', 'excessMinutes')] : []),
     number('Devamsız', 'absentDays'), number('İzinli', 'leaveDays'),
     ...leaveTypes.map(type => ({ label: leaveTypeLabel(type), value: (totals: PersonMonthTotals) => Object.prototype.hasOwnProperty.call(totals.leaveByType, type) ? totals.leaveByType[type] : 0 })),
     number('Hafta içi', 'workdays'), number('Hafta sonu', 'weekendDays'), number('Resmî tatil', 'holidayDays'),

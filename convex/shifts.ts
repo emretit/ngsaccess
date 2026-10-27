@@ -1,5 +1,5 @@
 import { departmentChain } from "./lib/shiftResolver";
-import { shiftPlanValidator, planShiftIds } from "./lib/shiftPlan";
+import { shiftPlanValidator, planShiftIds, validPlanDate, validateShiftPlan } from "./lib/shiftPlan";
 import { requirePermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { assertPeopleProject } from "./lib/peopleScope";
@@ -7,7 +7,8 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { shiftColorValidator } from "./lib/shiftColors";
 import { validateShift, type ScheduleRange } from "./lib/shiftUx";
-import { trDateKey } from "./lib/trDate";
+import { trDateKey, trTodayKey } from "./lib/trDate";
+import { MAX_VERSIONS_PER_SHIFT, SHIFT_RULE_KEYS, ruleSnapshot } from "./lib/shiftVersions";
 import {
   ASSIGNMENT_SCAN_LIMIT, BULK_ASSIGN_LIMIT, assignmentIntersectsRange, normalizeAssignmentPlan, syncPlanRefs,
   evaluateShiftAssignment, shiftDateOffset, validateAssignRange,
@@ -518,7 +519,8 @@ export const create = authedMutation({
       throw new Error("Bu vardiyayı oluşturma yetkiniz yok");
     }
     const now = new Date().toISOString();
-    const fields = { ...toPatch(args), name: args.name, startTime: args.startTime, endTime: args.endTime };
+    // Renk kaldırıldı; eski web istemcisi gönderirse yok sayılır (şemadan daraltma ayrı yayında).
+    const fields = { ...toPatch({ ...args, color: undefined }), name: args.name, startTime: args.startTime, endTime: args.endTime };
     validateShift(fields);
     if (fields.scheduleType === "flexible" && fields.flexible) {
       fields.startTime = fields.flexible.checkInStart;
@@ -549,6 +551,8 @@ export const update = authedMutation({
     overtimeStartToleranceMinutes: v.optional(v.union(v.null(), v.number())),
     overtimeEnabled: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()),
+    /** Hesap değişikliğinin ilk geçerli günü (İstanbul, YYYY-MM-DD); yoksa bugün. */
+    effectiveFrom: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -558,17 +562,87 @@ export const update = authedMutation({
     if (shift.projectId ? !allowedProjectIds.some(id => id === shift.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
-    const { shiftId, ...updates } = args;
+    // Renk kaldırıldı; eski web istemcisi gönderirse yok sayılır.
+    const { shiftId, color: _legacyColor, effectiveFrom, ...updates } = args;
     const patch = toPatch(updates);
-    // Ad, renk ve aktiflik hesabı değiştirmez; esnek tanımda da yerinde güncellenir.
-    const cosmeticOnly = Object.keys(patch).every((key) => key === "name" || key === "color" || key === "isActive");
-    if (!cosmeticOnly) validateShift({ ...shift, ...patch });
-    if ((shift.scheduleType === "flexible" || patch.scheduleType === "flexible") && !cosmeticOnly) {
-      throw new Error("Esnek vardiya değişikliği için yeni tanım oluşturun ve gelecek tarihli atama yapın; geçmiş hesaplar değiştirilmez");
+    const now = new Date().toISOString();
+    // Esnekte başlangıç/bitiş her zaman giriş penceresinden türetilir (create ile aynı).
+    const flexibleWindow = shift.scheduleType === "flexible" ? patch.flexible ?? shift.flexible : undefined;
+    if (flexibleWindow) { patch.startTime = flexibleWindow.checkInStart; patch.endTime = flexibleWindow.checkInEnd; }
+    // Ad ve aktiflik hesabı değiştirmez; sürüm açmadan yerinde güncellenir.
+    // Eski sabit tanımlarda tür alanı yok; "fixed" ile eşdeğer sayılır.
+    const ruleValue = (source: Partial<Doc<"shifts">>, key: keyof Doc<"shifts">) => key === "scheduleType" ? source.scheduleType ?? "fixed" : source[key];
+    const changedRules = SHIFT_RULE_KEYS.filter(key => key in patch && stableJson(ruleValue(patch, key)) !== stableJson(ruleValue(shift, key)));
+    if (!changedRules.length) {
+      const cosmetic = { ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}) };
+      await ctx.db.patch(shiftId, { ...cosmetic, updatedAt: now });
+      return;
     }
-    await ctx.db.patch(shiftId, { ...patch, updatedAt: new Date().toISOString() });
+    if (changedRules.includes("scheduleType")) throw new ConvexError("Vardiya türünü değiştirmek için yeni tanım oluşturun");
+    validateShift({ ...shift, ...patch });
+    if (changedRules.some(key => PLAN_TIMING_KEYS.includes(key))) await assertPlansStillValid(ctx, { ...shift, ...patch }, effectiveFrom ?? trTodayKey());
+    const versionPatch = await openShiftVersion(ctx, ctx.user, shift, effectiveFrom ?? trTodayKey(), now);
+    await ctx.db.patch(shiftId, { ...patch, ...versionPatch, updatedAt: now });
+    await writeAudit(ctx, { user: ctx.user, projectId: shift.projectId, action: "update", targetTable: "shifts", targetId: shiftId,
+      oldValue: Object.fromEntries(changedRules.map(key => [key, shift[key] ?? null])),
+      newValue: Object.fromEntries(changedRules.map(key => [key, patch[key] ?? null])),
+      note: `Vardiya kuralları ${effectiveFrom ?? trTodayKey()} tarihinden itibaren değişti: ${shift.name}` });
   },
 });
+
+/**
+ * Hesap alanı değişmeden önce eski değerleri `validUntil = from - 1` sürümüne yazar.
+ * Aynı başlangıçla ikinci düzenleme yeni sürüm açmaz; daha önceki bir sınırın gerisine dönülemez.
+ */
+async function openShiftVersion(ctx: MutationCtx, user: Doc<"users">, shift: Doc<"shifts">, from: string, now: string) {
+  const today = trTodayKey();
+  if (!validPlanDate(from) || from > today) throw new ConvexError("Geçerlilik başlangıcı bugün ya da geçmiş bir tarih olmalıdır");
+  const validUntil = shiftDateOffset(from, -1);
+  if (shift.versionedUntil !== undefined) {
+    if (validUntil < shift.versionedUntil) {
+      throw new ConvexError(`Bu tanım ${shiftDateOffset(shift.versionedUntil, 1)} tarihinden itibaren zaten değişti; daha erken bir başlangıç seçilemez`);
+    }
+    if (validUntil === shift.versionedUntil) return {};
+  }
+  const existing = await ctx.db.query("shiftVersions").withIndex("by_shift_until", q => q.eq("shiftId", shift._id)).take(MAX_VERSIONS_PER_SHIFT);
+  if (existing.length >= MAX_VERSIONS_PER_SHIFT) throw new ConvexError("Bu tanımın değişiklik geçmişi doldu; yeni bir vardiya tanımı oluşturun");
+  await ctx.db.insert("shiftVersions", { shiftId: shift._id, validUntil, rules: ruleSnapshot(shift), createdAt: now, createdBy: user._id });
+  return { versionedUntil: validUntil };
+}
+
+const PLAN_TIMING_KEYS: readonly string[] = ["startTime", "endTime", "flexible", "validWindow"];
+/**
+ * Saat değişikliği bu tanımı kullanan çok vardiyalı gün / döngü planlarını bozmamalı
+ * (aynı gün 30 dk boşluk, gece ve esnek sonrası ertesi gün kuralı). Başlangıçtan önce biten planlar atlanır.
+ */
+async function assertPlansStillValid(ctx: MutationCtx, next: Doc<"shifts">, from: string) {
+  if (!next.projectId) return;
+  const links = await definitionPlanLinks(ctx, next._id, next.projectId);
+  if (links.truncated) throw new ConvexError("Bu vardiyayı kullanan plan sayısı çok fazla; saat değişikliği doğrulanamadı");
+  const rows = [...links.personal, ...links.departments].filter(row => row.plan && row.projectId === next.projectId && row.endDate >= shiftDateOffset(from, -1));
+  if (!rows.length) return;
+  const shifts = new Map<string, Doc<"shifts">>();
+  for (const id of new Set(rows.flatMap(row => planShiftIds(row.plan)))) {
+    const doc = id === next._id ? next : await ctx.db.get(id);
+    // Pasif tanımlar mevcut planda kalabilir; burada yalnız saat uyumu sınanır.
+    if (doc) shifts.set(id, { ...doc, isActive: true });
+  }
+  for (const row of rows) {
+    try {
+      validateShiftPlan(row, shifts);
+    } catch (error) {
+      const reason = error instanceof ConvexError && typeof error.data === "string" ? error.data : error instanceof Error ? error.message : String(error);
+      throw new ConvexError(`Bu saat değişikliği mevcut bir vardiya planını bozuyor: ${reason}`);
+    }
+  }
+}
+
+/** Anahtar sırasından bağımsız karşılaştırma; tanımsız ile null aynı sayılır. */
+function stableJson(value: unknown): string {
+  if (value === undefined || value === null) return "null";
+  if (typeof value !== "object") return JSON.stringify(value);
+  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`).join(",")}}`;
+}
 
 export const remove = authedMutation({
   args: { shiftId: v.id("shifts") },
@@ -601,6 +675,8 @@ export const remove = authedMutation({
     if (linkedAssignments.some(row => row.projectId !== undefined && row.projectId !== shift.projectId)) throw new ConvexError("Atamaların proje bilgisi doğrulanamadı");
     const eligible = linkedAssignments.filter(row => row.projectId !== undefined);
     await Promise.all(eligible.map((a) => ctx.db.delete(a._id)));
+    const versions = await ctx.db.query("shiftVersions").withIndex("by_shift_until", q => q.eq("shiftId", args.shiftId)).take(MAX_VERSIONS_PER_SHIFT);
+    await Promise.all(versions.map(version => ctx.db.delete(version._id)));
     await ctx.db.delete(args.shiftId);
     return { removedAssignments: eligible.length, skippedAssignments: linkedAssignments.length - eligible.length };
   },

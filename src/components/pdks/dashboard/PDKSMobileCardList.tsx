@@ -6,6 +6,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { displayTime, displayDuration, type PdksRow } from "../lib/presentation";
 import { PdksRowStatus } from "./PdksRowStatus";
+import { PdksFlexibleTarget } from "./PdksFlexibleTarget";
 import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 export function PDKSMobileCardList({
   records,
@@ -65,6 +66,7 @@ export function PDKSMobileCardList({
                   <dd>{r.noShift ? "—" : displayDuration(r.totalMinutes, r.status, r.durationMeasured)}</dd>
                 </div>
               </dl>
+              {!r.noShift && <PdksFlexibleTarget day={r} className="mt-2 block text-xs tabular-nums" />}
               {(r.nightMinutes ?? 0) > 0 && <p className="mt-2 text-xs tabular-nums">Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}</p>}
               {r.overtimeMinutes > 0 && (
                 <p className="mt-2 text-xs tabular-nums">

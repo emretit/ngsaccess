@@ -10,6 +10,7 @@
 import { isRuleOpenAt } from "./ruleSchedule";
 import { trDateKey, trDayRangeISO } from "./trDate";
 import { createShiftResolver, readDepartmentPlans } from "./shiftResolver";
+import { loadShiftVersions } from "./shiftVersions";
 import { planShiftIds } from "./shiftPlan";
 import { addWorkDate } from "./pdksWorkDay";
 import { clockMinute, flexibleExitEnd, flexibleSchedule } from "./pdksFlexible";
@@ -59,11 +60,13 @@ async function directionShift(ctx: MutationCtx, employeeId: Id<"employees">, dat
   const shifts = (await Promise.all(ids.map(id => ctx.db.get(id))))
     .filter((shift): shift is NonNullable<typeof shift> => shift !== null)
     .filter(shift => !shift.projectId || shift.projectId === employee.projectId);
-  const plan = createShiftResolver([employee], shifts, [applicable], departmentData.departments, departmentData.assignments).resolvePlan(employeeId, date);
+  const versions = await loadShiftVersions(ctx, shifts, date);
+  const resolver = createShiftResolver([employee], shifts, [applicable], departmentData.departments, departmentData.assignments, versions);
+  const plan = resolver.resolvePlan(employeeId, date);
   if (plan.kind === "shifts") return plan.shifts[plan.shifts.length - 1] ?? null;
   if (plan.kind === "rest") return null;
   // Raw access direction keeps its legacy overnight toggle; this is not PDKS eligibility.
-  return shifts.find(shift => shift._id === employee.shiftId) ?? null;
+  return employee.shiftId ? resolver.shiftAt?.(employee.shiftId, date) ?? null : null;
 }
 
 // Cihazın yön ayarına ve toggle state'ine göre okumanın yönünü çözer.

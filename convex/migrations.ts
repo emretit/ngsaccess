@@ -160,3 +160,24 @@ export const normalizeEmployeeEmails = internalMutation({
     return { updated, collisions, isDone: page.isDone, continueCursor: page.continueCursor, scheduled };
   },
 });
+
+/**
+ * Vardiya rengi kaldırıldı (2026-10-26): kayıtlı `shifts.color` alanını siler.
+ * İdempotent; sayfa sayfa ilerler. Bittikten sonra şemadan `color` daraltılır.
+ */
+export const clearShiftColors = internalMutation({
+  args: { cursor: v.optional(v.string()), cleared: v.optional(v.number()) },
+  returns: v.object({ cleared: v.number(), isDone: v.boolean() }),
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query("shifts").paginate({ numItems: 200, cursor: args.cursor ?? null });
+    let cleared = args.cleared ?? 0;
+    for (const shift of page.page) {
+      if (shift.color === undefined) continue;
+      await ctx.db.patch(shift._id, { color: undefined });
+      cleared++;
+    }
+    if (!page.isDone) await ctx.scheduler.runAfter(0, internal.migrations.clearShiftColors, { cursor: page.continueCursor, cleared });
+    console.info("Shift color cleanup batch", { cleared, isDone: page.isDone });
+    return { cleared, isDone: page.isDone };
+  },
+});

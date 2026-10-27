@@ -25,15 +25,16 @@ describe("Sabit / Esnek vardiya formu", () => {
   it("esnek geçişinde gizlenen sabit saatleri kullanmaz; tipli payload pencereleri taşır", () => {
     const payload: ShiftFormPayload = shiftPayloadSchema.parse({ ...fixed, startTime: "", endTime: "", scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE });
     expect(payload).toMatchObject({ scheduleType: "flexible", startTime: "05:00", endTime: "22:00", breakStart: null, breakEnd: null, flexible: DEFAULT_FLEXIBLE });
-    const html = render({ ...payload, color: undefined, _id: "shift" as Id<"shifts">, breakStart: undefined, breakEnd: undefined, lateToleranceMinutes: undefined, earlyExitToleranceMinutes: undefined, overtimeStartToleranceMinutes: undefined });
+    const html = render({ ...payload, _id: "shift" as Id<"shifts">, breakStart: undefined, breakEnd: undefined, lateToleranceMinutes: undefined, earlyExitToleranceMinutes: undefined, overtimeStartToleranceMinutes: undefined });
     expect(html).toContain("Günlük net hedef (dk)");
     expect(html).toContain("En geç çıkış günü");
-    // Hesap alanı değişmeden açılan esnek tanım yerinde güncellenir (ad/renk/aktiflik).
-    expect(html).toContain("Ad, renk ve aktiflik bu tanımda güncellenir.");
+    // Esnek de sabit gibi tarihli sürümle güncellenir; tür değişmedikçe yeni tanım açılmaz.
+    expect(html).toContain("seçtiğiniz tarihten itibaren geçerlidir");
     expect(html).not.toContain("Yeni tanım olarak kaydet");
-    expect(html).toContain("Saat veya hesap değişikliği yeni tanım olarak kaydedilir.");
+    // Hesap alanı değişmeden tarih alanı çıkmaz.
+    expect(html).not.toContain("shift-effectiveFrom");
     expect(html).not.toContain("Başlangıç saati");
-    expect(html).not.toContain("Geç kalma toleransı");
+    expect(html).not.toContain("shift-lateToleranceMinutes");
     expect(html).not.toContain("Mola başlangıcı");
   });
   it("sabit moda dönüş, sabit saat ve mola doğrulamasını geri getirir", () => {
@@ -55,12 +56,6 @@ describe("Sabit / Esnek vardiya formu", () => {
   });
 });
 
-it("accepts allowed colors, rejects unknown ones and encodes no color as null", () => {
-  expect(shiftPayloadSchema.parse({ ...fixed, color: "blue" }).color).toBe("blue");
-  expect(shiftPayloadSchema.parse(fixed).color).toBeNull();
-  expect(shiftPayloadSchema.safeParse({ ...fixed, color: "red" }).success).toBe(false);
-});
-
 it("advanced rules hydrate in a closed section and blank fields clear through null", () => {
   const rules = { validWindow: { checkInStart: "07:00", checkInEnd: "09:00", checkOutStart: "16:00", checkOutEnd: "18:00", checkOutEndDayOffset: 0 as const }, absentAfterLateMinutes: 30, minWorkMinutes: 360, missingCheckInLateMinutes: 15, holidayWorkRequired: true };
   expect(shiftPayloadSchema.parse({ ...fixed, ...rules })).toMatchObject(rules);
@@ -72,9 +67,19 @@ it("advanced rules hydrate in a closed section and blank fields clear through nu
   expect(html).toContain('value="07:00"');
   const flexible = { ...fixed, ...rules, scheduleType: "flexible" as const, flexible: DEFAULT_FLEXIBLE };
   const payload = shiftPayloadSchema.parse(flexible);
+  // Esnekte saat bağımlı kurallar düşer; en az net çalışma ve resmi tatil kuralı kalır.
   expect(payload.validWindow).toBeUndefined();
-  expect(payload.minWorkMinutes).toBeUndefined();
-  expect(render({ ...flexible, _id: "shift" as Id<"shifts"> })).not.toContain("Gelişmiş");
+  expect(payload.absentAfterLateMinutes).toBeUndefined();
+  expect(payload).toMatchObject({ minWorkMinutes: 360, holidayWorkRequired: true });
+  expect(shiftPayloadSchema.parse({ ...flexible, minWorkMinutes: undefined, holidayWorkRequired: undefined })).toMatchObject({ minWorkMinutes: null, holidayWorkRequired: null });
+  const flexibleHtml = render({ ...flexible, _id: "shift" as Id<"shifts"> });
+  // Esnekte Gelişmiş: mesai toleransı + gün kuralları; saat bağımlı sabit kurallar görünmez.
+  expect(flexibleHtml).toContain("Gelişmiş");
+  expect(flexibleHtml).toContain("shift-overtimeStartToleranceMinutes");
+  expect(flexibleHtml).toContain("shift-minWorkMinutes");
+  expect(flexibleHtml).toContain("Resmi tatilde çalışma zorunlu");
+  expect(flexibleHtml).not.toContain("shift-absentAfterLateMinutes");
+  expect(flexibleHtml).not.toContain("Giriş/çıkış penceresi");
 });
 
 it("advanced rules validate limits, windows and zero without coercing blanks to zero", () => {

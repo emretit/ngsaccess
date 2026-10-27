@@ -156,8 +156,14 @@ export const planCells = authedQuery({
     const cells = [];
     for (const employee of employees) for (let date = args.rangeStart; date <= args.rangeEnd; date = shiftDateOffset(date, 1)) {
       const plan = resolver.resolvePlan(employee._id, date);
+      // Geçmiş sürümle çözülen vardiyalar o günün saatleriyle gösterilsin (güncel tanım farklı olabilir).
+      const versioned = plan.kind === "shifts" ? plan.shifts.filter(shift => shift !== resolver.shifts.get(shift._id)) : [];
       cells.push({ employeeId: employee._id, date, kind: plan.kind, source: plan.source,
         shiftIds: plan.kind === "shifts" ? plan.shifts.map(shift => shift._id) : [],
+        ...(versioned.length ? { versionedShifts: versioned.map(shift => ({
+          shiftId: shift._id, startTime: shift.startTime, endTime: shift.endTime,
+          scheduleType: shift.scheduleType ?? "fixed", flexible: shift.flexible ?? null,
+        })) } : {}),
         ...(plan.kind === "none" ? {} : {
           ...(plan.assignmentId ? { assignmentId: plan.assignmentId } : {}),
           ...(plan.departmentAssignmentId ? { departmentAssignmentId: plan.departmentAssignmentId } : {}),

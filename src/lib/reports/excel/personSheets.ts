@@ -1,7 +1,7 @@
 import type ExcelJS from 'exceljs';
 import { notify } from '@/lib/notify';
 import { formatReportDate, type DailyCell } from '../rows';
-import { countedMonthDay, personMonthTotals, type PersonMonthReportRow, type PersonMonthTotals } from '../personMonth';
+import { countedMonthDay, hasFlexibleDays, personMonthTotals, type PersonMonthReportRow, type PersonMonthTotals } from '../personMonth';
 import { addLegendSheet, dayFill, dayHeading, DEFAULT_LEGEND, fillCell, formatShortMinutes, HEADER_FILL, leaveTypeLabel, reportDays, setCell, setupPrint, statusLabel, THIN_BORDER, type ExcelLayoutInput } from './common';
 
 export const PERSON_SHEETS_LIMIT_MESSAGE = 'En fazla 300 kişi; departman ya da kişi filtresi seçin.';
@@ -63,6 +63,7 @@ function addSummary(sheet: ExcelJS.Worksheet, person: PersonMonthReportRow): voi
     ['Geç (gün / dk)', `${person.totals.lateDays} gün / ${person.totals.lateMinutes} dk`],
     ['Erken çıkış (gün / dk)', `${person.totals.earlyExitDays} gün / ${person.totals.earlyExitMinutes} dk`],
     ['Devamsız (gün)', person.totals.absentDays], ['Mola toplamı', formatShortMinutes(person.totals.breakMinutes)], ['İnceleme (gün)', person.totals.incompleteDays],
+    ...(hasFlexibleDays([person]) ? [['Esnek eksik / fazla süre', `Eksik ${person.totals.shortfallDays} gün / ${person.totals.shortfallMinutes} dk · fazla ${person.totals.excessMinutes} dk`] as const] : []),
   ] as const;
   other.forEach(([label, value], index) => {
     mergedText(sheet, index + 3, 7, 12, label);

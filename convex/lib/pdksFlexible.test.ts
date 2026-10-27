@@ -95,6 +95,24 @@ describe("tasarım §1 on iki senaryo", () => {
   });
 });
 
+describe("esnek gün kuralları (sabitle ortak)", () => {
+  it("en az net çalışmanın altında kalan esnek gün devamsız sayılır; eşikte kalan sayılmaz", () => {
+    const readings = [reading("09:00", "entry"), reading("16:00", "exit")];
+    const short = run(readings, { shift: shift({ minWorkMinutes: 400 }) });
+    expect(short).toMatchObject({ totalMinutes: 360, shortfallMinutes: 120, attendanceDecision: "absent", hasAttendance: false });
+    expect(status(short)).toBe("absent");
+    expect(run(readings, { shift: shift({ minWorkMinutes: 360 }) })).toMatchObject({ hasAttendance: true });
+    expect(run([reading("09:00", "entry")], { shift: shift({ minWorkMinutes: 400 }) }).attendanceDecision).not.toBe("absent");
+  });
+  it("resmi tatilde çalışma zorunluysa esnek hedef tam kalır ve tatil mesaisi yazılmaz", () => {
+    const holiday = { date, name: "Tatil" } as Doc<"holidays">;
+    const day = run([reading("08:00", "entry"), reading("17:00", "exit")], { holiday, shift: shift({ holidayWorkRequired: true }) });
+    expect(day).toMatchObject({ classification: "workday", requiredNetMinutes: 480, shortfallMinutes: 0, overtimeMinutes: 0 });
+    expect(status(day)).toBe("present");
+    expect(run([], { holiday, shift: shift({ holidayWorkRequired: true, minWorkMinutes: 60 }) }).classification).toBe("workday");
+  });
+});
+
 describe("esnek eşleme, mola ve mesai", () => {
   it("toleransı hedeften sonra düşer, dailyShift ve weekly45 çift ödeme yapmaz", () => {
     const day = run([reading("08:00", "entry"), reading("18:00", "exit")], { shift: shift({ overtimeStartToleranceMinutes: 15 }) });
@@ -219,13 +237,14 @@ async function handlerFixture() {
   return { t, caller, ...ids };
 }
 
-it("create doğrular ve uyumluluk saatlerini yazar; esnek update geçmişi değiştirmez", async () => {
+it("create doğrular ve uyumluluk saatlerini yazar; esnek update geçmişi sürüme yazar", async () => {
   const f = await handlerFixture();
   const args = { projectId: f.projectId, name: "Esnek", startTime: "00:00", endTime: "00:00", scheduleType: "flexible" as const, flexible: DEFAULT_FLEXIBLE };
   const id = await f.caller.mutation(api.shifts.create, args);
   expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ startTime: "05:00", endTime: "22:00", flexible: DEFAULT_FLEXIBLE });
   await expect(f.caller.mutation(api.shifts.create, { ...args, flexible: { ...DEFAULT_FLEXIBLE, checkInEnd: "24:00" } })).rejects.toThrow("HH:MM");
-  await expect(f.caller.mutation(api.shifts.update, { shiftId: id, flexible: { ...DEFAULT_FLEXIBLE, requiredNetMinutes: 420 } })).rejects.toThrow("yeni tanım");
+  await f.caller.mutation(api.shifts.update, { shiftId: id, flexible: { ...DEFAULT_FLEXIBLE, requiredNetMinutes: 420 } });
+  expect(await f.t.run(ctx => ctx.db.query("shiftVersions").collect())).toMatchObject([{ shiftId: id, rules: { flexible: { requiredNetMinutes: 480 } } }]);
   const fixedId = await f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: "Sabit", startTime: "08:00", endTime: "17:00" });
   await f.caller.mutation(api.shifts.update, { shiftId: fixedId, endTime: "18:00" });
   expect(await f.t.run(ctx => ctx.db.get(fixedId))).toMatchObject({ endTime: "18:00" });

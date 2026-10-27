@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { buildPersonMonthRows, personMonthTotals } from './personMonth';
+import { buildPersonMonthRows, hasFlexibleDays, personMonthTotals } from './personMonth';
 import { dailyCell, dailySource } from './testFixtures';
 
 it('aggregates daily evidence without counting future, unavailable or review days as attendance', () => {
@@ -19,7 +19,7 @@ it('aggregates daily evidence without counting future, unavailable or review day
   ];
   expect(personMonthTotals(days)).toEqual({ workedDays: 1, totalMinutes: 660, overtimeMinutes: 90, lateDays: 1, lateMinutes: 15,
     earlyExitDays: 1, earlyExitMinutes: 10, absentDays: 1, leaveDays: 2, leaveByType: { annual: 1, sick: 1 }, workdays: 5,
-    weekendDays: 1, holidayDays: 1, holidayWorkedDays: 2, breakMinutes: 50, incompleteDays: 1 });
+    weekendDays: 1, holidayDays: 1, holidayWorkedDays: 2, breakMinutes: 50, incompleteDays: 1, shortfallDays: 0, shortfallMinutes: 0, excessMinutes: 0 });
   const rows = buildPersonMonthRows([dailySource(days)]);
   expect(rows[0]).toMatchObject({ kind: 'personMonth', id: 'employee-a', payrollCode: 'P01', department: 'Üretim' });
   expect(rows[0].days).toBe(days);
@@ -29,4 +29,18 @@ it('keeps unknown leave types and treats a half-day holiday as a single calendar
   if (!detail) throw new Error('Missing detail');
   expect(personMonthTotals([dailyCell({ status: 'leave', payrollCode: 'İZN', totalMinutes: 0, leaveType: '__proto__', detail: { ...detail, dayType: 'halfDayHoliday' } })])).toMatchObject({ leaveDays: 1, holidayDays: 1, workdays: 0 });
   expect(Object.keys(personMonthTotals([dailyCell({ payrollCode: 'İZN', leaveType: '__proto__' })]).leaveByType)).toEqual(['__proto__']);
+});
+
+it('sums flexible shortfall and excess only on counted flexible days', () => {
+  const flex = { scheduleType: 'flexible' as const, requiredNetMinutes: 480 };
+  const days = [
+    dailyCell({ ...flex, shortfallMinutes: 120, excessMinutes: 0 }),
+    dailyCell({ ...flex, shortfallMinutes: 0, excessMinutes: 45 }),
+    dailyCell({ ...flex, shortfallMinutes: null, excessMinutes: 0 }),
+    dailyCell({ ...flex, status: 'future', shortfallMinutes: 999, excessMinutes: 999 }),
+    dailyCell({ shortfallMinutes: 999 }),
+  ];
+  expect(personMonthTotals(days)).toMatchObject({ shortfallDays: 1, shortfallMinutes: 120, excessMinutes: 45 });
+  expect(hasFlexibleDays([dailySource(days)])).toBe(true);
+  expect(hasFlexibleDays([dailySource([dailyCell({})])])).toBe(false);
 });

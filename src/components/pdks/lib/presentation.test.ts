@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   filterPdksRows,
+  flexibleTargetLabel,
   cellLabel,
   compareRows,
   displayTime,
@@ -175,4 +176,16 @@ it("shows unmeasured requirements days without replacing actual clocks, and keep
   expect(cellLabel("Ayşe", review.date, review)).toContain("İnceleme, Süre hesaplanamadı, Çıkış okutması yok");
   const employee: PdksRow = { ...row("Ayşe", 0), status: "incomplete", days: [review] };
   expect(filterPdksRows([employee], "incomplete")).toEqual([employee]);
+});
+
+describe("flexibleTargetLabel", () => {
+  it("esnekte hedefi eksik ya da fazla süreyle yazar; sabit ve hedefsiz günde boş kalır", () => {
+    expect(flexibleTargetLabel({ scheduleType: "flexible", requiredNetMinutes: 480, shortfallMinutes: 90, excessMinutes: 0 })).toEqual({ text: "Hedef 08:00 · eksik 01:30", shortfall: true });
+    expect(flexibleTargetLabel({ scheduleType: "flexible", requiredNetMinutes: 480, shortfallMinutes: 0, excessMinutes: 45 })).toEqual({ text: "Hedef 08:00 · fazla 00:45", shortfall: false });
+    expect(flexibleTargetLabel({ scheduleType: "flexible", requiredNetMinutes: 480, shortfallMinutes: null, excessMinutes: 0 })).toEqual({ text: "Hedef 08:00", shortfall: false });
+    // Dönem toplamında eksik ve fazla birlikte bulunabilir.
+    expect(flexibleTargetLabel({ scheduleType: "flexible", requiredNetMinutes: 960, shortfallMinutes: 120, excessMinutes: 60 })).toEqual({ text: "Hedef 16:00 · eksik 02:00 · fazla 01:00", shortfall: true });
+    expect(flexibleTargetLabel({ scheduleType: "flexible", requiredNetMinutes: 0, shortfallMinutes: 0, excessMinutes: 0 })).toBeNull();
+    expect(flexibleTargetLabel({})).toBeNull();
+  });
 });

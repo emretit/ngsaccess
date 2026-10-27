@@ -67,8 +67,10 @@ it('registers monthly person summaries with independent Excel layouts', () => {
   for (const [slug, layout] of [['aylik-ozet', 'personBlocks'], ['kisi-devam-dokumu', 'personSheets']]) {
     const definition = getReport('aylik', slug);
     expect(definition).toMatchObject({ dataSource: 'pdksMatrix', includePunches: true, rowsMode: 'personMonth', excelLayout: layout, filters: ['month', 'department', 'person'] });
-    expect(definition?.columns).toHaveLength(15);
-    expect(definition?.columns.filter(column => column.minutesValue).map(column => column.key)).toEqual(['duration', 'overtime', 'breakMinutes']);
+    expect(definition?.columns).toHaveLength(17);
+    expect(definition?.columns.filter(column => column.minutesValue).map(column => column.key)).toEqual(['duration', 'overtime', 'breakMinutes', 'shortfallMinutes', 'excessMinutes']);
+    // Esnek sütunları seçilebilir ama varsayılan kapalı; sabit projede boş sütun görünmez.
+    expect(definition?.columns.filter(column => !column.defaultVisible).map(column => column.key)).toEqual(['shortfallMinutes', 'excessMinutes']);
     expect(definition?.columns.some(column => column.key === 'date')).toBe(false);
   }
   expect(getReport('aylik', 'aylik-durum')?.excelLayout).toBe('statusMatrix');

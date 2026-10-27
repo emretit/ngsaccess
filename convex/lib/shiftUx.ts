@@ -2,7 +2,7 @@ import { ConvexError } from "convex/values";
 import { slotForDate, type ShiftPlan } from "./shiftPlan";
 import type { Id } from "../_generated/dataModel";
 import { validateFixedRules, type FixedShiftRules } from "./pdksFixedRules";
-import { flexibleExitEnd, flexibleSchedule, validateFlexible, type ShiftSchedule } from "./pdksFlexible";
+import { flexibleSchedule, flexibleSessionEnd, validateFlexible, type ShiftSchedule } from "./pdksFlexible";
 import { trDateKey } from "./trDate";
 const DAY = 86400000;
 const CODES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -67,7 +67,7 @@ export function scheduleIntervals(range: ScheduleRange, shift: ShiftSchedule, sh
   }
   const flex = flexibleSchedule(shift);
   const startMinute = minute(flex?.checkInStart ?? shift.startTime);
-  let endMinute = flex ? Math.min(flexibleExitEnd(flex), minute(flex.checkInEnd) + flex.maxSpanMinutes) : minute(shift.endTime);
+  let endMinute = flex ? flexibleSessionEnd(flex) : minute(shift.endTime);
   if (!flex && endMinute <= startMinute) endMinute += 1440;
   const result: [number, number][] = [];
   for (let date = Date.parse(range.startDate); date <= Date.parse(range.endDate); date += DAY) {

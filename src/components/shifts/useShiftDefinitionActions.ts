@@ -3,22 +3,17 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { notify } from "@/lib/notify";
 import type { ShiftFormPayload } from "./definitions/AddShiftDialog";
-import type { Shift } from "./lib/planning";
 
-export function useShiftDefinitionActions(projectId: Id<"projects">, shifts: Shift[]) {
+export function useShiftDefinitionActions(projectId: Id<"projects">) {
   const create = useMutation(api.shifts.create);
   const update = useMutation(api.shifts.update);
-  const add = async ({ color, ...payload }: ShiftFormPayload) => {
-    await create({ ...payload, color: color ?? undefined, projectId });
+  const add = async (payload: ShiftFormPayload) => {
+    await create({ ...payload, projectId });
     notify.success("Vardiya oluşturuldu");
   };
-  const edit = async (shiftId: Id<"shifts">, { color, ...payload }: ShiftFormPayload) => {
-    const current = shifts.find((shift) => shift._id === shiftId);
-    // Renk yalnız değiştiyse gönderilir: Convex'ten önce yayınlanan web eski backend'de düzenlemeyi bozmasın.
-    const colorPatch = (color ?? null) !== (current?.color ?? null) ? { color } : {};
-    await update(current?.scheduleType === "flexible"
-      ? { shiftId, name: payload.name, isActive: payload.isActive, ...colorPatch }
-      : { ...payload, ...colorPatch, shiftId });
+  // Hesap alanları sunucuda tarihli sürüme yazılır; yalnız ad/aktiflik değiştiyse sürüm açılmaz.
+  const edit = async (shiftId: Id<"shifts">, payload: ShiftFormPayload, effectiveFrom: string) => {
+    await update({ ...payload, shiftId, effectiveFrom });
     notify.success("Vardiya güncellendi");
   };
   return { add, edit };

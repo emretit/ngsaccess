@@ -3,7 +3,7 @@
 import { convexTest } from 'convex-test';
 import { describe, expect, it } from 'vitest';
 import schema from './schema';
-import { api } from './_generated/api';
+import { api, internal } from './_generated/api';
 const modules = import.meta.glob('./**/*.ts');
 async function fixture(role: 'project_admin' | 'project_user' = 'project_admin') {
   const t = convexTest(schema, modules);
@@ -64,38 +64,28 @@ describe('shift bulk clear', () => {
   });
 });
 
-describe('shift definition colors', () => {
-  it('creates, lists and updates a color; null removes it while omitted color preserves it', async () => {
+describe('shift definition colors (removed)', () => {
+  it('ignores a legacy client color on create and update; migration clears stored colors', async () => {
     const f = await fixture();
-    const shiftId = await f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: 'Renkli', startTime: '08:00', endTime: '17:00', color: 'teal' });
-    expect((await f.caller.query(api.shifts.list, { projectId: f.projectId })).find(row => row._id === shiftId)?.color).toBe('teal');
-    await f.caller.mutation(api.shifts.update, { shiftId, name: 'Yeni ad' });
-    expect((await f.t.run(ctx => ctx.db.get(shiftId)))?.color).toBe('teal');
+    const shiftId = await f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: 'Eski istemci', startTime: '08:00', endTime: '17:00', color: 'teal' });
+    expect(await f.t.run(ctx => ctx.db.get(shiftId))).not.toHaveProperty('color');
     await f.caller.mutation(api.shifts.update, { shiftId, color: 'violet' });
-    expect((await f.t.run(ctx => ctx.db.get(shiftId)))?.color).toBe('violet');
-    await f.caller.mutation(api.shifts.update, { shiftId, color: null });
     expect(await f.t.run(ctx => ctx.db.get(shiftId))).not.toHaveProperty('color');
+    await f.t.run(ctx => ctx.db.patch(f.shiftId, { color: 'blue' }));
+    expect(await f.t.mutation(internal.migrations.clearShiftColors, {})).toEqual({ cleared: 1, isDone: true });
+    expect(await f.t.run(ctx => ctx.db.get(f.shiftId))).not.toHaveProperty('color');
   });
-  it('rejects unknown color keys at both public mutation validators', async () => {
-    const f = await fixture();
-    // Simulate an untyped client sending an invalid runtime value.
-    // @ts-expect-error Invalid color is intentionally sent to the validator.
-    await expect(f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: 'Geçersiz', startTime: '08:00', endTime: '17:00', color: 'red' })).rejects.toThrow();
-    // @ts-expect-error Invalid color is intentionally sent to the validator.
-    await expect(f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, color: 'red' })).rejects.toThrow();
-  });
-  it('allows legacy clients to create a definition without color', async () => {
-    const f = await fixture();
-    const shiftId = await f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: 'Eski istemci', startTime: '08:00', endTime: '17:00' });
-    expect(await f.t.run(ctx => ctx.db.get(shiftId))).not.toHaveProperty('color');
-  });
-  it('updates name, color and activity of a flexible definition in place but rejects schedule changes', async () => {
+  it('updates name and activity of a flexible definition in place and keeps its times tied to the window', async () => {
     const f = await fixture();
     const flexible = { requiredNetMinutes: 480, checkInStart: '05:00', checkInEnd: '22:00', checkOutStart: '05:00', checkOutEnd: '14:00', checkOutEndDayOffset: 1 as const, maxSpanMinutes: 960, breakMode: 'duration' as const, breakMinutes: 60 };
     const shiftId = await f.t.run(ctx => ctx.db.insert('shifts', { projectId: f.projectId, name: 'Esnek', startTime: '05:00', endTime: '22:00', scheduleType: 'flexible', flexible, createdAt: 'original', updatedAt: 'original' }));
-    await f.caller.mutation(api.shifts.update, { shiftId, name: 'Esnek A', color: 'teal', isActive: false });
-    expect(await f.t.run(ctx => ctx.db.get(shiftId))).toMatchObject({ name: 'Esnek A', color: 'teal', isActive: false, flexible });
-    await expect(f.caller.mutation(api.shifts.update, { shiftId, startTime: '06:00' })).rejects.toThrow(/yeni tanım/);
+    await f.caller.mutation(api.shifts.update, { shiftId, name: 'Esnek A', isActive: false });
+    expect(await f.t.run(ctx => ctx.db.get(shiftId))).toMatchObject({ name: 'Esnek A', isActive: false, flexible });
+    // Esnekte saat penceresi türetilir; ham saat isteği hesap değişikliği sayılmaz, sürüm açmaz.
+    await f.caller.mutation(api.shifts.update, { shiftId, startTime: '06:00' });
+    expect(await f.t.run(ctx => ctx.db.get(shiftId))).toMatchObject({ startTime: '05:00' });
+    expect(await f.t.run(ctx => ctx.db.query('shiftVersions').collect())).toHaveLength(0);
+    await expect(f.caller.mutation(api.shifts.update, { shiftId, scheduleType: 'fixed' })).rejects.toThrow('yeni tanım');
   });
 });
 
@@ -124,15 +114,17 @@ describe('fixed shift advanced rules API', () => {
     await expect(f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: 'Hatalı', startTime: '09:00', endTime: '17:00', validWindow: { ...rules.validWindow, checkOutEnd: '25:00' } })).rejects.toThrow('HH:MM');
     expect(await f.t.run(ctx => ctx.db.get(f.shiftId))).toMatchObject({ startTime: '09:00', ...rules });
   });
-  it('rejects advanced rules in both flexible create and update mutations', async () => {
+  it('rejects clock-bound rules in both flexible create and update mutations', async () => {
     const f = await fixture();
     const flexible = { requiredNetMinutes: 480, checkInStart: '05:00', checkInEnd: '22:00', checkOutStart: '05:00', checkOutEnd: '14:00', checkOutEndDayOffset: 1 as const, maxSpanMinutes: 960, breakMode: 'duration' as const, breakMinutes: 60 };
     const args = { projectId: f.projectId, name: 'Esnek', startTime: '05:00', endTime: '22:00', scheduleType: 'flexible' as const, flexible };
     const shiftId = await f.caller.mutation(api.shifts.create, args);
-    for (const patch of [{ validWindow: rules.validWindow }, { absentAfterLateMinutes: 0 }, { minWorkMinutes: 0 }, { missingCheckInLateMinutes: 0 }, { holidayWorkRequired: false }]) {
+    for (const patch of [{ validWindow: rules.validWindow }, { absentAfterLateMinutes: 0 }, { missingCheckInLateMinutes: 0 }]) {
       await expect(f.caller.mutation(api.shifts.create, { ...args, ...patch })).rejects.toThrow('esnek vardiyada kullanılamaz');
       await expect(f.caller.mutation(api.shifts.update, { shiftId, ...patch })).rejects.toThrow('esnek vardiyada kullanılamaz');
     }
+    const withDayRules = await f.caller.mutation(api.shifts.create, { ...args, minWorkMinutes: 360, holidayWorkRequired: true });
+    expect(await f.t.run(ctx => ctx.db.get(withDayRules))).toMatchObject({ scheduleType: 'flexible', minWorkMinutes: 360, holidayWorkRequired: true });
   });
 });
 
@@ -140,7 +132,7 @@ describe('fixed shift advanced rules API', () => {
 it('allows cosmetic changes to malformed historic shift definitions but validates calculation changes', async () => {
   const f = await fixture();
   await f.t.run(ctx => ctx.db.patch(f.shiftId, { minWorkMinutes: -1 }));
-  await f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, name: 'Yeni ad', color: 'teal', isActive: false });
-  expect(await f.t.run(ctx => ctx.db.get(f.shiftId))).toMatchObject({ name: 'Yeni ad', color: 'teal', isActive: false, minWorkMinutes: -1 });
+  await f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, name: 'Yeni ad', isActive: false });
+  expect(await f.t.run(ctx => ctx.db.get(f.shiftId))).toMatchObject({ name: 'Yeni ad', isActive: false, minWorkMinutes: -1 });
   await expect(f.caller.mutation(api.shifts.update, { shiftId: f.shiftId, startTime: '08:00' })).rejects.toThrow();
 });

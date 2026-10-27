@@ -58,5 +58,6 @@ export function manualValidationShift(resolver: ShiftResolver, employee: Doc<"em
   const shift = resolver.resolveLast(employee._id, date);
   if (shift) return shift;
   if (resolver.resolvePlan(employee._id, date).kind !== "none") return null;
-  return employee.shiftId ? resolver.shifts.get(employee.shiftId) ?? null : null;
+  if (!employee.shiftId) return null;
+  return (resolver.shiftAt ? resolver.shiftAt(employee.shiftId, date) : resolver.shifts.get(employee.shiftId)) ?? null;
 }

@@ -8,7 +8,6 @@ import { DayShiftsPicker } from './DayShiftsPicker';
 import { ShiftSelect } from './ShiftSelect';
 import { buildRotation, mondayOf, resizeRotation } from './lib/planForm';
 import { DAYS, offsetDay, shortDate, type Shift } from './lib/planning';
-import { shiftColorClasses } from './lib/shiftColors';
 
 export function rotationNavigationIndex(index: number, length: number, key: string, control = false) {
   const next = key === 'ArrowLeft' ? index - 1 : key === 'ArrowRight' ? index + 1
@@ -73,7 +72,7 @@ export function RotationEditor({ value, shifts, onChange }: { value: Rotation; s
             slotButtons.current[next]?.focus();
           }}
           aria-label={`${shortDate(offsetDay(value.anchorDate, index))}, ${slotLabel(slot)}`}
-          className={`min-h-11 rounded border p-1 text-xs text-left ${current === index ? 'ring-2 ring-primary' : ''} ${slot.length ? shiftColorClasses(shifts.find(s => s._id === slot[0])?.color)?.bar ?? '' : 'bg-subtle text-muted-foreground'}`}
+          className={`min-h-11 rounded border p-1 text-xs text-left ${current === index ? 'ring-2 ring-primary' : ''} ${slot.length ? '' : 'bg-subtle text-muted-foreground'}`}
           onClick={() => setSelected(index)}><span className="block">{weekly ? `${Math.floor(index / 7) + 1}. hafta` : `${index + 1}. gün`}</span>{slotLabel(slot)}</button>)}
       </div>
     </div>

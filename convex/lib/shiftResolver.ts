@@ -3,6 +3,7 @@ import { slotForDate, planShiftIds } from "./shiftPlan";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { parseHHMM, type EffectiveWorkSettings } from "./pdksHelpers";
+import { createVersionedShiftLookup, loadShiftVersions, type ShiftVersionRow } from "./shiftVersions";
 
 type AnyCtx = QueryCtx | MutationCtx;
 
@@ -33,7 +34,10 @@ export interface ShiftResolver {
   resolve(employeeId: Id<"employees">, dateISO: string): Doc<"shifts"> | null;
   resolveLast(employeeId: Id<"employees">, dateISO: string): Doc<"shifts"> | null;
   resolvePlan(employeeId: Id<"employees">, dateISO: string): DayPlan;
+  /** Güncel tanımlar; geçmiş gün için `shiftAt` kullanılır. */
   shifts: Map<string, Doc<"shifts">>;
+  /** O tarihte geçerli vardiya sürümü (plan dışı eski `employee.shiftId` yedekleri için). */
+  shiftAt?(shiftId: Id<"shifts">, dateISO: string): Doc<"shifts"> | undefined;
 }
 export interface ResolverRange { start: string; end: string }
 export const DEPARTMENT_READ_LIMIT = 2000;
@@ -69,7 +73,8 @@ export async function buildShiftResolver(ctx: AnyCtx, employees: Doc<"employees"
     Promise.all(employees.map(employee => ctx.db.query("shiftAssignments").withIndex("by_employee", q => q.eq("employeeId", employee._id)).collect())),
     readDepartmentPlans(ctx, employees.flatMap(employee => employee.projectId && employee.departmentId ? [employee.projectId] : []), range),
   ]);
-  return createShiftResolver(employees, allShifts, assignmentLists, departmentData.departments, departmentData.assignments);
+  const versions = await loadShiftVersions(ctx, allShifts, range?.start);
+  return createShiftResolver(employees, allShifts, assignmentLists, departmentData.departments, departmentData.assignments, versions);
 }
 
 /** Versioned/mobile paths load only referenced shifts and bounded assignments. */
@@ -85,7 +90,8 @@ export async function buildBoundedShiftResolver(ctx: AnyCtx, employees: Doc<"emp
   const rows = [...relevantLists.flat(), ...departmentData.assignments];
   const ids = [...new Set(rows.flatMap(row => [row.shiftId, ...planShiftIds(row.plan)]))];
   const allShifts = (await Promise.all(ids.map(id => ctx.db.get(id)))).filter((shift): shift is NonNullable<typeof shift> => shift !== null);
-  return createShiftResolver(employees, allShifts, relevantLists, departmentData.departments, departmentData.assignments);
+  const versions = await loadShiftVersions(ctx, allShifts, range?.start);
+  return createShiftResolver(employees, allShifts, relevantLists, departmentData.departments, departmentData.assignments, versions);
 }
 
 /** Compute once per department; ignore corrupt cycles and cross-project parents. */
@@ -103,8 +109,10 @@ export function departmentChain(departmentId: Id<"departments"> | undefined, pro
   return chain;
 }
 export function createShiftResolver(employees: Doc<"employees">[], allShifts: Doc<"shifts">[], assignmentLists: Doc<"shiftAssignments">[][],
-  departments: Doc<"departments">[] = [], departmentAssignments: Doc<"departmentShiftAssignments">[] = []): ShiftResolver {
+  departments: Doc<"departments">[] = [], departmentAssignments: Doc<"departmentShiftAssignments">[] = [], versions: readonly ShiftVersionRow[] = []): ShiftResolver {
   const shiftMap = new Map<string, Doc<"shifts">>(allShifts.map(shift => [shift._id, shift]));
+  // Plan günü, o tarihte geçerli vardiya sürümünü alır; `shifts` haritası güncel tanımdır.
+  const shiftAt = createVersionedShiftLookup(shiftMap, versions);
   const assignmentsByEmp = new Map<string, Doc<"shiftAssignments">[]>();
   employees.forEach((employee, index) => assignmentsByEmp.set(employee._id, (assignmentLists[index] ?? []).slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))));
   const assignmentsByDepartment = new Map<string, Doc<"departmentShiftAssignments">[]>();
@@ -124,7 +132,7 @@ export function createShiftResolver(employees: Doc<"employees">[], allShifts: Do
     const source = "employeeId" in row ? { source: "employee" as const, assignmentId: row._id }
       : { source: "department" as const, departmentAssignmentId: row._id, departmentId: row.departmentId };
     if (ids.length === 0) return { kind: "rest", ...source, calendar: "plan" };
-    const shifts = ids.map(id => shiftMap.get(id));
+    const shifts = ids.map(id => shiftAt(id, date));
     if (shifts.some(shift => shift === undefined)) return null;
     return { kind: "shifts", shifts: shifts.filter((shift): shift is Doc<"shifts"> => shift !== undefined), ...source,
       calendar: row.plan && row.plan.kind !== "weekly" ? "plan" : "project" };
@@ -158,7 +166,7 @@ export function createShiftResolver(employees: Doc<"employees">[], allShifts: Do
     return plan;
   }
   return {
-    shifts: shiftMap, resolvePlan,
+    shifts: shiftMap, resolvePlan, shiftAt,
     resolve(employeeId, date) { const plan = resolvePlan(employeeId, date); return plan.kind === "shifts" ? plan.shifts[0] ?? null : null; },
     resolveLast(employeeId, date) { const plan = resolvePlan(employeeId, date); return plan.kind === "shifts" ? plan.shifts[plan.shifts.length - 1] ?? null : null; },
   };

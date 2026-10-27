@@ -2,7 +2,6 @@ import { dayDisplayRecords, shiftTimeLabel } from "./lib/planning";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { dayLabel, type DayData } from "./lib/planning";
 import { LEAVE_TYPE_LABEL_TR } from "./lib/calendarOverlays";
-import { shiftColorClasses } from "./lib/shiftColors";
 
 export function ShiftDayBadges({ data, compact = false }: { data: DayData; compact?: boolean }) {
   const badges = [
@@ -62,17 +61,14 @@ export function ShiftCalendarCell({
       )}
       <div className="pointer-events-none space-y-1">
         {rest && <span className="block font-medium">Boş</span>}
-        {records.slice(0, limit).map(({ key, shift, continuation }) => {
-          const bar = shiftColorClasses(shift.color)?.bar;
-          return (
-            <span key={key} className={`relative block ${bar ? `${bar} pl-1.5` : ""}`} title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
-              {!compact && <span className="block font-medium">{shift.name}</span>}
-              <span className={`text-muted-foreground tabular-nums ${compact ? "block text-[10px] leading-tight tracking-tight" : ""}`}>
-                {cellTimeLabel(shift, continuation, compact)}
-              </span>
+        {records.slice(0, limit).map(({ key, shift, continuation }) => (
+          <span key={key} className="relative block" title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
+            {!compact && <span className="block font-medium">{shift.name}</span>}
+            <span className={`text-muted-foreground tabular-nums ${compact ? "block text-[10px] leading-tight tracking-tight" : ""}`}>
+              {cellTimeLabel(shift, continuation, compact)}
             </span>
-          );
-        })}
+          </span>
+        ))}
         {records.length > limit && (
           <span className={compact ? "text-[10px]" : "block underline"}>
             {`+${records.length - limit}${compact ? "" : " atama · tümünü gör"}`}

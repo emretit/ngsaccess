@@ -120,10 +120,14 @@ describe("fixed shift optional rules", () => {
     expect(result.overtimeSegments.every(segment => segment.classification === "workday")).toBe(true);
     expect(result.overtimeMinutes).toBeLessThan(day({ startTime: "22:00", endTime: "06:00" }, extra).overtimeMinutes);
   });
-  it("rejects fixed rules on flexible schedules, including false and zero", () => {
-    for (const patch of [{ validWindow: window }, { absentAfterLateMinutes: 0 }, { minWorkMinutes: 0 }, { missingCheckInLateMinutes: 0 }, { holidayWorkRequired: false }]) {
+  it("rejects clock-bound fixed rules on flexible schedules, including zero, but allows day rules", () => {
+    for (const patch of [{ validWindow: window }, { absentAfterLateMinutes: 0 }, { missingCheckInLateMinutes: 0 }]) {
       expect(() => validateShift({ ...shift, scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE, ...patch })).toThrow(ConvexError);
     }
+    for (const patch of [{ minWorkMinutes: 0 }, { minWorkMinutes: 1440 }, { holidayWorkRequired: true }]) {
+      expect(() => validateShift({ ...shift, scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE, ...patch })).not.toThrow();
+    }
+    expect(() => validateShift({ ...shift, scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE, minWorkMinutes: 1441 })).toThrow("0–1440");
   });
   it("validates number boundaries and window containment", () => {
     for (const key of ["absentAfterLateMinutes", "minWorkMinutes", "missingCheckInLateMinutes"] as const) {

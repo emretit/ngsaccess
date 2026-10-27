@@ -27,7 +27,7 @@ export const DAILY_PREDICATES: Record<string, DailyPredicate> = {
   'fazla-mesai': cell => cell.overtimeMinutes > 0,
   'calisma-suresi': cell => cell.totalMinutes > 0,
   'ilk-giris-son-cikis': cell => Boolean(cell.firstEntry),
-  istisnalar: cell => (cell.detail?.dayType === 'workday' && (cell.isLate || cell.detail.isEarlyExit)) || cell.status === 'absent',
+  istisnalar: cell => (cell.detail?.dayType === 'workday' && (cell.isLate || cell.detail.isEarlyExit)) || cell.status === 'absent' || flexibleShortfall(cell) > 0,
   'erken-cikanlar': cell => cell.detail?.dayType === 'workday' && cell.detail.isEarlyExit,
   mola: cell => (cell.detail?.breaks?.length ?? 0) > 0 || Boolean(cell.detail?.breakViolation),
   'okutma-karti': cell => (cell.detail?.punches.length ?? 0) > 0,
@@ -106,7 +106,12 @@ export function formatDailyExceptions(cell: DailyCell): string {
   if (cell.status === 'absent') parts.push('Devamsız');
   if (cell.detail?.dayType === 'workday' && cell.isLate) parts.push(`Geç ${cell.lateMinutes} dk`);
   if (cell.detail?.dayType === 'workday' && cell.detail.isEarlyExit) parts.push(`Erken çıkış ${cell.detail.earlyExitMinutes} dk`);
+  if (cell.status !== 'absent' && flexibleShortfall(cell) > 0) parts.push(`Eksik ${flexibleShortfall(cell)} dk`);
   return parts.join(' · ');
+}
+/** Esnek günde net hedefe göre eksik süre; sabit ve ölçülemeyen günde 0. */
+export function flexibleShortfall(cell: DailyCell): number {
+  return cell.scheduleType === 'flexible' ? cell.shortfallMinutes ?? 0 : 0;
 }
 export function formatPunches(cell: DailyCell): string {
   if (!cell.detail) return '';

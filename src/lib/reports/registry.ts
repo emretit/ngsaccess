@@ -50,6 +50,8 @@ export const DAILY_COLUMNS: readonly ReportColumn[] = [
   daily('duration', 'Toplam süre', row => formatMinutes(row.cell.totalMinutes)), daily('lateMinutes', 'Geç (dk)', row => row.cell.lateMinutes, 'right'),
   daily('earlyExitMinutes', 'Erken çıkış (dk)', row => row.cell.detail?.earlyExitMinutes ?? null, 'right'),
   daily('overtime', 'Fazla mesai', row => formatMinutes(row.cell.overtimeMinutes)), daily('status', 'Durum', row => STATUS_META[row.cell.status].label),
+  daily('shortfallMinutes', 'Eksik (dk, esnek)', row => row.cell.scheduleType === 'flexible' ? row.cell.shortfallMinutes ?? null : null, 'right'),
+  daily('excessMinutes', 'Fazla süre (dk, esnek)', row => row.cell.scheduleType === 'flexible' ? row.cell.excessMinutes ?? null : null, 'right'),
   daily('readingCount', 'Okutma sayısı', row => row.cell.detail?.readingCount ?? null, 'right'), daily('manual', 'Manuel', row => row.cell.detail ? row.cell.detail.isManual ? 'Evet' : 'Hayır' : null),
 ];
 function personMonth(key: string, label: string, value: (row: PersonMonthReportRow) => string | number, minutes?: (row: PersonMonthReportRow) => number): ReportColumn {
@@ -66,6 +68,8 @@ const PERSON_MONTH_COLUMNS: readonly ReportColumn[] = [
   personMonth('absentDays', 'Devamsız', row => row.totals.absentDays), personMonth('leaveDays', 'İzinli', row => row.totals.leaveDays),
   personMonth('breakMinutes', 'Mola', row => formatMinutes(row.totals.breakMinutes), row => row.totals.breakMinutes),
   personMonth('holidayWorkedDays', 'Hafta sonu/tatil çalışma', row => row.totals.holidayWorkedDays), personMonth('incompleteDays', 'İnceleme (gün)', row => row.totals.incompleteDays),
+  { ...personMonth('shortfallMinutes', 'Eksik (esnek)', row => formatMinutes(row.totals.shortfallMinutes), row => row.totals.shortfallMinutes), defaultVisible: false },
+  { ...personMonth('excessMinutes', 'Fazla süre (esnek)', row => formatMinutes(row.totals.excessMinutes), row => row.totals.excessMinutes), defaultVisible: false },
 ];
 const DAY_TYPES = { workday: 'Hafta içi', weekend: 'Hafta sonu', holiday: 'Resmî tatil', halfDayHoliday: 'Yarım gün' };
 const MONTHLY_IDENTITY = [monthly('name', 'Ad Soyad', row => row.name), monthly('department', 'Departman', row => departmentLabel(row.department)), monthly('payrollCode', 'Bordro kodu', row => row.payrollCode)];
