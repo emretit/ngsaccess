@@ -1,5 +1,3 @@
-import { makeFunctionReference } from "convex/server";
-import type { VisitorHostOption } from "../../../../convex/visitorHosts";
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -8,10 +6,6 @@ import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { isoToLocalInput, defaultExpiryLocalInput } from "../visitorTime";
 import { isVisitorCardPlaceholder } from "../lib/preRegistration";
-
-// Typed reference keeps this isolated module usable before deployment codegen.
-// TODO(ziy-R3): codegen sonrası api.visitorHosts.search
-const hostSearchQuery = makeFunctionReference<"query", { projectId: Id<"projects">; search: string }, VisitorHostOption[]>("visitorHosts:search");
 
 export interface VisitorFormData {
   firstName: string;
@@ -61,7 +55,7 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
     return () => clearTimeout(timer);
   }, [hostSearch]);
   const employeesData = useQuery(
-    hostSearchQuery,
+    api.visitorHosts.search,
     !loading && formData.projectId ? { projectId: formData.projectId, search: debouncedHostSearch } : "skip",
   );
 
