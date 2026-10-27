@@ -175,7 +175,6 @@ function EmployeePage() {
           selectedValue={department}
           selectedCompany={company}
           selectedPosition={position}
-          onSelectUnassigned={() => update({ department: "unassigned", company: "" })}
           onSelectDepartment={(id) => update({ department: id ?? "", company: "" })}
           onSelectCompany={(id) => update({ company: id, department: "" })}
           onSelectPosition={(id) => update({ position: id ?? "" })}
