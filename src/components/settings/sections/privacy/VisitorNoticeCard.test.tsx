@@ -45,7 +45,7 @@ describe("visitor retention settings", () => {
     expect(html).toContain("Ziyaretçi kayıtlarını saklama süresi (gün)");
     expect(html).toContain('for="visitor-retention-days"');
     expect(html).toContain('type="number"'); expect(html).toContain('min="30"'); expect(html).toContain('max="3650"');
-    expect(html).toContain("boş = silinmez"); expect(html).toContain("otomatik silme kapalıdır");
+    expect(html).toContain("süresi geçmiş ön kayıtlar"); expect(html).toContain("otomatik silme kapalıdır");
     expect(state.query).toHaveBeenCalledWith("privacyRetention:previewVisitorRetention", "skip");
   });
   it("previews first activation with a lower-bound count and saves with a notification", async () => {

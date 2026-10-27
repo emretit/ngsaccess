@@ -49,7 +49,7 @@ export function VisitorRetentionForm({ projectId }: { projectId: Id<"projects"> 
   }}>
     <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
     <FormFieldWrapper htmlFor="visitor-retention-days" label="Ziyaretçi kayıtlarını saklama süresi (gün)"
-      hint="Pasif ziyaretçi kayıtları belirtilen gün sonra silinir (boş = silinmez). Boş bırakıldığında otomatik silme kapalıdır."
+      hint="Pasif ziyaretçiler ve süresi geçmiş ön kayıtlar, ziyaret bitişinden bu kadar gün sonra silinir (30–3650). Boş bırakılırsa otomatik silme kapalıdır."
       error={!parsed.success ? parsed.error.issues[0]?.message : undefined}>
       <Input id="visitor-retention-days" type="number" min={30} max={3650} step={1} value={draft.values.days} disabled={save.pending}
         onChange={event => draft.change({ days: event.target.value })} />
