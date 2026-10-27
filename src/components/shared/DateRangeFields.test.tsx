@@ -40,7 +40,7 @@ describe("DateRangeFields", () => {
     expect(end?.min).toBe("2026-10-01");
     expect(start?.disabled).toBe(true);
     expect(html.match(/aria-describedby="pdks-range-error"/g)).toHaveLength(2);
-    expect(html).toContain('id="pdks-range-error" class="text-xs text-destructive mt-1" role="alert">Başlangıç tarihi bitişten sonra olamaz.');
+    expect(html).toMatch(/<p id="pdks-range-error"[^>]*role="alert"[^>]*>Başlangıç tarihi bitişten sonra olamaz\.<\/p>/);
   });
 
   it("leaves bounds open while the other side is empty", () => {
