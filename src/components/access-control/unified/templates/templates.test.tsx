@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   slot: 0,
   changes: [] as [number, unknown][],
   buttons: new Map<string, MouseEventHandler<HTMLButtonElement>>(),
+  inputs: new Map<string, import("react").ChangeEventHandler<HTMLInputElement>>(),
   mutation: vi.fn(),
   success: vi.fn(),
 }));
@@ -35,11 +36,19 @@ vi.mock("@/components/ui/button", async (importOriginal) => {
   } };
 });
 vi.mock("@/lib/notify", () => ({ notify: { success: state.success } }));
+vi.mock("@/components/ui/input", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/ui/input")>();
+  return { ...actual, Input: (props: import("react").ComponentProps<typeof actual.Input>) => {
+    if (props.onChange && props["aria-label"]) state.inputs.set(props["aria-label"], props.onChange);
+    return <actual.Input {...props} />;
+  } };
+});
 beforeEach(() => {
   state.override = false;
   state.slot = 0;
   state.params = "";
   state.buttons.clear();
+  state.inputs.clear();
   state.changes = [];
   state.mutation.mockReset();
   state.success.mockReset();
@@ -94,6 +103,56 @@ const template: Template = {
   updatedAt: "",
 };
 describe("şablon arayüzü SSR", () => {
+  it("25:00 girilen ikinci aralığın hatasını satır altında ve bitiş alanına bağlı gösterir", () => {
+    let week = emptyWeek();
+    week.Monday = [{ start: "08:00", end: "12:00" }, { start: "13:00", end: "17:00" }];
+    const render = () => renderToStaticMarkup(<WeekEditor week={week} onChange={(next) => { week = next; }} />);
+    render();
+    const change = state.inputs.get("Pazartesi 2. bitiş");
+    expect(change).toBeDefined();
+    change?.({ target: { value: "25:00" } } as import("react").ChangeEvent<HTMLInputElement>);
+    const html = render();
+    const input = html.match(/<input[^>]*aria-label="Pazartesi 2\. bitiş"[^>]*>/)?.[0] ?? "";
+    const errorId = input.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(input).toContain('aria-invalid="true"');
+    expect(errorId).toBeTruthy();
+    const message = `id="${errorId}" role="alert"`;
+    expect(html).toContain(message);
+    expect(html).toContain("Pazartesi 2. aralık: bitiş 24:00&#x27;ü geçemez");
+    expect(html.indexOf(message)).toBeGreaterThan(html.indexOf(input));
+    expect(html.indexOf(message)).toBeLessThan(html.indexOf("Pazartesi aralık ekle"));
+    expect(html.match(/aria-invalid="true"/g)).toHaveLength(1);
+    state.inputs.get("Pazartesi 2. bitiş")?.({ target: { value: "24:00" } } as import("react").ChangeEvent<HTMLInputElement>);
+    expect(render()).not.toContain('role="alert"');
+  });
+  it("görünür Başlangıç/Bitiş etiketlerini ve biçim ipuçlarını saat alanlarına bağlar", () => {
+    const week = emptyWeek();
+    week.Monday = [{ start: "22:00", end: "24:00" }];
+    const html = renderToStaticMarkup(<WeekEditor week={week} onChange={() => undefined} />);
+    for (const [field, label] of [["başlangıç", "Başlangıç"], ["bitiş", "Bitiş"]]) {
+      const input = html.match(new RegExp(`<input[^>]*aria-label="Pazartesi 1\\. ${field}"[^>]*>`))?.[0] ?? "";
+      const id = input.match(/ id="([^"]+)"/)?.[1];
+      const hintId = input.match(/aria-describedby="([^"]+)"/)?.[1];
+      expect(id).toBeTruthy();
+      expect(html).toContain(`for="${id}"`);
+      expect(html).toMatch(new RegExp(`for="${id}"[^>]*>${label}</label>`));
+      expect(input).toContain('aria-invalid="false"');
+      expect(input).toContain("min-h-11");
+      expect(html).toContain(`id="${hintId}"`);
+    }
+    expect(html).toContain("Örnek: 22:00");
+    expect(html).toContain("En fazla 24:00");
+  });
+  it("gece açıklamasını ilgili satırda, başka gün hatalıyken de gösterir", () => {
+    const week = emptyWeek();
+    week.Monday = [{ start: "08:00", end: "25:00" }];
+    week.Sunday = [{ start: "22:00", end: "06:00" }];
+    const html = renderToStaticMarkup(<WeekEditor week={week} onChange={() => undefined} />);
+    const sunday = html.slice(html.indexOf(">Pazar</legend>"));
+    expect(sunday).toContain("Pazar 1. aralık: Ertesi güne taşan aralık");
+    expect(sunday).toContain("Pzt 00:00–06:00");
+    expect(sunday.indexOf("Ertesi güne taşan aralık")).toBeLessThan(sunday.indexOf("Pazar aralık ekle"));
+  });
   it("boş liste şablonun amacını ve Kapı Planları farkını açıklar", () => {
     state.admin = true;
     state.rows = [];

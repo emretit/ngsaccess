@@ -243,7 +243,7 @@ export function DoorPlanDialog({
           if (!next) close();
         }}
       >
-        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto min-w-0 p-4 sm:p-6 max-sm:[&_input:not([type=checkbox])]:min-h-11 [&_input]:min-w-0 [&_input]:max-w-full [&_label]:min-w-0 [&_select]:max-w-full max-sm:[&_select]:min-h-11 max-sm:[&_button:not([role=switch])]:min-h-11 max-sm:[&_label]:min-h-11 max-sm:[&_label]:content-center">
           <DialogHeader>
             <DialogTitle>Kapı Planları</DialogTitle>
             <DialogDescription>
@@ -495,7 +495,7 @@ export function DoorPlanDialog({
                 holiday={holidayChanged ? holiday : undefined}
               />
             )}
-            <DialogFooter>
+            <DialogFooter className="sticky -bottom-4 z-10 gap-2 border-t bg-background py-3 sm:static sm:border-0 sm:pb-0">
               <Button type="button" variant="outline" disabled={isSubmitting} onClick={close}>
                 {saved ? "Kapat" : "İptal"}
               </Button>

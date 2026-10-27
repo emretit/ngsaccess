@@ -62,14 +62,15 @@ export function GrantRows({
   rows: GrantRow[];
   selected: Pair[];
   onToggle: (row: Pair) => void;
-  onEmployee: (row: GrantRow) => void;
+  onEmployee: (row: GrantRow, trigger?: HTMLElement) => void;
   canManage: boolean;
 }) {
   const cells = (row: GrantRow) => [
     <Button
+      data-employee-trigger
       variant="link"
-      className="h-auto p-0 whitespace-normal text-left break-words hover:no-underline"
-      onClick={() => onEmployee(row)}
+      className="min-h-11 h-auto p-0 whitespace-normal text-left break-words hover:no-underline"
+      onClick={(event) => onEmployee(row, event.currentTarget)}
     >
       {row.employeeName}
     </Button>,
@@ -83,8 +84,9 @@ export function GrantRows({
     <GrantBadge row={row} />,
     row.updatedAt ? formatTrDateTime(row.updatedAt) : "—",
   ];
-  const checkbox = (row: GrantRow) => (
+  const checkbox = (row: GrantRow, mobile = false) => (
     <Checkbox
+      id={`${mobile ? "mobile" : "desktop"}-${pairKey(row)}`}
       aria-label={`${row.employeeName} · ${row.deviceName} seç`}
       checked={selected.some((p) => pairKey(p) === pairKey(row))}
       onCheckedChange={() => onToggle(row)}
@@ -109,7 +111,7 @@ export function GrantRows({
               <tr
                 key={pairKey(row)}
                 className={`border-t ${ROW_CLICK_CLASS}`}
-                onClick={onRowActivate(() => onEmployee(row))}
+                onClick={onRowActivate((event) => onEmployee(row, event.currentTarget.querySelector<HTMLButtonElement>("[data-employee-trigger]") ?? undefined))}
               >
                 {canManage && (
                   <td className="p-2" onClick={(e) => e.stopPropagation()}>
@@ -134,16 +136,17 @@ export function GrantRows({
           <article
             key={pairKey(row)}
             className={`border rounded-md p-3 min-w-0 space-y-2 ${ROW_CLICK_CLASS}`}
-            onClick={onRowActivate(() => onEmployee(row))}
+            onClick={onRowActivate((event) => onEmployee(row, event.currentTarget.querySelector<HTMLButtonElement>("[data-employee-trigger]") ?? undefined))}
           >
             {canManage && (
-              <div
-                className="flex gap-2 items-center"
+              <label
+                htmlFor={`mobile-${pairKey(row)}`}
+                className="inline-flex min-h-11 min-w-11 gap-2 items-center cursor-pointer"
                 onClick={(e) => e.stopPropagation()}
               >
-                {checkbox(row)}
+                {checkbox(row, true)}
                 <span className="text-xs">Seç</span>
-              </div>
+              </label>
             )}
             <dl className="space-y-2">
               {cells(row).map((cell, i) => (

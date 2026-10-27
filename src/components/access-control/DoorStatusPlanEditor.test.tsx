@@ -108,7 +108,7 @@ describe("DoorStatusPlanEditor", () => {
     expect(html).not.toContain("Sürekli Kapalı");
     expect(html).not.toContain("Sürekli Açık");
   });
-  it("Her gün aynı ile Gün bazında arasında geçer ve yedi günü doldurur", () => {
+  it("Gün bazına geçiş yalnız hafta içini doldurur, hafta sonu normal kalır", () => {
     const editor = edit();
     const change = (value: string) =>
       (
@@ -123,11 +123,26 @@ describe("DoorStatusPlanEditor", () => {
     expect(
       editor
         .value()
-        .weekly?.every((day) => day.segments[0]?.beginTime === "08:00:00"),
+        .weekly?.slice(0, 5).every((day) => day.segments[0]?.beginTime === "08:00:00"),
     ).toBe(true);
+    expect(editor.value().weekly?.slice(5).every(day => day.segments.length === 0)).toBe(true);
     change("daily");
     expect(editor.value().weekly).toBeUndefined();
     expect(editor.value().beginTime).toBe("08:00:00");
+  });
+  it("Dalga3 C1-1 gün bazında haftalıkta Hafta içi sunulmaz; mevcut aralıklar silinmez", () => {
+    const editor = edit({ ...legacy, weekly: [{ day: "Saturday", segments: [legacy] }] });
+    expect(nodes(editor.tree()).some(node => node.props?.children === "Hafta içi")).toBe(false);
+  });
+  it("04-O4 Hafta içi seçimi hafta sonunu boşaltır ve saniyeleri korur", () => {
+    const editor = edit(legacy);
+    click(editor.tree(), "Hafta içi");
+    expect(editor.value().weekly?.slice(0, 5).every(day => day.segments[0]?.beginTime === legacy.beginTime)).toBe(true);
+    expect(editor.value().weekly?.slice(5).every(day => day.segments.length === 0)).toBe(true);
+    const days = nodes(editor.tree()).filter(node => node.type === "details");
+    expect(days).toHaveLength(7);
+    expect(days.filter(node => node.props.open)).toHaveLength(1);
+    expect(renderToStaticMarkup(editor.tree())).toContain("Cumartesi · Normal çalışır");
   });
   it("boş gün, ekle/sil, sekiz aralık sınırı ve pazartesi kopyası", () => {
     const editor = edit({

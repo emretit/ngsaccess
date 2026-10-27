@@ -185,6 +185,25 @@ describe("run-wide refresh and IDE dispatch", () => {
     f.tables.accessRules[0].projectId = "other";
     await expect(invoke(runs.listRecent, f.ctx, { projectId: "project", ruleId: "rule" })).rejects.toThrow("Kural bu projeye ait değil");
   });
+  it("a newer project send replaces the rule's stale run, narrowed to the rule's devices", async () => {
+    const f = memory();
+    f.tables.accessRules = [{ _id: "rule", projectId: "project" }];
+    f.tables.groupDevices = [{ projectId: "project", groupId: "rule", deviceId: "hik" }];
+    f.tables.groupDoors = [];
+    f.tables.devices = [{ _id: "hik", projectId: "project" }];
+    Object.assign(f.run, { kind: "rule_sync", ruleId: "rule", startedAt: 1000 });
+    f.tables.deviceSyncRuns.push({ _id: "project-run", projectId: "project", kind: "project_resync", startedAt: 2000, dispatchFinished: true });
+    f.tables.deviceSyncRunTargets.push(
+      { _id: "p-hik", runId: "project-run", deviceId: "hik", status: "sent" },
+      { _id: "p-other", runId: "project-run", deviceId: "other", status: "skipped" },
+    );
+    const result = await invoke<Row & { targets: Row[] }>(runs.latestForRule, f.ctx, { ruleId: "rule" });
+    expect(result._id).toBe("project-run");
+    expect(result.status).toBe("done");
+    expect(result.targets.map(target => target.deviceId)).toEqual(["hik"]);
+    f.tables.accessRules[0].isActive = false;
+    expect((await invoke<Row>(runs.latestForRule, f.ctx, { ruleId: "rule" }))._id).toBe("run");
+  });
 });
 
 

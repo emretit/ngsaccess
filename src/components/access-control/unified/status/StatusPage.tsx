@@ -39,11 +39,15 @@ export default function StatusPage() {
 }
 function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
   const convex = useConvex();
+  const { activeProject } = useActiveProject();
+  const { can } = usePermissions();
+  const canManageDevices = can("devices.manage");
+  const employeeTrigger = useRef<HTMLElement | null>(null);
   const [view, setView] = useState<"person" | "device">("person");
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision((r) => r + 1), []);
-  const { filters, search, setSearch, expanded, setExpanded, change } =
+  const { filters, search, setSearch, expanded, setExpanded, change, clear } =
     useStatusFilters();
   const options = useStatusOptions({ convex, projectId, setError, revision });
   const { counts, projectCounts } = useStatusCounts({
@@ -57,16 +61,16 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
   const { employee, setEmployee, detail, detailError } =
     useEmployeeGrantDetail(convex, revision);
   const { action, setAction, sending, success, runId, send } = useRedistribution({
-    projectId, selected, setSelected, setError,
+    projectId, selected, setSelected, setError, canManageDevices,
   });
   return (
-    <div className="space-y-4 min-w-0">
+    <div className="flex flex-col gap-4 min-w-0">
       <div className="flex flex-wrap justify-between gap-2 items-center">
         <div>
           <h1 className="text-xl font-semibold">Yetki Durumu</h1>
           <p className="text-sm text-muted-foreground">Kişi yetkilerinin cihazlara ulaşıp ulaşmadığını kontrol edin.</p>
         </div>
-        <Button variant="outline" disabled={busy} onClick={refresh}>
+        <Button className="max-lg:min-h-11" variant="outline" disabled={busy} onClick={refresh}>
           Yenile
         </Button>
       </div>
@@ -77,16 +81,24 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
       </p>
       {success && <p role="status">{success}</p>}
       {runId && <RunNotice key={runId} runId={runId} onComplete={refresh} />}
-      <StatusCounters filters={filters} counts={counts} change={change} />
-      <StatusFilters
-        filters={filters}
-        options={options}
-        search={search}
-        setSearch={setSearch}
-        change={change}
-      />
+      <div className="flex flex-col gap-4">
+        <div className="order-2 lg:order-1 space-y-4">
+          <StatusCounters filters={filters} counts={counts} change={change} />
+        </div>
+        <div className="order-1 lg:order-2">
+          <StatusFilters
+            filters={filters}
+            options={options}
+            search={search}
+            setSearch={setSearch}
+            change={change}
+            clear={clear}
+          />
+        </div>
+      </div>
       <StatusViewToggle view={view} setView={setView} />
       <RedistributeBar
+        canManageDevices={canManageDevices}
         selected={selected}
         sending={sending}
         projectCounts={projectCounts}
@@ -105,7 +117,10 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
         rows={rows}
         selected={selected}
         toggle={toggle}
-        setEmployee={setEmployee}
+        setEmployee={(row, trigger) => {
+          employeeTrigger.current = trigger ?? null;
+          setEmployee(row);
+        }}
         cursor={cursor}
         busy={busy}
         more={more}
@@ -116,6 +131,8 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
         deviceCounts={deviceCounts}
       />
       <RedistributeDialog
+        projectName={activeProject?.name ?? "Seçili proje"}
+        selectedRows={rows.filter((row) => selected.some((pair) => pair.employeeId === row.employeeId && pair.deviceId === row.deviceId))}
         action={action}
         setAction={setAction}
         sending={sending}
@@ -126,6 +143,7 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
         setError={setError}
       />
       <EmployeeGrantSheet
+        returnFocusRef={employeeTrigger}
         employee={employee}
         setEmployee={setEmployee}
         detail={detail}
@@ -135,7 +153,7 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
   );
 }
 
-function useStatusFilters() {
+export function useStatusFilters() {
   const [filters, setFilters] = useState<Filters>({});
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Id<"devices">>();
@@ -150,10 +168,14 @@ function useStatusFilters() {
     return () => clearTimeout(timer);
   }, [search]);
   const change = (patch: Partial<Filters>) => {
-    setExpanded(undefined);
+    if (patch.deviceId && patch.deviceId !== expanded) setExpanded(undefined);
     setFilters((f) => ({ ...f, ...patch }));
   };
-  return { filters, search, setSearch, expanded, setExpanded, change };
+  const clear = () => {
+    setSearch("");
+    setFilters({});
+  };
+  return { filters, search, setSearch, expanded, setExpanded, change, clear };
 }
 
 function useStatusCounts({

@@ -49,7 +49,7 @@ export function StatusResults({
   rows: GrantRow[];
   selected: Pair[];
   toggle: (pair: Pair) => void;
-  setEmployee: (employee: GrantRow) => void;
+  setEmployee: (employee: GrantRow, trigger?: HTMLElement) => void;
   cursor: string | null;
   busy: boolean;
   more: () => Promise<void>;
@@ -105,7 +105,7 @@ export function StatusResults({
               >
                 <Button
                   variant="ghost"
-                  className="whitespace-normal h-auto text-left break-words max-w-full"
+                  className="min-h-11 whitespace-normal h-auto text-left break-words max-w-full"
                   aria-expanded={expanded === device._id}
                   onClick={() =>
                     setExpanded(

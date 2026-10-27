@@ -10,6 +10,8 @@ import { notify } from "@/lib/notify";
 import { DoorPlanImpactSummary } from "./DoorPlanImpactSummary";
 import { DoorStatusPlanEditor } from "../DoorStatusPlanEditor";
 import { TemplatePicker } from "../unified/templates/TemplatePicker";
+import { DoorStatusPlanSection } from "../door-dialog/DoorStatusPlanSection";
+import { DoorVerifyPlanEditor } from "../door-dialog/DoorVerifyPlanEditor";
 import { DoorVerifyPlanSection } from "../door-dialog/DoorVerifyPlanSection";
 import type { VerifyPlan } from "../../../../convex/lib/doorStatusPlan";
 import { CopyDoorPlansDialog } from "./CopyDoorPlansDialog";
@@ -144,6 +146,55 @@ describe("DoorPlanDialog haftalık kayıt", () => {
       door: { ...door, ...overrides },
     });
   }
+  it("04-O1 kapalı durum planını gizler, anahtarı açınca eski saatleri gösterir", () => {
+    let value = { ...legacy, enabled: false };
+    const render = () => DoorStatusPlanSection({
+      statusPlan: value,
+      setStatusPlan: next => { value = typeof next === "function" ? next(value) : next; },
+      isSubmitting: false, saved: false,
+      children: <input type="time" value={value.beginTime} readOnly />,
+    });
+    const tree = render();
+    expect(nodes(tree).some(node => node.props.type === "time")).toBe(false);
+    expect(renderToStaticMarkup(tree)).toContain("Plan etkin değil");
+    expect(hasText(tree, "Kapalı")).toBe(true);
+    (find(tree, node => node.props.id === "status-enabled").props.onCheckedChange as (enabled: boolean) => void)(true);
+    expect(find(render(), node => node.props.type === "time").props.value).toBe(legacy.beginTime);
+    expect(hasText(render(), "Açık")).toBe(true);
+  });
+  it("04-O1 kapalı doğrulama planını gizler, açınca eski değerleri korur", () => {
+    let value: VerifyPlan = { enabled: false, beginTime: "09:15:01", endTime: "17:45:02", verifyMode: "face" };
+    const render = () => DoorVerifyPlanSection({
+      verifyPlan: value, setVerifyPlan: next => { value = typeof next === "function" ? next(value) : next; },
+      isSubmitting: false, saved: false, timeErrors: {},
+    });
+    expect(nodes(render()).some(node => node.type === DoorVerifyPlanEditor)).toBe(false);
+    expect(renderToStaticMarkup(render())).toContain("Plan etkin değil");
+    (find(render(), node => node.props.id === "verify-enabled").props.onCheckedChange as (enabled: boolean) => void)(true);
+    expect(find(render(), node => node.type === DoorVerifyPlanEditor).props.value).toEqual({
+      enabled: true, beginTime: "09:15:01", endTime: "17:45:02", verifyMode: "face",
+    });
+  });
+  it("04-O4 Hafta içi seçimi yalnız Pzt–Cum aralıkları kaydeder ve hafta sonunu özetler", async () => {
+    const editor = find(dialog(), node => node.type === DoorStatusPlanEditor);
+    const tree = DoorStatusPlanEditor(editor.props as Parameters<typeof DoorStatusPlanEditor>[0]);
+    (find(tree, node => node.props.children === "Hafta içi").props.onClick as () => void)();
+    const updated = dialog();
+    const summary = find(updated, node => node.type === DoorPlanImpactSummary);
+    expect(renderToStaticMarkup(DoorPlanImpactSummary(summary.props as Parameters<typeof DoorPlanImpactSummary>[0]))).toContain("Cmt–Paz normal çalışır");
+    await submit(updated);
+    const payload = state.save.mock.calls[0][0] as { hikDoorStatusPlan: DoorStatusPlan };
+    const week = payload.hikDoorStatusPlan.weekly ?? [];
+    expect(week.filter(day => day.segments.length).map(day => day.day)).toEqual(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
+    expect(week.slice(5).every(day => day.segments.length === 0)).toBe(true);
+  });
+  it("04-O7 mobil eylemler yapışkan ve dokunma hedefleri en az 44px", () => {
+    const tree = dialog();
+    expect(nodes(tree).some(node => typeof node.props.className === "string" && node.props.className.includes("sticky -bottom-4"))).toBe(true);
+    expect(nodes(tree).some(node => typeof node.props.className === "string" && node.props.className.includes("max-sm:[&_button:not([role=switch])]:min-h-11"))).toBe(true);
+    // Dalga3 C1-2: masaüstü ve anahtar (switch) 44px'e büyütülmez
+    expect(nodes(tree).some(node => typeof node.props.className === "string" && / \[&_button\]:min-h-11/.test(node.props.className))).toBe(false);
+  });
   it("04-H1 boş kayıtta başarı bildirmez, bilgi verir ve düzenlemeyi açık tutar", async () => {
     state.save.mockResolvedValue([]);
     await submit(dialog());

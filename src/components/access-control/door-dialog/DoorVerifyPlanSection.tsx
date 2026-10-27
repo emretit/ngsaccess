@@ -20,19 +20,22 @@ export function DoorVerifyPlanSection({
   return (
     <fieldset
       disabled={isSubmitting || saved}
-      className="rounded-md border p-3 space-y-3"
+      className="min-w-0 rounded-md border p-3 space-y-3"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex min-h-11 items-center justify-between gap-2">
         <Label htmlFor="verify-enabled">Doğrulama Modu Planı</Label>
-        <Switch
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-sm">{verifyPlan.enabled ? "Açık" : "Kapalı"}</span>
+          <Switch
           id="verify-enabled"
           checked={verifyPlan.enabled}
           onCheckedChange={(enabled) =>
             setVerifyPlan((p) => ({ ...p, enabled }))
           }
         />
+        </div>
       </div>
-      <div
+      {verifyPlan.enabled ? <div
         id="verify-plan"
         tabIndex={-1}
         aria-invalid={!!timeErrors["verify-plan"]}
@@ -48,7 +51,7 @@ export function DoorVerifyPlanSection({
             {timeErrors["verify-plan"]}
           </p>
         )}
-      </div>
+      </div> : <p className="text-sm">Plan etkin değil. Geçerli doğrulama yöntemi kullanılır; kayıtlı saatler korunur.</p>}
     </fieldset>
   );
 }

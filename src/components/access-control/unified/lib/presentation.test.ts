@@ -9,7 +9,8 @@ import {
 } from "./presentation";
 describe("gönderim kanıtı ve kapsam sunumu", () => {
   it("gönderildi sonucunu cihaz doğrulaması olarak sunmaz", () => {
-    expect(targetLabels.sent).toContain("teslim kanıtı yok");
+    expect(targetLabels.sent).toBe("Cihaza gönderildi");
+    expect(Object.values(targetLabels).join(" ")).not.toContain("teslim kanıtı");
     expect(targetTone("sent")).not.toBe("success");
     expect(targetTone("verified")).toBe("success");
     expect(
@@ -22,7 +23,7 @@ describe("gönderim kanıtı ve kapsam sunumu", () => {
         unknown: 6,
       }),
     ).toBe(
-      "1 kuyrukta · 2 gönderildi (teslim kanıtı yok) · 3 cihazda doğrulandı · 4 başarısız · 5 atlandı · 6 bilinmiyor",
+      "1 kuyrukta · 2 kayıt cihaza gönderildi · 3 cihazda doğrulandı · 4 başarısız · 5 atlandı · 6 bilinmiyor",
     );
   });
   it("ziyaretçi şablonunu personelden ayırır; eski türü personel sayar", () => {

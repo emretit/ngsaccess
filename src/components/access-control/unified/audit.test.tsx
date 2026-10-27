@@ -13,6 +13,7 @@ vi.mock("convex/react", () => ({
     state.queries.push({ name, args });
     if (name === "accessRules:listSummaries") return { page: [{ _id: "r", name: "NGS", targetType: "visitor", memberCount: 0, panels: [{ deviceId: "p", label: "Panel — tüm kapılar" }], unassignedDoors: [] }], isDone: true, continueCursor: "" };
     if (name === "accessRules:projectDeviceCounts") return { total: 4, brands: { hikvision: 2, ide_smart: 1, other: 1 } };
+    if (name === "deviceSyncRuns:latestForRule") return null;
     if (name === "accessRules:getDetails") return { targetType: state.detailType, panels: [{ deviceId: "p", label: "Panel X — 1/4 kapı", doors: [{ doorId: "d", name: "Giriş", zoneName: "Kat 1" }] }], unassignedDoors: [] };
     return [];
   },

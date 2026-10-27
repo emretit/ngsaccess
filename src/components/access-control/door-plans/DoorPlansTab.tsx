@@ -88,47 +88,67 @@ export function DoorPlansTab() {
   const heading = (
     <div className="space-y-1">
       <h1 className="text-xl font-semibold">Kapı Planları</h1>
-      <p className="text-sm text-muted-foreground">Kapının herkes için ne zaman sürekli açık ya da kilitli kalacağını belirleyin.</p>
+      <p className="text-sm text-muted-foreground">
+        Kapının herkes için ne zaman sürekli açık ya da kilitli kalacağını
+        belirleyin.
+      </p>
     </div>
   );
   if (loading || (projectId && targets === undefined))
-    return <div className="space-y-4 min-w-0">{heading}<p role="status">Kapı planları yükleniyor…</p></div>;
+    return (
+      <div className="space-y-4 min-w-0">
+        {heading}
+        <p role="status">Kapı planları yükleniyor…</p>
+      </div>
+    );
   if (!projectId || !targets?.length)
-    return <div className="space-y-4 min-w-0">{heading}<EmptyState title="Plan kurulabilecek Hikvision kapısı yok" /></div>;
+    return (
+      <div className="space-y-4 min-w-0">
+        {heading}
+        <EmptyState title="Plan kurulabilecek Hikvision kapısı yok" />
+      </div>
+    );
   return (
     <div className="space-y-4 min-w-0">
       {heading}
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex flex-wrap items-center gap-3 mb-3">
         <span className="text-sm">
           {checked.length} kapı seçildi (en fazla {MAX_BULK_DOORS})
         </span>
         <Button
+          className="min-h-11"
           disabled={!checked.length || checked.length > MAX_BULK_DOORS}
           onClick={() => setCopyProject(projectId)}
         >
           Planı kopyala
         </Button>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>
-              <input
-                type="checkbox"
-                aria-label="Tüm kapıları seç"
-                checked={
-                  checked.length > 0 &&
-                  checked.length === Math.min(targets.length, MAX_BULK_DOORS)
-                }
-                onChange={(event) =>
-                  setSelection({
-                    projectId,
-                    ids: event.target.checked
-                      ? targets.slice(0, MAX_BULK_DOORS).map((door) => door.doorId)
-                      : [],
-                  })
-                }
-              />
+      <Table className="block w-full md:table">
+        <TableHeader className="block md:table-header-group">
+          <TableRow className="block md:table-row">
+            <TableHead className="block h-auto px-0 md:table-cell md:h-9 md:px-4">
+              <label className="flex items-center gap-2 min-h-11 md:min-h-0">
+                <input
+                  className="size-5"
+                  type="checkbox"
+                  aria-label="Tüm kapıları seç"
+                  checked={
+                    checked.length > 0 &&
+                    checked.length === Math.min(targets.length, MAX_BULK_DOORS)
+                  }
+                  onChange={(event) =>
+                    setSelection({
+                      projectId,
+                      ids: event.target.checked
+                        ? targets
+                            .slice(0, MAX_BULK_DOORS)
+                            .map((door) => door.doorId)
+                        : [],
+                    })
+                  }
+                />
+                <span className="md:hidden">Tüm kapıları seç</span>
+              </label>
             </TableHead>
             {[
               "Kapı",
@@ -138,39 +158,49 @@ export function DoorPlansTab() {
               "Doğrulama planı",
               "Gönderim",
             ].map((label) => (
-              <TableHead key={label}>{label}</TableHead>
+              <TableHead className="hidden md:table-cell" key={label}>
+                {label}
+              </TableHead>
             ))}
           </TableRow>
         </TableHeader>
-        <TableBody>
+        <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
           {targets.map((door) => (
             <TableRow
               key={door.doorId}
-              className={ROW_CLICK_CLASS}
+              className={`${ROW_CLICK_CLASS} flex flex-col rounded-lg border p-3 min-w-0 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:p-0 [&>td]:block [&>td]:p-1 [&>td]:h-auto [&>td]:min-w-0 [&>td]:break-words md:[&>td]:table-cell md:[&>td]:px-4 md:[&>td]:py-2 md:[&>td]:h-[42px]`}
               onClick={onRowActivate(() => setSelected({ projectId, door }))}
             >
-              <TableCell onClick={(event) => event.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  aria-label={`${door.doorName} seç`}
-                  checked={checked.includes(door.doorId)}
-                  disabled={
-                    !checked.includes(door.doorId) && checked.length >= MAX_BULK_DOORS
-                  }
-                  onChange={(event) =>
-                    setSelection({
-                      projectId,
-                      ids: event.target.checked
-                        ? [...checked, door.doorId]
-                        : checked.filter((id) => id !== door.doorId),
-                    })
-                  }
-                />
+              <TableCell
+                className="order-1"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <label className="flex items-center gap-2 min-h-11 md:min-h-0">
+                  <input
+                    className="size-5"
+                    type="checkbox"
+                    aria-label={`${door.doorName} seç`}
+                    checked={checked.includes(door.doorId)}
+                    disabled={
+                      !checked.includes(door.doorId) &&
+                      checked.length >= MAX_BULK_DOORS
+                    }
+                    onChange={(event) =>
+                      setSelection({
+                        projectId,
+                        ids: event.target.checked
+                          ? [...checked, door.doorId]
+                          : checked.filter((id) => id !== door.doorId),
+                      })
+                    }
+                  />
+                  <span className="text-sm md:hidden">Kopyalamak için seç</span>
+                </label>
               </TableCell>
               <TableCell>
                 <button
                   type="button"
-                  className="text-left font-medium rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="min-h-11 md:min-h-0 text-left font-medium rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => setSelected({ projectId, door })}
                   aria-label={`${door.doorName} kapı planlarını düzenle`}
                 >
@@ -183,8 +213,12 @@ export function DoorPlansTab() {
                   <StatusBadge tone="warning">Çevrimdışı</StatusBadge>
                 )}
               </TableCell>
-              <TableCell>{door.zoneName ?? "—"}</TableCell>
-              <TableCell>
+              <TableCell className="order-4 text-sm">
+                <span className="md:hidden">Bölge: </span>
+                {door.zoneName ?? "—"}
+              </TableCell>
+              <TableCell className="order-3 text-sm">
+                <span className="font-medium md:hidden">Durum planı: </span>
                 {door.templateName && <p>Şablon: {door.templateName}</p>}
                 {statusSummary(door.hikDoorStatusPlan)}
                 {door.templateChanged && (
@@ -199,14 +233,19 @@ export function DoorPlansTab() {
                   </p>
                 )}
               </TableCell>
-              <TableCell>
+              <TableCell className="order-3 text-sm">
+                <span className="font-medium md:hidden">Doğrulama planı: </span>
                 {door.hikVerifyPlan?.enabled
                   ? door.hikVerifyPlan.weekly
                     ? `Haftalık · ${door.hikVerifyPlan.weekly.reduce((n, day) => n + day.segments.length, 0)} aralık`
                     : `${door.hikVerifyPlan.beginTime.slice(0, 5)}–${door.hikVerifyPlan.endTime.slice(0, 5)} ${modes[door.hikVerifyPlan.verifyMode] ?? door.hikVerifyPlan.verifyMode}`
                   : "Plan etkin değil"}
               </TableCell>
-              <TableCell>
+              <TableCell
+                className="order-2 rounded bg-muted/50 text-sm font-medium md:bg-transparent md:font-normal"
+                aria-label={`${door.doorName} gönderim durumu`}
+              >
+                <span className="md:hidden">Gönderim: </span>
                 {door.hikPlanApplyError
                   ? `Hata: ${door.hikPlanApplyError}`
                   : door.plansPending

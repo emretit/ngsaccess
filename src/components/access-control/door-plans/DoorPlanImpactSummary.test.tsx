@@ -10,7 +10,15 @@ describe("04-H2 kapıya etkisi", () => {
     const html = render({ statusPlan: { ...status, weekly: DOOR_STATUS_DAYS.slice(0, 5).map(day => ({ day, segments: [status] })) } });
     expect(html).toContain("Ana giriş");
     expect(html).toContain("Pzt–Cum 08:00–09:00 sürekli açık kalacak");
+    expect(html).toContain("Cmt–Paz normal çalışır");
     expect(html).toContain('class="text-warning"');
+  });
+  it("04-O4 doğrulama planında da hafta sonunu açıklar", () => {
+    const html = render({ verifyPlan: {
+      enabled: true, beginTime: "08:00", endTime: "09:00", verifyMode: "face",
+      weekly: DOOR_STATUS_DAYS.map((day, index) => ({ day, segments: index < 5 ? [{ beginTime: "08:00", endTime: "09:00", verifyMode: "face" }] : [] })),
+    } });
+    expect(html).toContain("Pzt–Cum 08:00–09:00 Yüz; Cmt–Paz normal çalışır");
   });
   it.each(["remainClosed", "normal"] as const)("%s kapı davranışını açıklar", mode => {
     expect(render({ statusPlan: { ...status, mode } })).toContain(mode === "normal" ? "normal çalışır" : "sürekli kilitli kalacak");

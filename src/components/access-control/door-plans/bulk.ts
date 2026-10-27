@@ -4,6 +4,45 @@ import {
   type PlanResult,
   type PlanKey,
 } from "../doorPlanResult";
+import type { DoorPlanTarget } from "./DoorPlanDialog";
+import { normalizeVerifyPlan } from "../../../../convex/lib/doorStatusPlan";
+
+export type CopyPlanType = "status" | "verify" | "holiday";
+export const COPY_PLAN_LABELS: Record<CopyPlanType, string> = {
+  status: "Durum planı",
+  verify: "Doğrulama planı",
+  holiday: "Tatil planı",
+};
+/** Seçilmeyen veya kaynakta bulunmayan planlar hedefte korunur. */
+export function copyPlanFields(
+  source: DoorPlanTarget,
+  target: DoorPlanTarget | undefined,
+  types: CopyPlanType[],
+) {
+  const verifyChanged =
+    source.hikVerifyPlan &&
+    JSON.stringify(normalizeVerifyPlan(source.hikVerifyPlan)) !==
+      JSON.stringify(
+        target?.hikVerifyPlan
+          ? normalizeVerifyPlan(target.hikVerifyPlan)
+          : null,
+      );
+  return {
+    ...(types.includes("status") && source.hikDoorStatusPlan
+      ? {
+          hikDoorStatusTemplateId: source.hikDoorStatusTemplateId ?? null,
+          hikDoorStatusPlan: source.hikDoorStatusPlan,
+        }
+      : {}),
+    ...(types.includes("verify") && verifyChanged && source.hikVerifyPlan
+      ? { hikVerifyPlan: source.hikVerifyPlan }
+      : {}),
+    ...(types.includes("holiday") && source.hikDoorHolidayPlan
+      ? { hikDoorHolidayPlan: source.hikDoorHolidayPlan }
+      : {}),
+  };
+}
+
 /** Toplu plan işleminde bir seferde en fazla kapı sayısı. */
 export const MAX_BULK_DOORS = 50;
 export type BulkResult = {

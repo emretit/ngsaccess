@@ -5,6 +5,8 @@ import {
   formatSchedule,
   inspectSchedule,
   invalidTimeField,
+  timeFieldError,
+  overnightDescription,
   WEEKDAYS,
 } from "./schedule";
 import {
@@ -174,6 +176,19 @@ describe("denetim düzeltmeleri", () => {
 });
 
 describe("invalidTimeField", () => {
+  it("hata nedenini yalnız ilgili alan için verir ve 24:00 bitişini kabul eder", () => {
+    expect(timeFieldError({ start: "13:00", end: "25:00" }, "end")).toBe("bitiş 24:00'ü geçemez");
+    expect(timeFieldError({ start: "13:00", end: "25:00" }, "start")).toBe("");
+    expect(timeFieldError({ start: "8", end: "17:00" }, "start")).toContain("22:00 biçiminde");
+    expect(timeFieldError({ start: "22:00", end: "24:00" }, "end")).toBe("");
+    expect(timeFieldError({ start: "09:00", end: "09:00" }, "start")).toContain("farklı olmalı");
+  });
+  it("gece açıklamasını yalnız geçerli gece aralığı için üretir", () => {
+    expect(overnightDescription("Sunday", { start: "22:00", end: "06:00" })).toContain("Pzt 00:00–06:00");
+    expect(overnightDescription("Monday", { start: "25:00", end: "06:00" })).toBe("");
+    expect(overnightDescription("Monday", { start: "08:00", end: "17:00" })).toBe("");
+    expect(overnightDescription("Monday", { start: "08:00", end: "08:00" })).toBe("");
+  });
   it("biçimi bozuk alanı ve eşit başlangıç/bitişi işaretler", () => {
     expect(invalidTimeField({ start: "08:00", end: "17:00" }, "start")).toBe(false);
     expect(invalidTimeField({ start: "8", end: "17:00" }, "start")).toBe(true);

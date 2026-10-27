@@ -1,6 +1,3 @@
-import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import { requestTemplateEdit } from "./templates/model";
 import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
@@ -50,11 +47,6 @@ export default function CreateRuleDialog({
   const [stepError, setStepError] = useState("");
   const guard = useUnsavedChangesGuard(isDirty);
   const { projectId: currentProjectId } = useActiveProject();
-  const templates = useQuery(
-    api.accessScheduleTemplates.list,
-    currentProjectId ? { projectId: currentProjectId, includeArchived: true } : "skip",
-  );
-  const selectedTemplate = templates?.find((template) => template._id === formData.scheduleTemplateId);
   const projectChanged = currentProjectId !== projectId;
   const previousProject = useRef(currentProjectId);
   const submittingRef = useRef(false);
@@ -261,12 +253,6 @@ export default function CreateRuleDialog({
                       )}
                     </div>
                     <TimeSchedule
-                      currentTemplateId={editingRule?.scheduleTemplateId}
-                      onEditTemplate={(navigate) => {
-                        if (!submittingRef.current && !isSubmitting) {
-                          requestTemplateEdit(guard.requestClose, onClose, navigate);
-                        }
-                      }}
                       formData={formData}
                       setFormData={setFormData}
                       errors={errors}
@@ -286,13 +272,7 @@ export default function CreateRuleDialog({
               ? "Ziyaretçi üyelikleri korunur"
               : `${formData.selected_employees.length} kişi`}{" "}
             · {formData.selected_doors.length} kapı ·{" "}
-            {formData.scheduleMode === "template"
-              ? <span className={!formData.scheduleTemplateId ? "text-warning" : undefined}>
-                  {formData.scheduleTemplateId
-                    ? selectedTemplate?.name ?? "Zaman şablonu yükleniyor…"
-                    : "Zaman şablonu seçilmedi"}
-                </span>
-              : `${ruleDaysSummary(formData.days)} ${formData.start_time || formData.end_time ? `${formData.start_time}–${formData.end_time}` : "tüm gün"}`}
+            {`${ruleDaysSummary(formData.days)} ${formData.start_time || formData.end_time ? `${formData.start_time}–${formData.end_time}` : "tüm gün"}`}
           </div>
           <DialogFooter className="px-4 py-3 border-t flex-wrap">
             <Button

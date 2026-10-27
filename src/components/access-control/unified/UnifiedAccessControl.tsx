@@ -3,7 +3,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import StatusPage from "./status/StatusPage";
-import TemplatesPage from "./templates/TemplatesPage";
 import { useState } from "react";
 import AccessRulesList from "./AccessRulesList";
 import CreateRuleDialog from "./CreateRuleDialog";
@@ -20,9 +19,7 @@ const ProjectAccessControl = () => {
       ? "doors"
       : params.get("tab") === "status" && canManage
       ? "status"
-      : params.get("tab") === "templates"
-        ? "templates"
-        : "rules";
+      : "rules";
   const [saved, setSaved] = useState<RuleSaveResult | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AccessRule | null>(null);
@@ -43,7 +40,7 @@ const ProjectAccessControl = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {saved && (
         <RuleSaveNotice result={saved} onDismiss={() => setSaved(null)} />
       )}
@@ -52,7 +49,7 @@ const ProjectAccessControl = () => {
         onValueChange={(value) =>
           setParams((prev) => {
             const next = new URLSearchParams(prev);
-            if (value === "templates" || value === "status" || value === "doors")
+            if (value === "status" || value === "doors")
               next.set("tab", value);
             else {
               next.delete("tab");
@@ -62,9 +59,8 @@ const ProjectAccessControl = () => {
           })
         }
       >
-        <TabsList className="h-auto flex flex-wrap w-fit max-w-full">
+        <TabsList className="h-auto flex flex-nowrap justify-start w-fit max-w-full overflow-x-auto [&>button]:shrink-0 [&>button]:min-h-11 md:[&>button]:min-h-0">
           <TabsTrigger value="rules">Kurallar</TabsTrigger>
-          <TabsTrigger value="templates">Zaman Şablonları</TabsTrigger>
           {canManage && <TabsTrigger value="status">Yetki Durumu</TabsTrigger>}
           {canManage && <TabsTrigger value="doors">Kapı Planları</TabsTrigger>}
         </TabsList>
@@ -74,9 +70,6 @@ const ProjectAccessControl = () => {
             <StatusPage />
           </TabsContent>
         )}
-        <TabsContent value="templates">
-          <TemplatesPage />
-        </TabsContent>
         <TabsContent value="rules">
           <AccessRulesList
             onCreateRule={handleCreateRule}

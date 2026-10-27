@@ -10,8 +10,10 @@ export function useRedistribution({
   selected,
   setSelected,
   setError,
+  canManageDevices,
 }: {
   projectId: Id<"projects">;
+  canManageDevices: boolean;
   selected: Pair[];
   setSelected: Dispatch<SetStateAction<Pair[]>>;
   setError: Dispatch<SetStateAction<string>>;
@@ -25,7 +27,7 @@ export function useRedistribution({
   const [runId, setRunId] = useState<Id<"deviceSyncRuns"> | null>(null);
   const actionLock = useRef(false);
   async function send() {
-    if (!action || actionLock.current) return;
+    if (!action || actionLock.current || (action === "all" && !canManageDevices)) return;
     actionLock.current = true;
     setSending(true);
     setError("");

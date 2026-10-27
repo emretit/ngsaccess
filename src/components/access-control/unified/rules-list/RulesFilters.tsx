@@ -38,9 +38,9 @@ export function RulesFilters({
           label: "Arama alanı",
           value: searchBy,
           options: [
-            ["rule", "Kural adı"],
-            ["person", "Kişi adı"],
-            ["door", "Kapı adı"],
+            ["rule", "Kural"],
+            ["person", "Kişi"],
+            ["door", "Kapı"],
           ],
         },
         {
@@ -71,13 +71,16 @@ export function RulesFilters({
         >
           <SelectTrigger
             aria-label={filter.label}
-            className="w-auto min-w-36 max-w-full"
+            className="w-auto min-w-36 max-w-full max-md:min-h-11"
           >
-            <SelectValue />
+            <span>
+              {filter.key === "by" && "Ara: "}
+              <SelectValue />
+            </span>
           </SelectTrigger>
           <SelectContent>
             {filter.options.map(([value, label]) => (
-              <SelectItem key={value} value={value}>
+              <SelectItem key={value} value={value} className="max-md:min-h-11">
                 {label}
               </SelectItem>
             ))}

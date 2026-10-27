@@ -53,6 +53,7 @@ export function RuleRow({
   const edit = useAsyncAction(
     async () => {
       const details = await loadRuleEditor(convex, rule._id, projectId);
+      setOpen(false);
       onEditRule?.(details);
     },
     { error: "Kural ayrıntısı yüklenemedi" },
@@ -74,14 +75,23 @@ export function RuleRow({
           <p className="md:hidden text-xs text-muted-foreground break-words">
             {scopeText(rule)}
           </p>
-          {rule.scheduleTemplateId && (
-            <p className="xl:hidden text-xs text-muted-foreground break-words">
+          <p className="xl:hidden text-xs text-muted-foreground break-words">
+            {rule.scheduleTemplateId ? (
               <RuleScheduleSummary
                 templateId={rule.scheduleTemplateId}
                 projectId={projectId}
               />
-            </p>
-          )}
+            ) : (
+              <>
+                {formatWeekdaysAbbr(rule.days ?? [])} ·{" "}
+                {rule.startTime && rule.endTime
+                  ? `${rule.startTime}–${rule.endTime}`
+                  : rule.startTime || rule.endTime
+                    ? "Eksik saat aralığı"
+                    : "Tüm gün"}
+              </>
+            )}
+          </p>
         </TableCell>
         <TableCell className="hidden lg:table-cell">
           {rule.targetType === "visitor"
@@ -154,7 +164,19 @@ export function RuleRow({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="break-words">{rule.name}</SheetTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
+              <SheetTitle className="min-w-0 break-words">{rule.name}</SheetTitle>
+              {canManage && (
+                <Button
+                  variant="outline"
+                  className="min-h-11 md:min-h-0"
+                  disabled={edit.pending}
+                  onClick={() => void edit.run()}
+                >
+                  Düzenle
+                </Button>
+              )}
+            </div>
             <SheetDescription>
               {rule.targetType === "visitor"
                 ? "Ziyaretçi şablonu"

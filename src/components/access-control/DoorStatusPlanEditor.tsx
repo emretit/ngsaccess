@@ -110,7 +110,7 @@ export function DoorStatusPlanEditor({
       })),
     });
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3 max-sm:[&_input:not([type=checkbox])]:min-h-11 [&_input]:min-w-0 [&_input]:max-w-full [&_label]:min-w-0 [&_select]:max-w-full max-sm:[&_select]:min-h-11 max-sm:[&_button]:min-h-11">
       <Label className="block space-y-1">
         Plan düzeni
         <NativeSelect
@@ -124,15 +124,15 @@ export function DoorStatusPlanEditor({
               e.target.value === "weekly"
                 ? {
                     ...daily,
-                    weekly: DOOR_STATUS_DAYS.map((day) => ({
+                    weekly: DOOR_STATUS_DAYS.map((day, index) => ({
                       day,
-                      segments: [
+                      segments: index < 5 ? [
                         {
                           beginTime: daily.beginTime,
                           endTime: daily.endTime,
                           mode: daily.mode,
                         },
-                      ],
+                      ] : [],
                     })),
                   }
                 : {
@@ -146,6 +146,28 @@ export function DoorStatusPlanEditor({
           <option value="weekly">Gün bazında</option>
         </NativeSelect>
       </Label>
+      {value.weekly === undefined && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            onChange({
+              ...value,
+              weekly: DOOR_STATUS_DAYS.map((day, index) => ({
+                day,
+                segments: index < 5 ? [{
+                  beginTime: value.beginTime,
+                  endTime: value.endTime,
+                  mode: value.mode,
+                }] : [],
+              })),
+            });
+          }}
+        >
+          Hafta içi
+        </Button>
+      )}
+      {value.weekly && <p className="text-xs text-muted-foreground">Hafta sonu dahil her günü aşağıdan kontrol edebilirsiniz. Aralık olmayan günler normal çalışır.</p>}
       {value.weekly === undefined ? (
         <IntervalEditor
           invalid={invalid}
@@ -185,8 +207,10 @@ export function DoorStatusPlanEditor({
               value.weekly?.find((entry) => entry.day === day)?.segments ?? [];
             const label = DAY_LABELS[dayIndex] ?? day;
             return (
-              <fieldset key={day} className="space-y-2 rounded-md border p-2">
-                <legend className="px-1 text-sm font-medium">{label}</legend>
+              <details key={day} open={dayIndex === 0 || invalid || undefined} className="min-w-0 space-y-2 rounded-md border p-2">
+                <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium">
+                  {label} · {segments.length ? `${segments.length} aralık` : "Normal çalışır"}
+                </summary>
                 {segments.length === 0 && (
                   <p className="text-xs text-muted-foreground">
                     Zaman aralığı yok
@@ -241,7 +265,7 @@ export function DoorStatusPlanEditor({
                 >
                   Aralık ekle
                 </Button>
-              </fieldset>
+              </details>
             );
           })}
         </>

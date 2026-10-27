@@ -39,9 +39,33 @@ export function invalidTimeField(
   interval: { start: string; end: string },
   field: "start" | "end",
 ): boolean {
+  return !!timeFieldError(interval, field);
+}
+export function timeFieldError(
+  interval: { start: string; end: string },
+  field: "start" | "end",
+): string {
   const value = interval[field];
-  if (!(TIME.test(value) || (field === "end" && value === "24:00"))) return true;
-  return interval.start === interval.end;
+  const label = field === "start" ? "başlangıç" : "bitiş";
+  if (field === "end" && /^\d{2}:\d{2}$/.test(value) && value > "24:00")
+    return "bitiş 24:00'ü geçemez";
+  if (!(TIME.test(value) || (field === "end" && value === "24:00")))
+    return `${label} saatini 22:00 biçiminde girin${field === "end" ? " (en fazla 24:00)" : " (00:00–23:59)"}`;
+  if (interval.start === interval.end)
+    return "başlangıç ve bitiş saatleri farklı olmalı";
+  return "";
+}
+export function overnightDescription(
+  day: (typeof WEEKDAYS)[number],
+  interval: { start: string; end: string },
+): string {
+  if (
+    invalidTimeField(interval, "start") ||
+    invalidTimeField(interval, "end") ||
+    interval.end >= interval.start
+  )
+    return "";
+  return `Ertesi güne taşan aralık → ${formatSchedule(splitOvernight(day, interval.start, interval.end))}`;
 }
 export function inspectSchedule(raw: WeekSchedule) {
   const expanded = emptyWeek();
@@ -51,9 +75,10 @@ export function inspectSchedule(raw: WeekSchedule) {
       for (const interval of raw[day]) {
         const split = splitOvernight(day, interval.start, interval.end);
         for (const d of WEEKDAYS) expanded[d].push(...split[d]);
-        if (interval.end < interval.start)
+        const description = overnightDescription(day, interval);
+        if (description)
           overnight.push(
-            `${DAY_NAMES[index]} ${interval.start}–${interval.end}: Ertesi güne taşan aralık → ${formatSchedule(split)}`,
+            `${DAY_NAMES[index]} ${interval.start}–${interval.end}: ${description}`,
           );
       }
     const week = normalizeWeek(expanded);

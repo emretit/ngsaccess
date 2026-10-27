@@ -4,7 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
-import { RecentRuns } from "./SyncRuns";
+import { RuleLastRun } from "./SyncRuns";
 function Members({
   ruleId,
   kind,
@@ -102,7 +102,7 @@ export function AccessRuleDetails({
         </ul>
         {!rule.scopeTruncated && rule.panels.length === 0 && rule.unassignedDoors.length === 0 && <p className="text-xs text-muted-foreground">Kapı veya cihaz seçilmemiş.</p>}
       </section>
-      <RecentRuns projectId={projectId} ruleId={ruleId} />
+      <RuleLastRun ruleId={ruleId} />
     </div>
   );
 }

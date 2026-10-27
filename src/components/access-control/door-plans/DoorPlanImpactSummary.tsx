@@ -31,9 +31,11 @@ function weeklySummary<T extends { beginTime: string; endTime: string }>(
     if (previous && previous.end === index - 1 && previous.text === text) previous.end = index;
     else groups.push({ start: index, end: index, text });
   });
-  const text = groups.map((group) => `${DAYS[group.start]}${group.end !== group.start ? `–${DAYS[group.end]}` : ""} ${group.text}`).join("; ");
+  const weekendNormal = DOOR_STATUS_DAYS.slice(5).every(day => !(week.find(entry => entry.day === day)?.segments.length));
+  const activeText = groups.map((group) => `${DAYS[group.start]}${group.end !== group.start ? `–${DAYS[group.end]}` : ""} ${group.text}`).join("; ");
+  const text = (activeText || "Zaman aralığı yok") + (weekendNormal ? "; Cmt–Paz normal çalışır" : "");
   return text.length > 180
-    ? { text: `Haftalık · ${week.reduce((count, day) => count + day.segments.length, 0)} aralık`, truncated: true }
+    ? { text: `Haftalık · ${week.reduce((count, day) => count + day.segments.length, 0)} aralık${weekendNormal ? "; Cmt–Paz normal çalışır" : ""}`, truncated: true }
     : { text: text || "Zaman aralığı yok", truncated: false };
 }
 

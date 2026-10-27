@@ -4,7 +4,7 @@ import type { RuleSaveResult } from "@/hooks/access-rules/useComplexAccessRuleMu
 import { useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import type { Id } from "../../../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -97,48 +97,73 @@ export function SyncRunSheet({
     </Sheet>
   );
 }
-export function RecentRuns({
-  projectId,
-  ruleId,
-}: {
-  projectId: Id<"projects">;
-  ruleId?: Id<"accessRules">;
-}) {
-  const runs = useQuery(api.deviceSyncRuns.listRecent, {
-    projectId,
-    ruleId,
-    limit: 1,
-  });
+type RunHeaderData = Pick<Doc<"deviceSyncRuns">, "kind" | "startedAt" | "status" | "counts">;
+function RunHeader({ run }: { run: RunHeaderData }) {
+  const display = runDisplay(run.status, run.counts);
+  return (
+    <>
+      <StatusBadge tone={display.tone}>{display.label}</StatusBadge>
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="font-medium">{runKindLabels[run.kind]}</p>
+        <p className="text-xs text-muted-foreground tabular-nums">
+          {formatTrDateTime(run.startedAt)}
+        </p>
+      </div>
+      <p className="text-xs text-muted-foreground break-words">
+        {runCountParts(run.counts).join(" · ") || "Hedef cihaz yok"}
+      </p>
+    </>
+  );
+}
+export function RecentRuns({ projectId }: { projectId: Id<"projects"> }) {
+  const runs = useQuery(api.deviceSyncRuns.listRecent, { projectId, limit: 1 });
   const [selected, setSelected] = useState<Id<"deviceSyncRuns"> | null>(null);
   if (!runs) return <SectionSkeleton rows={1} label="Son gönderim yükleniyor" />;
   const run = runs[0];
   return (
     <section className="space-y-2 min-w-0">
-      <h2 className="text-base font-semibold">
-        {ruleId ? "Kuralın son gönderimi" : "Son gönderim"}
-      </h2>
+      <h2 className="text-base font-semibold">Son gönderim</h2>
       {!run ? (
-        <p className="text-muted-foreground text-xs">
-          {ruleId ? "Bu kural için henüz gönderim yok." : "Henüz gönderim yok."}
-        </p>
+        <p className="text-muted-foreground text-xs">Henüz gönderim yok.</p>
       ) : (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border px-4 py-3">
-          <StatusBadge tone={runDisplay(run.status, run.counts).tone}>{runDisplay(run.status, run.counts).label}</StatusBadge>
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <p className="font-medium">{runKindLabels[run.kind]}</p>
-            <p className="text-xs text-muted-foreground tabular-nums">
-              {formatTrDateTime(run.startedAt)}
-            </p>
-          </div>
-          <p className="text-xs text-muted-foreground break-words">
-            {runCountParts(run.counts).join(" · ") || "Hedef cihaz yok"}
-          </p>
+          <RunHeader run={run} />
           <Button variant="outline" onClick={() => setSelected(run._id)} aria-label={`${formatTrDateTime(run.startedAt)} gönderiminin ayrıntısı`}>
             Ayrıntı
           </Button>
         </div>
       )}
       <SyncRunSheet runId={selected} onClose={() => setSelected(null)} />
+    </section>
+  );
+}
+/** Rule details already sit in a sheet: no second sheet, only the devices that need attention. */
+export function RuleLastRun({ ruleId }: { ruleId: Id<"accessRules"> }) {
+  const run = useQuery(api.deviceSyncRuns.latestForRule, { ruleId });
+  if (run === undefined) return <SectionSkeleton rows={1} label="Son gönderim yükleniyor" />;
+  const problems = run?.targets.filter((target) => target.status === "failed" || target.status === "skipped" || target.status === "unknown") ?? [];
+  return (
+    <section className="space-y-2 min-w-0">
+      <h2 className="text-base font-semibold">Kuralın son gönderimi</h2>
+      {!run ? (
+        <p className="text-muted-foreground text-xs">Bu kural için henüz gönderim yok.</p>
+      ) : (
+        <div className="rounded-md border px-4 py-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <RunHeader run={run} />
+          </div>
+          {problems.length > 0 && (
+            <ul className="space-y-0.5 text-xs text-muted-foreground">
+              {problems.map((target) => (
+                <li key={target._id} className="break-words">
+                  {target.deviceName}: {targetLabels[target.status]}
+                  {target.reason ? ` · ${errorMessage(target.reason)}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </section>
   );
 }

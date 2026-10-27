@@ -1,7 +1,7 @@
 import { addInterval, removeInterval, saveDecision } from "./model";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useProjectChangeGuard } from "@/contexts/ActiveProjectContext";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useConvex, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../../convex/_generated/api";
@@ -22,7 +22,8 @@ import {
   WEEKDAYS,
   emptyWeek,
   inspectSchedule,
-  invalidTimeField,
+  timeFieldError,
+  overnightDescription,
   type WeekSchedule,
 } from "./schedule";
 export type Template = FunctionReturnType<
@@ -35,12 +36,14 @@ export function WeekEditor({
   week: WeekSchedule;
   onChange: (week: WeekSchedule) => void;
 }) {
+  const editorId = useId();
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant="outline"
+          className="min-h-11"
           onClick={() =>
             onChange({
               ...week,
@@ -58,6 +61,7 @@ export function WeekEditor({
         <Button
           type="button"
           variant="outline"
+          className="min-h-11"
           onClick={() => onChange(emptyWeek())}
         >
           Tümünü temizle
@@ -66,40 +70,91 @@ export function WeekEditor({
       {WEEKDAYS.map((day, i) => (
         <fieldset key={day} className="border rounded p-3 space-y-2 min-w-0">
           <legend className="px-1 text-sm font-medium">{DAY_NAMES[i]}</legend>
-          {week[day].map((r, n) => (
-            <div key={n} className="flex flex-wrap gap-2 items-center">
-              {(["start", "end"] as const).map((field) => (
-                <Input
-                  key={field}
-                  aria-label={`${DAY_NAMES[i]} ${n + 1}. ${field === "start" ? "başlangıç" : "bitiş"}`}
-                  className="w-24 min-w-0"
-                  aria-invalid={invalidTimeField(r, field)}
-                  placeholder="HH:MM"
-                  list={field === "end" ? "schedule-end-times" : undefined}
-                  value={r[field]}
-                  onChange={(e) =>
-                    onChange({
-                      ...week,
-                      [day]: week[day].map((v, index) =>
-                        index === n ? { ...v, [field]: e.target.value } : v,
-                      ),
-                    })
-                  }
-                />
-              ))}
-              <Button
-                type="button"
-                variant="ghost"
-                aria-label={`${DAY_NAMES[i]} ${n + 1}. aralığı sil`}
-                onClick={() => onChange(removeInterval(week, day, n))}
-              >
-                Sil
-              </Button>
-            </div>
-          ))}
+          {week[day].map((r, n) => {
+            const rowId = `${editorId}-${day}-${n}`;
+            const overnight = overnightDescription(day, r);
+            const errors = (["start", "end"] as const).map((field) => ({
+              field,
+              message: timeFieldError(r, field),
+            }));
+            return (
+              <div key={n} className="space-y-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:grid-cols-[6rem_6rem_auto] sm:justify-start gap-2 items-start">
+                  {errors.map(({ field, message }) => (
+                    <div key={field} className="min-w-0 space-y-1">
+                      <Label htmlFor={`${rowId}-${field}`}>
+                        {field === "start" ? "Başlangıç" : "Bitiş"}
+                      </Label>
+                      <Input
+                        id={`${rowId}-${field}`}
+                        aria-label={`${DAY_NAMES[i]} ${n + 1}. ${field === "start" ? "başlangıç" : "bitiş"}`}
+                        className="w-full min-w-0 min-h-11"
+                        aria-invalid={!!message}
+                        aria-describedby={
+                          message
+                            ? `${rowId}-${field}-error`
+                            : `${rowId}-${field}-hint`
+                        }
+                        placeholder="22:00"
+                        list={
+                          field === "end" ? `${editorId}-end-times` : undefined
+                        }
+                        value={r[field]}
+                        onChange={(e) =>
+                          onChange({
+                            ...week,
+                            [day]: week[day].map((v, index) =>
+                              index === n
+                                ? { ...v, [field]: e.target.value }
+                                : v,
+                            ),
+                          })
+                        }
+                      />
+                      <p
+                        id={`${rowId}-${field}-hint`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {field === "start"
+                          ? "Örnek: 22:00"
+                          : "Örnek: 22:00 · En fazla 24:00"}
+                      </p>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="min-h-11 mt-6"
+                    aria-label={`${DAY_NAMES[i]} ${n + 1}. aralığı sil`}
+                    onClick={() => onChange(removeInterval(week, day, n))}
+                  >
+                    Sil
+                  </Button>
+                </div>
+                {errors
+                  .filter(({ message }) => message)
+                  .map(({ field, message }) => (
+                    <p
+                      key={field}
+                      id={`${rowId}-${field}-error`}
+                      role="alert"
+                      className="text-sm text-danger"
+                    >
+                      {DAY_NAMES[i]} {n + 1}. aralık: {message}
+                    </p>
+                  ))}
+                {overnight && (
+                  <p className="text-sm" role="status">
+                    {DAY_NAMES[i]} {n + 1}. aralık: {overnight}
+                  </p>
+                )}
+              </div>
+            );
+          })}
           <Button
             type="button"
             variant="outline"
+            className="min-h-11"
             disabled={week[day].length >= 8}
             onClick={() => onChange(addInterval(week, day))}
           >
@@ -107,7 +162,7 @@ export function WeekEditor({
           </Button>
         </fieldset>
       ))}
-      <datalist id="schedule-end-times">
+      <datalist id={`${editorId}-end-times`}>
         <option value="24:00" />
       </datalist>
     </div>
@@ -142,9 +197,11 @@ export function TemplateEditor({
   const create = useMutation(api.accessScheduleTemplates.create);
   const update = useMutation(api.accessScheduleTemplates.update);
   const check = inspectSchedule(week);
-  const weekChanged = JSON.stringify(check.week) !== JSON.stringify(
-    template ? inspectSchedule(template.week).week : emptyWeek(),
-  );
+  const weekChanged =
+    JSON.stringify(check.week) !==
+    JSON.stringify(
+      template ? inspectSchedule(template.week).week : emptyWeek(),
+    );
   const save = async (confirmed = false) => {
     const decision = saveDecision({
       valid: !!check.week && !check.error,
@@ -208,6 +265,7 @@ export function TemplateEditor({
               <Label htmlFor="template-name">Ad</Label>
               <Input
                 id="template-name"
+                className="min-h-11"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -216,23 +274,27 @@ export function TemplateEditor({
               <Label htmlFor="template-description">Açıklama</Label>
               <Input
                 id="template-description"
+                className="min-h-11"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
             <WeekEditor week={week} onChange={setWeek} />
           </fieldset>
-          {check.overnight.map((v) => (
-            <p key={v} className="text-sm" role="status">
-              {v}
-            </p>
-          ))}
           <section className="space-y-1" aria-label="Cihaz uyumluluğu">
             <h3 className="font-medium">Cihaz uyumluluğu</h3>
-            <p>Hikvision: günde en fazla 8 aralık — bu şablonda en çok {check.hik} {check.hik <= 8 ? "✓" : "✗"}</p>
-            <p>IDE: en fazla 8 izin kaydı — bu şablon {check.ide} kullanıyor {check.ide <= 8 ? "✓" : "✗"}</p>
+            <p>
+              Hikvision: günde en fazla 8 aralık — bu şablonda en çok{" "}
+              {check.hik} {check.hik <= 8 ? "✓" : "✗"}
+            </p>
+            <p>
+              IDE: en fazla 8 izin kaydı — bu şablon {check.ide} kullanıyor{" "}
+              {check.ide <= 8 ? "✓" : "✗"}
+            </p>
             {(check.hik > 8 || check.ide > 8) && (
-              <p className="text-danger">Aralıkları birleştirin ya da azaltın.</p>
+              <p className="text-danger">
+                Aralıkları birleştirin ya da azaltın.
+              </p>
             )}
           </section>
           {check.error && (
@@ -264,6 +326,7 @@ export function TemplateEditor({
             />
           ) : (
             <Button
+              className="min-h-11"
               disabled={pending || !name.trim() || !!check.error || !check.week}
               onClick={() => void save()}
             >
@@ -272,6 +335,7 @@ export function TemplateEditor({
           )}
 
           <Button
+            className="min-h-11"
             type="button"
             variant="outline"
             disabled={pending}
@@ -316,17 +380,24 @@ export function ImpactConfirmation({
           <ul className="text-xs break-all">
             {impact.ideOverLimit.map((v) => (
               <li key={`${v.employeeId}/${v.deviceId}`}>
-                {v.employeeName?.trim() || v.employeeId} — {v.deviceName?.trim() || v.deviceId} (toplam {v.total}/16)
+                {v.employeeName?.trim() || v.employeeId} —{" "}
+                {v.deviceName?.trim() || v.deviceId} (toplam {v.total}/16)
               </li>
             ))}
           </ul>
         </>
       )}
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={pending} onClick={onBack}>
+        <Button
+          className="min-h-11"
+          variant="outline"
+          disabled={pending}
+          onClick={onBack}
+        >
           Geri dön
         </Button>
         <Button
+          className="min-h-11"
           disabled={pending || impact.ideOverLimit.length > 0}
           onClick={onConfirm}
         >

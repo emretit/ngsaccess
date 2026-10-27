@@ -23,6 +23,7 @@ export function StatusCounters({
           const active = state === "all" ? !filters.state : filters.state === state;
           return (
             <Button
+              className="max-lg:min-h-11"
               key={state}
               variant={active ? "default" : "outline"}
               aria-pressed={active}

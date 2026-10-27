@@ -15,7 +15,7 @@ const initial: VerifyPlan = {
   verifyMode: "face",
 };
 describe("weekly verify editor", () => {
-  it("converts legacy window to seven days without losing mode or seconds", () => {
+  it("converts legacy window to weekdays without losing mode or seconds", () => {
     const change = vi.fn();
     const tree = DoorVerifyPlanEditor({ value: initial, onChange: change });
     const select = nodes(tree).find(
@@ -35,7 +35,26 @@ describe("weekly verify editor", () => {
         },
       ]),
     });
-    expect(change.mock.calls[0][0].weekly).toHaveLength(7);
+    const plan = change.mock.calls[0][0] as VerifyPlan;
+    expect(plan.weekly).toHaveLength(7);
+    expect(plan.weekly?.slice(5).every(day => day.segments.length === 0)).toBe(true);
+  });
+  it("04-O4 Hafta içi sets only five days and collapses daily sections", () => {
+    const change = vi.fn();
+    const tree = DoorVerifyPlanEditor({ value: initial, onChange: change });
+    const button = nodes(tree).find(node => node.props.children === "Hafta içi");
+    (button?.props.onClick as () => void)();
+    const plan = change.mock.calls[0][0] as VerifyPlan;
+    expect(plan.weekly?.slice(0, 5).every(day => day.segments[0]?.verifyMode === "face")).toBe(true);
+    expect(plan.weekly?.slice(5).every(day => day.segments.length === 0)).toBe(true);
+    const days = nodes(DoorVerifyPlanEditor({ value: plan, onChange: change })).filter(node => node.type === "details");
+    expect(days).toHaveLength(7);
+    expect(days.filter(node => node.props.open)).toHaveLength(1);
+  });
+  it("Dalga3 C1-1 does not offer Hafta içi on a per-day plan", () => {
+    const value: VerifyPlan = { ...initial, weekly: [{ day: "Saturday", segments: [{ ...initial, verifyMode: "card" }] }] };
+    const tree = DoorVerifyPlanEditor({ value, onChange: vi.fn() });
+    expect(nodes(tree).some(node => node.props.children === "Hafta içi")).toBe(false);
   });
   it("copies Monday to weekdays and preserves weekend", () => {
     const change = vi.fn();

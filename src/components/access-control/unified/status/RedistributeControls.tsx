@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
   countText,
   type Counts,
   type Pair,
+  type GrantRow,
 } from "./model";
 import type { useRedistribution } from "./useRedistribution";
 
@@ -20,6 +22,9 @@ type RedistributeControlsProps = Pick<
   "action" | "setAction" | "sending" | "send"
 > & {
   selected: Pair[];
+  projectName?: string;
+  selectedRows?: GrantRow[];
+  canManageDevices?: boolean;
   projectCounts: Counts | null;
   error: string;
   setError: (error: string) => void;
@@ -31,24 +36,32 @@ export function RedistributeBar({
   projectCounts,
   setError,
   setAction,
+  canManageDevices = false,
 }: Pick<
   RedistributeControlsProps,
-  "selected" | "sending" | "projectCounts" | "setError" | "setAction"
+  "selected" | "sending" | "projectCounts" | "setError" | "setAction" | "canManageDevices"
 >) {
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
+  const maintenanceId = useId();
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="contents lg:flex lg:flex-wrap lg:gap-2">
+    <div className={`${selected.length ? "flex sticky bottom-2 z-10 bg-background border rounded-md p-2 lg:static lg:border-0 lg:p-0" : "hidden lg:flex"} flex-wrap gap-2`} aria-label="Seçili kayıt işlemleri">
       <Button
-        className="whitespace-normal h-auto min-h-10"
+        className={`${selected.length ? "" : "hidden lg:inline-flex"} whitespace-normal h-auto min-h-11`}
         disabled={!selected.length || sending}
         onClick={() => {
           setError("");
           setAction("selected");
         }}
       >
-        Seçilileri yeniden dağıt ({selected.length}/100)
+        Seçili {selected.length} kaydı yeniden gönder
       </Button>
+    </div>
+    <div className="order-last lg:order-none space-y-2">
+      <Button className="min-h-11 lg:hidden" variant="ghost" aria-expanded={maintenanceOpen} aria-controls={maintenanceId} onClick={() => setMaintenanceOpen(!maintenanceOpen)}>Diğer gönderim işlemleri</Button>
+      <div id={maintenanceId} className={`${maintenanceOpen ? "flex" : "hidden lg:flex"} flex-wrap gap-2`}>
       <Button
-        className="whitespace-normal h-auto min-h-10"
+        className="whitespace-normal h-auto min-h-11"
         variant="outline"
         disabled={sending || !projectCounts?.failed}
         onClick={() => {
@@ -58,8 +71,8 @@ export function RedistributeBar({
       >
         Hatalıları yeniden dağıt ({countText(projectCounts?.failed ?? 0, projectCounts?.capped ?? false)})
       </Button>
-      <Button
-        className="whitespace-normal h-auto min-h-10"
+      {canManageDevices && <Button
+        className="whitespace-normal h-auto min-h-11"
         variant="outline"
         disabled={sending || !projectCounts}
         onClick={() => {
@@ -68,7 +81,9 @@ export function RedistributeBar({
         }}
       >
         Tümünü yeniden dağıt
-      </Button>
+      </Button>}
+      </div>
+    </div>
     </div>
   );
 }
@@ -82,6 +97,8 @@ export function RedistributeDialog({
   projectCounts,
   error,
   setError,
+  projectName = "Seçili proje",
+  selectedRows = [],
 }: RedistributeControlsProps) {
   return (
     <Dialog
@@ -106,6 +123,15 @@ export function RedistributeDialog({
                 )}
           </DialogDescription>
         </DialogHeader>
+        {action === "selected" && (
+          <div className="space-y-2 text-sm break-words">
+            <p>Proje: {projectName}</p>
+            <ul className="space-y-1">
+              {selectedRows.slice(0, 5).map((row) => <li key={`${row.employeeId}:${row.deviceId}`}>{row.employeeName} · {row.deviceName}</li>)}
+            </ul>
+            {selected.length > 5 && <p>ve {selected.length - 5} kayıt daha</p>}
+          </div>
+        )}
         {action !== "selected" && (
           <p className="text-sm">
             {action === "failed"
@@ -121,6 +147,7 @@ export function RedistributeDialog({
         )}
         <div className="flex flex-wrap gap-2">
           <Button
+            className="min-h-11"
             variant="outline"
             disabled={sending}
             onClick={() => {
@@ -130,8 +157,8 @@ export function RedistributeDialog({
           >
             Vazgeç
           </Button>
-          <Button disabled={sending} onClick={() => void send()}>
-            {sending ? "Başlatılıyor…" : "Onayla ve gönder"}
+          <Button className="min-h-11" disabled={sending} onClick={() => void send()}>
+            {sending ? "Başlatılıyor…" : action === "selected" ? `Seçili ${selected.length} kaydı yeniden gönder` : "Onayla ve gönder"}
           </Button>
         </div>
       </DialogContent>

@@ -5,7 +5,7 @@ vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ p
 vi.mock("react-router-dom", () => ({ useSearchParams: () => [new URLSearchParams(), vi.fn()] }));
 vi.mock("./RulesPage", () => ({ RulesPage: () => <p>Sayfa 1 · 2 kural gösteriliyor</p> }));
 vi.mock("./RulesFilters", () => ({ RulesFilters: () => null }));
-vi.mock("../SyncRuns", () => ({ ProjectSyncButton: () => <button>Gönder</button>, RecentRuns: () => null }));
+vi.mock("../SyncRuns", () => ({ ProjectSyncButton: () => <button>Gönder</button>, RecentRuns: () => null, RuleLastRun: () => null }));
 import AccessRulesList from "../AccessRulesList";
 it("sekme adını ve açıklamayı gösterir, sayacı yalnız sayfalama satırında tutar", () => {
   const html = renderToStaticMarkup(<AccessRulesList onCreateRule={() => undefined} />);

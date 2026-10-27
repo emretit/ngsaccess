@@ -391,6 +391,33 @@ export const listRecent = authedQuery({
     }));
   },
 });
+/** A rule's newest delivery: project/template sends also carry an active rule, so they count;
+ * their targets are narrowed to the rule's own devices. */
+export const latestForRule = authedQuery({
+  args: { ruleId: v.id("accessRules") },
+  handler: async (ctx, args) => {
+    const rule = await ctx.db.get(args.ruleId);
+    const projectId = rule?.projectId;
+    if (!rule || !projectId) throw new ConvexError("Kural bulunamadı");
+    await resolveProjectScope(ctx, projectId);
+    const own = (await ctx.db.query("deviceSyncRuns")
+      .withIndex("by_rule_started", q => q.eq("ruleId", rule._id)).order("desc").take(1))
+      .find(candidate => candidate.projectId === projectId);
+    const recent = rule.isActive === false ? [] : await ctx.db.query("deviceSyncRuns")
+      .withIndex("by_project_started", q => q.eq("projectId", projectId)).order("desc").take(20);
+    const shared = recent.find(run => run.kind === "project_resync"
+      || (run.kind === "template_sync" && rule.scheduleTemplateId !== undefined && run.templateId === rule.scheduleTemplateId));
+    const run = shared && (!own || shared.startedAt > own.startedAt) ? shared : own;
+    if (!run) return null;
+    let targets = await ctx.db.query("deviceSyncRunTargets")
+      .withIndex("by_run", q => q.eq("runId", run._id)).take(MAX_DEVICES + 1);
+    if (run.kind !== "rule_sync") {
+      const deviceIds = new Set((await scheduleRuleDevices(ctx, rule)).map(device => device._id));
+      targets = targets.filter(target => deviceIds.has(target.deviceId));
+    }
+    return { ...run, ...summarizeRun(targets.map(t => t.status), run.dispatchFinished === true), targets };
+  },
+});
 export const get = authedQuery({
   args: { runId: v.id("deviceSyncRuns") },
   handler: async (ctx, args) => {

@@ -9,7 +9,7 @@ export type TargetStatus =
   | "unknown";
 export const targetLabels: Record<TargetStatus, string> = {
   queued: "Kuyrukta",
-  sent: "Gönderildi · teslim kanıtı yok",
+  sent: "Cihaza gönderildi",
   verified: "Cihazda doğrulandı",
   failed: "Başarısız",
   skipped: "Atlandı",
@@ -27,13 +27,13 @@ export function targetTone(status: TargetStatus) {
           : "neutral";
 }
 export function runSummary(counts: Record<TargetStatus, number>) {
-  return `${counts.queued} kuyrukta · ${counts.sent} gönderildi (teslim kanıtı yok) · ${counts.verified} cihazda doğrulandı · ${counts.failed} başarısız · ${counts.skipped} atlandı · ${counts.unknown} bilinmiyor`;
+  return `${counts.queued} kuyrukta · ${counts.sent} kayıt cihaza gönderildi · ${counts.verified} cihazda doğrulandı · ${counts.failed} başarısız · ${counts.skipped} atlandı · ${counts.unknown} bilinmiyor`;
 }
 /** Only non-zero counts, in display order; empty when the run had no targets. */
 export function runCountParts(counts: Record<TargetStatus, number>) {
   const labels: [TargetStatus, string][] = [
     ["verified", "cihazda doğrulandı"],
-    ["sent", "gönderildi (teslim kanıtı yok)"],
+    ["sent", "kayıt cihaza gönderildi"],
     ["queued", "kuyrukta"],
     ["failed", "başarısız"],
     ["skipped", "atlandı"],

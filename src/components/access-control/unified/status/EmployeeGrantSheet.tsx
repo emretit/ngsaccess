@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import {
   Sheet,
   SheetContent,
@@ -13,8 +14,10 @@ export function EmployeeGrantSheet({
   setEmployee,
   detail,
   detailError,
+  returnFocusRef,
 }: {
   employee: GrantRow | null;
+  returnFocusRef?: RefObject<HTMLElement | null>;
   setEmployee: (employee: GrantRow | null) => void;
   detail: EmployeeDetail | null;
   detailError: string;
@@ -26,7 +29,12 @@ export function EmployeeGrantSheet({
         if (!open) setEmployee(null);
       }}
     >
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto" onCloseAutoFocus={(event) => {
+        if (returnFocusRef?.current?.isConnected) {
+          event.preventDefault();
+          returnFocusRef.current.focus();
+        }
+      }}>
         <SheetHeader>
           <SheetTitle>{employee?.employeeName ?? "Kişi detayı"}</SheetTitle>
           <SheetDescription>
