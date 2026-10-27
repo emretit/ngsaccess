@@ -1,3 +1,4 @@
+import { useListSelection } from "@/hooks/useListSelection";
 import { useState } from "react";
 import { Device } from "@/types/device";
 import { notify } from "@/lib/notify";
@@ -28,9 +29,14 @@ export function useDeviceTable(devices: Device[]) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const removeDevice = useMutation(api.devices.remove);
 
-  const handleSelectAll = (checked: boolean) => setSelection(checked ? devices.map((d) => d._id) : []);
+  const selectionActions = useListSelection({
+    visibleIds: devices.map(device => device._id),
+    selected: new Set(selectedDevices),
+    onChange: next => setSelection([...next]),
+  });
+  const handleSelectAll = selectionActions.selectAll;
   const handleSelectDevice = (checked: boolean, deviceId: Id<"devices">) => {
-    setSelection((current) => checked ? Array.from(new Set([...current, deviceId])) : current.filter((id) => id !== deviceId));
+    if (checked !== selectedDevices.includes(deviceId)) selectionActions.toggle(deviceId);
   };
   const handleBulkDelete = async () => {
     const targets = visibleSelection(selectedDevices, devices.map((device) => device._id));
@@ -40,5 +46,5 @@ export function useDeviceTable(devices: Device[]) {
     if (failed.length) throw new Error(`${failed.length} cihaz silinemedi. Yalnız bu cihazlar seçili kaldı; tekrar deneyebilirsiniz.`);
     setShowDeleteDialog(false);
   };
-  return { selectedDevices, showDeleteDialog, setShowDeleteDialog, handleSelectAll, handleSelectDevice, handleBulkDelete };
+  return { checked: selectionActions.checked, selectedDevices, showDeleteDialog, setShowDeleteDialog, handleSelectAll, handleSelectDevice, handleBulkDelete };
 }

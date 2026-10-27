@@ -6,13 +6,7 @@ import { api } from "../../../../convex/_generated/api";
 import { FormActions } from "@/components/shared/FormActions";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/shared/FormDialog";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { errorMessage, notify } from "@/lib/notify";
@@ -72,86 +66,71 @@ export function ProjectEditor({
   };
   return (
     <>
-      <Dialog
-        open
-        onOpenChange={(open) => {
-          if (!open) close();
+      <FormDialog
+        open={true}
+        onRequestClose={close}
+        pending={pending}
+        title={project ? "Projeyi düzenle" : "Yeni proje"}
+        size="md"
+        description="Proje bilgilerini ve seçicideki görünürlüğünü yönetin."
+        onSubmit={(event) => {
+          event.preventDefault();
+          void run();
         }}
+        footer={
+          <FormActions
+            layout="dialog"
+            isLoading={pending}
+            onClose={close}
+            busyLabel="İşlem sürüyor…"
+          />
+        }
       >
-        <DialogContent
-          className="max-h-[90dvh] overflow-y-auto"
-          aria-busy={pending}
+        <FormFieldWrapper
+          htmlFor="admin-project-name"
+          label="Ad (zorunlu)"
+          error={nameError}
         >
-          <DialogHeader>
-            <DialogTitle>
-              {project ? "Projeyi düzenle" : "Yeni proje"}
-            </DialogTitle>
-            <DialogDescription>
-              Proje bilgilerini ve seçicideki görünürlüğünü yönetin.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            noValidate
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void run();
-            }}
+          <Input
+            value={form.name}
+            disabled={pending}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+          />
+        </FormFieldWrapper>
+        <FormFieldWrapper
+          htmlFor="admin-project-description"
+          label="Açıklama (opsiyonel)"
+        >
+          <Textarea
+            value={form.description}
+            disabled={pending}
+            onChange={(event) =>
+              setForm({ ...form, description: event.target.value })
+            }
+          />
+        </FormFieldWrapper>
+        <FormFieldWrapper
+          htmlFor="admin-project-status"
+          label="Durum"
+          hint="Pasif proje, aktif proje seçicisinde listelenmez. Veriler ve mevcut erişimler korunur."
+        >
+          <select
+            disabled={pending}
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            value={form.isActive ? "active" : "inactive"}
+            onChange={(event) =>
+              setForm({
+                ...form,
+                isActive: event.target.value === "active",
+              })
+            }
           >
-            <FormFieldWrapper
-              htmlFor="admin-project-name"
-              label="Ad (zorunlu)"
-              error={nameError}
-            >
-              <Input
-                value={form.name}
-                disabled={pending}
-                onChange={(event) =>
-                  setForm({ ...form, name: event.target.value })
-                }
-              />
-            </FormFieldWrapper>
-            <FormFieldWrapper
-              htmlFor="admin-project-description"
-              label="Açıklama (opsiyonel)"
-            >
-              <Textarea
-                value={form.description}
-                disabled={pending}
-                onChange={(event) =>
-                  setForm({ ...form, description: event.target.value })
-                }
-              />
-            </FormFieldWrapper>
-            <FormFieldWrapper
-              htmlFor="admin-project-status"
-              label="Durum"
-              hint="Pasif proje, aktif proje seçicisinde listelenmez. Veriler ve mevcut erişimler korunur."
-            >
-              <select
-                disabled={pending}
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                value={form.isActive ? "active" : "inactive"}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    isActive: event.target.value === "active",
-                  })
-                }
-              >
-                <option value="active">Aktif</option>
-                <option value="inactive">Pasif</option>
-              </select>
-            </FormFieldWrapper>
-            {error && (
-              <FormFeedback tone="error">
-                {error}
-              </FormFeedback>
-            )}
-            <FormActions layout="dialog" isLoading={pending} onClose={close} busyLabel="İşlem sürüyor…" />
-          </form>
-        </DialogContent>
-      </Dialog>
+            <option value="active">Aktif</option>
+            <option value="inactive">Pasif</option>
+          </select>
+        </FormFieldWrapper>
+        {error && <FormFeedback tone="error">{error}</FormFeedback>}
+      </FormDialog>
       {guard.dialog}
     </>
   );

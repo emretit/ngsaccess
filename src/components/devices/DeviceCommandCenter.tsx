@@ -8,16 +8,7 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { ConfirmAction } from "@/components/shared/ConfirmAction";
 import { useDeviceCommands } from "./useDeviceCommands";
 import { getAdapter } from "./deviceAdapter";
 import { deviceLabels } from "./deviceLabels";
@@ -105,37 +96,26 @@ function DeviceCenter({
         objectName={device.name ?? "Cihaz"}
         effects={[
           pendingAction?.description ?? "",
-          ...(connection === "offline"
-            ? [offlineMessage]
-            : []),
+          ...(connection === "offline" ? [offlineMessage] : []),
         ]}
         confirmLabel={deviceLabels.reboot}
         onConfirm={runConfirmed}
       />
-      <AlertDialog
+      <ConfirmAction
         open={pendingAction !== null && !pendingAction.destructive}
         onOpenChange={(open) => {
           if (!open && !pending) setPendingAction(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {pendingAction?.title ?? "İşlem onayı"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingAction?.description ?? ""}{" "}
-              {connection === "offline" ? offlineMessage : ""}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Vazgeç</AlertDialogCancel>
-            <Button disabled={pending} onClick={runConfirmed}>
-              {pending ? "İşlem sürüyor…" : "Onayla"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={pendingAction?.title ?? "İşlem onayı"}
+        description={
+          <>
+            {pendingAction?.description ?? ""}{" "}
+            {connection === "offline" ? offlineMessage : ""}
+          </>
+        }
+        confirmLabel="Onayla"
+        onConfirm={runConfirmed}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React from "react";
+import { AsyncConfirmation } from "@/components/shared/ConfirmAction";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
@@ -42,6 +43,18 @@ function management() {
   if (!value) throw new Error("Missing management hook");
   return value;
 }
+function confirmation(targetValue: PasswordResetTarget, onClose: () => void, onSend: (target: PasswordResetTarget) => Promise<boolean>) {
+  const dialog = PasswordResetDialog({ target: targetValue, onClose, onSend, pending: false });
+  let click: (() => Promise<void>) | undefined;
+  function Harness() {
+    const element = AsyncConfirmation({ ...dialog.props, variant: "default" });
+    click = findButton(element)?.props.onClick;
+    return element;
+  }
+  renderToStaticMarkup(<Harness />);
+  if (!click) throw new Error("Missing send confirmation");
+  return click;
+}
 function findButton(node: React.ReactNode): React.ReactElement<{ onClick: () => Promise<void>; disabled: boolean }> | undefined {
   if (!React.isValidElement<{ children?: React.ReactNode; onClick?: () => Promise<void>; disabled?: boolean }>(node)) return undefined;
   if (node.props.onClick) return node as React.ReactElement<{ onClick: () => Promise<void>; disabled: boolean }>;
@@ -82,9 +95,7 @@ describe("F5-A yönetici şifre sıfırlama", () => {
     const html = renderToStaticMarkup(dialog);
     expect(html).toContain("ada@example.com adresine şifre sıfırlama bağlantısı gönderilecek. Mevcut oturumları şifre değişince kapanır.");
     expect(state.send).not.toHaveBeenCalled();
-    const button = findButton(dialog);
-    if (!button) throw new Error("Missing send confirmation");
-    await button.props.onClick();
+    await confirmation(target, close, value.handlePasswordReset)();
     expect(state.send).toHaveBeenCalledWith({ ...target, type: "reset" });
     expect(state.success).toHaveBeenCalledWith("Şifre sıfırlama bağlantısı gönderildi");
     expect(close).toHaveBeenCalledOnce();
@@ -103,9 +114,7 @@ describe("F5-A yönetici şifre sıfırlama", () => {
     state.send.mockRejectedValue(error);
     const value = management();
     const close = vi.fn();
-    const button = findButton(PasswordResetDialog({ target, onClose: close, onSend: value.handlePasswordReset, pending: false }));
-    if (!button) throw new Error("Missing send confirmation");
-    await button.props.onClick();
+    await confirmation(target, close, value.handlePasswordReset)();
     expect(close).not.toHaveBeenCalled();
     expect(state.success).not.toHaveBeenCalled();
     expect(state.error).toHaveBeenCalledWith("Şifre sıfırlama bağlantısı gönderilemedi", expect.objectContaining({ message: "Bu kullanıcıya şifre sıfırlama bağlantısı gönderilemiyor." }));

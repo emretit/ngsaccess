@@ -1,10 +1,4 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/shared/FormDialog";
 import { Input } from "@/components/ui/input";
 import { FormActions } from "@/components/shared/FormActions";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
@@ -47,47 +41,49 @@ export function AddDepartmentDialog({
     onOpenChange(open);
   };
   return (
-    <Dialog open={isOpen} onOpenChange={close}>
-      <DialogContent
-        className="sm:max-w-[440px]"
-        onInteractOutside={(event) => {
-          if (pending) event.preventDefault();
-        }}
+    <FormDialog
+      open={isOpen}
+      onRequestClose={() => close(false)}
+      pending={pending}
+      title={title}
+      size="sm"
+      description={description}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!departmentName.trim()) {
+          setNameError("Departman adı zorunludur");
+          return;
+        }
+        setNameError(undefined);
+        if (await run(departmentName.trim())) {
+          setDepartmentName("");
+          onOpenChange(false);
+        }
+      }}
+      footer={
+        <FormActions
+          layout="dialog"
+          className="pt-2"
+          isLoading={pending}
+          onClose={() => close(false)}
+          cancelLabel="İptal"
+          submitLabel="Ekle"
+          busyLabel="Ekleniyor…"
+        />
+      }
+    >
+      <FormFieldWrapper
+        htmlFor={inputId}
+        label="Departman adı"
+        error={nameError}
       >
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <form
-          onSubmit={async (event) => {
-            event.preventDefault();
-            if (!departmentName.trim()) {
-              setNameError("Departman adı zorunludur");
-              return;
-            }
-            setNameError(undefined);
-            if (await run(departmentName.trim())) {
-              setDepartmentName("");
-              onOpenChange(false);
-            }
-          }}
-          className="space-y-4"
-        >
-          <FormFieldWrapper
-            htmlFor={inputId}
-            label="Departman adı"
-            error={nameError}
-          >
-            <Input
-              id={inputId}
-              value={departmentName}
-              disabled={pending}
-              onChange={(event) => setDepartmentName(event.target.value)}
-            />
-          </FormFieldWrapper>
-          <FormActions layout="dialog" className="pt-2" isLoading={pending} onClose={() => close(false)} cancelLabel="İptal" submitLabel="Ekle" busyLabel="Ekleniyor…" />
-        </form>
-      </DialogContent>
-    </Dialog>
+        <Input
+          id={inputId}
+          value={departmentName}
+          disabled={pending}
+          onChange={(event) => setDepartmentName(event.target.value)}
+        />
+      </FormFieldWrapper>
+    </FormDialog>
   );
 }

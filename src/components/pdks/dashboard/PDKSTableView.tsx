@@ -1,3 +1,6 @@
+import { useListSelection } from "@/hooks/useListSelection";
+import { ListSelectAll } from "@/components/shared/ListSelectAll";
+import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import { PdksPlanSummary } from "./PdksPlanSummary";
 import { singleRowDay } from "../lib/presentation";
 import { PdksFlexibleTarget } from "./PdksFlexibleTarget";
@@ -50,12 +53,11 @@ export function PDKSTableView({
   const rows = [...records].sort((a, b) =>
     compareRows(a, b, sort.key, sort.direction),
   );
-  const toggle = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    onSelectionChange?.(next);
-  };
+  const { toggle, selectAll, checked } = useListSelection({
+    visibleIds: rows.map(row => row.id),
+    selected: selectedIds,
+    onChange: next => onSelectionChange?.(next),
+  });
   if (loading)
     return (
       <div role="status" className="py-10">
@@ -63,16 +65,14 @@ export function PDKSTableView({
       </div>
     );
   return (
-    <>
-      <div className="md:hidden">
+    <ResponsiveResults label="Günlük PDKS kayıtları" mobile={
         <PDKSMobileCardList
           records={rows}
           selectedIds={selectedIds}
           onToggleSelect={toggle}
           onShowDetail={onShowDetail}
         />
-      </div>
-      <div className="hidden md:block">
+      } desktop={
         <table className="w-full table-fixed border-collapse text-xs">
           <caption className="sr-only">
             Günlük PDKS kayıtları. Saatler İstanbul saatidir. Toplam süreden mola düşülmüştür.
@@ -80,16 +80,10 @@ export function PDKSTableView({
           <thead className="sticky top-0 bg-muted">
             <tr className="h-9 border-b">
               <th className="w-9 px-2">
-                <Checkbox
-                  aria-label="Görünen tüm çalışanları seç"
-                  checked={
-                    rows.length > 0 && rows.every((r) => selectedIds.has(r.id))
-                  }
-                  onCheckedChange={(checked) =>
-                    onSelectionChange?.(
-                      checked ? new Set(rows.map((r) => r.id)) : new Set(),
-                    )
-                  }
+                <ListSelectAll
+                  label="Görünen tüm çalışanları seç"
+                  checked={checked}
+                  onChange={selectAll}
                 />
               </th>
               {columns.map((c) => (
@@ -183,7 +177,6 @@ export function PDKSTableView({
             ))}
           </tbody>
         </table>
-      </div>
-    </>
+      } />
   );
 }

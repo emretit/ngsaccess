@@ -1,3 +1,4 @@
+import { SettingsSection } from "@/components/shared/SettingsSection";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -25,9 +26,7 @@ export function WorkingDaysSettings({ projectId }: { projectId: Id<"projects"> }
   if (stored === undefined) return <SectionSkeleton label="Çalışma günleri yükleniyor" />;
   if (stored === null) return null;
   const toggle = (day: string, checked: boolean) => draft.change({ days: WEEKDAY_NAMES.filter(name => name === day ? checked : days.includes(name)) });
-  return <section className="space-y-4">
-    <div><h3 className="text-base font-semibold">Çalışma günleri</h3>
-      <p className="mt-1 text-sm text-muted-foreground">Seçilmeyen günler hafta tatili sayılır; o günkü çalışma hafta tatili çarpanıyla hesaplanır.</p></div>
+  return <SettingsSection title="Çalışma günleri" description="Seçilmeyen günler hafta tatili sayılır; o günkü çalışma hafta tatili çarpanıyla hesaplanır.">
     <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
     <form noValidate className="space-y-4" onSubmit={async event => { event.preventDefault(); setFailed(!await run()); }}>
       <fieldset disabled={pending} className="flex flex-wrap gap-x-6 gap-y-3">
@@ -39,5 +38,5 @@ export function WorkingDaysSettings({ projectId }: { projectId: Id<"projects"> }
       {days.length === 0 && <p role="alert" className="text-sm text-destructive">En az bir çalışma günü seçin.</p>}
       <SettingsSaveBar dirty={draft.dirty} saving={pending} valid={days.length > 0} label="Çalışma günlerini kaydet" onCancel={draft.reset} />
     </form>
-  </section>;
+  </SettingsSection>;
 }

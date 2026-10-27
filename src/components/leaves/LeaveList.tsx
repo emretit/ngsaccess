@@ -1,3 +1,4 @@
+import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RowActions } from "@/components/shared/RowActions";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -56,8 +57,7 @@ export function LeaveList({
   const duration = (row: LeaveRow) =>
     row.calendarDays === null ? "—" : `${row.calendarDays} takvim günü`;
   return (
-    <>
-      <div className="hidden min-w-0 overflow-x-auto rounded-md border md:block">
+    <ResponsiveResults label="İzin kayıtları" desktop={
         <table className="w-full table-fixed text-xs">
           <caption className="sr-only">
             İzin kayıtları, başlangıç tarihi azalan
@@ -100,8 +100,8 @@ export function LeaveList({
             ))}
           </tbody>
         </table>
-      </div>
-      <ul className="divide-y rounded-md border md:hidden">
+      } mobile={
+      <ul className="divide-y">
         {rows.map((row) => (
           <li
             key={row._id}
@@ -123,6 +123,6 @@ export function LeaveList({
           </li>
         ))}
       </ul>
-    </>
+      } />
   );
 }

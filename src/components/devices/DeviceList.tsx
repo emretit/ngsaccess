@@ -15,7 +15,7 @@ import { Smartphone } from "lucide-react";
 import { DeviceBulkActions } from "./DeviceBulkActions";
 import { DeviceDeleteDialog } from "./DeviceDeleteDialog";
 import { useDeviceTable } from "@/hooks/useDeviceTable";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ListSelectAll } from "@/components/shared/ListSelectAll";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -78,6 +78,7 @@ export function DeviceList({
   );
   const {
     selectedDevices,
+    checked,
     showDeleteDialog,
     setShowDeleteDialog,
     handleSelectAll,
@@ -125,22 +126,10 @@ export function DeviceList({
           <TableHeader className="bg-subtle">
             <TableRow>
               <TableHead className="w-9 px-2 md:w-10 md:px-3">
-                <Checkbox
-                  aria-label="Görünen tüm cihazları seç"
-                  className="data-[state=indeterminate]:[&_svg]:hidden data-[state=indeterminate]:before:content-['−'] data-[state=indeterminate]:before:absolute data-[state=indeterminate]:before:inset-0 data-[state=indeterminate]:before:flex data-[state=indeterminate]:before:items-center data-[state=indeterminate]:before:justify-center"
-                  checked={
-                    pageDevices.length > 0 &&
-                    pageDevices.every((device) =>
-                      selectedDevices.includes(device._id),
-                    )
-                      ? true
-                      : selectedDevices.length > 0
-                        ? "indeterminate"
-                        : false
-                  }
-                  onCheckedChange={(checked) =>
-                    handleSelectAll(checked === true)
-                  }
+                <ListSelectAll
+                  label="Görünen tüm cihazları seç"
+                  checked={checked}
+                  onChange={handleSelectAll}
                 />
               </TableHead>
               {showProject && (

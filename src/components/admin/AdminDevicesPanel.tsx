@@ -1,3 +1,4 @@
+import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAdminPrimaryAction } from "./hooks/useAdminPrimaryAction";
 import { useState } from "react";
@@ -224,8 +225,7 @@ function AdminDevicesContent() {
           }}
         />
       ) : (
-        <>
-          <div className="hidden min-w-0 overflow-x-auto rounded-md border min-[761px]:block">
+        <ResponsiveResults label="Cihaz havuzu" desktop={
             <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
@@ -277,10 +277,10 @@ function AdminDevicesContent() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          } mobile={
           <ul
             aria-label="Cihaz havuzu"
-            className="divide-y rounded-md border min-[761px]:hidden"
+            className="divide-y"
           >
             {result.page.map((device) => (
               <li
@@ -308,7 +308,7 @@ function AdminDevicesContent() {
               </li>
             ))}
           </ul>
-        </>
+      } />
       )}
       <AdminPagination
         page={paging.page}

@@ -1,3 +1,4 @@
+import { SettingsSection } from "@/components/shared/SettingsSection";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Link } from "react-router-dom";
 import { useConsentDocumentUpload } from "./hooks/useConsentDocumentUpload";
@@ -104,16 +105,14 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
 
   if (consents === undefined) {
     return (
-      <section className="space-y-3 border-t pt-5">
-        <h3 className="text-base font-semibold">KVKK rızaları</h3>
+      <SettingsSection title="KVKK rızaları" divided>
         <SectionSkeleton rows={2} label="Rızalar yükleniyor" />
-      </section>
+      </SettingsSection>
     );
   }
 
   return (
-    <section className="space-y-3 border-t pt-5">
-      <h3 className="text-base font-semibold">KVKK rızaları</h3>
+    <SettingsSection title="KVKK rızaları" divided>
       <p className="text-xs text-muted-foreground">
         Biyometri yalnız erişim kontrolü içindir; rıza yoksa kayıt eklenemez.
       </p>
@@ -279,6 +278,6 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
             }} />
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }

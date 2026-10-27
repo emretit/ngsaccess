@@ -13,7 +13,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
+import { ConfirmAction } from "@/components/shared/ConfirmAction";
 import { deviceBrandLabel } from "@/lib/deviceBrand";
 import { formatTrDateTime } from "@/lib/date";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -160,7 +160,6 @@ export function ProjectSyncButton({
   const send = useAsyncAction(async () => {
     const result = await start({ projectId });
     setRunId(result.runId);
-    setConfirm(false);
   }, { error: "Cihaz gönderimi başlatılamadı" });
   return (
     <>
@@ -172,25 +171,25 @@ export function ProjectSyncButton({
       >
         Tüm proje cihazlarına gönder
       </Button>
-      <AlertDialog open={confirm} onOpenChange={(open) => { if (!send.pending) setConfirm(open); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Tüm proje cihazlarına gönderilsin mi?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {counts?.total ?? 0} cihaz. Marka dağılımı: {brandDistribution(counts?.brands ?? {})}.
-              {" "}Projedeki tüm cihazlar değerlendirilir; liste filtreleri kapsamı daraltmaz.
-              Aktif kurallar gönderilir, uygun olmayan cihazlar gerekçesiyle atlanır.
-              Hikvision gönderimi teslim kanıtı değildir; IDE cihaz onayı ayrıca izlenir.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={send.pending}>Vazgeç</AlertDialogCancel>
-            <Button disabled={send.pending} onClick={() => { void send.run(); }}>
-              {send.pending ? "Başlatılıyor…" : "Tüm proje cihazlarına gönder"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmAction
+        open={confirm}
+        onOpenChange={(open) => {
+          if (!send.pending) setConfirm(open);
+        }}
+        title="Tüm proje cihazlarına gönderilsin mi?"
+        description={
+          <>
+            {counts?.total ?? 0} cihaz. Marka dağılımı:{" "}
+            {brandDistribution(counts?.brands ?? {})}. Projedeki tüm cihazlar
+            değerlendirilir; liste filtreleri kapsamı daraltmaz. Aktif kurallar
+            gönderilir, uygun olmayan cihazlar gerekçesiyle atlanır. Hikvision
+            gönderimi teslim kanıtı değildir; IDE cihaz onayı ayrıca izlenir.
+          </>
+        }
+        confirmLabel="Tüm proje cihazlarına gönder"
+        pendingLabel="Başlatılıyor…"
+        onConfirm={send.run}
+      />
       <SyncRunSheet runId={runId} onClose={() => setRunId(null)} />
     </>
   );

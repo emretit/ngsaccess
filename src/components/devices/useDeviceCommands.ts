@@ -76,10 +76,11 @@ export function useDeviceCommands(
     onPendingChange?.(pending && !longRunning);
   }, [pending, longRunning, onPendingChange]);
   useEffect(() => () => onPendingChange?.(false), [onPendingChange]);
-  const runConfirmed = async () => {
-    if (!pendingAction) return;
-    if (await execute(pendingAction.id, pendingAction.run))
-      setPendingAction(null);
+  const runConfirmed = async (): Promise<boolean> => {
+    if (!pendingAction) return false;
+    const succeeded = await execute(pendingAction.id, pendingAction.run);
+    if (succeeded) setPendingAction(null);
+    return succeeded;
   };
 
   const handleFetchCapabilities = () =>

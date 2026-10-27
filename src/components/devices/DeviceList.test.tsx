@@ -2,9 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { DeviceList } from "./DeviceList";
+import { listSelectionChecked } from "@/hooks/useListSelection";
 const mocks = vi.hoisted(() => ({ selected: [] as Id<"devices">[] }));
 vi.mock("@/hooks/useDeviceTable", () => ({
-  useDeviceTable: () => ({
+  useDeviceTable: (devices: readonly { _id: Id<"devices"> }[]) => ({
+    checked: listSelectionChecked(devices.map(device => device._id), new Set(mocks.selected)),
     selectedDevices: mocks.selected,
     showDeleteDialog: false,
     setShowDeleteDialog: vi.fn(),
@@ -43,7 +45,7 @@ describe("cihaz listesi toplu seçim şeridi", () => {
       'class="h-[88px] overflow-auto border-b border-line sm:h-[53px]"',
     );
     expect(partialSelection).toContain('aria-checked="mixed"');
-    expect(partialSelection).toContain("before:content-[&#x27;−&#x27;]");
+    expect(partialSelection).toContain("data-[state=indeterminate]:before:h-0.5");
     expect(partialSelection).toContain("Seçilenleri sil");
   });
   it("boş sonuçta anlamsız 0–0 gösterimini kaldırır", () => {

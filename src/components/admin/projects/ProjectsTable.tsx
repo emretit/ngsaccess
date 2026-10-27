@@ -1,3 +1,4 @@
+import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import {
   Table,
   TableBody,
@@ -43,8 +44,7 @@ export function ProjectsTable({
   const members = (project: Project) =>
     `${project.memberCount}${project.memberCountCapped ? "+" : ""}`;
   return (
-    <>
-      <div className="hidden min-w-0 overflow-x-auto rounded-md border min-[761px]:block">
+    <ResponsiveResults label="Projeler" desktop={
         <Table className="table-fixed">
           <TableHeader>
             <TableRow>
@@ -84,10 +84,10 @@ export function ProjectsTable({
             ))}
           </TableBody>
         </Table>
-      </div>
+      } mobile={
       <ul
         aria-label="Projeler"
-        className="divide-y rounded-md border min-[761px]:hidden"
+        className="divide-y"
       >
         {projects.map((project) => (
           <li
@@ -114,6 +114,6 @@ export function ProjectsTable({
           </li>
         ))}
       </ul>
-    </>
+      } />
   );
 }

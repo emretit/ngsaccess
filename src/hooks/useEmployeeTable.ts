@@ -1,3 +1,4 @@
+import { useListSelection } from "@/hooks/useListSelection";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
@@ -39,27 +40,14 @@ export function useEmployeeTable(employees: Employee[]) {
     setSelectedDepartment("");
   });
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedEmployees(employees.map((emp) => emp._id));
-    } else {
-      setSelectedEmployees([]);
-    }
-  };
-
-  const handleSelectEmployee = (
-    checked: boolean,
-    employeeId: Id<"employees">,
-  ) => {
-    if (checked) {
-      setSelectedEmployees((current) =>
-        current.includes(employeeId) ? current : [...current, employeeId],
-      );
-    } else {
-      setSelectedEmployees((current) =>
-        current.filter((id) => id !== employeeId),
-      );
-    }
+  const selectionActions = useListSelection({
+    visibleIds: employees.map(employee => employee._id),
+    selected: new Set(selectedEmployees),
+    onChange: next => setSelectedEmployees([...next]),
+  });
+  const handleSelectAll = selectionActions.selectAll;
+  const handleSelectEmployee = (checked: boolean, employeeId: Id<"employees">) => {
+    if (checked !== selectedEmployees.includes(employeeId)) selectionActions.toggle(employeeId);
   };
 
   const handleBulkDelete = async () => {

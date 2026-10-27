@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Visitor, VisitorDetail } from "@/types/visitor";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { DetailSheet } from "@/components/shared/DetailSheet";
 import { Button } from "@/components/ui/button";
 import { RowActions } from "@/components/shared/RowActions";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -28,17 +28,20 @@ export default function VisitorSlideOverPanel({ isOpen, onClose, visitor, onSave
   const guard = useUnsavedChangesGuard(formState.dirty);
   const close = () => { if (!formState.pending) guard.requestClose(onClose); };
   const onFormState = useCallback((dirty: boolean, pending: boolean) => setFormState({ dirty, pending }), []);
-  return <><Sheet open={isOpen} onOpenChange={open => { if (!open) close(); }}>
-    <SheetContent size="md" className="flex h-dvh max-w-full [overflow-wrap:anywhere] flex-col gap-0 p-0 sm:max-w-[520px] md:max-w-[520px]">
-      <SheetHeader className="shrink-0 border-b p-5 pr-14 text-left"><SheetTitle>{visitor ? `${visitor.firstName} ${visitor.lastName}` : "Ziyaretçi kaydet"}</SheetTitle><SheetDescription>Seçili projenin geçici erişim kaydı</SheetDescription></SheetHeader>
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <QuerySectionBoundary title={visitor ? "Ziyaret ayrıntısı yüklenemedi" : "Form bilgileri yüklenemedi"} resetKey={visitor?._id ?? "new"}>
-          {visitor ? <VisitorDetailContent visitor={visitor} now={now} canManage={canManage} onClose={close} onSaved={onClose} onFormState={onFormState} /> :
-            <VisitorForm onClose={close} onSave={onSave} onStateChange={onFormState} />}
-        </QuerySectionBoundary>
-      </div>
-    </SheetContent>
-  </Sheet>{guard.dialog}</>;
+  return <><DetailSheet open={isOpen} onRequestClose={close} pending={formState.pending}
+    title={visitor ? `${visitor.firstName} ${visitor.lastName}` : "Ziyaretçi kaydet"}
+    description="Seçili projenin geçici erişim kaydı"
+    contentProps={{ className: "h-dvh max-w-full [overflow-wrap:anywhere] sm:max-w-[520px] md:max-w-[520px]" }}
+    headerClassName="border-b pr-14 text-left"
+    bodyClassName="flex flex-col overflow-hidden"
+  >
+    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+      <QuerySectionBoundary title={visitor ? "Ziyaret ayrıntısı yüklenemedi" : "Form bilgileri yüklenemedi"} resetKey={visitor?._id ?? "new"}>
+        {visitor ? <VisitorDetailContent visitor={visitor} now={now} canManage={canManage} onClose={close} onSaved={onClose} onFormState={onFormState} /> :
+          <VisitorForm onClose={close} onSave={onSave} onStateChange={onFormState} />}
+      </QuerySectionBoundary>
+    </div>
+  </DetailSheet>{guard.dialog}</>;
 }
 
 function VisitorDetailContent({ visitor, now, canManage, onClose, onSaved, onFormState }: {

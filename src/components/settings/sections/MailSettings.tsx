@@ -1,3 +1,4 @@
+import { SettingsSection } from "@/components/shared/SettingsSection";
 import { useState } from "react";
 import { z } from "zod";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -165,8 +166,7 @@ function TestMail({ projectId }: { projectId: Id<"projects"> }) {
     setResult(null);
     setResult(await sendTest({ projectId, to: to.trim() || undefined }));
   }, { error: "Test maili gönderilemedi" });
-  return <section className="space-y-3 border-t pt-4">
-    <h3 className="text-sm font-semibold">Bağlantıyı test et</h3>
+  return <SettingsSection title="Bağlantıyı test et" density="compact" divided>
     <form className="flex flex-wrap items-end gap-3" noValidate onSubmit={event => { event.preventDefault(); void action.run(); }}>
       <FormFieldWrapper className="min-w-0 flex-1" htmlFor="mail-test-to" label="Test alıcısı" hint="Boş bırakırsanız kendi hesabınızın e-postasına gider.">
         <Input type="email" value={to} disabled={action.pending} onChange={event => setTo(event.target.value)} />
@@ -176,5 +176,5 @@ function TestMail({ projectId }: { projectId: Id<"projects"> }) {
     {result && <p role={result.ok ? "status" : "alert"} className={`text-sm break-words ${result.ok ? "text-muted-foreground" : "text-destructive"}`}>
       {result.ok ? `Test maili ${result.to} adresine gönderildi. Gelen kutusunu (ve spam klasörünü) kontrol edin.` : result.error}
     </p>}
-  </section>;
+  </SettingsSection>;
 }

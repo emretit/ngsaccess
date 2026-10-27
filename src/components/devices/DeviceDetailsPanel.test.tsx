@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   admin: true,
   effects: [] as (() => void | (() => void))[],
   navigation: vi.fn(),
+  titleRef: undefined as undefined | { current: unknown },
+  contentRef: undefined as undefined | { current: unknown },
   autoFocus: undefined as undefined | ((event: { preventDefault: () => void }) => void),
   formDisabled: false,
   formSuccess: undefined as undefined | (() => void),
@@ -77,12 +79,16 @@ vi.mock("@/components/ui/sheet", () => {
       mocks.sheetChange = onOpenChange;
       return <div>{children}</div>;
     },
-    SheetContent: ({ children, onOpenAutoFocus }: { children?: ReactNode; onOpenAutoFocus: typeof mocks.autoFocus }) => {
+    SheetContent: ({ children, onOpenAutoFocus, ref }: { children?: ReactNode; onOpenAutoFocus: typeof mocks.autoFocus; ref?: { current: unknown } }) => {
+      mocks.contentRef = ref;
       mocks.autoFocus = onOpenAutoFocus;
       return <div>{children}</div>;
     },
     SheetHeader: Part,
-    SheetTitle: Part,
+    SheetTitle: ({ children, ref }: { children?: ReactNode; ref?: { current: unknown } }) => {
+      mocks.titleRef = ref;
+      return <h2>{children}</h2>;
+    },
     SheetDescription: Part,
   };
 });
@@ -265,7 +271,7 @@ it("kapanışta skip olan proje sorgusu formu iskelete dönüştürmez", () => {
 it("edit açılışında başlığa, marka seçiminden sonra ada odaklanır", () => {
   render();
   const titleFocus = vi.fn();
-  mocks.refs[0].current = { focus: titleFocus };
+  if (mocks.titleRef) mocks.titleRef.current = { focus: titleFocus };
   const preventDefault = vi.fn();
   mocks.autoFocus?.({ preventDefault });
   expect(preventDefault).toHaveBeenCalledOnce();
@@ -276,7 +282,7 @@ it("edit açılışında başlığa, marka seçiminden sonra ada odaklanır", ()
   render(false, true, null);
   const focus = vi.fn();
   const querySelector = vi.fn(() => ({ focus }));
-  mocks.refs[1].current = { querySelector };
+  if (mocks.contentRef) mocks.contentRef.current = { querySelector };
   mocks.effects[mocks.effects.length - 1]?.();
   expect(querySelector).toHaveBeenCalledWith('[data-device-brand="hikvision"] input[name="name"]');
   expect(focus).toHaveBeenCalledOnce();
@@ -286,8 +292,7 @@ it("dirty/pending olduğunda router guard kurar; pending iken onay yolu ilerleme
   mocks.formState?.("other", true, false);
   mocks.effects = [];
   render();
-  // Açılış/reset ve proje etkilerini çalıştırmadan navigation effect'ini çalıştır.
-  mocks.effects[mocks.effects.length - 2]?.();
+  mocks.effects.forEach(effect => effect());
   expect(mocks.navigation).toHaveBeenCalledWith(navigator, expect.any(Function), window, false);
   const request = mocks.navigation.mock.calls[mocks.navigation.mock.calls.length - 1]?.[1] as (proceed: () => void) => void;
   const proceed = vi.fn();
@@ -297,7 +302,7 @@ it("dirty/pending olduğunda router guard kurar; pending iken onay yolu ilerleme
   mocks.formState?.("other", false, true);
   mocks.effects = [];
   render();
-  mocks.effects[mocks.effects.length - 2]?.();
+  mocks.effects.forEach(effect => effect());
   expect(mocks.navigation).toHaveBeenLastCalledWith(navigator, expect.any(Function), window, true);
   mocks.requestClose.mockClear();
   const blocked = mocks.navigation.mock.calls[mocks.navigation.mock.calls.length - 1]?.[1] as (proceed: () => void) => void;

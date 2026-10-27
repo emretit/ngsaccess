@@ -1,7 +1,7 @@
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormDialog } from "@/components/shared/FormDialog";
 import { FormActions } from "@/components/shared/FormActions";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import {
@@ -14,7 +14,7 @@ import {
 import { notify } from "@/lib/notify";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { ServerDevice } from '@/types/device';
+import { ServerDevice } from "@/types/device";
 
 interface AssignLocationFormProps {
   open: boolean;
@@ -29,15 +29,15 @@ export function AssignLocationForm({
   onClose,
   onSubmit,
   deviceName,
-  device
+  device,
 }: AssignLocationFormProps) {
-  const isPanel = device?.brand === "ide_smart" || device?.brand === "hikvision";
+  const isPanel =
+    device?.brand === "ide_smart" || device?.brand === "hikvision";
   const { zones, doors, loading } = useZonesAndDoors();
   const [attempted, setAttempted] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string>("");
   const [selectedDoorId, setSelectedDoorId] = useState<string>("");
   const [filteredDoors, setFilteredDoors] = useState<typeof doors>([]);
-
 
   useEffect(() => {
     if (open) setAttempted(false);
@@ -61,10 +61,17 @@ export function AssignLocationForm({
 
   useEffect(() => {
     if (selectedZoneId && doors.length > 0) {
-      const filtered = doors.filter(door => door.zoneId === selectedZoneId && (!door.deviceId || door.deviceId === device?._id));
+      const filtered = doors.filter(
+        (door) =>
+          door.zoneId === selectedZoneId &&
+          (!door.deviceId || door.deviceId === device?._id),
+      );
       setFilteredDoors(filtered);
 
-      if (selectedDoorId && !filtered.some(door => door._id === selectedDoorId)) {
+      if (
+        selectedDoorId &&
+        !filtered.some((door) => door._id === selectedDoorId)
+      ) {
         setSelectedDoorId("");
       }
     } else {
@@ -77,32 +84,67 @@ export function AssignLocationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedZoneId, doors]);
 
-  const { run: assign, pending: isSubmitting } = useAsyncAction(async () => {
-    if (!selectedZoneId || (!isPanel && !selectedDoorId)) throw new Error("Lütfen bölge ve kapı seçin");
-    await onSubmit(selectedZoneId, selectedDoorId);
-    notify.success(`${deviceName} cihazının konumu güncellendi.`);
-  }, { error: "Konum atanamadı" });
-  const guard = useUnsavedChangesGuard(open && (selectedZoneId !== (device?.zoneId ?? "") || selectedDoorId !== (device?.doorId ?? "")));
-  const close = () => { if (!isSubmitting) guard.requestClose(onClose); };
+  const { run: assign, pending: isSubmitting } = useAsyncAction(
+    async () => {
+      if (!selectedZoneId || (!isPanel && !selectedDoorId))
+        throw new Error("Lütfen bölge ve kapı seçin");
+      await onSubmit(selectedZoneId, selectedDoorId);
+      notify.success(`${deviceName} cihazının konumu güncellendi.`);
+    },
+    { error: "Konum atanamadı" },
+  );
+  const guard = useUnsavedChangesGuard(
+    open &&
+      (selectedZoneId !== (device?.zoneId ?? "") ||
+        selectedDoorId !== (device?.doorId ?? "")),
+  );
+  const close = () => {
+    if (!isSubmitting) guard.requestClose(onClose);
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttempted(true);
-    if (!selectedZoneId || (!isPanel && !selectedDoorId)) { document.getElementById(!selectedZoneId ? "zone" : "door")?.focus(); return; }
+    if (!selectedZoneId || (!isPanel && !selectedDoorId)) {
+      document.getElementById(!selectedZoneId ? "zone" : "door")?.focus();
+      return;
+    }
     if (await assign()) onClose();
   };
 
   return (
     <>
-    <Dialog open={open} onOpenChange={nextOpen => { if (!nextOpen) close(); }}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{deviceName} — Konum Ata</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} noValidate>
-          {attempted && (!selectedZoneId || (!isPanel && !selectedDoorId)) && <p role="alert" className="text-sm text-destructive">Konum atanamadı. Bölge ve uygun kapıyı seçin.</p>}
-          <div className="grid gap-4 py-4">
-            <FormFieldWrapper htmlFor="zone" label="Bölge" className="grid gap-2" error={attempted && !selectedZoneId ? "Bölge seçin." : undefined}>
-              {(control) => (
+      <FormDialog
+        open={open}
+        onRequestClose={close}
+        pending={isSubmitting}
+        title={`${deviceName} — Konum Ata`}
+        size="sm"
+        onSubmit={handleSubmit}
+        footer={
+          <FormActions
+            layout="dialog"
+            isLoading={isSubmitting}
+            onClose={close}
+            cancelLabel="İptal"
+            submitLabel="Konum Ata"
+            busyLabel="Atanıyor..."
+            submitDisabled={loading}
+          />
+        }
+      >
+        {attempted && (!selectedZoneId || (!isPanel && !selectedDoorId)) && (
+          <p role="alert" className="text-sm text-destructive">
+            Konum atanamadı. Bölge ve uygun kapıyı seçin.
+          </p>
+        )}
+        <div className="grid gap-4 py-4">
+          <FormFieldWrapper
+            htmlFor="zone"
+            label="Bölge"
+            className="grid gap-2"
+            error={attempted && !selectedZoneId ? "Bölge seçin." : undefined}
+          >
+            {(control) => (
               <Select
                 value={selectedZoneId}
                 onValueChange={setSelectedZoneId}
@@ -119,34 +161,43 @@ export function AssignLocationForm({
                   ))}
                 </SelectContent>
               </Select>
+            )}
+          </FormFieldWrapper>
+          {isPanel ? (
+            <p className="text-sm text-muted-foreground">
+              Panelin tüm kapıları ve okuyucuları seçilen bölgeye taşınır. Kapı
+              eşlemesi değiştirilmez.
+            </p>
+          ) : (
+            <FormFieldWrapper
+              htmlFor="door"
+              label="Kapı"
+              className="grid gap-2"
+              error={attempted && !selectedDoorId ? "Kapı seçin." : undefined}
+            >
+              {(control) => (
+                <Select
+                  value={selectedDoorId}
+                  onValueChange={setSelectedDoorId}
+                  disabled={!selectedZoneId || loading || isSubmitting}
+                >
+                  <SelectTrigger {...control}>
+                    <SelectValue placeholder="Kapı seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredDoors.map((door) => (
+                      <SelectItem key={door._id} value={door._id}>
+                        {door.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </FormFieldWrapper>
-            {isPanel ? <p className="text-sm text-muted-foreground">Panelin tüm kapıları ve okuyucuları seçilen bölgeye taşınır. Kapı eşlemesi değiştirilmez.</p> : <FormFieldWrapper htmlFor="door" label="Kapı" className="grid gap-2" error={attempted && !selectedDoorId ? "Kapı seçin." : undefined}>
-              {(control) => (
-              <Select
-                value={selectedDoorId}
-                onValueChange={setSelectedDoorId}
-                disabled={!selectedZoneId || loading || isSubmitting}
-              >
-                <SelectTrigger {...control}>
-                  <SelectValue placeholder="Kapı seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredDoors.map((door) => (
-                    <SelectItem key={door._id} value={door._id}>
-                      {door.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              )}
-            </FormFieldWrapper>}
-          </div>
-          <FormActions layout="dialog" isLoading={isSubmitting} onClose={close} cancelLabel="İptal" submitLabel="Konum Ata" busyLabel="Atanıyor..." submitDisabled={loading} />
-        </form>
-      </DialogContent>
-    </Dialog>
-    {guard.dialog}
+          )}
+        </div>
+      </FormDialog>
+      {guard.dialog}
     </>
   );
 }

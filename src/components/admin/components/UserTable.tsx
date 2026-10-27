@@ -1,3 +1,4 @@
+import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import { useState } from "react";
 import { AccountAccessActions, AccountAccessBadges, AccountAccessDialog } from "./AccountAccessActions";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -87,7 +88,7 @@ export function UserTable({
   return (
     <>
       {accessDialog && <AccountAccessDialog user={accessDialog.user} mode={accessDialog.mode} onClose={() => setAccessDialog(null)} />}
-      <div className="hidden min-w-0 overflow-x-auto rounded-md border min-[761px]:block">
+      <ResponsiveResults label="Kullanıcılar" desktop={
         <Table className="table-fixed">
           <TableHeader>
             <TableRow>
@@ -112,10 +113,10 @@ export function UserTable({
             ))}
           </TableBody>
         </Table>
-      </div>
+      } mobile={
       <ul
         aria-label="Kullanıcılar"
-        className="divide-y rounded-md border min-[761px]:hidden"
+        className="divide-y"
       >
         {users.map((user) => (
           <li
@@ -134,6 +135,7 @@ export function UserTable({
           </li>
         ))}
       </ul>
+      } />
     </>
   );
 }

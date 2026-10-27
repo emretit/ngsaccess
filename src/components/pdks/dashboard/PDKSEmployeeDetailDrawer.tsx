@@ -11,13 +11,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+import { DetailSheet } from "@/components/shared/DetailSheet";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -75,23 +69,26 @@ class DetailBoundary extends Component<
 export function PDKSEmployeeDetailDrawer(props: Props) {
   const { projectId } = useActiveProject();
   return (
-    <Sheet open={props.open} onOpenChange={props.onOpenChange}>
-      <SheetContent onCloseAutoFocus={event => restorePdksFocus(event, props.returnFocusTo)} className="flex w-full flex-col overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>Çalışan · gün detayı</SheetTitle>
-          <SheetDescription>
-            Günlük devam bilgileri ve hareketler.
-          </SheetDescription>
-        </SheetHeader>
-        {props.open && props.employeeId && (
-          <DetailBoundary
-            key={`${projectId}:${props.employeeId}:${props.highlightDate}:${props.startDate}:${props.endDate}`}
-          >
-            <Detail {...props} employeeId={props.employeeId} />
-          </DetailBoundary>
-        )}
-      </SheetContent>
-    </Sheet>
+    <DetailSheet
+      open={props.open}
+      onRequestClose={() => props.onOpenChange(false)}
+      scroll="all"
+      bodyClassName="pt-4"
+      title="Çalışan · gün detayı"
+      description="Günlük devam bilgileri ve hareketler."
+      contentProps={{
+        className: "sm:max-w-lg",
+        onCloseAutoFocus: event => restorePdksFocus(event, props.returnFocusTo),
+      }}
+    >
+      {props.open && props.employeeId && (
+        <DetailBoundary
+          key={`${projectId}:${props.employeeId}:${props.highlightDate}:${props.startDate}:${props.endDate}`}
+        >
+          <Detail {...props} employeeId={props.employeeId} />
+        </DetailBoundary>
+      )}
+    </DetailSheet>
   );
 }
 function Detail({
