@@ -9,13 +9,15 @@ import '../../providers/visitor_provider.dart';
 import '../../widgets/visitor/visitor_labels.dart';
 
 class VisitorFormScreen extends StatefulWidget {
-  const VisitorFormScreen({super.key, this.visitor});
+  const VisitorFormScreen({super.key, this.visitor, this.now});
   final Visitor? visitor;
+  final DateTime Function()? now;
   @override
   State<VisitorFormScreen> createState() => _VisitorFormScreenState();
 }
 
-class _VisitorFormScreenState extends State<VisitorFormScreen> {
+class _VisitorFormScreenState extends State<VisitorFormScreen>
+    with WidgetsBindingObserver {
   final _form = GlobalKey<FormState>();
   late final TextEditingController _first, _last, _phone, _purpose, _notes;
   late DateTime _start, _end;
@@ -25,10 +27,14 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
   bool _noticeLoading = true, _reviewed = false, _uncertain = false;
   bool _recoveryPreparing = true;
   VisitorDraft? _pending;
+  bool _timesTouched = false;
+
+  DateTime _now() => (widget.now ?? DateTime.now)();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final visitor = widget.visitor;
     final pending = visitor == null
         ? context.read<VisitorProvider>().pendingCreate
@@ -51,7 +57,7 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
     _start =
         pending?.draft.start.toLocal() ??
         visitor?.visitStart.toLocal() ??
-        DateTime.now();
+        _now();
     _end =
         pending?.draft.end.toLocal() ??
         visitor?.visitEnd.toLocal() ??
@@ -65,6 +71,31 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
     _sessionEpoch = context.read<VisitorProvider>().sessionEpoch;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _prepareCreate();
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshDefaultTimes(_now());
+  }
+
+  void _refreshDefaultTimes(DateTime now) {
+    if (widget.visitor != null ||
+        _pending != null ||
+        _uncertain ||
+        _timesTouched ||
+        !_start.isBefore(now)) {
+      return;
+    }
+    final duration = _end.difference(_start);
+    // Round up so the minute displayed in the form is never before now.
+    final minute = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    final start = minute.isBefore(now)
+        ? minute.add(const Duration(minutes: 1))
+        : minute;
+    setState(() {
+      _start = start;
+      _end = start.add(duration);
     });
   }
 
@@ -105,7 +136,7 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
 
   Future<void> _pickDate(bool start) async {
     final current = start ? _start : _end;
-    final now = DateTime.now();
+    final now = _now();
     final initial = current.isBefore(now.subtract(const Duration(days: 1)))
         ? now
         : current;
@@ -124,6 +155,7 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
     );
     if (!mounted || time == null) return;
     setState(() {
+      _timesTouched = true;
       final value = DateTime(
         day.year,
         day.month,
@@ -150,10 +182,12 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
                 state.createRecoveryError != null))) {
       return;
     }
+    final now = _now();
+    _refreshDefaultTimes(now);
     if (!_uncertain &&
         (_form.currentState?.validate() != true ||
             !_end.isAfter(_start) ||
-            !_end.isAfter(DateTime.now()) ||
+            !_end.isAfter(now) ||
             _end.difference(_start) > const Duration(days: 31) ||
             (notice.available && !_reviewed))) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -527,6 +561,7 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _first.dispose();
     _last.dispose();
     _phone.dispose();
