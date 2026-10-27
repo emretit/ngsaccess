@@ -160,7 +160,6 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
 {
   "reads": [
     "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
-    "["companies",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
     "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
     "["generalSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
     "["holidays",["withIndex","by_project_date"],["eq","projectId","projectId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",

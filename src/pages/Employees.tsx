@@ -59,6 +59,8 @@ function EmployeePage() {
   const [privateQuery, setPrivateQuery] = useState<string | null>(null);
   const q = privateQuery ?? safeSearchParam(params.get("q") ?? "");
   const department = params.get("department") ?? "";
+  const company = params.get("company") ?? "";
+  const position = params.get("position") ?? "";
   const status = ["active", "inactive", "terminated"].includes(params.get("status") ?? "")
     ? (params.get("status") ?? "all")
     : "all";
@@ -88,8 +90,8 @@ function EmployeePage() {
   }, [location.state, location.pathname, location.search, projectId, isLoading, employees, navigate]);
   const previousProject = useRef(projectId);
   const filtered = useMemo(
-    () => filterAndSortEmployees(employees, q, department, status, sort),
-    [employees, q, department, status, sort],
+    () => filterAndSortEmployees(employees, q, department, status, sort, { company, position }),
+    [employees, q, department, status, sort, company, position],
   );
   const page = clampPage(
     Number(params.get("page") ?? 1),
@@ -150,7 +152,7 @@ function EmployeePage() {
     );
   if (!projectId)
     return <EmptyState title="Personelleri görmek için proje seçin." />;
-  const hasFilters = !!q || !!department || status !== "all";
+  const hasFilters = !!q || !!department || !!company || !!position || status !== "all";
   const exportTooLarge = filtered.length > EMPLOYEE_EXPORT_MAX_ROWS;
   const activeCount = employees.filter((employee) => employee.isActive).length;
   const statusCounts = {
@@ -171,8 +173,12 @@ function EmployeePage() {
       />
       <MasterDetailListLayout sidebar={<DepartmentTree
           selectedValue={department}
-          onSelectUnassigned={() => update({ department: "unassigned" })}
-          onSelectDepartment={(id) => update({ department: id ?? "" })}
+          selectedCompany={company}
+          selectedPosition={position}
+          onSelectUnassigned={() => update({ department: "unassigned", company: "" })}
+          onSelectDepartment={(id) => update({ department: id ?? "", company: "" })}
+          onSelectCompany={(id) => update({ company: id, department: "" })}
+          onSelectPosition={(id) => update({ position: id ?? "" })}
         />}>
         <EmployeeFilters
           searchQuery={q}
@@ -189,7 +195,7 @@ function EmployeePage() {
           hideClear={filtered.length === 0}
           onClear={() => {
             setPrivateQuery(null);
-            update({ q: "", department: "", status: "" });
+            update({ q: "", department: "", company: "", position: "", status: "" });
           }}
         />
         {(canManage || canExport) && <div className="flex flex-wrap items-center gap-2">
@@ -207,19 +213,19 @@ function EmployeePage() {
           />
         ) : filtered.length === 0 ? (
           <EmptyState
-            title={q ? "Aramanızla eşleşen personel yok" : department && status === "all" ? "Bu departmanda doğrudan bağlı kişi yok" : "Seçili filtrelerle eşleşen personel yok"}
-            description="Aramayı veya departman seçimini değiştirin."
+            title={q ? "Aramanızla eşleşen personel yok" : department && !position && status === "all" ? "Bu departmanda doğrudan bağlı kişi yok" : company && !position && status === "all" ? "Bu şirkette kişi yok" : "Seçili filtrelerle eşleşen personel yok"}
+            description="Aramayı veya şirket, departman ve pozisyon seçimini değiştirin."
             action={{
-              label: department && !q && status === "all" ? "Tüm personele dön" : "Filtreleri temizle",
+              label: (department || company) && !q && !position && status === "all" ? "Tüm personele dön" : "Filtreleri temizle",
               onClick: () => {
                 setPrivateQuery(null);
-                update({ q: "", department: "", status: "" });
+                update({ q: "", department: "", company: "", position: "", status: "" });
               },
             }}
           />
         ) : (
           <EmployeeTable
-            key={`${projectId}/${q}/${department}/${status}/${sort}/${page}/${size}`}
+            key={`${projectId}/${q}/${department}/${company}/${position}/${status}/${sort}/${page}/${size}`}
             sort={sort}
             onSortChange={(value) => update({ sort: value })}
             showDepartment={!department}

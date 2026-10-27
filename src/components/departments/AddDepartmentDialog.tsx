@@ -12,6 +12,12 @@ interface AddDepartmentDialogProps {
   title?: string;
   successMessage?: string;
   description?: string;
+  /** Aynı ad penceresi pozisyon ve yeniden adlandırma için de kullanılır. */
+  fieldLabel?: string;
+  errorMessage?: string;
+  submitLabel?: string;
+  busyLabel?: string;
+  initialName?: string;
 }
 
 export function AddDepartmentDialog({
@@ -21,16 +27,21 @@ export function AddDepartmentDialog({
   successMessage = "Departman eklendi",
   title = "Yeni Departman Ekle",
   description = "Departmanın adını girin",
+  fieldLabel = "Departman adı",
+  errorMessage = "Departman eklenemedi",
+  submitLabel = "Ekle",
+  busyLabel = "Ekleniyor…",
+  initialName = "",
 }: AddDepartmentDialogProps) {
-  const [departmentName, setDepartmentName] = useState("");
+  const [departmentName, setDepartmentName] = useState(initialName);
   const [nameError, setNameError] = useState<string>();
   const inputId = useId();
   const { run, pending } = useAsyncAction(
     async (name: string) => {
       if ((await onAdd(name)) === false)
-        throw new Error("Departman eklenemedi");
+        throw new Error(errorMessage);
     },
-    { success: successMessage, error: "Departman eklenemedi" },
+    { success: successMessage, error: errorMessage },
   );
   const close = (open: boolean) => {
     if (pending) return;
@@ -51,7 +62,7 @@ export function AddDepartmentDialog({
       onSubmit={async (event) => {
         event.preventDefault();
         if (!departmentName.trim()) {
-          setNameError("Departman adı zorunludur");
+          setNameError(`${fieldLabel} zorunludur`);
           return;
         }
         setNameError(undefined);
@@ -67,14 +78,14 @@ export function AddDepartmentDialog({
           isLoading={pending}
           onClose={() => close(false)}
           cancelLabel="İptal"
-          submitLabel="Ekle"
-          busyLabel="Ekleniyor…"
+          submitLabel={submitLabel}
+          busyLabel={busyLabel}
         />
       }
     >
       <FormFieldWrapper
         htmlFor={inputId}
-        label="Departman adı"
+        label={fieldLabel}
         error={nameError}
       >
         <Input

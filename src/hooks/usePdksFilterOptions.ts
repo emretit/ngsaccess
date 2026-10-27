@@ -3,7 +3,7 @@ import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 export function usePdksFilterOptions() {
   const { projectId } = useActiveProject();
-  const departments = useQuery(
+  const departmentRows = useQuery(
     api.departments.list,
     projectId ? { projectId } : "skip",
   );
@@ -11,11 +11,13 @@ export function usePdksFilterOptions() {
     api.companies.list,
     projectId ? { projectId } : "skip",
   );
-  const allPositions = useQuery(api.positions.list, projectId ? {} : "skip");
-  // Positions has no project argument; narrow its authorized catalog locally.
-  const positions = allPositions?.filter(
-    (position) => position.projectId === projectId,
-  );
+  const positions = useQuery(api.positions.list, projectId ? { projectId } : "skip");
   const shifts = useQuery(api.shifts.list, projectId ? { projectId } : "skip");
+  // Aynı departman adı birden çok şirkette olabilir: seçenekte şirket adı öne eklenir.
+  const companyNames = new Map((companies ?? []).map((company) => [company._id, company.name]));
+  const departments = departmentRows?.map((department) => {
+    const companyName = department.companyId && companyNames.get(department.companyId);
+    return companyName ? { ...department, name: `${companyName} / ${department.name}` } : department;
+  });
   return { departments, companies, positions, shifts };
 }

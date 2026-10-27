@@ -6,7 +6,7 @@ import { scheduleFingerprintPurge, scheduleEmployeeCardChange } from "./lib/empl
 import { canSeePayInProject, maskPay } from "./lib/payVisibility";
 import { claimEmployeePhoto } from "./lib/peoplePhoto";
 import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
-import { employeeRelationsToValidate, validateEmployeeRelations } from "./lib/peopleRelations";
+import { employeeCompanyForDepartment, employeeRelationsToValidate, validateEmployeeRelations } from "./lib/peopleRelations";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { assertSameProject, validatePay, employeeDependentTables, assertEmployeeBulkDeleteLimit } from "./lib/employeeUx";
@@ -244,10 +244,12 @@ export const create = authedMutation({
     if (args.photoUrl && !args.photoStorageId) throw new Error("Fotoğrafı yeniden yükleyin");
     const photo = args.photoStorageId ? await claimEmployeePhoto(ctx, args.photoStorageId, ctx.user._id) : {};
     await validateEmployeeRelations(ctx, args);
+    const companyId = await employeeCompanyForDepartment(ctx, args.departmentId, args.companyId, args.companyId !== undefined);
     validatePay(args.hourlyRate, args.monthlySalary);
     const now = new Date().toISOString();
     const id = await ctx.db.insert("employees", {
       ...args,
+      companyId,
       email: normalizeEmployeeEmail(args.email) ?? "",
       ...photo,
       accessStartsAt: normalizeEmployeeAccessStart(args.accessStartsAt),
@@ -357,6 +359,11 @@ export const update = authedMutation({
         ? { photoUrl: undefined, photoStorageId: undefined }
         : {};
     await validateEmployeeRelations(ctx, employeeRelationsToValidate(emp, toPatch(updates)));
+    if (updates.departmentId !== undefined || updates.companyId !== undefined) {
+      const departmentId = updates.departmentId === undefined ? emp.departmentId : updates.departmentId;
+      const companyId = updates.companyId === undefined ? emp.companyId : updates.companyId;
+      updates.companyId = await employeeCompanyForDepartment(ctx, departmentId, companyId, updates.companyId !== undefined) ?? null;
+    }
     validatePay(updates.hourlyRate, updates.monthlySalary);
     const previousHikSnapshot = updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber
       ? await snapshotEmployeeHikDevices(ctx, emp) : undefined;

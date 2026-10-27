@@ -9,6 +9,7 @@ export interface Department {
   name: string;
   projectId?: Id<"projects">;
   parentId?: Id<"departments"> | null;
+  companyId?: Id<"companies">;
   level?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -36,6 +37,7 @@ export function useDepartments() {
   const addDepartment = async (
     name: string,
     parentId: Id<"departments"> | null = null,
+    companyId: Id<"companies"> | null = null,
   ) => {
     if (!name.trim()) throw new Error("Departman adı zorunludur");
     if (!projectId) throw new Error("Departman eklemek için proje seçin");
@@ -46,8 +48,17 @@ export function useDepartments() {
       name: name.trim(),
       projectId,
       parentId: parentId ?? undefined,
+      companyId: companyId ?? undefined,
       level: parentDept ? (parentDept.level ?? 0) + 1 : 0,
     });
+    return true;
+  };
+  const setCompany = useMutation(api.departments.setCompany);
+  const moveDepartmentToCompany = async (
+    departmentId: Id<"departments">,
+    companyId: Id<"companies"> | null,
+  ) => {
+    await setCompany({ departmentId, companyId });
     return true;
   };
 
@@ -64,6 +75,7 @@ export function useDepartments() {
     addDepartment,
     renameDepartment,
     deleteDepartment,
+    moveDepartmentToCompany,
     fetchDepartments: () => {},
   };
 }

@@ -13,6 +13,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 interface Option {
   id: string;
   name: string;
+  /** Departman seçeneklerinde: departmanın şirketi. */
+  companyId?: string;
 }
 interface Props {
   canViewPay?: boolean;
@@ -109,6 +111,26 @@ export default function EmployeeFormFields({
     </FormFieldWrapper>
     );
   };
+  // Şirket seçiliyse yalnız o şirketin ve şirketsiz departmanlar listelenir.
+  const companyDepartments = formData.companyId
+    ? departments.filter((department) => !department.companyId || department.companyId === formData.companyId)
+    : departments;
+  const changeSelect = (key: "companyId" | "departmentId" | "positionId" | "accessRuleId", raw: string) => {
+    const value = raw || null;
+    if (key === "departmentId") {
+      // Şirkete bağlı departman kişinin şirketini de belirler.
+      const companyId = departments.find((department) => department.id === value)?.companyId;
+      setFormData({ ...formData, departmentId: value as EmployeeFormData["departmentId"], ...(companyId ? { companyId: companyId as EmployeeFormData["companyId"] } : {}) });
+      return;
+    }
+    if (key === "companyId") {
+      const departmentCompany = departments.find((department) => department.id === formData.departmentId)?.companyId;
+      const keepDepartment = !departmentCompany || departmentCompany === value;
+      setFormData({ ...formData, companyId: value as EmployeeFormData["companyId"], ...(keepDepartment ? {} : { departmentId: null }) });
+      return;
+    }
+    update(key, value as EmployeeFormData[typeof key]);
+  };
   const select = (
     key: "companyId" | "departmentId" | "positionId" | "accessRuleId",
     label: string,
@@ -126,9 +148,7 @@ export default function EmployeeFormFields({
           key === "accessRuleId" && !canManageAccessRules && "employee-accessRuleId-permission",
         ].filter(Boolean).join(" ") || undefined}
         value={formData[key] ?? ""}
-        onChange={(e) =>
-          update(key, (e.target.value || null) as EmployeeFormData[typeof key])
-        }
+        onChange={(e) => changeSelect(key, e.target.value)}
       >
         <option value="">
           {key === "accessRuleId" ? (isEditing ? "Ek kural seçilmedi" : "Kural eklenmesin") : "Atanmamış"}
@@ -195,7 +215,7 @@ export default function EmployeeFormFields({
           )}
           <div className="grid gap-x-4 gap-y-3 sm:grid-cols-3">
             {select("companyId", "Şirket", companies)}
-            {select("departmentId", "Departman", departments)}
+            {select("departmentId", "Departman", companyDepartments)}
             {select("positionId", "Pozisyon", positions)}
           </div>
           <DepartmentShiftWarning isEditing={isEditing} originalDepartmentId={originalDepartmentId} departmentId={formData.departmentId} />

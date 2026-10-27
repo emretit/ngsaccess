@@ -4,6 +4,7 @@ export interface Department {
   _id: Id<"departments">;
   name: string;
   parentId?: Id<"departments"> | null;
+  companyId?: Id<"companies">;
   level?: number;
   projectId?: Id<"projects">;
   createdAt?: string;

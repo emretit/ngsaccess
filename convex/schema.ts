@@ -156,6 +156,8 @@ export default defineSchema({
     .index("by_tc", ["tcNo"])
     .index("by_visitor", ["isVisitor"])
     .index("by_department", ["departmentId"])
+    .index("by_company", ["companyId"])
+    .index("by_position", ["positionId"])
     .index("by_photo_storage", ["photoStorageId"])
     .index("by_project_visitor", ["projectId", "isVisitor"])
     .index("by_project_host_visitor", ["projectId", "hostEmployeeId", "isVisitor"])
@@ -239,12 +241,15 @@ export default defineSchema({
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     parentId: v.optional(v.id("departments")),
+    // Departmanın şirketi (şube). Alt departmanlar üstünün şirketini taşır; boşsa şirketsiz.
+    companyId: v.optional(v.id("companies")),
     level: v.optional(v.number()),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
-    .index("by_parent", ["parentId"]),
+    .index("by_parent", ["parentId"])
+    .index("by_company", ["companyId"]),
 
   // ═══════ 3 · ERİŞİM TOPOLOJİSİ · BÖLGE / KAPI / OKUYUCU / CİHAZ ═════════
   zones: defineTable({

@@ -57,9 +57,14 @@ export const importChunk = authedMutation({
         if (!found) errors.push(`${label} bu projede bulunamadı`);
         return found;
       };
-      const department = relation(departments, row.department, "Departman");
-      const position = relation(positions, row.position, "Pozisyon");
       const company = relation(companies, row.company, "Firma");
+      // Aynı departman adı farklı şirketlerde olabilir: Firma doluysa o şirketin (veya şirketsiz) departmanı aranır.
+      const departmentChoices = company ? departments.filter(item => !item.companyId || item.companyId === company._id) : departments;
+      const departmentKey = row.department?.trim() ? normalizeEmployeeImportName(row.department) : undefined;
+      const departmentMatches = departmentKey ? departmentChoices.filter(item => normalizeEmployeeImportName(item.name) === departmentKey) : [];
+      if (departmentMatches.length > 1) errors.push("Departman adı birden çok şirkette var; Firma sütununu doldurun");
+      const department = departmentMatches.length > 1 ? undefined : relation(departmentChoices, row.department, "Departman");
+      const position = relation(positions, row.position, "Pozisyon");
       if (errors.length) { results.push({ rowNumber: row.rowNumber, status: "error", message: errors.join("; ") }); continue; }
       let duplicateMessage: string | undefined;
       const email = normalizeEmployeeEmail(row.email) ?? "";
@@ -92,7 +97,7 @@ export const importChunk = authedMutation({
         tcNo: row.tcNo?.trim() || undefined, payrollCode: row.payrollCode?.trim() || undefined, cardNumber: row.cardNumber.trim(),
         departmentId: department?._id,
         positionId: position?._id,
-        companyId: company?._id,
+        companyId: company?._id ?? department?.companyId,
         isActive: row.isActive ?? true, createdAt: now, updatedAt: now,
       });
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });

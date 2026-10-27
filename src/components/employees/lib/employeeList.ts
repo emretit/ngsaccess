@@ -15,6 +15,7 @@ export function filterAndSortEmployees(
   department: string,
   status: string,
   sort: string,
+  org: { company?: string; position?: string } = {},
 ) {
   const query = q.trim().toLocaleLowerCase("tr");
   const [key, direction] = sort.split(":");
@@ -41,6 +42,8 @@ export function filterAndSortEmployees(
           (department === "unassigned"
             ? !employee.departmentId
             : employee.departmentId === department)) &&
+        (!org.company || employee.companyId === org.company) &&
+        (!org.position || employee.positionId === org.position) &&
         (status === "all" ||
           (status === "terminated" ? !!employee.employmentEndDate : status === "active" ? !!employee.isActive : !employee.isActive && !employee.employmentEndDate)) &&
         (!query ||

@@ -1,5 +1,6 @@
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { ConvexError } from "convex/values";
 import { assertPeopleProject } from "./peopleScope";
 
 type EmployeeRelations = {
@@ -38,4 +39,22 @@ export async function validateEmployeeRelations(ctx: MutationCtx, employee: Empl
     if (!related) throw new Error(`${label}: bağlı kayıt bulunamadı`);
     assertPeopleProject(employee.projectId, related.projectId, label);
   }
+}
+
+/**
+ * Şirkete bağlı departman kişinin şirketini belirler: açıkça başka şirket seçildiyse reddedilir,
+ * seçilmediyse departmanın şirketi döner. Şirketsiz departmanda seçim olduğu gibi kalır.
+ */
+export async function employeeCompanyForDepartment(
+  ctx: MutationCtx,
+  departmentId: Id<"departments"> | null | undefined,
+  companyId: Id<"companies"> | null | undefined,
+  companyChosen: boolean,
+): Promise<Id<"companies"> | undefined> {
+  const department = departmentId ? await ctx.db.get(departmentId) : null;
+  if (!department?.companyId) return companyId ?? undefined;
+  if (companyChosen && companyId && companyId !== department.companyId) {
+    throw new ConvexError("Seçilen departman başka şirkete ait; önce departmanı değiştirin");
+  }
+  return department.companyId;
 }

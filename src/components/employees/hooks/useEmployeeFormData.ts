@@ -96,7 +96,10 @@ export const useEmployeeFormData = (employee?: Employee | null, { saving = false
     api.accessRules.listMemberships,
     defaultProjectId && can("employees.manage") ? { projectId: defaultProjectId } : "skip",
   );
-  const positionsData = useQuery(api.positions.list);
+  const positionsData = useQuery(
+    api.positions.list,
+    defaultProjectId ? { projectId: defaultProjectId } : "skip",
+  );
 
   const optionsLoading =
     departmentsData === undefined ||
@@ -107,6 +110,7 @@ export const useEmployeeFormData = (employee?: Employee | null, { saving = false
   const departments = (departmentsData ?? []).map((d) => ({
     id: d._id,
     name: departmentPath(d._id, departmentsData ?? []),
+    companyId: d.companyId,
   }));
   const companies = (companiesData ?? []).map(
     (c: { _id: string; name: string }) => ({ id: c._id, name: c.name }),
@@ -115,7 +119,6 @@ export const useEmployeeFormData = (employee?: Employee | null, { saving = false
     .filter((r: { isActive?: boolean }) => r.isActive !== false)
     .map((r: { _id: string; name: string }) => ({ id: r._id, name: r.name }));
   const positions = (positionsData ?? [])
-    .filter((p) => p.projectId === defaultProjectId)
     .map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
 
   const incoming = JSON.stringify(employeeFormValues(employee, defaultProjectId));

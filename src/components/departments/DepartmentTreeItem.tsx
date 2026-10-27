@@ -15,6 +15,8 @@ interface Props {
   onSelect: (id: Id<"departments">) => void;
   onAddSubDepartment: (id: Id<"departments">) => void;
   onRename?: () => void;
+  /** Yalnız üst seviye departmanda: alt ağacıyla birlikte başka şirkete taşır. */
+  onMoveToCompany?: () => void;
   onDelete: (id: Id<"departments">) => void;
   hasChildren: boolean;
 }
@@ -26,6 +28,7 @@ export function DepartmentTreeItem({
   onAddSubDepartment,
   onDelete,
   onRename,
+  onMoveToCompany,
   hasChildren,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
@@ -75,6 +78,11 @@ export function DepartmentTreeItem({
             >
               Alt departman ekle
             </DropdownMenuItem>
+            {onMoveToCompany && (
+              <DropdownMenuItem onSelect={onMoveToCompany}>
+                Şirkete taşı
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={hasChildren}
               onSelect={() => onDelete(department._id)}

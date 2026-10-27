@@ -38,10 +38,8 @@ export const buildAphbForMonth = authedQuery({
     );
 
     // Aylık bildirimin tüm kayıtları gerekir; sorgular seçili proje/ay ile sınırlıdır.
-    const [company, projectEmployees, generalSettings, projectHolidays, globalHolidays] =
+    const [projectEmployees, generalSettings, projectHolidays, globalHolidays] =
       await Promise.all([
-        ctx.db.query("companies")
-          .withIndex("by_project", (q) => q.eq("projectId", targetProjectId)).first(),
         ctx.db.query("employees")
           .withIndex("by_project", (q) => q.eq("projectId", targetProjectId)).collect(),
         ctx.db.query("generalSettings")
@@ -143,7 +141,8 @@ export const buildAphbForMonth = authedQuery({
       xml: blockedByReview ? "" : buildAphbXml({
         year: args.year,
         month: args.month,
-        companyName: company?.name ?? "Şirket",
+        // Şirketler şube olarak kullanılır; işveren adı Genel Ayarlar'dan gelir.
+        companyName: generalSettings?.companyName || "Şirket",
         employees: entries,
       }),
       filename: `aphb-taslak-resmi-sgk-formati-degildir-${args.year}-${monthStr}.xml`,
