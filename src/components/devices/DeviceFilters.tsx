@@ -6,6 +6,7 @@ interface DeviceFiltersProps {
   /** Sol panelde bölge/kapı seçili mi (temizle düğmesi için). */
   locationActive?: boolean;
   statusCounts: { all: number; online: number; offline: number; never: number };
+  typeCounts: Record<string, number>;
   search: string;
   onSearchChange: (value: string) => void;
   statusFilter: string;
@@ -23,7 +24,7 @@ interface DeviceFiltersProps {
   filteredCount: number;
 }
 
-export function DeviceFilters({ onClearFilters, locationActive, statusCounts,
+export function DeviceFilters({ onClearFilters, locationActive, statusCounts, typeCounts,
   filteredCount, search, onSearchChange, statusFilter, onStatusFilterChange, typeFilter, onTypeFilterChange, deviceTypes }: DeviceFiltersProps) {
   return <div className={filteredCount === 0 ? "[&_[role=search]>button:last-child]:hidden" : undefined}><FilterBar search={search} onSearchChange={onSearchChange}
     searchLabel="Cihaz adı, seri numarası veya UUID ile ara" placeholder="Ad, seri no veya UUID ara…"
@@ -39,8 +40,8 @@ export function DeviceFilters({ onClearFilters, locationActive, statusCounts,
     </Select>
     <Select value={typeFilter} onValueChange={onTypeFilterChange}>
       <SelectTrigger aria-label="Cihaz tipi filtresi" className="w-auto max-w-full min-w-28"><span className="mr-1">Tip:</span><SelectValue /></SelectTrigger>
-      <SelectContent><SelectItem value="all">Tümü</SelectItem>
-        {deviceTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+      <SelectContent><SelectItem value="all">Tümü ({statusCounts.all})</SelectItem>
+        {deviceTypes.map(type => <SelectItem key={type} value={type}>{type} ({typeCounts[type] ?? 0})</SelectItem>)}
       </SelectContent>
     </Select>
   </FilterBar></div>;

@@ -46,11 +46,11 @@ vi.mock("@/contexts/ActiveProjectContext", () => ({
   useActiveProject: () => ({ activeProject: { _id: "p" } }),
 }));
 vi.mock("@/hooks/useDeviceFilters", () => ({
-  useDeviceFilters: () => ({
+  useDeviceFilters: (devices: Device[]) => ({
     search: "",
     statusFilter: "all",
     typeFilter: "all",
-    deviceTypes: [],
+    deviceTypes: [...new Set(devices.flatMap(device => device.deviceType ? [device.deviceType] : []))],
     filteredDevices: [],
     clearFilters: vi.fn(),
     setSearch: vi.fn(),
@@ -240,16 +240,18 @@ describe("cihaz audit görünümü", () => {
     expect(html).toContain('aria-label="NGS QR kimlik QR kodu"');
     expect(html).toContain("data-description");
   });
-  it("konum seçiliyken bağlantı sayıları yalnız o konumdaki cihazları sayar", () => {
+  it("konum seçiliyken bağlantı ve tip sayıları yalnız o konumdaki cihazları sayar", () => {
     const html = renderToStaticMarkup(
       <DevicesContent
         devices={[
-          { ...device, zoneId: "z1" as Id<"zones"> },
+          { ...device, zoneId: "z1" as Id<"zones">, deviceType: "Okuyucu" },
+          { ...device, _id: "same-type" as Id<"devices">, zoneId: "z1" as Id<"zones">, deviceType: "okuyucu" },
           {
             ...device,
             _id: "other" as Id<"devices">,
             zoneId: "z2" as Id<"zones">,
             connectionStatus: "online",
+            deviceType: "Turnike",
           },
         ]}
         isLoading={false}
@@ -263,14 +265,18 @@ describe("cihaz audit görünümü", () => {
         onAddFromCloud={noop}
       />,
     );
-    expect(html).toContain("Tümü (1)");
+    expect(html.match(/Tümü \(2\)/g)).toHaveLength(2);
     expect(html).toContain("Çevrimiçi (0)");
-    expect(html).toContain("Çevrimdışı (1)");
+    expect(html).toContain("Çevrimdışı (2)");
+    expect(html).toContain("Okuyucu (2)");
+    expect(html).toContain("okuyucu (2)");
+    expect(html).toContain("Turnike (0)");
   });
   it("boş sonuçta yalnız temizleme düğmesini gizler, seçeneklerin önekini tekrarlamaz", () => {
     const html = renderToStaticMarkup(
       <DeviceFilters
         statusCounts={{ all: 1, online: 0, offline: 1, never: 0 }}
+        typeCounts={{}}
         search="x"
         onSearchChange={noop}
         statusFilter="all"

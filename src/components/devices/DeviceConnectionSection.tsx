@@ -1,7 +1,6 @@
 import { Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { notify } from "@/lib/notify";
 import { deviceLastSignal } from "@/lib/deviceStatus";
 import { deviceDateTime } from "./deviceAdapter";
@@ -10,11 +9,9 @@ import type { DeviceCenterView } from "./deviceCenterView";
 export function DeviceConnectionSection({
   overview,
   adapter,
-  connected,
-  connection,
 }: Pick<
   DeviceCenterView,
-  "overview" | "adapter" | "connected" | "connection"
+  "overview" | "adapter"
 >) {
   const lastSignal = deviceDateTime(deviceLastSignal(overview.device));
   return (
@@ -23,7 +20,6 @@ export function DeviceConnectionSection({
         <div className="space-y-0.5">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-semibold">Bağlantı</h3>
-            <Badge variant="outline">{adapter.label}</Badge>
             <Badge variant="secondary">{adapter.transport}</Badge>
           </div>
           {overview.device.deviceIp && (
@@ -32,21 +28,6 @@ export function DeviceConnectionSection({
             </p>
           )}
         </div>
-        <StatusBadge
-          tone={
-            connected
-              ? "success"
-              : connection === "offline"
-                ? "warning"
-                : "neutral"
-          }
-        >
-          {connected
-            ? "Çevrimiçi"
-            : connection === "never"
-              ? "Henüz bağlanmadı"
-              : "Çevrimdışı"}
-        </StatusBadge>
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-x-3">

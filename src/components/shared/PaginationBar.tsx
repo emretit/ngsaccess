@@ -44,20 +44,26 @@ export function PaginationBar({
   pageSizeLabel = "Sayfadaki kayıt sayısı",
   className,
 }: PaginationBarProps) {
+  const isSinglePage = pageCount !== undefined && pageCount <= 1 && page <= 1;
+  const showPageSize = pageSize !== undefined && pageSizes !== undefined && onPageSizeChange !== undefined
+    && (!isSinglePage || pageSize !== Math.min(...pageSizes));
+
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-3 border-t border-line px-3 py-2 text-xs text-muted-foreground", className)}>
       <span role="status">{summary}</span>
-      <div className="flex flex-wrap items-center gap-2">
-        {pageSize !== undefined && pageSizes && onPageSizeChange && (
+      {(showPageSize || !isSinglePage) && <div className="flex flex-wrap items-center gap-2">
+        {showPageSize && (
           <Select value={String(pageSize)} onValueChange={value => onPageSizeChange(Number(value))}>
             <SelectTrigger aria-label={pageSizeLabel} className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>{pageSizes.map(size => <SelectItem key={size} value={String(size)}>{size} / sayfa</SelectItem>)}</SelectContent>
           </Select>
         )}
-        <Button variant="outline" size="sm" disabled={previousDisabled} onClick={onPrevious}>Önceki</Button>
-        <span className="tabular-nums">{pageCount === undefined ? page : `${page} / ${pageCount}`}</span>
-        <Button variant="outline" size="sm" disabled={nextDisabled} onClick={onNext}>{nextLabel}</Button>
-      </div>
+        {!isSinglePage && <>
+          <Button variant="outline" size="sm" disabled={previousDisabled} onClick={onPrevious}>Önceki</Button>
+          <span className="tabular-nums">{pageCount === undefined ? page : `${page} / ${pageCount}`}</span>
+          <Button variant="outline" size="sm" disabled={nextDisabled} onClick={onNext}>{nextLabel}</Button>
+        </>}
+      </div>}
     </div>
   );
 }

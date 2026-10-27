@@ -73,6 +73,12 @@ export function DevicesContent({
       doorId: selectedDoorId,
     }),
   );
+  const typeCounts = Object.fromEntries(deviceTypes.map((type) => [
+    type,
+    locationDevices.filter((device) =>
+      device.deviceType?.toLocaleLowerCase("tr-TR") === type.toLocaleLowerCase("tr-TR"),
+    ).length,
+  ]));
 
   return (
     <div className="min-w-0 space-y-5">
@@ -85,6 +91,7 @@ export function DevicesContent({
         <DeviceFilters
           onClearFilters={clearFilters}
           locationActive={Boolean(selectedZoneId || selectedDoorId)}
+          typeCounts={typeCounts}
           statusCounts={{
             all: locationDevices.length,
             online: locationDevices.filter(

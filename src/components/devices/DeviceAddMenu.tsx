@@ -42,7 +42,7 @@ export function DeviceAddMenu({ onAddNew, onAddFromCloud, onAddVirtualReader }: 
           <Cloud className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="flex flex-col">
             <span className="text-sm font-medium">Havuzdan ata</span>
-            <span className="text-xs text-muted-foreground">Havuzdan projeye ata</span>
+            <span className="text-xs text-muted-foreground">Sistemde kayıtlı cihazı bu projeye bağla</span>
           </div>
         </DropdownMenuItem>
         {onAddVirtualReader && (

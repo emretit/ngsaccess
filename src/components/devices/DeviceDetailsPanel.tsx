@@ -131,7 +131,7 @@ export function DeviceDetailsPanel({
         size="lg"
         focusTitleOnOpen={Boolean(deviceId)}
         contentProps={{ ref: contentRef, className: "max-sm:[&>button]:min-h-11 max-sm:[&>button]:min-w-11" }}
-        headerClassName="border-b border-line pr-12 text-left"
+        headerClassName="border-b border-line pr-12 text-left [&>p:empty]:hidden"
         bodyClassName="flex min-h-0 flex-col overflow-hidden"
         title={deviceId ? canManage ? "Cihaz düzenle" : "Cihaz ayrıntısı" : step === "picker" ? "Yeni cihaz" : `Yeni cihaz · ${BRAND_LABELS[brand]}`}
         headerExtra={currentDevice && (
@@ -145,7 +145,7 @@ export function DeviceDetailsPanel({
           ? "Bağlantı, kapılar ve cihaz bilgileri"
           : !deviceId && step === "picker"
             ? "Önce cihazın markasını seçin."
-            : "Zorunlu alanlar * ile işaretlidir."}
+            : undefined}
       >
         <fieldset
           disabled={projectChanged || deviceUnavailable}
