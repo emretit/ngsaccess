@@ -1,3 +1,4 @@
+import { DoorPlanImpactSummary } from "./DoorPlanImpactSummary";
 import { TemplatePicker } from "../unified/templates/TemplatePicker";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { DoorStatusPlanSection } from "../door-dialog/DoorStatusPlanSection";
@@ -23,10 +24,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { errorMessage, notify } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import {
   applySelectedDoorPlans,
+  allDoorPlansApplied,
   type PlanKey,
   type PlanResult,
 } from "../doorPlanResult";
@@ -68,6 +72,7 @@ export function DoorPlanDialog({
   door,
 }: DoorPlanDialogProps) {
   const [saved, setSaved] = useState(false);
+  const [persistedSendResolved, setPersistedSendResolved] = useState(false);
   const [planResults, setPlanResults] = useState<PlanResult[]>([]);
   const [timeErrors, setTimeErrors] = useState<Record<string, string>>({});
 
@@ -94,13 +99,15 @@ export function DoorPlanDialog({
 
   const holidayRanges = useQuery(api.doors.listPlanHolidays,
     holiday.enabled ? { projectId: door.projectId, year: holiday.year } : "skip");
-  const statusChanged = JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN) ||
-    useTemplate !== !!door.hikDoorStatusTemplateId || templateId !== (door.hikDoorStatusTemplateId ?? "") ||
-    (useTemplate && door.templateChanged);
+  const statusEdited = JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN) ||
+    useTemplate !== !!door.hikDoorStatusTemplateId || templateId !== (door.hikDoorStatusTemplateId ?? "");
+  const statusChanged = statusEdited || (useTemplate && door.templateChanged);
   const verifyChanged = JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ?? DEFAULT_VERIFY_PLAN);
   const holidayChanged = JSON.stringify(holiday) !== JSON.stringify(door.hikDoorHolidayPlan ?? {
     enabled: false, year: new Date().getFullYear(), mode: "remainClosed",
   });
+  // Kullanıcının formda yaptığı düzenleme (şablonun dışarıda değişmesi sayılmaz).
+  const formDirty = statusEdited || verifyChanged || holidayChanged;
 
   const updateDoor = useMutation(api.doors.updatePlans);
   const applyDoorStatusPlan = useAction(
@@ -109,6 +116,22 @@ export function DoorPlanDialog({
   const applyVerifyPlan = useAction(
     api.actions.hikGatewayDevice.applyVerifyPlan,
   );
+
+  const persistedKeys: PlanKey[] = [];
+  // Kaydedilmiş devre dışı planlar da cihazdaki eski planı kaldırmak için gönderilir.
+  if (door.hikDoorStatusPlan || door.hikDoorHolidayPlan?.enabled) persistedKeys.push("status");
+  if (door.hikVerifyPlan) persistedKeys.push("verify");
+  // Gönderilecek kayıtlı plan yoksa eski hata/bekleyen bayrağı için yapılacak bir şey yok.
+  const persistedSendPending = !persistedSendResolved && persistedKeys.length > 0 &&
+    !!(door.plansPending || door.hikPlanApplyError);
+  const failedResults = planResults.filter((result) => !result.ok);
+  const failedKeys = failedResults.map((result) => result.key);
+  const failedErrors = failedResults.map((result) => result.error).filter((error): error is string => !!error);
+  const pendingKeys = persistedSendPending ? persistedKeys : [];
+  const retryKeys = [...new Set([...failedKeys, ...pendingKeys])];
+  const statusMessage = failedKeys.length === 0
+    ? door.hikPlanApplyError ? `Son gönderim başarısız: ${door.hikPlanApplyError}` : "Kaydedildi ama cihaza gönderilmedi"
+    : failedErrors.length > 0 ? `Son gönderim başarısız: ${failedErrors.join("; ")}` : "Cihaza gönderilemedi";
 
   const sendPlans = async (keys: PlanKey[]) => {
     const results = await applySelectedDoorPlans(
@@ -123,7 +146,7 @@ export function DoorPlanDialog({
       ...previous.filter((result) => !keys.includes(result.key)),
       ...results,
     ]);
-    return results.every((result) => result.ok);
+    return allDoorPlansApplied(results);
   };
 
   const saveAction = useAsyncAction(
@@ -137,8 +160,14 @@ export function DoorPlanDialog({
         ...(verifyChanged ? { hikVerifyPlan: normalizeVerifyPlan(verifyPlan) } : {}),
         ...(holidayChanged ? { hikDoorHolidayPlan: holiday } : {}),
       });
+      const keysToSend = [...new Set([...keys, ...pendingKeys])];
+      if (keysToSend.length === 0) {
+        notify.info("Değişiklik yok; cihaza bir şey gönderilmedi.");
+        return;
+      }
       setSaved(true);
-      if (!(await sendPlans(keys))) return;
+      setPersistedSendResolved(true);
+      if (!(await sendPlans(keysToSend))) return;
       notify.success("Kapı planları kaydedildi ve cihaza uygulandı");
       onSuccess();
       onOpenChange(false);
@@ -148,35 +177,20 @@ export function DoorPlanDialog({
 
   const retryAction = useAsyncAction(
     async () => {
-      const failed = planResults
-        .filter((result) => !result.ok)
-        .map((result) => result.key);
-      if (failed.length === 0) return;
-      if (await sendPlans(failed))
+      if (retryKeys.length === 0) return;
+      setPersistedSendResolved(true);
+      if (await sendPlans(retryKeys)) {
         notify.success("Zaman planları cihaza uygulandı");
+        onSuccess();
+        // Formda kaydedilmemiş düzenleme varsa açık kalır; yoksa kayıt gibi kapanır.
+        if (saved || !formDirty) onOpenChange(false);
+      }
     },
     { error: "Planlar gönderilemedi" },
   );
   const isSubmitting = saveAction.pending || retryAction.pending;
 
-  const initialVerify = door.hikVerifyPlan ?? DEFAULT_VERIFY_PLAN;
-  const guard = useUnsavedChangesGuard(
-    open &&
-      !saved &&
-      (useTemplate !== !!door.hikDoorStatusTemplateId ||
-        templateId !== (door.hikDoorStatusTemplateId ?? "") ||
-        JSON.stringify(holiday) !==
-          JSON.stringify(
-            door.hikDoorHolidayPlan ?? {
-              enabled: false,
-              year: new Date().getFullYear(),
-              mode: "remainClosed",
-            },
-          ) ||
-        JSON.stringify(statusPlan) !==
-          JSON.stringify(door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN) ||
-        JSON.stringify(verifyPlan) !== JSON.stringify(initialVerify)),
-  );
+  const guard = useUnsavedChangesGuard(open && !saved && formDirty);
   const close = () => {
     if (!isSubmitting) guard.requestClose(() => onOpenChange(false));
   };
@@ -226,12 +240,19 @@ export function DoorPlanDialog({
           <DialogHeader>
             <DialogTitle>Kapı Planları</DialogTitle>
             <DialogDescription>
-              {door.doorName} · {door.deviceName} kapısının zaman planlarını
-              düzenleyin.
+              {door.doorName} · {door.deviceName} kapısının zaman planlarını düzenleyin. Kaydettiğinizde plan hemen cihaza gönderilir.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} aria-busy={isSubmitting} noValidate>
+            {retryKeys.length > 0 && (
+              <div role="status" className="mb-4 space-y-2 text-sm">
+                <p>{statusMessage}</p>
+                <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => void retryAction.run()}>
+                  {isSubmitting ? "Gönderiliyor…" : "Cihaza tekrar gönder"}
+                </Button>
+              </div>
+            )}
             {Object.keys(timeErrors).length > 0 && (
               <div role="alert" className="mb-4 text-sm text-destructive">
                 <p className="font-medium">
@@ -299,9 +320,8 @@ export function DoorPlanDialog({
                         />
                         <label className="block">
                           Kapı modu
-                          <select
+                          <NativeSelect
                             aria-label="Şablon kapı modu"
-                            className="h-10 w-full border rounded bg-background"
                             value={statusPlan.mode}
                             onChange={(event) => {
                               const mode = event.target.value;
@@ -316,7 +336,7 @@ export function DoorPlanDialog({
                             <option value="remainClosed">
                               Sürekli kilitli
                             </option>
-                          </select>
+                          </NativeSelect>
                         </label>
                         <p className="text-xs text-muted-foreground">
                           Şablon değişiklikleri otomatik gönderilmez.
@@ -327,6 +347,12 @@ export function DoorPlanDialog({
                       <DoorStatusPlanEditor
                         value={statusPlan}
                         onChange={setStatusPlan}
+                        invalid={!!timeErrors["status-plan"]}
+                        aria-describedby={
+                          timeErrors["status-plan"]
+                            ? "status-plan-error"
+                            : undefined
+                        }
                       />
                     )}
                     {timeErrors["status-plan"] && (
@@ -374,9 +400,9 @@ export function DoorPlanDialog({
                     <>
                       <label className="block">
                         Yıl{" "}
-                        <input
+                        <Input
                           aria-label="Tatil yılı"
-                          className="w-24 rounded border bg-background p-2"
+                          className="w-24"
                           type="number"
                           min={2000}
                           max={2100}
@@ -391,9 +417,9 @@ export function DoorPlanDialog({
                       </label>
                       <label className="block">
                         Tatil kapı modu{" "}
-                        <select
+                        <NativeSelect
                           aria-label="Tatil kapı modu"
-                          className="h-10 rounded border bg-background"
+                          className="w-auto"
                           value={holiday.mode}
                           onChange={(event) => {
                             const mode = event.target.value;
@@ -408,7 +434,7 @@ export function DoorPlanDialog({
                           <option value="remainClosed">Sürekli kilitli</option>
                           <option value="remainOpen">Sürekli açık</option>
                           <option value="normal">Normal</option>
-                        </select>
+                        </NativeSelect>
                       </label>
                       <p className="text-xs text-muted-foreground">
                         Seçilen yılın tatil tarihleri tam gün uygulanır (yarım
@@ -427,34 +453,28 @@ export function DoorPlanDialog({
                 />
               </div>
             </fieldset>
-            {saved && (
+            {planResults.length > 0 && (
               <DoorSaveResults
                 planResults={planResults}
                 isSubmitting={isSubmitting}
               />
             )}
+            {!saved && (statusChanged || verifyChanged || holidayChanged) && (
+              <DoorPlanImpactSummary
+                doorName={door.doorName}
+                statusPlan={statusChanged ? statusPlan : undefined}
+                template={useTemplate}
+                verifyPlan={verifyChanged ? verifyPlan : undefined}
+                holiday={holidayChanged ? holiday : undefined}
+              />
+            )}
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isSubmitting}
-                onClick={close}
-              >
+              <Button type="button" variant="outline" disabled={isSubmitting} onClick={close}>
                 {saved ? "Kapat" : "İptal"}
               </Button>
-              {saved ? (
-                planResults.some((result) => !result.ok) && (
-                  <Button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => void retryAction.run()}
-                  >
-                    {isSubmitting ? "Gönderiliyor…" : "Tekrar gönder"}
-                  </Button>
-                )
-              ) : (
+              {!saved && (
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Kaydediliyor…" : "Kaydet"}
+                  {isSubmitting ? "Gönderiliyor…" : "Kaydet ve cihaza gönder"}
                 </Button>
               )}
             </DialogFooter>

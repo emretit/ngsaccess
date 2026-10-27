@@ -53,23 +53,21 @@ export function togglePair(
 }
 export const confirmationText = (count: number | string) =>
   `${count} kişi×cihaz için tek gönderim başlatılacak.`;
-export function grantBadge(row: {
-  state: keyof typeof labels;
-  stale?: boolean;
-  lastError?: string;
-}) {
+export function grantBadge(
+  row: Pick<EmployeeDetail["rows"][number], "state"> & Partial<Pick<GrantRow, "stale" | "lastError" | "doorUnresolved">>,
+) {
   return {
-    label: row.stale ? labels.pending : labels[row.state],
+    label: labels[row.state],
     stale: row.stale === true,
     tone:
       row.state === "failed"
         ? ("danger" as const)
-        : row.stale || row.state === "pending"
+        : row.state === "pending"
           ? ("warning" as const)
           : row.state === "effective"
             ? ("success" as const)
             : ("neutral" as const),
-    hint: row.state === "failed" ? row.lastError : undefined,
+    hint: row.state === "failed" && !row.lastError?.includes("door_io_unresolved") ? row.lastError : undefined,
   };
 }
 

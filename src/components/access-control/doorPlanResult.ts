@@ -29,3 +29,8 @@ export async function applySelectedDoorPlans(
     }
   }));
 }
+
+/** Boş gönderim, cihaza uygulanmış bir plan değildir. */
+export function allDoorPlansApplied(results: PlanResult[]): boolean {
+  return results.length > 0 && results.every((result) => result.ok);
+}

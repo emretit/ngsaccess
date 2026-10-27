@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 const state = vi.hoisted(() => ({
   run: undefined as
-    | { status: "running" | "done" | "partial" | "failed" }
+    | { status: "running" | "done" | "partial" | "failed"; counts: { sent: number; verified: number } }
     | undefined,
   effect: undefined as (() => void) | undefined,
   completed: { current: false },
@@ -38,14 +38,18 @@ it.each(["done", "partial", "failed"] as const)(
       return html;
     };
     render();
-    state.run = { status: "running" };
+    state.run = { status: "running", counts: { sent: 0, verified: 0 } };
     render();
     expect(refresh).not.toHaveBeenCalled();
-    state.run = { status };
+    state.run = { status, counts: { sent: 0, verified: 0 } };
     const html = render();
     render();
     render();
     expect(refresh).toHaveBeenCalledOnce();
+    if (status === "partial") {
+      expect(html).toContain("Gönderilemedi");
+      expect(html).not.toContain("Kısmi sonuç");
+    }
     expect(html).toContain("Gönderim sonucunu aç");
     expect(html).toContain("Cihaz gönderiminin sonucu ayrıca izlenir");
   },

@@ -47,7 +47,7 @@ async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map
     ruleNames: rules.map(rule => rule.name), templateIds: [...new Set(templates.map(template => template._id))],
     templateNames: [...new Map(templates.map(template => [template._id, template.name])).values()],
     stale: grantStale(row.appliedAt, [...rules.map(rule => rule.updatedAt), ...templates.map(template => template.updatedAt)]),
-    ...(unresolvedDoor && row.state !== "removed" ? { state: "failed" as const, lastError: "door_io_unresolved: Kapı aktüatörü çözülemedi; kuralın kapı seçimini ve ioId değerlerini düzeltin" } : {}),
+    doorUnresolved: unresolvedDoor,
   };
 }
 
@@ -199,7 +199,7 @@ export const byEmployee = authedQuery({
       if (stored.some(row => row.deviceId === deviceId)) continue;
       const synthetic = await enrich(ctx, { _id: null, _creationTime: 0, projectId, employeeId: employee._id, deviceId,
         departmentId: employee.departmentId, state: "pending", ruleIds: scope.ruleIds, updatedAt: 0 }, scopes, employees);
-      rows.push({ ...synthetic, _id: null, state: synthetic.state === "failed" ? "failed" as const : "unknown" as const, authorized: true, removalRequired: false });
+      rows.push({ ...synthetic, _id: null, state: "unknown" as const, authorized: true, removalRequired: false });
     }
     const allowedDoors = new Set([...graph.values()].flatMap(scope => scope.doors.map(door => door._id)));
     const doors = bounded(await ctx.db.query("doors").withIndex("by_project", q => q.eq("projectId", projectId)).take(1001));

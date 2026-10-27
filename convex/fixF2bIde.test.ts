@@ -218,11 +218,11 @@ describe("IDE grant projection", () => {
       expect(await grantRuleScope(ctx, rule)).toMatchObject([{ doors: [], errorCode: "door_io_unresolved" }]);
     });
     const projection = await f.caller.query(api.accessGrantStatus.byEmployee, { employeeId: f.employeeId });
-    expect(projection.rows).toMatchObject([{ doorIds: [], state: "failed", lastError: expect.stringContaining("door_io_unresolved") }]);
+    expect(projection.rows).toMatchObject([{ doorIds: [], doorUnresolved: true }]);
     expect(projection.unauthorizedDoors.map(door => door.doorId)).toContain(f.doorId);
     await f.t.action(internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId: f.employeeId });
     expect((await f.caller.query(api.accessGrantStatus.listByProject, { projectId: f.projectId, paginationOpts: { cursor: null, numItems: 10 } })).page)
-      .toMatchObject([{ doorIds: [], state: "failed", lastError: expect.stringContaining("door_io_unresolved") }]);
+      .toMatchObject([{ doorIds: [], doorUnresolved: true }]);
   });
 
   it("empty schedules do not report unresolved IO", async () => {
@@ -266,7 +266,7 @@ describe("IDE grant projection", () => {
     });
     expect((await f.t.query(internal.ideSync.getRuleIoIdsForPanel, { ruleId: f.ruleId, deviceId: f.deviceId }))).toEqual([]);
     expect((await f.caller.query(api.accessGrantStatus.byEmployee, { employeeId: f.employeeId })).rows)
-      .toMatchObject([{ doorIds: [], state: "failed", lastError: expect.stringContaining("door_io_unresolved") }]);
+      .toMatchObject([{ doorIds: [], doorUnresolved: true }]);
   });
 
   it("projection respects role and project boundaries", async () => {

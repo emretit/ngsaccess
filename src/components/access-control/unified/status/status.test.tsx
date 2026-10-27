@@ -22,6 +22,7 @@ import {
   DeviceCounters,
   EmployeeStatus,
   EmptyStatus,
+  GrantBadge,
   GrantRows,
 } from "./StatusViews";
 import { keepSameDevices } from "./useStatusData";
@@ -72,6 +73,7 @@ const row: GrantRow = {
   templateIds: [],
   templateNames: ["Hafta içi"],
   stale: true,
+  doorUnresolved: false,
   lastError: "Cihaz yanıt vermedi",
 };
 beforeEach(() => {
@@ -147,14 +149,14 @@ describe("yetki durumu saf model", () => {
       "3 kişi×cihaz için tek gönderim başlatılacak.",
     );
     expect(grantBadge(row)).toEqual({
-      label: "Bekliyor",
+      label: "Hata",
       stale: true,
       tone: "danger",
       hint: row.lastError,
     });
     expect(grantBadge({ state: "effective", stale: true })).toMatchObject({
-      label: "Bekliyor",
-      tone: "warning",
+      label: "Etkin",
+      tone: "success",
       stale: true,
     });
     expect(grantBadge({ state: "unknown" })).toMatchObject({
@@ -167,6 +169,24 @@ describe("yetki durumu saf model", () => {
   });
 });
 describe("yetki durumu SSR", () => {
+  it("güncellik uyarısını saklanan durumdan ayrı gösterir", () => {
+    const html = renderToStaticMarkup(<GrantBadge row={{ state: "effective", stale: true }} />);
+    expect(html).toContain("Etkin");
+    expect(html).toContain("Güncel değil");
+    expect(html).toContain('title="Kural veya şablon cihaza gönderildikten sonra değişti; yeniden dağıtın."');
+    expect(html).not.toContain("Bekliyor");
+  });
+  it.each(["effective", "failed"] as const)("kapı uyarısını %s durumundan ayrı gösterir, teknik hatayı gizler", (grantState) => {
+    const html = renderToStaticMarkup(
+      <GrantRows rows={[{ ...row, state: grantState, doorUnresolved: true, lastError: "door_io_unresolved: ioId 99" }]}
+        selected={[]} onToggle={() => undefined} onEmployee={() => undefined} canManage={false} />,
+    );
+    expect(html).toContain(grantState === "effective" ? "Etkin" : "Hata");
+    expect(html).toContain("Kapı eşleşmedi");
+    expect(html).toContain('title="Kuralın kapı seçimini düzeltin; yeniden göndermek bunu çözmez."');
+    expect(html).not.toContain("door_io_unresolved");
+    expect(html).not.toContain("ioId");
+  });
   it("okuyucuya status sekmesi ve dağıtım aksiyonlarını sunmaz, deep link de açılmaz", () => {
     state.admin = false;
     state.params = "tab=status";

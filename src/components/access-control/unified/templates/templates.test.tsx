@@ -190,7 +190,7 @@ describe("şablon arayüzü SSR", () => {
       <ImpactConfirmation {...props} impact={impact} />,
     );
     expect(html).toContain(
-      "2 kural, 3 cihaz güncellenecek; 20 sn içinde tek gönderim başlar.",
+      "2 kural ve 3 cihaz güncellenecek; cihaz gönderimi yaklaşık 20 saniye içinde başlar.",
     );
     const blocked = renderToStaticMarkup(
       <ImpactConfirmation
@@ -311,4 +311,14 @@ describe("şablon aksiyonu geri bildirimi", () => {
     expect(state.success).not.toHaveBeenCalled();
     expect(state.changes).not.toContainEqual([2, null]);
   });
+});
+
+it("yalnız ad değişince onayda cihaz gönderimi sözü vermez", () => {
+  state.override = true;
+  state.slots = ["Yeni ad", "", template.week, "", false,
+    { ruleCount: 2, deviceCount: 3, hikMaxSegmentsPerDay: 0, ideRecordCount: 0, ideOverLimit: [] }];
+  const html = renderToStaticMarkup(<TemplateEditor template={template} projectId={template.projectId} onClose={() => undefined} />);
+  const confirmation = html.slice(html.indexOf('role="alertdialog"'));
+  expect(confirmation).toContain("Geçiş saatleri değişmedi; cihaza gönderim gerekmiyor.");
+  expect(confirmation).not.toContain("20");
 });

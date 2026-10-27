@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applySelectedDoorPlans, doorPlanTimeSchema } from "./doorPlanResult";
+import { allDoorPlansApplied, applySelectedDoorPlans, doorPlanTimeSchema } from "./doorPlanResult";
 
 describe("kapı planı saatleri", () => {
   it("geçerli HH:mm aralığını kabul eder", () => {
@@ -36,4 +36,15 @@ describe("bağımsız plan gönderimi", () => {
       { key: "status", ok: false, error: "Bağlantı kesildi" }, { key: "verify", ok: true },
     ]);
   });
+});
+
+it("04-H1 boş gönderim başarı değildir ve eylem çağırmaz", async () => {
+  const status = vi.fn();
+  const verify = vi.fn();
+  const results = await applySelectedDoorPlans([], { status, verify }, String);
+  expect(allDoorPlansApplied(results)).toBe(false);
+  expect(status).not.toHaveBeenCalled();
+  expect(verify).not.toHaveBeenCalled();
+  expect(allDoorPlansApplied([{ key: "status", ok: true }])).toBe(true);
+  expect(allDoorPlansApplied([{ key: "status", ok: false, error: "Hata" }])).toBe(false);
 });

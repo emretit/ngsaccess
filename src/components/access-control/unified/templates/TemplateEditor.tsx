@@ -22,6 +22,7 @@ import {
   WEEKDAYS,
   emptyWeek,
   inspectSchedule,
+  invalidTimeField,
   type WeekSchedule,
 } from "./schedule";
 export type Template = FunctionReturnType<
@@ -72,6 +73,7 @@ export function WeekEditor({
                   key={field}
                   aria-label={`${DAY_NAMES[i]} ${n + 1}. ${field === "start" ? "başlangıç" : "bitiş"}`}
                   className="w-24 min-w-0"
+                  aria-invalid={invalidTimeField(r, field)}
                   placeholder="HH:MM"
                   list={field === "end" ? "schedule-end-times" : undefined}
                   value={r[field]}
@@ -140,6 +142,9 @@ export function TemplateEditor({
   const create = useMutation(api.accessScheduleTemplates.create);
   const update = useMutation(api.accessScheduleTemplates.update);
   const check = inspectSchedule(week);
+  const weekChanged = JSON.stringify(check.week) !== JSON.stringify(
+    template ? inspectSchedule(template.week).week : emptyWeek(),
+  );
   const save = async (confirmed = false) => {
     const decision = saveDecision({
       valid: !!check.week && !check.error,
@@ -249,6 +254,7 @@ export function TemplateEditor({
           {impact ? (
             <ImpactConfirmation
               impact={impact}
+              weekChanged={weekChanged}
               pending={pending}
               onBack={() => setImpact(null)}
               onConfirm={() => void save(true)}
@@ -279,11 +285,13 @@ export function TemplateEditor({
 
 export function ImpactConfirmation({
   impact,
+  weekChanged = true,
   pending,
   onBack,
   onConfirm,
 }: {
   impact: FunctionReturnType<typeof api.accessScheduleTemplates.previewImpact>;
+  weekChanged?: boolean;
   pending: boolean;
   onBack: () => void;
   onConfirm: () => void;
@@ -295,8 +303,9 @@ export function ImpactConfirmation({
       aria-label="Şablon değişikliğini onayla"
     >
       <p>
-        {impact.ruleCount} kural, {impact.deviceCount} cihaz güncellenecek; 20
-        sn içinde tek gönderim başlar.
+        {weekChanged
+          ? `${impact.ruleCount} kural ve ${impact.deviceCount} cihaz güncellenecek; cihaz gönderimi yaklaşık 20 saniye içinde başlar.`
+          : "Geçiş saatleri değişmedi; cihaza gönderim gerekmiyor."}
       </p>
       {impact.ideOverLimit.length > 0 && (
         <>

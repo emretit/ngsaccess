@@ -17,7 +17,16 @@ export function GrantBadge({ row }: { row: Parameters<typeof grantBadge>[0] }) {
   return (
     <span className="inline-flex flex-wrap gap-1" title={badge.hint}>
       <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
-      {badge.stale && <StatusBadge tone="warning">Güncel değil</StatusBadge>}
+      {badge.stale && (
+        <StatusBadge tone="warning" title="Kural veya şablon cihaza gönderildikten sonra değişti; yeniden dağıtın.">
+          Güncel değil
+        </StatusBadge>
+      )}
+      {row.doorUnresolved && (
+        <StatusBadge tone="warning" title="Kuralın kapı seçimini düzeltin; yeniden göndermek bunu çözmez.">
+          Kapı eşleşmedi
+        </StatusBadge>
+      )}
       {badge.hint && (
         <span className="text-xs text-danger break-words">{badge.hint}</span>
       )}

@@ -22,9 +22,8 @@ import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import {
   runCountParts,
   runKindLabels,
-  runLabels,
+  runDisplay,
   runSummary,
-  runTone,
   targetLabels,
   targetTone,
 } from "./lib/presentation";
@@ -32,9 +31,12 @@ import {
 function RunResult({ runId }: { runId: Id<"deviceSyncRuns"> }) {
   const run = useQuery(api.deviceSyncRuns.get, { runId });
   if (!run) return <SectionSkeleton label="Gönderim yükleniyor" />;
+  const display = runDisplay(run.status, run.counts);
   return (
     <div className="space-y-4">
-      <p role="status">{runLabels[run.status]}</p>
+      <div role="status">
+        <StatusBadge tone={display.tone}>{display.label}</StatusBadge>
+      </div>
       <p className="text-muted-foreground text-xs break-words">
         {runSummary(run.counts)}
       </p>
@@ -53,6 +55,9 @@ function RunResult({ runId }: { runId: Id<"deviceSyncRuns"> }) {
               <p className="break-words text-xs text-muted-foreground">
                 {errorMessage(target.reason)}
               </p>
+            )}
+            {target.status === "skipped" && target.reason === "Cihaz çevrimdışı" && (
+              <p className="text-xs text-muted-foreground">Cihaz bağlanınca yeniden gönderin.</p>
             )}
           </li>
         ))}
@@ -119,7 +124,7 @@ export function RecentRuns({
         </p>
       ) : (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border px-4 py-3">
-          <StatusBadge tone={runTone(run.status)}>{runLabels[run.status]}</StatusBadge>
+          <StatusBadge tone={runDisplay(run.status, run.counts).tone}>{runDisplay(run.status, run.counts).label}</StatusBadge>
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="font-medium">{runKindLabels[run.kind]}</p>
             <p className="text-xs text-muted-foreground tabular-nums">

@@ -70,3 +70,13 @@ export const runKindLabels = {
   template_sync: "Şablon gönderimi",
   rule_sync: "Kural gönderimi",
 };
+
+export function runDisplay(
+  status: keyof typeof runLabels,
+  counts: Pick<Record<TargetStatus, number>, "sent" | "verified">,
+) {
+  if (status === "partial" && counts.sent + counts.verified === 0) {
+    return { label: "Gönderilemedi", tone: "danger" } as const;
+  }
+  return { label: runLabels[status], tone: runTone(status) } as const;
+}

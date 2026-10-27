@@ -39,7 +39,7 @@ export const TimeSchedule = <T extends TimeScheduleFormData>({
       >
         <Button
           type="button"
-          variant="outline"
+          variant={formData.scheduleMode !== "template" ? "default" : "outline"}
           className="min-h-11"
           aria-pressed={formData.scheduleMode !== "template"}
           onClick={() =>
@@ -50,7 +50,7 @@ export const TimeSchedule = <T extends TimeScheduleFormData>({
         </Button>
         <Button
           type="button"
-          variant="outline"
+          variant={formData.scheduleMode === "template" ? "default" : "outline"}
           className="min-h-11"
           aria-pressed={formData.scheduleMode === "template"}
           onClick={() =>
@@ -69,9 +69,13 @@ export const TimeSchedule = <T extends TimeScheduleFormData>({
               setFormData((prev) => ({ ...prev, scheduleTemplateId: value }))
             }
             onEdit={onEditTemplate}
+            aria-invalid={!!errors.scheduleTemplateId}
+            aria-describedby={
+              errors.scheduleTemplateId ? "schedule-template-error" : undefined
+            }
           />
           {errors.scheduleTemplateId && (
-            <p role="alert" className="text-danger">
+            <p id="schedule-template-error" role="alert" className="text-danger">
               {errors.scheduleTemplateId}
             </p>
           )}

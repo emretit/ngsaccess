@@ -142,6 +142,32 @@ describe("grant status writes in existing queue transactions", () => {
 });
 
 describe("grant status queries", () => {
+  it("03-H2: unresolved doors preserve effective state across list, filters, counts and failed redistribution", async () => {
+    const { t, ids, admin, write, status } = await fixture();
+    await write("effective");
+    await t.run(ctx => ctx.db.patch(ids.ideDoorId, { ioId: undefined }));
+    const original = await status();
+    const args = { projectId: ids.projectId, paginationOpts: { numItems: 50, cursor: null } };
+    expect((await admin.query(api.accessGrantStatus.listByProject, args)).page[0]).toMatchObject({ state: "effective", doorUnresolved: true });
+    expect((await admin.query(api.accessGrantStatus.listByProject, { ...args, state: "effective" })).page[0]).toMatchObject({ state: "effective", doorUnresolved: true });
+    expect((await admin.query(api.accessGrantStatus.listByProject, { ...args, state: "failed" })).page).toEqual([]);
+    expect((await admin.query(api.accessGrantStatus.listByProject, { ...args, state: "failed", deviceId: ids.ideId })).page).toEqual([]);
+    expect((await admin.query(api.accessGrantStatus.byEmployee, { employeeId: ids.employeeId })).rows.find(row => row.deviceId === ids.ideId)).toMatchObject({ state: "effective", doorUnresolved: true });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId })).toMatchObject({ effective: 1, failed: 0 });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.ideId })).toMatchObject({ effective: 1, failed: 0 });
+    await expect(admin.mutation(api.accessGrantStatus.redistribute, { projectId: ids.projectId, onlyFailed: true })).rejects.toThrow();
+    expect(await status()).toEqual(original);
+  });
+  it("03-H2: unresolved doors remain a separate warning for unknown and stored pending, failed and removed states", async () => {
+    const { t, ids, admin, write } = await fixture();
+    await t.run(ctx => ctx.db.patch(ids.ideDoorId, { ioId: undefined }));
+    const detail = () => admin.query(api.accessGrantStatus.byEmployee, { employeeId: ids.employeeId });
+    expect((await detail()).rows.find(row => row.deviceId === ids.ideId)).toMatchObject({ state: "unknown", doorUnresolved: true });
+    for (const state of ["pending", "failed", "removed"] as const) {
+      await write(state);
+      expect((await detail()).rows.find(row => row.deviceId === ids.ideId)).toMatchObject({ state, doorUnresolved: true });
+    }
+  });
   it("denies project_user for all reads and writes and foreign project admin reads", async () => {
     const { admin, reader, ids } = await fixture();
     await expect(reader.query(api.accessGrantStatus.listByProject, { projectId: ids.projectId, paginationOpts: { numItems: 50, cursor: null } })).rejects.toThrow("yetkiniz");

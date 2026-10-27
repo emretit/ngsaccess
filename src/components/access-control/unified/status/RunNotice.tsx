@@ -4,7 +4,8 @@ import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { SyncRunSheet } from "../SyncRuns";
-import { runLabels } from "../lib/presentation";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { runDisplay } from "../lib/presentation";
 
 /** Only the small run record is subscribed; grant rows remain snapshots. */
 export function RunNotice({
@@ -23,12 +24,15 @@ export function RunNotice({
       onComplete();
     }
   }, [run, onComplete]);
+  const display = run ? runDisplay(run.status, run.counts) : null;
   return (
     <section className="flex flex-wrap gap-3 items-center border rounded-md p-3">
-      <p role="status">
-        Gönderim başlatıldı · {run ? runLabels[run.status] : "Yükleniyor"}.
+      <div role="status">
+        Gönderim başlatıldı · {display ? (
+          <StatusBadge tone={display.tone}>{display.label}</StatusBadge>
+        ) : "Yükleniyor"}.
         Cihaz gönderiminin sonucu ayrıca izlenir.
-      </p>
+      </div>
       <Button variant="outline" onClick={() => setOpen(true)}>
         Gönderim sonucunu aç
       </Button>

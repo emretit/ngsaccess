@@ -1,10 +1,11 @@
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { RuleSaveNotice, RecentRuns } from "./SyncRuns";
+import { RuleSaveNotice, RecentRuns, SyncRunSheet } from "./SyncRuns";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
-const state = vi.hoisted(() => ({ runs: undefined as unknown[] | undefined }));
-vi.mock("convex/react", () => ({ useAction: () => vi.fn(), useQuery: () => state.runs }));
+const state = vi.hoisted(() => ({ runs: undefined as unknown[] | undefined, detail: undefined as unknown }));
+vi.mock("convex/react", () => ({ useAction: () => vi.fn(), useQuery: () => state.detail ?? state.runs }));
 
 describe("rule diff save feedback", () => {
   it("offers the existing full-send path when there was no device diff", () => {
@@ -34,8 +35,25 @@ it("yalnız son gönderimi sıfır olmayan sayılarla gösterir", () => {
   const html = renderToStaticMarkup(<RecentRuns projectId={"p" as Id<"projects">} />);
   expect(html).toContain("Son gönderim");
   expect(html).not.toContain("Son gönderimler");
-  expect(html).toContain("Kısmi sonuç");
+  expect(html).toContain("Gönderilemedi");
   expect(html).toContain("2 atlandı");
   expect(html).not.toContain("0 kuyrukta");
   state.runs = undefined;
+});
+
+vi.mock("@/components/ui/sheet", () => ({
+  Sheet: ({ children, open }: { children: ReactNode; open: boolean }) => open ? <div>{children}</div> : null,
+  SheetContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SheetHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SheetTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
+  SheetDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+}));
+it("çevrimdışı cihaz için yeniden gönderim yolunu açıklar", () => {
+  state.detail = { status: "partial", counts: { queued: 0, sent: 0, verified: 0, failed: 0, skipped: 1, unknown: 0 },
+    targets: [{ _id: "target", deviceName: "Giriş", brand: "hikvision", status: "skipped", reason: "Cihaz çevrimdışı" }] };
+  const html = renderToStaticMarkup(<SyncRunSheet runId={"run" as Id<"deviceSyncRuns">} onClose={() => undefined} />);
+  expect(html).toContain("Gönderilemedi");
+  expect(html).toContain("Cihaz bağlanınca yeniden gönderin.");
+  expect(html).not.toContain("Kısmi sonuç");
+  state.detail = undefined;
 });

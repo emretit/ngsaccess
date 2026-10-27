@@ -1,3 +1,5 @@
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { requestTemplateEdit } from "./templates/model";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -47,6 +49,11 @@ export default function CreateRuleDialog({
   const [stepError, setStepError] = useState("");
   const guard = useUnsavedChangesGuard(isDirty);
   const { projectId: currentProjectId } = useActiveProject();
+  const templates = useQuery(
+    api.accessScheduleTemplates.list,
+    currentProjectId ? { projectId: currentProjectId, includeArchived: true } : "skip",
+  );
+  const selectedTemplate = templates?.find((template) => template._id === formData.scheduleTemplateId);
   const projectChanged = currentProjectId !== projectId;
   const previousProject = useRef(currentProjectId);
   const submittingRef = useRef(false);
@@ -277,10 +284,14 @@ export default function CreateRuleDialog({
             {formData.target_type === "visitor"
               ? "Ziyaretçi üyelikleri korunur"
               : `${formData.selected_employees.length} kişi`}{" "}
-            → {formData.selected_devices.length} panel /{" "}
-            {formData.selected_doors.length} açık kapı seçimi →{" "}
+            · {formData.selected_devices.length} cihaz /{" "}
+            {formData.selected_doors.length} kapı ·{" "}
             {formData.scheduleMode === "template"
-              ? "Şablon kullanılıyor"
+              ? <span className={!formData.scheduleTemplateId ? "text-warning" : undefined}>
+                  {formData.scheduleTemplateId
+                    ? selectedTemplate?.name ?? "Zaman şablonu yükleniyor…"
+                    : "Zaman şablonu seçilmedi"}
+                </span>
               : `${formData.days.length} gün · ${formData.start_time || formData.end_time ? `${formData.start_time}–${formData.end_time}` : "Tüm gün"}`}
           </div>
           <DialogFooter className="px-4 py-3 border-t flex-wrap">
