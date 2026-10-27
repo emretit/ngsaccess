@@ -25,6 +25,43 @@ export const visitorNoticeSchema = z.object({
   }
 });
 
+const visitorRetentionSchema = z.number().int("Tam gün sayısı girin.").min(30, "En az 30 gün girin.").max(3650, "En fazla 3650 gün girin.").nullable();
+
+export function VisitorRetentionForm({ projectId }: { projectId: Id<"projects"> }) {
+  const saved = useQuery(api.privacyRetention.getVisitorRetention, { projectId });
+  const mutate = useMutation(api.privacyRetention.setVisitorRetention);
+  const draft = useSettingsDraft({ days: String(saved?.visitorRetentionDays ?? "") });
+  const [failed, setFailed] = useState(false);
+  const parsed = visitorRetentionSchema.safeParse(draft.values.days.trim() === "" ? null : Number(draft.values.days));
+  const needsPreview = parsed.success && parsed.data !== null
+    && (saved?.visitorRetentionDays == null || parsed.data < saved.visitorRetentionDays);
+  const preview = useQuery(api.privacyRetention.previewVisitorRetention,
+    needsPreview && parsed.success && parsed.data !== null ? { projectId, days: parsed.data } : "skip");
+  const save = useAsyncAction(mutate, { success: "Ziyaretçi kayıtlarını saklama süresi kaydedildi", error: "Saklama süresi kaydedilemedi" });
+  useSettingsFormState("visitor-retention", draft.dirty, save.pending);
+  if (saved === undefined) return <SectionSkeleton label="Ziyaretçi saklama süresi yükleniyor" />;
+  return <form className="space-y-4 border-t pt-4" noValidate onSubmit={async event => {
+    event.preventDefault();
+    if (!parsed.success || (needsPreview && preview === undefined)) return;
+    const success = await save.run({ projectId, days: parsed.data });
+    setFailed(!success);
+    if (success) draft.reset();
+  }}>
+    <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
+    <FormFieldWrapper htmlFor="visitor-retention-days" label="Ziyaretçi kayıtlarını saklama süresi (gün)"
+      hint="Pasif ziyaretçi kayıtları belirtilen gün sonra silinir (boş = silinmez). Boş bırakıldığında otomatik silme kapalıdır."
+      error={!parsed.success ? parsed.error.issues[0]?.message : undefined}>
+      <Input id="visitor-retention-days" type="number" min={30} max={3650} step={1} value={draft.values.days} disabled={save.pending}
+        onChange={event => draft.change({ days: event.target.value })} />
+    </FormFieldWrapper>
+    {needsPreview && <p role="status" className="text-sm text-muted-foreground">{preview === undefined
+      ? "Silinecek kayıtlar hesaplanıyor…"
+      : `Bu süreye göre ${preview.capped ? "en az " : ""}${preview.count} pasif ziyaretçi kaydı günlük temizlikte kalıcı olarak silinecek.${preview.capped ? " Sayım sınırlıdır; daha fazla kayıt olabilir." : ""}`}</p>}
+    <SettingsSaveBar dirty={draft.dirty} saving={save.pending} valid={parsed.success && (!needsPreview || preview !== undefined)}
+      label="Ziyaretçi saklama süresini kaydet" onCancel={() => { draft.reset(); setFailed(false); }} />
+  </form>;
+}
+
 export function VisitorNoticeCard({ projectId }: { projectId: Id<"projects"> }) {
   const saved = useQuery(api.privacyRetention.getVisitorNotice, { projectId });
   const save = useMutation(api.privacyRetention.setVisitorNotice);
@@ -49,5 +86,6 @@ export function VisitorNoticeCard({ projectId }: { projectId: Id<"projects"> }) 
       </fieldset>
       <SettingsSaveBar dirty={draft.dirty} saving={action.pending} valid={parsed.success} label="Ziyaretçi metni ayarını kaydet" onCancel={() => { draft.reset(); setFailed(false); }} />
     </form>
+    <VisitorRetentionForm key={projectId} projectId={projectId} />
   </section>;
 }

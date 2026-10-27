@@ -23,6 +23,7 @@ function cardlessRows(employees: Employee[]): CardAssignmentRow[] {
 
 export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees }: Props) {
   const assignCards = useMutation(api.employeeImport.assignCards);
+  const startCardCapture = useMutation(api.cardReadings.startCardCapture);
   const startProjectResync = useAction(api.deviceSyncRuns.startProjectResync);
   const { can } = usePermissions();
   const canCapture = can("employees.manage") || can("visitors.manage") || can("devices.manage") || can("reports.view");
@@ -31,6 +32,8 @@ export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees
   const [rows, setRows] = useState<CardAssignmentRow[]>(() => cardlessRows(employees));
   const [readerId, setReaderId] = useState<Id<"devices"> | "">("");
   const [sinceTime, setSinceTime] = useState<string | null>(null);
+  const [startingCapture, setStartingCapture] = useState(false);
+  const captureGeneration = useRef(0);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -46,6 +49,29 @@ export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees
     setSinceTime(null);
     lastReading.current = null;
   }, [open, employees]);
+
+  useEffect(() => {
+    captureGeneration.current += 1;
+    setSinceTime(null);
+    setStartingCapture(false);
+    return () => { captureGeneration.current += 1; };
+  }, [open, employees, projectId, readerId]);
+
+  const beginCapture = async () => {
+    if (!canCapture || !readerId) return;
+    const generation = ++captureGeneration.current;
+    setMessage(null);
+    lastReading.current = null;
+    setStartingCapture(true);
+    try {
+      const startedAt = await startCardCapture({ projectId, deviceId: readerId });
+      if (captureGeneration.current === generation) setSinceTime(startedAt);
+    } catch {
+      if (captureGeneration.current === generation) setMessage("Okuma başlatılamadı. Yeniden deneyin.");
+    } finally {
+      if (captureGeneration.current === generation) setStartingCapture(false);
+    }
+  };
 
   useEffect(() => {
     if (!sinceTime || !reading || reading.accessTime === lastReading.current) return;
@@ -92,7 +118,7 @@ export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees
             <option value="">Okuyucu seçin</option>
             {readers.map((device) => <option key={device._id} value={device._id}>{visitorReaderLabel(device)}</option>)}
           </NativeSelect>
-          <Button type="button" variant="outline" disabled={!readerId || !!sinceTime} onClick={() => { setMessage(null); lastReading.current = null; setSinceTime(new Date().toISOString()); }}> {sinceTime ? "Kart bekleniyor…" : "Okut"}</Button>
+          <Button type="button" variant="outline" disabled={!canCapture || !readerId || !!sinceTime || startingCapture} onClick={() => void beginCapture()}> {startingCapture ? "Okuma başlatılıyor…" : sinceTime ? "Kart bekleniyor…" : "Okut"}</Button>
         </div>
         {rows.map((row) => <div key={row.employeeId} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 rounded border p-3">
           <span className="text-sm font-medium">{row.employeeName}</span>

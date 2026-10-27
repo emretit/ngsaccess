@@ -8,7 +8,7 @@ export const routeMeta: RouteMeta[] = [
   { href: "/employees", group: "main", name: "Kişiler", icon: Users, permission: "employees.view" },
   { href: "/devices", group: "main", name: "Cihazlar", icon: Cpu },
   { href: "/access-control", group: "main", name: "Geçiş Kontrol", icon: Shield },
-  { href: "/visitors", group: "main", name: "Ziyaretçiler", icon: DoorOpen },
+  { href: "/visitors", group: "main", name: "Ziyaretçiler", icon: DoorOpen, anyPermission: ["visitors.manage", "reports.view"] },
   { href: "/live-monitoring", group: "main", name: "Canlı İzleme", icon: Activity, anyPermission: ["reports.view", "devices.manage"] },
   { href: "/pdks-records", group: "attendance", name: "PDKS", icon: FileText, permission: "reports.view" },
   { href: "/leaves", group: "attendance", name: "İzinler", icon: Palmtree },

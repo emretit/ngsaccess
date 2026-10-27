@@ -1,14 +1,13 @@
 import { FilterBar } from "@/components/shared/FilterBar";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { isVisitorStatus, visitorStatusInfo, type VisitorStatus } from "./lib/status";
 
 export type VisitorStatusFilter = "all" | VisitorStatus;
-export function VisitorFilters({ searchQuery, onSearchChange, statusFilter, onStatusFilterChange, onClear, onNewZone }: {
+export function VisitorFilters({ searchQuery, onSearchChange, statusFilter, onStatusFilterChange, onClear }: {
   searchQuery: string; onSearchChange: (value: string) => void;
   statusFilter: VisitorStatusFilter; onStatusFilterChange: (value: VisitorStatusFilter) => void;
-  onClear: () => void; onNewZone?: () => void;
+  onClear: () => void;
 }) {
   return <div className="min-w-0 space-y-2">
     <FilterBar search={searchQuery} onSearchChange={onSearchChange} searchLabel="Ziyaretçi ara" placeholder="Ad, şirket veya kart numarası" onClear={onClear} hasFilters={statusFilter !== "all"}>
@@ -20,7 +19,6 @@ export function VisitorFilters({ searchQuery, onSearchChange, statusFilter, onSt
           </SelectContent>
         </Select>
       </div>
-      {onNewZone && <Button variant="outline" onClick={onNewZone}>Erişim bölgesi oluştur</Button>}
     </FilterBar>
 
   </div>;

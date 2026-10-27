@@ -34,6 +34,7 @@ const commonLabels: Record<string, string> = {
   biometricChangedAt: "Biyometrik ayar değişiklik zamanı",
   biometricChangedBy: "Biyometrik ayarı değiştiren",
   cardReadingRetentionDays: "Kart okuma saklama süresi (gün)",
+  visitorRetentionDays: "Ziyaretçi kayıtlarını saklama süresi (gün)",
   aiMaskNames: "Yapay zekâda adları gizleme",
   name: "Ad",
   fullName: "Ad soyad",

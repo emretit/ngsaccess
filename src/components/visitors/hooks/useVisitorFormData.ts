@@ -1,3 +1,5 @@
+import { makeFunctionReference } from "convex/server";
+import type { VisitorHostOption } from "../../../../convex/visitorHosts";
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -6,6 +8,10 @@ import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { isoToLocalInput, defaultExpiryLocalInput } from "../visitorTime";
 import { isVisitorCardPlaceholder } from "../lib/preRegistration";
+
+// Typed reference keeps this isolated module usable before deployment codegen.
+// TODO(ziy-R3): codegen sonrası api.visitorHosts.search
+const hostSearchQuery = makeFunctionReference<"query", { projectId: Id<"projects">; search: string }, VisitorHostOption[]>("visitorHosts:search");
 
 export interface VisitorFormData {
   firstName: string;
@@ -48,12 +54,19 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
   const [initialData, setInitialData] = useState<VisitorFormData>(() => emptyForm(defaultProjectId));
 
   const presetRulesData = useQuery(api.visitors.presetRules, !loading && defaultProjectId ? { projectId: defaultProjectId } : "skip");
+  const [hostSearch, setHostSearch] = useState("");
+  const [debouncedHostSearch, setDebouncedHostSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedHostSearch(hostSearch), 200);
+    return () => clearTimeout(timer);
+  }, [hostSearch]);
   const employeesData = useQuery(
-    api.employees.list,
-    !loading && defaultProjectId ? { projectId: defaultProjectId } : "skip",
+    hostSearchQuery,
+    !loading && formData.projectId ? { projectId: formData.projectId, search: debouncedHostSearch } : "skip",
   );
 
-  const optionsLoading = presetRulesData === undefined || employeesData === undefined;
+  const optionsLoading = presetRulesData === undefined;
+  const hostsLoading = employeesData === undefined || hostSearch !== debouncedHostSearch;
 
   const presetRules = (presetRulesData ?? [])
     .filter((r) => r.isActive || r._id === visitor?.presetRuleId)
@@ -61,10 +74,14 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
   if (visitor?.presetRuleId && !presetRules.some(rule => rule.id === visitor.presetRuleId)) {
     presetRules.push({ id: visitor.presetRuleId, name: visitor.presetRuleName ?? "Kayıtlı erişim bölgesi", disabled: true });
   }
-  const hostEmployees = (employeesData ?? []).filter(e => !e.isVisitor).map((e) => ({
+  const hostEmployees = (employeesData ?? []).map((e) => ({
     id: e._id,
     name: `${e.firstName} ${e.lastName}${e.isActive ? "" : " (Pasif)"}`,
   }));
+
+  if (visitor?.hostEmployeeId && visitor.hostName && !hostEmployees.some(host => host.id === visitor.hostEmployeeId)) {
+    hostEmployees.push({ id: visitor.hostEmployeeId, name: visitor.hostName });
+  }
 
   useEffect(() => {
     if (visitor) {
@@ -98,5 +115,5 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visitor?._id, defaultProjectId]);
 
-  return { formData, setFormData, presetRules, hostEmployees, optionsLoading, isDirty: JSON.stringify(formData) !== JSON.stringify(initialData) };
+  return { formData, setFormData, presetRules, hostEmployees, hostSearch, setHostSearch, hostsLoading, optionsLoading, isDirty: JSON.stringify(formData) !== JSON.stringify(initialData) };
 };

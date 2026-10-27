@@ -78,7 +78,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
     <DetailFieldList fields={[
       ...fields,
       { key: "card", label: "Kart", numeric: true, value: <span className="break-all">{detail.cardReleased ? "İade edildi" : needsCard ? "Henüz kart atanmadı" : showCard ? detail.cardNumber : `•••• ${detail.cardNumber.slice(-4)}`}
-        {!detail.cardReleased && !needsCard && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</span> },
+        {!detail.sensitiveMasked && !detail.cardReleased && !needsCard && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</span> },
     ]} />
     {detail.presence && <p className="text-xs text-muted-foreground">Son konum izinli okumaya dayanır. Sürenin dolması veya manuel sonlandırma fiziksel çıkış okuması oluşturmaz.</p>}
     <VisitorCollapsible title="Şirket, iletişim ve ek bilgiler"><DetailFieldList className="whitespace-pre-wrap" fields={[

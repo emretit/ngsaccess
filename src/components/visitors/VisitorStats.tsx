@@ -9,10 +9,14 @@ export function VisitorStats({ now, onNextExpiry }: { now: number; onNextExpiry?
   const { projectId } = useActiveProjectScope();
   const summary = useStableQuery(useQuery(api.visitors.summary, projectId ? { projectId, now } : "skip"), projectId);
   useEffect(() => { if (summary) onNextExpiry?.(summary.nextExpiry); }, [summary, onNextExpiry]);
-  return <StatInline loading={summary === undefined} items={[
-    { label: "Aktif", value: summary?.counts.active },
-    { label: "Süresi doldu", value: summary?.counts.expired },
-    { label: "Sonlandırıldı / pasif", value: summary?.counts.checkedOut },
-    { label: "Ön kayıt", value: summary?.counts.preRegistered },
-  ]} />;
+  const count = (value: number | undefined) => value === undefined ? undefined : summary?.overflow ? `${value.toLocaleString("tr-TR")}+` : value;
+  return <div className="space-y-2"><StatInline loading={summary === undefined} items={[
+    { label: "Aktif", value: count(summary?.counts.active) },
+    { label: "Süresi doldu", value: count(summary?.counts.expired) },
+    { label: "Sonlandırıldı / pasif", value: count(summary?.counts.checkedOut) },
+    { label: "Ön kayıt", value: count(summary?.counts.preRegistered) },
+  ]} />
+    {summary?.overflow && <p className="text-xs text-muted-foreground">İlk {summary.scanned.toLocaleString("tr-TR")} kayda göre gösteriliyor; toplamlar daha yüksek olabilir.</p>}
+    {summary?.nextExpiryScanLimited && <p className="text-xs text-muted-foreground">Yaklaşan bitişlerin bir bölümü özete dahil edilemedi.</p>}
+  </div>;
 }

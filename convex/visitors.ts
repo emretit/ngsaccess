@@ -1,5 +1,5 @@
 import { hasReadingPermission, VISITOR_READING_PERMISSIONS } from "./lib/readingAccess";
-import { hasPermission, requirePermission } from "./lib/permissions";
+import { getUserPermissions, requirePermission } from "./lib/permissions";
 import { validateVisitorPresetCard } from "./lib/mobileVisitors";
 import { visitorQueryNow } from "./lib/visitorStatus";
 import { mergedStream, stream } from "convex-helpers/server/stream";
@@ -165,7 +165,14 @@ async function latestVisitorPresence(ctx: QueryCtx, visitor: Doc<"employees">) {
   return visitorPresence(simultaneous.length > 50 ? [] : simultaneous.filter(row => row.projectId === visitor.projectId));
 }
 
-async function visitorListRow(ctx: QueryCtx, visitor: Doc<"employees">, now: number, canRead: boolean) {
+async function requireVisitorRead(ctx: QueryCtx & { user: Doc<"users"> }, projectId: Id<"projects">) {
+  const permissions = await getUserPermissions(ctx, ctx.user, projectId);
+  const canManage = permissions.has("visitors.manage");
+  if (!canManage && !permissions.has("reports.view")) throw new Error("Ziyaretçileri görüntüleme yetkiniz yok");
+  return canManage;
+}
+
+async function visitorListRow(ctx: QueryCtx, visitor: Doc<"employees">, now: number, canRead: boolean, canManage: boolean) {
   const [host, rule, presence, consent] = await Promise.all([
     visitor.hostEmployeeId ? ctx.db.get(visitor.hostEmployeeId) : null,
     visitor.accessRuleId ? ctx.db.get(visitor.accessRuleId) : null,
@@ -177,6 +184,9 @@ async function visitorListRow(ctx: QueryCtx, visitor: Doc<"employees">, now: num
     firstName: visitor.firstName,
     lastName: visitor.lastName,
     company: visitor.visitorCompany ?? null,
+    visitorPhone: canManage ? visitor.visitorPhone ?? null : null,
+    notes: canManage ? visitor.notes ?? null : null,
+    visitPurpose: canManage ? visitor.visitPurpose ?? null : null,
     cardNumber: maskedVisitorCard(visitor.cardNumber),
     hostName: host?.projectId === visitor.projectId && host ? `${host.firstName} ${host.lastName}` : null,
     presetRuleName: rule?.projectId === visitor.projectId && rule ? rule.name : null,
@@ -201,6 +211,7 @@ export const listPage = authedQuery({
   },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
+    const canManage = await requireVisitorRead(ctx, args.projectId);
     if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 100) {
       throw new Error("Sayfa boyutu 1–100 arasında olmalıdır");
     }
@@ -226,10 +237,10 @@ export const listPage = authedQuery({
         : source.withIndex("by_project_visitor", q => q.eq("projectId", args.projectId).eq("isVisitor", true)).order("desc");
     const result = await indexed
       .filterWith(async visitor => (!args.status || visitorStatus(visitor, now) === args.status) && visitorMatchesSearch(visitor, args.search))
-      .paginate(args.paginationOpts);
+      .paginate({ ...args.paginationOpts, maximumRowsRead: 200, maximumBytesRead: 128 * 1024 });
     return {
       ...result,
-      page: await Promise.all(result.page.map(visitor => visitorListRow(ctx, visitor, now, canRead))),
+      page: await Promise.all(result.page.map(visitor => visitorListRow(ctx, visitor, now, canRead, canManage))),
       searchScope: "project" as const,
       statusScope: "project" as const,
       evaluatedAt: new Date(now).toISOString(),
@@ -237,25 +248,51 @@ export const listPage = authedQuery({
   },
 });
 
-/** Counts share exactly the list's four lifecycle states; no per-visitor presence reads. */
+const VISITOR_SUMMARY_LIMIT = 2000;
+const VISITOR_EXPIRY_SCAN_LIMIT = 50;
+
+/** Counts are lower bounds when the independent project scan reaches its budget. */
 export const summary = authedQuery({
   args: { projectId: v.id("projects"), now: v.optional(v.number()) },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
+    await requireVisitorRead(ctx, args.projectId);
     const now = visitorQueryNow(args.now);
     const counts = { active: 0, checkedOut: 0, expired: 0, preRegistered: 0 };
-    let total = 0;
+    const result = await stream(ctx.db, schema).query("employees")
+      .withIndex("by_project_visitor", q => q.eq("projectId", args.projectId).eq("isVisitor", true))
+      .paginate({ numItems: VISITOR_SUMMARY_LIMIT + 1, cursor: null,
+        maximumRowsRead: VISITOR_SUMMARY_LIMIT + 1, maximumBytesRead: 2 * 1024 * 1024 });
+    const rows = result.page.slice(0, VISITOR_SUMMARY_LIMIT);
     let nextExpiry: number | null = null;
-    const rows = ctx.db.query("employees")
-      .withIndex("by_project_visitor", q => q.eq("projectId", args.projectId).eq("isVisitor", true));
-    for await (const visitor of rows) {
-      total++;
+    const includeExpiry = (visitor: Doc<"employees">) => {
       const status = visitorStatus(visitor, now);
-      counts[status]++;
       const expiry = visitorTime(visitor.accessExpiresAt);
-      if (status !== "checkedOut" && status !== "expired" && expiry > now && (nextExpiry === null || expiry < nextExpiry)) nextExpiry = expiry;
+      if ((status === "active" || status === "preRegistered") && expiry > now && (nextExpiry === null || expiry < nextExpiry)) nextExpiry = expiry;
+    };
+    for (const visitor of rows) {
+      counts[visitorStatus(visitor, now)]++;
+      includeExpiry(visitor);
     }
-    return { total, counts, nextExpiry, evaluatedAt: new Date(now).toISOString() };
+    // Search expiry independently of the summary prefix. Inactive history cannot
+    // crowd active records out; the window also admits legacy TR/offset values.
+    const lower = new Date(now - 14 * 60 * 60 * 1000).toISOString();
+    const source = stream(ctx.db, schema).query("employees");
+    const expiryBudget = { numItems: VISITOR_EXPIRY_SCAN_LIMIT + 1, cursor: null,
+      maximumRowsRead: VISITOR_EXPIRY_SCAN_LIMIT + 1, maximumBytesRead: 128 * 1024 };
+    const [active, invitations] = await Promise.all([
+      source.withIndex("by_project_visitor_active_expiry", q => q.eq("projectId", args.projectId).eq("isVisitor", true).eq("isActive", true).gte("accessExpiresAt", lower))
+        .order("asc").paginate(expiryBudget),
+      // Pre-registrations also become expired at their boundary, without activation.
+      source.withIndex("by_project_visitor_status_expiry", q => q.eq("projectId", args.projectId).eq("isVisitor", true).eq("visitorStatus", "preRegistered").gte("accessExpiresAt", lower))
+        .order("asc").paginate(expiryBudget),
+    ]);
+    for (const visitor of [...active.page, ...invitations.page]) includeExpiry(visitor);
+    return { total: rows.length, counts, nextExpiry,
+      overflow: !result.isDone || result.page.length > VISITOR_SUMMARY_LIMIT,
+      scanned: rows.length, limit: VISITOR_SUMMARY_LIMIT,
+      nextExpiryScanLimited: !active.isDone || !invitations.isDone,
+      evaluatedAt: new Date(now).toISOString() };
   },
 });
 
@@ -266,9 +303,10 @@ export const getDetail = authedQuery({
     if (!visitor || visitor.isVisitor !== true) return null;
     const allowed = await resolveProjectScope(ctx, visitor.projectId);
     if (!visitor.projectId || !allowed.includes(visitor.projectId)) throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
+    const canManage = await requireVisitorRead(ctx, visitor.projectId);
     const canRead = await hasReadingPermission(ctx, visitor.projectId, VISITOR_READING_PERMISSIONS);
     const [row, consent, accepted, denied, unknown] = await Promise.all([
-      visitorListRow(ctx, visitor, Date.now(), canRead),
+      visitorListRow(ctx, visitor, Date.now(), canRead, canManage),
       activeKvkkConsentId(ctx, visitor._id),
       canRead ? ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "izin_verildi")).order("desc").take(10) : [],
       canRead ? ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "reddedildi")).order("desc").take(10) : [],
@@ -277,16 +315,13 @@ export const getDetail = authedQuery({
     return {
       ...row,
       projectId: visitor.projectId,
-      ...visitorSensitiveFields(visitor, await hasPermission(ctx, ctx.user, visitor.projectId, "visitors.manage")),
+      ...visitorSensitiveFields(visitor, canManage),
       cardReleased: visitor.cardNumber.startsWith("IADE:"),
       isActive: visitor.isActive ?? false,
       hostEmployeeId: visitor.hostEmployeeId ?? null,
       presetRuleId: visitor.accessRuleId ?? null,
       email: visitor.email?.toLowerCase().endsWith("@ngsaccess.local") ? null : visitor.email,
-      visitorPhone: visitor.visitorPhone ?? null,
       visitorCompany: visitor.visitorCompany ?? null,
-      visitPurpose: visitor.visitPurpose ?? null,
-      notes: visitor.notes ?? null,
       kvkkConsent: consent ? { grantedAt: consent.grantedAt, documentUrl: consent.documentUrl ?? null, version: consent.documentVersion ?? null } : null,
       recentReadings: [...accepted, ...denied, ...unknown].filter(reading => reading.projectId === visitor.projectId)
         .sort((a, b) => b.accessTime.localeCompare(a.accessTime)).slice(0, 10)
@@ -514,7 +549,7 @@ export const update = authedMutation({
     if (assigningPreset) patch.accessRuleId = args.presetRuleId;
     if (activeChanged) {
       patch.isActive = args.isActive;
-      patch.visitorStatus = args.isActive ? "checkedIn" : "preRegistered";
+      patch.visitorStatus = args.isActive ? "checkedIn" : "checkedOut";
     }
     await ctx.db.patch(args.visitorId, patch);
     if (assigningPreset) {

@@ -89,7 +89,7 @@ export const clearHostedVisitors = internalMutation({
  * employeeAuth, employeeSessions, shiftAssignments) burada tekrar yapılmaz.
  */
 export async function cascadeRemoveEmployeePII(
-  ctx: MutationCtx & { user: Doc<"users"> },
+  ctx: MutationCtx & { user: Doc<"users"> | null },
   employeeId: Id<"employees">,
 ): Promise<{
   facesDeleted: number;

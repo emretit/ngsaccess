@@ -418,7 +418,7 @@ export const update = authedMutation({
   returns: v.id("employees"),
 });
 
-export async function removeEmployeeRecord(ctx: MutationCtx, emp: Doc<"employees">, actor: Doc<"users">) {
+export async function removeEmployeeRecord(ctx: MutationCtx, emp: Doc<"employees">, actor: Doc<"users"> | null) {
     await assertNoEmployeeTransfer(ctx, emp._id);
     const snapshot = await snapshotEmployeeHikDevices(ctx, emp);
     await ctx.scheduler.runAfter(

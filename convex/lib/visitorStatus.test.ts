@@ -142,7 +142,7 @@ function visitorQueryFixture(employees: Record<string, unknown>[], extra: Record
     const chain = {
       withIndex(name: string, apply?: (q: typeof range) => unknown) {
         indexes.push(name);
-        fields = name === "by_project_visitor_status_expiry" ? ["projectId", "isVisitor", "visitorStatus", "accessExpiresAt", "_creationTime", "_id"] : name === "by_project_visitor_expiry" ? ["projectId", "isVisitor", "accessExpiresAt", "_creationTime", "_id"] : ["projectId", "isVisitor", "_creationTime", "_id"];
+        fields = name === "by_project_visitor_status_expiry" ? ["projectId", "isVisitor", "visitorStatus", "accessExpiresAt", "_creationTime", "_id"] : name === "by_project_visitor_active_expiry" ? ["projectId", "isVisitor", "isActive", "accessExpiresAt", "_creationTime", "_id"] : name === "by_project_visitor_expiry" ? ["projectId", "isVisitor", "accessExpiresAt", "_creationTime", "_id"] : ["projectId", "isVisitor", "_creationTime", "_id"];
         apply?.(range); return chain;
       },
       order(direction: string) { rows.sort((a, b) => {

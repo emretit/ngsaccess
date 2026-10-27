@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { visitorExpiryDelay } from "./hooks/useVisitorClock";
 import { canCaptureVisitorCard, visitorReaderLabel } from "./lib/readerCapability";
 import { DEFAULT_WORKDAYS } from "@/components/access-control/unified/components/weekdays";
@@ -17,10 +19,13 @@ import { getFunctionName, type FunctionReference } from "convex/server";
 
 const notice = vi.hoisted(() => ({ value: { url: null, version: null } as { url: string | null; version: string | null } }));
 const pageData = vi.hoisted(() => ({ value: { page: [] as VisitorDetail[], isDone: true, continueCursor: "done" } }));
+const permissions = vi.hoisted(() => ({ manage: true }));
 const mutationNames = vi.hoisted(() => [] as string[]);
 vi.mock("@/hooks/useVisitors", () => ({ useVisitors: () => ({ page: pageData.value }) }));
 vi.mock("convex/react", () => ({ useQuery: () => notice.value, useMutation: (ref: FunctionReference<"mutation">) => { mutationNames.push(getFunctionName(ref)); return vi.fn(); } }));
 vi.mock("./VisitorCardCapture", () => ({ default: () => <div>Kart okuyucusu</div> }));
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => permissions.manage }) }));
+const renderToStaticMarkup = (children: ReactNode) => renderMarkup(<MemoryRouter>{children}</MemoryRouter>);
 const noop = () => undefined;
 const form: VisitorFormData = {
   firstName: "", lastName: "", visitorPhone: "", visitorCompany: "", visitPurpose: "", hostEmployeeId: null,
@@ -81,7 +86,16 @@ describe("visitor audit fixes", () => {
   it("displays the configured notice and version, with a clear fallback when unconfigured", () => {
     const render = () => renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} presetRules={[]} hostEmployees={[]} isEditing={false} onNewZone={noop} />);
     notice.value = { url: null, version: null };
-    expect(render()).toContain("Aydınlatma metni henüz tanımlanmadı");
+    expect(render()).toContain("Aydınlatma metni tanımlı değil.");
+    expect(render().match(/<button[^>]*id="v_kvkk"[^>]*>/)?.[0]).toMatch(/\sdisabled[\s=>]/);
+    expect(render()).toContain("Ziyaretçi aydınlatma metnini onayladıysa işaretleyin.");
+    const settingsLink = render().match(/<a[^>]*href="\/settings\?tab=privacy"[^>]*>/)?.[0];
+    expect(settingsLink).toContain('target="_blank"');
+    expect(settingsLink).toContain('rel="noopener noreferrer"');
+    expect(render()).not.toContain("Mevcut kayıt sistemine");
+    permissions.manage = false;
+    expect(render()).not.toContain('href="/settings?tab=privacy"');
+    permissions.manage = true;
     notice.value = { url: "https://example.org/kvkk", version: "2026-1" };
     const html = render();
     expect(html).toContain('href="https://example.org/kvkk"');
@@ -113,4 +127,12 @@ it("hides redacted visitor reading fields without breaking the detail or list", 
   const list = renderToStaticMarkup(<VisitorTable visitors={[redacted]} onOpen={noop} />);
   expect(list).toContain(redacted.firstName);
   expect(list).toContain("—");
+});
+
+it.each([false, true])("keeps access controls for new/inactive records, hides them only for active edits (%s)", isCurrentlyActive => {
+  const html = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} presetRules={[]} hostEmployees={[]} isEditing isCurrentlyActive={isCurrentlyActive} onNewZone={noop} />);
+  expect(html.includes('id="v_active"')).toBe(!isCurrentlyActive);
+  expect(html.includes("Erişimi kapatmak için ayrıntıdaki")).toBe(isCurrentlyActive);
+  const newHtml = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} presetRules={[]} hostEmployees={[]} isEditing={false} onNewZone={noop} />);
+  expect(newHtml).toContain('id="v_active"');
 });

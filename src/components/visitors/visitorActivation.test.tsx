@@ -1,5 +1,6 @@
 import { Children, isValidElement, type FormEvent, type ReactNode } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getFunctionName } from "convex/server";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -38,6 +39,8 @@ const initialForm: VisitorFormData = {
   hostEmployeeId: visitor.hostEmployeeId, cardNumber: "12345678", presetRuleId: selectedRule,
   accessExpiresAt: "2099-01-01T18:00", isActive: true, notes: "", kvkkConsent: false, projectId: visitor.projectId,
 };
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true }) }));
+const renderToStaticMarkup = (children: ReactNode) => renderMarkup(<MemoryRouter>{children}</MemoryRouter>);
 const noop = () => undefined;
 
 // Exercise the actual form submit handler and submit hook through the mutation
@@ -164,4 +167,27 @@ describe("operator activation of mobile visitor preregistration", () => {
     expect(html).not.toContain("synthetic-reference");
     expect(html).not.toContain("Tam numarayı göster");
   });
+});
+
+it("preserves active access in update payload even if stale form state requests deactivation", async () => {
+  mocks.formData = { ...initialForm, isActive: false };
+  await renderForm({ ...visitor, isActive: true, status: "active", presetRuleId: selectedRule, cardNumber: "12345678" })(formEvent());
+  expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ isActive: true }));
+});
+it.each([
+  { patch: { firstName: "", lastName: "", presetRuleId: null, cardNumber: "", accessExpiresAt: "" }, id: "v_zone" },
+  { patch: { firstName: "", cardNumber: "", accessExpiresAt: "" }, id: "v_expires" },
+  { patch: { firstName: "", cardNumber: "" }, id: "v_card" },
+  { patch: { firstName: "", lastName: "" }, id: "v_first_name" },
+  { patch: { lastName: "" }, id: "v_last_name" },
+])("focuses the first invalid visible field $id", async ({ patch, id }) => {
+  mocks.formData = { ...initialForm, ...patch };
+  const focus = vi.fn();
+  const getElementById = vi.fn(() => ({ focus }));
+  vi.stubGlobal("document", { getElementById });
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+  await renderForm(null)(formEvent());
+  expect(getElementById).toHaveBeenCalledExactlyOnceWith(id);
+  expect(focus).toHaveBeenCalledOnce();
+  expect(mocks.create).not.toHaveBeenCalled();
 });

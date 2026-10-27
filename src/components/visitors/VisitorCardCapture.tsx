@@ -4,7 +4,7 @@ import { createCardCaptureSession } from "./cardCaptureSession";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useDevices } from "@/hooks/useDevices";
@@ -28,13 +28,14 @@ interface VisitorCardCaptureProps {
 }
 
 // Kayıt okuyucusu seçilir; ziyaretçi kartı bastırılınca okunan numara Convex reaktif
-// query ile anında yakalanıp forma düşürülür (getLastUnknownByDevice → bilinmeyen kart).
+// query ile yakalanır; pasif ziyaretçiden geri alınabilecek kartlar da kabul edilir.
 export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCardCaptureProps) {
   const { can } = usePermissions();
   const canCapture = can("employees.manage") || can("visitors.manage") || can("devices.manage") || can("reports.view");
   const { devices: projectDevices } = useDevices();
   const devices = projectDevices.filter(canCaptureVisitorCard);
   const { projectId } = useActiveProjectScope();
+  const startCardCapture = useMutation(api.cardReadings.startCardCapture);
 
   const [readerId, setReaderIdState] = useState<Id<"devices"> | null>(() => {
     try {
@@ -48,22 +49,30 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
   const [sinceTime, setSinceTime] = useState<string | null>(null);
   const [captured, setCaptured] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
 
   const previousCapture = useRef<string | null>(null);
   const session = useRef(createCardCaptureSession());
   const [replacement, setReplacement] = useState<string | null>(null);
 
+  const validReaderId = devices.some(device => device._id === readerId) ? readerId : null;
+
   useEffect(() => {
-    session.current.rearm();
+    const currentSession = session.current;
+    currentSession.cancel();
     setSinceTime(null);
     setCaptured(null);
     setReplacement(null);
-  }, [projectId]);
+    setTimedOut(false);
+    setStarting(false);
+    setCaptureError(null);
+    return () => currentSession.cancel();
+  }, [projectId, validReaderId]);
 
-  const validReaderId = devices.some(device => device._id === readerId) ? readerId : null;
   const reading = useQuery(
     api.cardReadings.getLastUnknownByDevice,
-    canCapture && projectId && validReaderId && sinceTime && !captured ? { projectId, deviceId: validReaderId, sinceTime } : "skip",
+    canCapture && projectId && validReaderId && sinceTime && !captured ? { projectId, deviceId: validReaderId, sinceTime, includeInactiveVisitorCards: true } : "skip",
   );
 
   useEffect(() => {
@@ -83,6 +92,7 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
   }, [sinceTime, captured]);
 
   const setReaderId = (id: Id<"devices"> | null) => {
+    session.current.cancel();
     setReaderIdState(id);
     try {
       if (id) localStorage.setItem(STORAGE_KEY, id);
@@ -92,14 +102,28 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
     }
     setSinceTime(null);
     setCaptured(null);
+    setTimedOut(false);
+    setStarting(false);
+    setCaptureError(null);
+    setReplacement(null);
   };
 
-  const rearm = () => {
+  const rearm = async () => {
+    if (!canCapture || !projectId || !validReaderId) return;
     setTimedOut(false);
+    setCaptureError(null);
+    setStarting(true);
     previousCapture.current = captured === currentCard ? captured : null;
-    session.current.rearm();
-    setSinceTime(new Date().toISOString());
+    const token = session.current.rearm();
     setCaptured(null);
+    try {
+      const startedAt = await startCardCapture({ projectId, deviceId: validReaderId });
+      if (session.current.isCurrent(token)) setSinceTime(startedAt);
+    } catch {
+      if (session.current.isCurrent(token)) setCaptureError("Okuma başlatılamadı. Yeniden deneyin.");
+    } finally {
+      if (session.current.isCurrent(token)) setStarting(false);
+    }
   };
 
   const listening = !!validReaderId && !!sinceTime && !captured;
@@ -139,12 +163,13 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
               <Loader2 className="h-4 w-4 animate-spin" />
               Kartı seçili okuyucuya okutun. İlk okuma forma alınır.
             </span>
-          ) : <span role="status" className="text-muted-foreground">{timedOut ? "30 saniyede kart okunmadı. Okuyucuyu kontrol edin veya numarayı elle girin." : "Dinleme kapalı"}</span>}
+          ) : <span role="status" className="text-muted-foreground">{captureError ?? (starting ? "Okuma başlatılıyor…" : timedOut ? "30 saniyede kart okunmadı. Okuyucuyu kontrol edin veya numarayı elle girin." : "Dinleme kapalı")}</span>}
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => listening ? setSinceTime(null) : rearm()}
+            disabled={starting || !canCapture}
+            onClick={() => listening ? setSinceTime(null) : void rearm()}
             className="h-7 gap-1 text-xs"
           >
             <RefreshCw className="h-3.5 w-3.5" />

@@ -10,6 +10,8 @@ import { writeAudit } from "./lib/audit";
 import { RETENTION_BATCH_SIZE, retentionBatchPlan, retentionCutoff, validRetentionDays } from "./lib/cardReadingRetention";
 import { maskChatNames } from "./lib/chatMasking";
 import { filterPdksReadings } from "./lib/pdksSource";
+import { removeEmployeeRecord } from "./employees";
+import { shouldPurgeVisitor, validVisitorRetentionDays, visitorRetentionCutoff, VISITOR_RETENTION_BATCH_SIZE, VISITOR_RETENTION_PREVIEW_LIMIT } from "./lib/visitorRetention";
 
 async function requireProject(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">): Promise<void> {
   const allowed = await getProjectIdsForUser(ctx);
@@ -118,6 +120,41 @@ export const getVisitorNotice = authedQuery({
   },
 });
 
+export const getVisitorRetention = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
+    return { visitorRetentionDays: (await getPrivacySettings(ctx, projectId)).visitorRetentionDays };
+  },
+});
+
+export const setVisitorRetention = authedMutation({
+  args: { projectId: v.id("projects"), days: v.union(v.number(), v.null()) },
+  handler: async (ctx, { projectId, days }): Promise<null> => {
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
+    if (!validVisitorRetentionDays(days)) throw new ConvexError("Saklama süresi 30–3650 arasında tam gün olmalıdır.");
+    const oldValue = (await getPrivacySettings(ctx, projectId)).visitorRetentionDays;
+    await upsertPrivacySettings(ctx, projectId, { visitorRetentionDays: days });
+    await writeAudit(ctx, { user: ctx.user, projectId, action: "update", targetTable: "projectPrivacySettings", targetId: projectId,
+      oldValue: { visitorRetentionDays: oldValue }, newValue: { visitorRetentionDays: days } });
+    return null;
+  },
+});
+
+export const previewVisitorRetention = authedQuery({
+  args: { projectId: v.id("projects"), days: v.number() },
+  handler: async (ctx, { projectId, days }) => {
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
+    if (!validVisitorRetentionDays(days)) throw new ConvexError("Saklama süresi 30–3650 arasında tam gün olmalıdır.");
+    const runAt = Date.now();
+    const rows = await ctx.db.query("employees").withIndex("by_project_visitor_active_expiry", q =>
+      q.eq("projectId", projectId).eq("isVisitor", true).eq("isActive", false).lt("accessExpiresAt", visitorRetentionCutoff(days, runAt)),
+    ).take(VISITOR_RETENTION_PREVIEW_LIMIT + 1);
+    return { count: rows.slice(0, VISITOR_RETENTION_PREVIEW_LIMIT).filter(row => shouldPurgeVisitor(row, days, runAt)).length,
+      capped: rows.length > VISITOR_RETENTION_PREVIEW_LIMIT };
+  },
+});
+
 export const setVisitorNotice = authedMutation({
   args: { projectId: v.id("projects"), visitorKvkkUrl: v.string(), visitorKvkkVersion: v.string() },
   handler: async (ctx, { projectId, visitorKvkkUrl, visitorKvkkVersion }): Promise<null> => {
@@ -162,11 +199,12 @@ const stages = [
   ["purgeDeviceEvents", ""], ["purgeCheckInTokens", "expired"], ["purgeCheckInTokens", "used"],
   ["purgeEmployeeSessions", ""],
   ["purgeMobileOperations", "confirmed"], ["purgeMobileOperations", "failed"], ["purgeMobileOperations", "unknown"],
+  ["purgeVisitors", ""],
 ] as const;
 const groups = {
   operations: { first: 0, last: 6 },
   events: { first: 7, last: 7 },
-  access: { first: 8, last: 13 },
+  access: { first: 8, last: 14 },
 } as const;
 function stageGroup(stage: number) {
   return Object.values(groups).find(group => stage >= group.first && stage <= group.last);
@@ -306,6 +344,76 @@ export const purgeMobileOperations = internalMutation({
     const page = await ctx.db.query("mobileAccessOperations").withIndex("by_status_and_requestedAt", q => q.eq("status", status).lt("requestedAt", isoCutoff(args, MOBILE_OPERATION_RETENTION_DAYS))).paginate(opts(args));
     for (const row of page.page) await ctx.db.delete(row._id);
     await advance(ctx, args, page.isDone, page.continueCursor);
+    return null;
+  },
+});
+
+/** One bounded project page per call; shares the access group's 20-call budget. */
+export const purgeVisitors = internalMutation({
+  args: { ...batchArgs, visitorProjectId: v.optional(v.id("projects")), days: v.optional(v.number()) }, returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    if (!valid(args, "purgeVisitors")) return null;
+    let projectId = args.visitorProjectId;
+    let days: number | null = null;
+    if (args.cursor && projectId) {
+      days = (await getPrivacySettings(ctx, projectId)).visitorRetentionDays;
+    } else {
+      // Keyset through settings avoids a second paginate call in this mutation.
+      const after = projectId;
+      const settings = await ctx.db.query("projectPrivacySettings").withIndex("by_project", q => after ? q.gt("projectId", after) : q).take(50);
+      const enabled = settings.find(row => row.visitorRetentionDays !== undefined && validVisitorRetentionDays(row.visitorRetentionDays));
+      projectId = enabled?.projectId ?? settings[settings.length - 1]?.projectId;
+      days = enabled?.visitorRetentionDays ?? null;
+      if (!enabled && settings.length < 50) return null;
+    }
+    if (!projectId) return null;
+    let cursor: string | undefined;
+    if (days !== null && validVisitorRetentionDays(days)) {
+      const page = await ctx.db.query("employees").withIndex("by_project_visitor_active_expiry", q =>
+        q.eq("projectId", projectId).eq("isVisitor", true).eq("isActive", false).lt("accessExpiresAt", visitorRetentionCutoff(days, args.runAt)),
+      ).paginate({ numItems: VISITOR_RETENTION_BATCH_SIZE, maximumRowsRead: VISITOR_RETENTION_BATCH_SIZE,
+        // A cursor belongs to the original index range, including its cutoff.
+        cursor: args.days === days ? args.cursor ?? null : null });
+      for (const row of page.page) {
+        if (!shouldPurgeVisitor(row, days, args.runAt)) continue;
+        await ctx.scheduler.runAfter(0, internal.privacyRetention.removeRetainedVisitor, { visitorId: row._id, projectId });
+      }
+      if (!page.isDone) cursor = page.continueCursor;
+    }
+    const batch = args.batch + 1;
+    if (batch < MAX_CHAIN_LENGTH) await ctx.scheduler.runAfter(0, internal.privacyRetention.purgeVisitors, {
+      stage: args.stage, batch, runAt: args.runAt, visitorProjectId: projectId, ...(cursor && days !== null ? { cursor, days } : {}),
+    });
+    return null;
+  },
+});
+
+/** A failed cascade rolls back in a subtransaction before its failure is audited. */
+export const removeRetainedVisitor = internalMutation({
+  args: { visitorId: v.id("employees"), projectId: v.id("projects") }, returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    try {
+      await ctx.runMutation(internal.privacyRetention.removeRetainedVisitorRecord, args);
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : "Bilinmeyen hata";
+      await writeAudit(ctx, { user: null, projectId: args.projectId, action: "update", targetTable: "employees", targetId: args.visitorId,
+        note: `Saklama silmesi atlandı: ${reason.slice(0, 500)}` });
+    }
+    return null;
+  },
+});
+
+/** Separate transaction: the manual cascade owns its one allowed paginated query. */
+export const removeRetainedVisitorRecord = internalMutation({
+  args: { visitorId: v.id("employees"), projectId: v.id("projects") }, returns: v.null(),
+  handler: async (ctx, { visitorId, projectId }): Promise<null> => {
+    const visitor = await ctx.db.get(visitorId);
+    if (!visitor || visitor.projectId !== projectId) return null;
+    const days = (await getPrivacySettings(ctx, projectId)).visitorRetentionDays;
+    if (!shouldPurgeVisitor(visitor, days, Date.now())) return null;
+    await removeEmployeeRecord(ctx, visitor, null);
+    await writeAudit(ctx, { user: null, projectId, action: "delete", targetTable: "employees", targetId: visitorId,
+      note: "Saklama süresi doldu (sistem)" });
     return null;
   },
 });

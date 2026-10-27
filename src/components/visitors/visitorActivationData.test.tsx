@@ -1,25 +1,30 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { getFunctionName } from "convex/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { VisitorDetail } from "@/types/visitor";
 import { useVisitorFormData, type VisitorFormData } from "./hooks/useVisitorFormData";
 
-const state = vi.hoisted(() => ({ updates: [] as unknown[], effects: [] as (() => void)[], cursor: 0 }));
+const queries = vi.hoisted(() => [] as { name: string; args: unknown }[]);
+const state = vi.hoisted(() => ({ search: "", updates: [] as unknown[], effects: [] as (() => void)[], cursor: 0 }));
 vi.mock("react", async original => ({
   ...await original<typeof import("react")>(),
   useState: (initial: unknown) => {
     const index = state.cursor++;
-    return [typeof initial === "function" ? initial() : initial, (value: unknown) => { state.updates[index] = value; }];
+    return [index === 2 || index === 3 ? state.search : typeof initial === "function" ? initial() : initial, (value: unknown) => { state.updates[index] = value; }];
   },
   useEffect: (effect: () => void) => { state.effects.push(effect); },
 }));
 vi.mock("convex/react", () => ({
-  useQuery: (reference: Parameters<typeof getFunctionName>[0]) => getFunctionName(reference) === "visitors:presetRules" ? [
+  useQuery: (reference: Parameters<typeof getFunctionName>[0], args: unknown) => {
+    const name = getFunctionName(reference);
+    queries.push({ name, args });
+    return name === "visitors:presetRules" ? [
     { _id: "active-rule", name: "Lobby", isActive: true, hasDoors: true },
     { _id: "no-doors", name: "Empty zone", isActive: true, hasDoors: false },
     { _id: "inactive-rule", name: "Inactive zone", isActive: false, hasDoors: true },
-  ] : [],
+  ] : [];
+  },
 }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project", loading: false }) }));
 
@@ -33,16 +38,20 @@ const visitor: VisitorDetail = {
   visitPurpose: null, notes: null, kvkkConsent: null, recentReadings: [],
 };
 function initialize(detail: VisitorDetail) {
+  let hosts: { id: string; name: string }[] = [];
   let options: { id: string; disabled: boolean }[] = [];
   function Harness() {
-    options = useVisitorFormData(detail).presetRules;
+    const data = useVisitorFormData(detail);
+    options = data.presetRules;
+    hosts = data.hostEmployees;
     return null;
   }
   renderToStaticMarkup(<Harness />);
   for (const effect of state.effects) effect();
-  return { form: state.updates[0] as VisitorFormData, options };
+  return { form: state.updates[0] as VisitorFormData, options, hosts };
 }
-beforeEach(() => { state.updates = []; state.effects = []; state.cursor = 0; });
+afterEach(() => vi.useRealTimers());
+beforeEach(() => { vi.useFakeTimers(); state.search = ""; queries.length = 0; state.updates = []; state.effects = []; state.cursor = 0; });
 
 it.each(["PRE:synthetic-reference", "IADE:returned-card", "•••• 1234"])("starts the real edit form with an empty actual-card input for %s", cardNumber => {
   const { form } = initialize({ ...visitor, cardNumber });
@@ -66,4 +75,18 @@ it("offers only active zones for assignment and marks a zone without doors unava
 it("retains an existing inactive zone as disabled instead of making it selectable", () => {
   const { options } = initialize({ ...visitor, presetRuleId: "inactive-rule" as Id<"accessRules"> });
   expect(options.find(option => option.id === "inactive-rule")).toMatchObject({ disabled: true });
+});
+
+it("uses bounded server host search and retains the current host name outside results", () => {
+  const hostEmployeeId = "old-host" as Id<"employees">;
+  const { hosts } = initialize({ ...visitor, hostEmployeeId, hostName: "Deniz Yılmaz" });
+  expect(hosts).toContainEqual({ id: hostEmployeeId, name: "Deniz Yılmaz" });
+  expect(queries).toContainEqual({ name: "visitorHosts:search", args: { projectId: "project", search: "" } });
+  expect(queries.some(query => query.name === "employees:list")).toBe(false);
+});
+
+it("sends the typed host search to the server while keeping the form available", () => {
+  state.search = "Deniz";
+  initialize(visitor);
+  expect(queries).toContainEqual({ name: "visitorHosts:search", args: { projectId: "project", search: "Deniz" } });
 });

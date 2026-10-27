@@ -215,7 +215,7 @@ it("drains 450 events in 200/200/50 independently of an operations backlog", asy
 });
 
 it.each([
-  ["operations", 0, 6], ["events", 7, 7], ["access", 8, 13],
+  ["operations", 0, 6], ["events", 7, 7], ["access", 8, 14],
 ] as const)("bounds the %s chain to 20 calls and stays within its stages", async (group, first, last) => {
   const { t, ids } = await fixture();
   await t.run(async ctx => { for (let i = 0; i < 4100; i++) await insert(ctx, ids, first); });
@@ -225,4 +225,151 @@ it.each([
   expect(jobs).toHaveLength(20);
   expect(jobs.every(job => job.args[0].stage >= first && job.args[0].stage <= last)).toBe(true);
   for (let stage = first; stage <= last; stage++) expect(jobs.some(job => job.args[0].stage === stage)).toBe(true);
+});
+
+
+async function visitorFixture(days: number | null = 90) {
+  const { t, ids } = await fixture();
+  const privacyId = await t.run(ctx => ctx.db.insert("projectPrivacySettings", { projectId: ids.projectId,
+    ...(days === null ? {} : { visitorRetentionDays: days }), updatedAt: iso(runAt) }));
+  return { t, ids, privacyId };
+}
+async function addVisitor(ctx: MutationCtx, projectId: Id<"projects">, patch: Partial<import("./_generated/dataModel").Doc<"employees">> = {}) {
+  return ctx.db.insert("employees", { projectId, firstName: "Visitor", lastName: "Retention", email: "visitor@example.test", cardNumber: crypto.randomUUID(),
+    isVisitor: true, isActive: false, visitorStatus: "checkedOut", accessExpiresAt: iso(runAt - 100 * DAY_MS), updatedAt: iso(runAt), ...patch });
+}
+it("visitor retention is disabled by default", async () => {
+  const { t, ids } = await visitorFixture(null);
+  const id = await t.run(ctx => addVisitor(ctx, ids.projectId));
+  await t.mutation(internal.privacyRetention.startDailyPurge, { group: "access" });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await t.run(ctx => ctx.db.get(id))).not.toBeNull();
+});
+it("purges only expired inactive visitors in enabled projects through the manual deletion cascade", async () => {
+  const { t, ids } = await visitorFixture();
+  const data = await t.run(async ctx => {
+    const otherProject = await ctx.db.insert("projects", { name: "Other" });
+    const expired = await addVisitor(ctx, ids.projectId);
+    const oldPreRegistration = await addVisitor(ctx, ids.projectId, { visitorStatus: "preRegistered" });
+    const fallback = await addVisitor(ctx, ids.projectId, { accessExpiresAt: undefined, updatedAt: iso(runAt - 100 * DAY_MS) });
+    const keep = [
+      await addVisitor(ctx, ids.projectId, { accessExpiresAt: iso(runAt - 80 * DAY_MS) }),
+      await addVisitor(ctx, ids.projectId, { isActive: true }),
+      await addVisitor(ctx, ids.projectId, { visitorStatus: "preRegistered", accessExpiresAt: iso(runAt + DAY_MS) }),
+      await addVisitor(ctx, ids.projectId, { visitorStatus: "preRegistered", accessExpiresAt: iso(runAt - 10 * DAY_MS) }),
+      await addVisitor(ctx, ids.projectId, { isVisitor: false }),
+      await addVisitor(ctx, otherProject),
+    ];
+    const token = await ctx.db.insert("checkInTokens", { employeeId: expired, token: "visitor-token", createdAt: iso(runAt), expiresAt: iso(runAt + DAY_MS) });
+    const consent = await ctx.db.insert("employeeConsents", { employeeId: expired, consentType: "visitor_kvkk", grantedAt: iso(old) });
+    return { expired, oldPreRegistration, fallback, keep, token, consent };
+  });
+  await t.mutation(internal.privacyRetention.startDailyPurge, { group: "access" });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await t.run(ctx => ctx.db.get(data.expired))).toBeNull();
+  expect(await t.run(ctx => ctx.db.get(data.fallback))).toBeNull();
+  expect(await t.run(ctx => ctx.db.get(data.oldPreRegistration))).toBeNull();
+  expect(await t.run(ctx => ctx.db.get(data.token))).toBeNull();
+  expect(await t.run(ctx => ctx.db.get(data.consent))).toMatchObject({ revokedAt: iso(runAt) });
+  for (const id of data.keep) expect(await t.run(ctx => ctx.db.get(id))).not.toBeNull();
+  const audit = await t.run(ctx => ctx.db.query("auditLog").collect());
+  expect(audit.filter(row => row.note === "Saklama süresi doldu (sistem)")).toHaveLength(3);
+  expect(audit.every(row => row.userId === undefined)).toBe(true);
+});
+it("bounds visitor deletion to 25 per call, chains and rechecks disabled settings", async () => {
+  const { t, ids, privacyId } = await visitorFixture();
+  await t.run(async ctx => { for (let i = 0; i < 30; i++) await addVisitor(ctx, ids.projectId); });
+  await t.mutation(internal.privacyRetention.purgeVisitors, { stage: 14, batch: 0, runAt });
+  const remaining = await t.run(ctx => ctx.db.query("employees").withIndex("by_project_visitor", q => q.eq("projectId", ids.projectId).eq("isVisitor", true)).collect());
+  expect(remaining).toHaveLength(30);
+  const queued = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(queued.filter(job => job.name === "privacyRetention:removeRetainedVisitor")).toHaveLength(25);
+  await t.run(ctx => ctx.db.patch(privacyId, { visitorRetentionDays: undefined }));
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  for (const row of remaining) expect(await t.run(ctx => ctx.db.get(row._id))).not.toBeNull();
+});
+it("preserves visitor backlog at the shared 20-call limit", async () => {
+  const { t, ids } = await visitorFixture();
+  await t.run(async ctx => { for (let i = 0; i < 30; i++) await addVisitor(ctx, ids.projectId); });
+  await t.mutation(internal.privacyRetention.purgeVisitors, { stage: 14, batch: 19, runAt });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  const rows = await t.run(ctx => ctx.db.query("employees").withIndex("by_project_visitor", q => q.eq("projectId", ids.projectId).eq("isVisitor", true)).collect());
+  expect(rows).toHaveLength(5);
+  const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(jobs.filter(job => job.name === "privacyRetention:purgeVisitors")).toHaveLength(0);
+});
+
+it("rechecks state and project at deletion time and is idempotent", async () => {
+  const { t, ids } = await visitorFixture();
+  const data = await t.run(async ctx => {
+    const other = await ctx.db.insert("projects", { name: "Other" });
+    const active = await addVisitor(ctx, ids.projectId, { isActive: true });
+    const extended = await addVisitor(ctx, ids.projectId, { accessExpiresAt: iso(runAt + DAY_MS) });
+    const reassigned = await addVisitor(ctx, other);
+    const expired = await addVisitor(ctx, ids.projectId);
+    return { keep: [active, extended, reassigned], expired };
+  });
+  for (const visitorId of data.keep) await t.mutation(internal.privacyRetention.removeRetainedVisitor, { visitorId, projectId: ids.projectId });
+  for (const id of data.keep) expect(await t.run(ctx => ctx.db.get(id))).not.toBeNull();
+  await t.mutation(internal.privacyRetention.removeRetainedVisitor, { visitorId: data.expired, projectId: ids.projectId });
+  await t.mutation(internal.privacyRetention.removeRetainedVisitor, { visitorId: data.expired, projectId: ids.projectId });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await t.run(ctx => ctx.db.get(data.expired))).toBeNull();
+  const audit = await t.run(ctx => ctx.db.query("auditLog").collect());
+  expect(audit.filter(row => row.note === "Saklama süresi doldu (sistem)")).toHaveLength(1);
+});
+it("continues beyond the first visitor page and across enabled projects", async () => {
+  const { t, ids } = await visitorFixture();
+  const all = await t.run(async ctx => {
+    const other = await ctx.db.insert("projects", { name: "Enabled" });
+    await ctx.db.insert("projectPrivacySettings", { projectId: other, visitorRetentionDays: 90, updatedAt: iso(runAt) });
+    const result = [await addVisitor(ctx, other)];
+    for (let i = 0; i < 30; i++) result.push(await addVisitor(ctx, ids.projectId));
+    return result;
+  });
+  await t.mutation(internal.privacyRetention.startDailyPurge, { group: "access" });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  for (const id of all) expect(await t.run(ctx => ctx.db.get(id))).toBeNull();
+  const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(jobs.filter(job => job.name === "privacyRetention:purgeVisitors").length).toBeLessThanOrEqual(14);
+});
+
+it.each([30, 180])("restarts a visitor page when retention changes from 90 to %i days", async days => {
+  const { t, ids, privacyId } = await visitorFixture();
+  await t.run(async ctx => { for (let i = 0; i < 30; i++) await addVisitor(ctx, ids.projectId); });
+  await t.mutation(internal.privacyRetention.purgeVisitors, { stage: 14, batch: 0, runAt });
+  const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  const continuation = jobs.find(job => job.name === "privacyRetention:purgeVisitors");
+  expect(continuation?.args[0]).toMatchObject({ days: 90, visitorProjectId: ids.projectId });
+  expect(continuation?.args[0].cursor).toEqual(expect.any(String));
+  await t.run(ctx => ctx.db.patch(privacyId, { visitorRetentionDays: days }));
+  // A cursor from a different index range must never reach paginate, even if invalid.
+  await t.mutation(internal.privacyRetention.purgeVisitors, { stage: 14, batch: 1, runAt,
+    visitorProjectId: ids.projectId, days: 90, cursor: "obsolete-range-cursor" });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  const remaining = await t.run(ctx => ctx.db.query("employees").withIndex("by_project_visitor", q => q.eq("projectId", ids.projectId).eq("isVisitor", true)).collect());
+  expect(remaining).toHaveLength(days === 30 ? 0 : 30);
+});
+
+it("audits failed retention deletion, rolls back its partial cascade and continues other visitors", async () => {
+  const { t, ids } = await visitorFixture();
+  const data = await t.run(async ctx => {
+    const blocked = await addVisitor(ctx, ids.projectId);
+    const healthy = await addVisitor(ctx, ids.projectId);
+    const session = await ctx.db.insert("employeeSessions", { employeeId: blocked, token: "keep-on-failure", createdAt: iso(runAt), expiresAt: iso(runAt + DAY_MS) });
+    for (let i = 0; i < 1001; i++) await ctx.db.insert("attendanceCorrections", {
+      employeeId: blocked, projectId: ids.projectId, date: "2026-01-01", correctionType: "checkIn",
+      reason: "Limit fixture", status: "pending", createdAt: iso(runAt), updatedAt: iso(runAt),
+    });
+    return { blocked, healthy, session };
+  });
+  await t.mutation(internal.privacyRetention.startDailyPurge, { group: "access" });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await t.run(ctx => ctx.db.get(data.blocked))).not.toBeNull();
+  expect(await t.run(ctx => ctx.db.get(data.session))).not.toBeNull();
+  expect(await t.run(ctx => ctx.db.get(data.healthy))).toBeNull();
+  const audit = await t.run(ctx => ctx.db.query("auditLog").collect());
+  expect(audit.some(row => row.targetId === data.blocked && row.note?.startsWith("Saklama silmesi atlandı: ") && row.note.includes("talep geçmişi"))).toBe(true);
+  const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(jobs.some(job => job.name.includes("deleteEmployeeFromDevicesInternal") && job.args[0].employeeId === data.blocked)).toBe(false);
 });

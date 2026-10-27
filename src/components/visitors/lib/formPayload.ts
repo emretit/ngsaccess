@@ -12,7 +12,7 @@ export function visitorFormPayload(formData: VisitorFormData, visitor?: VisitorD
   const originalExpiry = visitor ? isoToLocalInput(visitor.visitEnd ?? "") : undefined;
   const isPreRegistration = canAssignVisitorPreset(visitor);
   const parsed = visitorFormSchema.parse({ ...formData, isEditing: !!visitor, isPreRegistration, originalExpiry, wasActive: visitor?.isActive });
-  const shared = { firstName: parsed.firstName, lastName: parsed.lastName, isActive: formData.isActive, kvkkConsent: formData.kvkkConsent, kvkkDocumentVersion: formData.kvkkDocumentVersion };
+  const shared = { firstName: parsed.firstName, lastName: parsed.lastName, isActive: visitor?.isActive === true ? true : formData.isActive, kvkkConsent: formData.kvkkConsent, kvkkDocumentVersion: formData.kvkkDocumentVersion };
   if (visitor) {
     return { kind: "update", args: {
       visitorId: visitor._id, projectId: formData.projectId, ...shared,

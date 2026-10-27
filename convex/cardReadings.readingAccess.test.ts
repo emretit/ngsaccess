@@ -139,10 +139,16 @@ describe("embedded reading redaction", () => {
     { permissions: [], visible: false },
     { permissions: ["visitors.manage"], visible: true },
     { permissions: ["reports.view"], visible: true },
-    { permissions: ["devices.manage"], visible: true },
+    { permissions: ["devices.manage"], visible: false },
   ] satisfies { permissions: Permission[]; visible: boolean }[])("visitor data keeps its shape: $permissions", async ({ permissions, visible }) => {
     const f = await fixture("security", permissions);
     await f.t.run(ctx => ctx.db.patch(f.employeeId, { isVisitor: true }));
+    if (!visible) {
+      await expect(f.caller.query(api.visitors.getDetail, { visitorId: f.employeeId })).rejects.toThrow("Ziyaretçileri görüntüleme yetkiniz yok");
+      await expect(f.caller.query(api.visitors.listPage, { projectId: f.projectId, paginationOpts: page })).rejects.toThrow("Ziyaretçileri görüntüleme yetkiniz yok");
+      await expect(f.caller.query(api.visitors.summary, { projectId: f.projectId })).rejects.toThrow("Ziyaretçileri görüntüleme yetkiniz yok");
+      return;
+    }
     const detail = await f.caller.query(api.visitors.getDetail, { visitorId: f.employeeId });
     expect(detail?.recentReadings).toHaveLength(visible ? 1 : 0);
     expect(detail?.presence).toBe(visible ? "inside" : null);

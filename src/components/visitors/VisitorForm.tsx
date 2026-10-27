@@ -19,7 +19,7 @@ export default function VisitorForm({ visitor, onClose, onSave, onStateChange }:
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
   const [failed, setFailed] = useState(false);
   const [zoneOpen, setZoneOpen] = useState(false);
-  const { formData, setFormData, presetRules, hostEmployees, optionsLoading, isDirty } = useVisitorFormData(visitor);
+  const { formData, setFormData, presetRules, hostEmployees, hostSearch, setHostSearch, hostsLoading, optionsLoading, isDirty } = useVisitorFormData(visitor);
   const { isLoading, handleSubmit } = useVisitorFormSubmit(visitor, onSave);
   const isPreRegistration = canAssignVisitorPreset(visitor);
   useEffect(() => { onStateChange(isDirty, isLoading); }, [isDirty, isLoading, onStateChange]);
@@ -34,7 +34,8 @@ export default function VisitorForm({ visitor, onClose, onSave, onStateChange }:
       }
       setFieldErrors(errors);
       const ids: Record<string, string> = { firstName: "v_first_name", lastName: "v_last_name", cardNumber: "v_card", presetRuleId: "v_zone", accessExpiresAt: "v_expires" };
-      requestAnimationFrame(() => document.getElementById(ids[String(result.error.issues[0]?.path[0])])?.focus());
+      const firstError = ["presetRuleId", "accessExpiresAt", "cardNumber", "firstName", "lastName"].find(key => errors[key]);
+      if (firstError) requestAnimationFrame(() => document.getElementById(ids[firstError])?.focus());
       return;
     }
     setFieldErrors({}); setFailed(false);
@@ -43,7 +44,7 @@ export default function VisitorForm({ visitor, onClose, onSave, onStateChange }:
   return <>
     <form onSubmit={onSubmit} className="min-w-0" noValidate>
       <fieldset disabled={isLoading} className="min-w-0 space-y-5 p-5">
-        {optionsLoading ? <SectionSkeleton rows={5} label="Form bilgileri yükleniyor" /> : <VisitorFormFields formData={formData} setFormData={setFormData} presetRules={presetRules} hostEmployees={hostEmployees} isEditing={!!visitor} isPreRegistration={isPreRegistration} kvkkConsentAt={visitor?.kvkkConsent?.grantedAt} errors={fieldErrors} onNewZone={() => setZoneOpen(true)} />}
+        {optionsLoading ? <SectionSkeleton rows={5} label="Form bilgileri yükleniyor" /> : <VisitorFormFields formData={formData} setFormData={setFormData} presetRules={presetRules} hostEmployees={hostEmployees} hostSearch={hostSearch} onHostSearchChange={setHostSearch} hostsLoading={hostsLoading} isCurrentlyActive={visitor?.isActive === true} isEditing={!!visitor} isPreRegistration={isPreRegistration} kvkkConsentAt={visitor?.kvkkConsent?.grantedAt} errors={fieldErrors} onNewZone={() => setZoneOpen(true)} />}
         {failed && <FormFeedback tone="error">Ziyaretçi kaydedilemedi. Girişleriniz korundu; bilgileri kontrol edip tekrar deneyin.</FormFeedback>}
       </fieldset>
       <FormActions isLoading={isLoading} onClose={onClose} busyLabel="Kaydediliyor…" submitDisabled={optionsLoading} submitLabel={isPreRegistration && formData.isActive ? "Erişimi etkinleştir" : visitor ? "Değişiklikleri kaydet" : "Ziyaretçiyi kaydet"} />

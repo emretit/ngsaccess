@@ -166,6 +166,9 @@ export default defineSchema({
     .index("by_project_visitor_expiry", ["projectId", "isVisitor", "accessExpiresAt"])
     // Bitişi ileri taşınmış ama durumu "expired" kalan ziyaretçiler için ikinci tarama aralığı (06-H1).
     .index("by_project_visitor_status_expiry", ["projectId", "isVisitor", "visitorStatus", "accessExpiresAt"])
+    // Ziyaretçi özeti: projedeki en yakın aktif bitiş, sınırlı taramada (Z-O5); isActive=false
+    // aralığı ziyaretçi saklama süresi önizleme/imha taramasında da kullanılır (privacyRetention.ts).
+    .index("by_project_visitor_active_expiry", ["projectId", "isVisitor", "isActive", "accessExpiresAt"])
     .searchIndex("search_first_name", { searchField: "firstName", filterFields: ["projectId"] })
     .searchIndex("search_last_name", { searchField: "lastName", filterFields: ["projectId"] })
     // Expiry cron: isVisitor=true ∧ isActive=true ∧ accessExpiresAt<=now (ISO-UTC sıralanabilir).
@@ -1452,6 +1455,7 @@ export default defineSchema({
     biometricChangedAt: v.optional(v.string()),
     biometricChangedBy: v.optional(v.id("users")),
     cardReadingRetentionDays: v.optional(v.number()),
+    visitorRetentionDays: v.optional(v.number()),
     aiMaskNames: v.optional(v.boolean()),
     // Ziyaretçi KVKK aydınlatma metni bağlantısı ve sürümü (06-O5; Ayarlar > Gizlilik'ten yönetilir).
     visitorKvkkUrl: v.optional(v.string()),

@@ -63,24 +63,59 @@ import { pdksLeaveMatchesProject, readPdksAvailableDateKeys, pdksFirstRecordDate
 
 export type CardReadingListPage = PaginationResult<Awaited<ReturnType<typeof enrichReadingsForList>>[number]>;
 
-/** Kayıt okuyucusunun seçili projedeki son atanmamış kartı. */
+/** Yazma yapmadan her dinleme için güncel sunucu saatini alır (query önbelleği yok). */
+export const startCardCapture = authedMutation({
+  args: { projectId: v.id("projects"), deviceId: v.id("devices") },
+  returns: v.string(),
+  handler: async (ctx, args) => {
+    const allowed = await resolveReadingScope(ctx, args.projectId, CARD_CAPTURE_PERMISSIONS);
+    const device = await ctx.db.get(args.deviceId);
+    if (!device?.projectId || !allowed.includes(device.projectId)) {
+      throw new ConvexError("Okuyucu seçili projede bulunamadı");
+    }
+    return new Date().toISOString();
+  },
+});
+
+/** Kayıt okuyucusunun seçili projedeki son alınabilir kartı. */
 export const getLastUnknownByDevice = authedQuery({
   args: {
     projectId: v.optional(v.id("projects")),
     deviceId: v.id("devices"),
     sinceTime: v.optional(v.string()),
+    includeInactiveVisitorCards: v.optional(v.boolean()),
   },
   returns: v.union(v.object({ cardNo: v.string(), accessTime: v.string() }), v.null()),
   handler: async (ctx, args) => {
     const allowed = await resolveReadingScope(ctx, args.projectId, CARD_CAPTURE_PERMISSIONS);
     const device = await ctx.db.get(args.deviceId);
     if (!device?.projectId || !allowed.includes(device.projectId)) return null;
-    const reading = await ctx.db.query("cardReadings")
-      .withIndex("by_project_device_employee_time", q => {
-        const prefix = q.eq("projectId", device.projectId).eq("deviceId", args.deviceId).eq("employeeId", undefined);
-        return args.sinceTime ? prefix.gt("accessTime", args.sinceTime) : prefix;
-      }).order("desc").first();
-    return reading ? { cardNo: reading.cardNo, accessTime: reading.accessTime } : null;
+    const since = args.sinceTime === undefined ? undefined : Date.parse(args.sinceTime);
+    if (since !== undefined && !Number.isFinite(since)) return null;
+    // by_device'nin örtük _creationTime sırası cihaz saatinden bağımsızdır.
+    // En fazla 50 kayıt: cihaz saati 7 gün geride olsa bile yeni kayıt bulunur.
+    const readings = await ctx.db.query("cardReadings")
+      .withIndex("by_device", q => {
+        const prefix = q.eq("deviceId", args.deviceId);
+        return since === undefined ? prefix : prefix.gt("_creationTime", since);
+      }).order("desc").take(50);
+    for (const reading of readings) {
+      const receivedAt = reading.createdAt === undefined ? reading._creationTime : Date.parse(reading.createdAt);
+      if (reading.projectId !== device.projectId || !Number.isFinite(receivedAt) ||
+          (since !== undefined && receivedAt <= since)) continue;
+      // Okuma geldiğinde bilinmeyen kart, bu sırada bir kişiye atanmış olabilir.
+      const person = reading.employeeId ? await ctx.db.get(reading.employeeId) :
+        await ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", reading.cardNo)).first();
+      if (reading.employeeId && !person) continue;
+      if (person) {
+        if (!args.includeInactiveVisitorCards) continue;
+        if (person.projectId !== device.projectId || person.isVisitor !== true ||
+            person.isActive !== false || person.cardNumber.startsWith("IADE:") ||
+            person.cardNumber !== reading.cardNo) continue;
+      }
+      return { cardNo: reading.cardNo, accessTime: reading.accessTime };
+    }
+    return null;
   },
 });
 

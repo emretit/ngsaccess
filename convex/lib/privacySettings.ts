@@ -6,6 +6,7 @@ export type PrivacySettings = {
   biometricEnabled: boolean;
   biometricReason: string | null;
   cardReadingRetentionDays: number | null;
+  visitorRetentionDays: number | null;
   aiMaskNames: boolean;
 };
 
@@ -15,6 +16,7 @@ export const DEFAULT_PRIVACY: PrivacySettings = {
   biometricEnabled: true,
   biometricReason: null,
   cardReadingRetentionDays: null,
+  visitorRetentionDays: null,
   aiMaskNames: true,
 };
 
@@ -29,6 +31,7 @@ export function toPrivacySettings(row: Doc<"projectPrivacySettings"> | null): Pr
     biometricEnabled: row.biometricEnabled ?? DEFAULT_PRIVACY.biometricEnabled,
     biometricReason: row.biometricReason ?? null,
     cardReadingRetentionDays: row.cardReadingRetentionDays ?? null,
+    visitorRetentionDays: row.visitorRetentionDays ?? null,
     aiMaskNames: row.aiMaskNames ?? DEFAULT_PRIVACY.aiMaskNames,
   };
 }
@@ -65,6 +68,7 @@ export type PrivacyPatch = {
   biometricChangedAt?: string;
   biometricChangedBy?: Id<"users">;
   cardReadingRetentionDays?: number | null;
+  visitorRetentionDays?: number | null;
   aiMaskNames?: boolean;
 };
 
