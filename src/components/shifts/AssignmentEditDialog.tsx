@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { DateRangeFields } from "@/components/shared/DateRangeFields";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { notify } from "@/lib/notify";
@@ -26,7 +27,6 @@ import {
   bulkAssignmentFormSchema,
   type BulkAssignmentFormValues,
 } from "./assignmentFormSchema";
-import { DateInput } from "@/components/ui/date-picker";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -170,22 +170,10 @@ function EditForm({
                 options={shifts.filter(s => s.isActive !== false || s._id === assignment.shiftId).map(s => ({ value: s._id, label: `${s.name} · ${shiftTimeLabel(s)}` }))} />
             </FormFieldWrapper>}
             {hasInactiveShift && <p id="edit-inactive-shift" role="status" className="text-xs text-muted-foreground">Bu vardiya pasif; kaydetmek için aktif bir vardiya seçin.</p>}
-            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
-              {(["startDate", "endDate"] as const).map((key) => (
-                <FormFieldWrapper
-                  key={key}
-                  htmlFor={`edit-${key}`}
-                  label={key === "startDate" ? "Başlangıç" : "Bitiş"}
-                  error={errors[key]}
-                >
-                  <DateInput
-                    id={`edit-${key}`}
-                    value={values[key]}
-                    onChange={(value) => change({ ...values, [key]: value })}
-                  />
-                </FormFieldWrapper>
-              ))}
-            </div>
+            <DateRangeFields idPrefix="edit" layout="row" labels={{ start: "Başlangıç", end: "Bitiş" }}
+              value={{ start: values.startDate, end: values.endDate }}
+              errors={{ start: errors.startDate, end: errors.endDate }}
+              onChange={(next) => change({ ...values, startDate: next.start, endDate: next.end })} />
             {!(assignment.plan || "departmentId" in assignment) && <><label className="flex gap-2 text-sm">
               <input
                 type="checkbox" className="size-6 shrink-0 accent-primary"

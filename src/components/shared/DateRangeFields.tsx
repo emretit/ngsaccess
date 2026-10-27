@@ -26,11 +26,10 @@ export function DateRangeFields({
 }: DateRangeFieldsProps) {
   const rangeErrorId = `${idPrefix}-range-error`;
   const rangeProps = errors?.range ? { "aria-invalid": true, "aria-describedby": rangeErrorId } : {};
-  const fieldClass = layout === "row" ? "min-w-40 flex-1" : undefined;
   return (
     <div className={className}>
-      <div className={layout === "row" ? "flex flex-wrap gap-3" : "space-y-4"}>
-        <FormFieldWrapper htmlFor={`${idPrefix}-start`} label={labels.start} error={errors?.start} className={fieldClass}>
+      <div className={layout === "row" ? "grid grid-cols-1 gap-3 min-[400px]:grid-cols-2" : "space-y-4"}>
+        <FormFieldWrapper htmlFor={`${idPrefix}-start`} label={labels.start} error={errors?.start}>
           <DateInput
             {...rangeProps}
             className="min-w-0 max-w-full"
@@ -41,7 +40,7 @@ export function DateRangeFields({
             onChange={start => onChange({ ...value, start }, "start")}
           />
         </FormFieldWrapper>
-        <FormFieldWrapper htmlFor={`${idPrefix}-end`} label={labels.end} error={errors?.end} className={fieldClass}>
+        <FormFieldWrapper htmlFor={`${idPrefix}-end`} label={labels.end} error={errors?.end}>
           <DateInput
             {...rangeProps}
             className="min-w-0 max-w-full"

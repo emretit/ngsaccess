@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { DateRangeFields } from "@/components/shared/DateRangeFields";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { PlanQueryBoundary } from "./PlanQueryBoundary";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -37,7 +38,6 @@ import {
   type Preview,
 } from "./lib/planning";
 import { LEAVE_TYPE_LABEL_TR } from "./lib/calendarOverlays";
-import { DateInput } from "@/components/ui/date-picker";
 export interface AssignShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -250,22 +250,10 @@ export function AssignShiftDialog({
                     ))}
                 </div>
                 </>}
-                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
-                  {(["startDate", "endDate"] as const).map((key) => (
-                    <FormFieldWrapper
-                      key={key}
-                      htmlFor={`assignment-${key}`}
-                      label={key === "startDate" ? "Başlangıç" : "Bitiş"}
-                      error={errors[key]}
-                    >
-                      <DateInput
-                        id={`assignment-${key}`}
-                        value={values[key]}
-                        onChange={(value) => change({ ...values, [key]: value })}
-                      />
-                    </FormFieldWrapper>
-                  ))}
-                </div>
+                <DateRangeFields idPrefix="assignment" layout="row" labels={{ start: "Başlangıç", end: "Bitiş" }}
+                  value={{ start: values.startDate, end: values.endDate }}
+                  errors={{ start: errors.startDate, end: errors.endDate }}
+                  onChange={(next) => change({ ...values, startDate: next.start, endDate: next.end })} />
                 <AssignmentPatternEditor values={values} shifts={shifts} onChange={change} errors={errors} errorRef={planErrorRef} />
                 <p className="text-xs text-muted-foreground">
                   {shortDate(values.startDate)}–{shortDate(values.endDate)} dahil aralık ·{" "}
