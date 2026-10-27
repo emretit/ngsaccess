@@ -226,6 +226,7 @@ import type * as lib_shiftUx from "../lib/shiftUx.js";
 import type * as lib_shiftVersions from "../lib/shiftVersions.js";
 import type * as lib_smtpConfig from "../lib/smtpConfig.js";
 import type * as lib_syncErrors from "../lib/syncErrors.js";
+import type * as lib_syncReasons from "../lib/syncReasons.js";
 import type * as lib_syncStatusLogic from "../lib/syncStatusLogic.js";
 import type * as lib_syncStatusScope from "../lib/syncStatusScope.js";
 import type * as lib_trDate from "../lib/trDate.js";
@@ -494,6 +495,7 @@ declare const fullApi: ApiFromModules<{
   "lib/shiftVersions": typeof lib_shiftVersions;
   "lib/smtpConfig": typeof lib_smtpConfig;
   "lib/syncErrors": typeof lib_syncErrors;
+  "lib/syncReasons": typeof lib_syncReasons;
   "lib/syncStatusLogic": typeof lib_syncStatusLogic;
   "lib/syncStatusScope": typeof lib_syncStatusScope;
   "lib/trDate": typeof lib_trDate;

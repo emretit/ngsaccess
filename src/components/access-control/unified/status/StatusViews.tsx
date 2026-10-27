@@ -32,8 +32,8 @@ export function EmptyStatus({ unknownCount }: { unknownCount: number }) {
   if (unknownCount === 0) return null;
   return (
     <p className="text-sm text-muted-foreground break-words">
-      Bu özellik açılmadan önceki dağıtımlar 'Bilinmiyor' görünür; 'Tümünü
-      yeniden dağıt' ile güncellenir.
+      {unknownCount} kişi–cihaz kaydının cihaza gönderildiğine dair kayıt yok.
+      Görmek için Bilinmiyor sayacına tıklayın; seçip yeniden gönderebilirsiniz.
     </p>
   );
 }

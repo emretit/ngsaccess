@@ -107,7 +107,7 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
           {error}
         </p>
       )}
-      <EmptyStatus unknownCount={counts?.unknown ?? 0} />
+      <EmptyStatus unknownCount={filters.state === "unknown" ? 0 : (counts?.unknown ?? 0)} />
       {busy && <p role="status">Yükleniyor…</p>}
       <StatusResults
         view={view}

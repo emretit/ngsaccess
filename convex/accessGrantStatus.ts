@@ -48,8 +48,78 @@ async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map
   };
 }
 
+type DepartmentEmployees = Awaited<ReturnType<typeof departmentGrantCandidates>>["employees"];
+type UnknownPair = { employee: Doc<"employees">; deviceId: Id<"devices">; ruleIds: Id<"accessRules">[] };
+// Rule-graph person×device pairs without a stored grant row ("Bilinmiyor"). Graph
+// enumeration has explicit rule/member/pair bounds; capped results are lower bounds.
+async function unknownGrantPairs(ctx: QueryCtx, projectId: Id<"projects">, departmentEmployees?: DepartmentEmployees, ruleId?: Id<"accessRules">) {
+  const people = new Set<Id<"employees">>();
+  const unknown = new Map<string, UnknownPair>();
+  let capped = false;
+  const visit = async (employee: Doc<"employees">, deviceId: Id<"devices">, ruleIds: Id<"accessRules">[]) => {
+    const row = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employee._id).eq("deviceId", deviceId)).unique();
+    if (!row) unknown.set(`${employee._id}:${deviceId}`, { employee, deviceId, ruleIds });
+    people.add(employee._id);
+  };
+  if (departmentEmployees) {
+    let examinedPairs = 0;
+    department: for (const employee of departmentEmployees.values()) {
+      if (employee.isActive === false) continue;
+      let graph: Awaited<ReturnType<typeof employeeGrantGraph>>;
+      try { graph = await employeeGrantGraph(ctx, employee); } catch (error) {
+        if (!(error instanceof ConvexError)) throw error;
+        capped = true; continue;
+      }
+      for (const [deviceId, scope] of graph) {
+        if (++examinedPairs > 1000) { capped = true; break department; }
+        await visit(employee, deviceId, scope.ruleIds);
+      }
+    }
+    return { pairs: [...unknown.values()], people, capped };
+  }
+  // A rule filter spends the whole member/pair budget on that rule only.
+  const onlyRule = ruleId ? await ctx.db.get(ruleId) : null;
+  const rules = ruleId ? (onlyRule?.projectId === projectId ? [onlyRule] : [])
+    : await ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", projectId)).take(101);
+  if (rules.length > 100) capped = true;
+  const seen = new Set<string>();
+  let examinedMembers = 0;
+  outer: for (const rule of rules.slice(0, 100)) {
+    if (!rule.isActive) continue;
+    const members = await ctx.db.query("groupMembers").withIndex("by_project_group", q => q.eq("projectId", projectId).eq("groupId", rule._id)).take(1001);
+    if (members.length > 1000) capped = true;
+    let scopes: Awaited<ReturnType<typeof grantRuleScope>>;
+    try { scopes = await grantRuleScope(ctx, rule); } catch (error) {
+      if (!(error instanceof ConvexError)) throw error;
+      capped = true; continue;
+    }
+    for (const member of members.slice(0, 1000)) {
+      if (++examinedMembers > 1000) { capped = true; break outer; }
+      const employee = await ctx.db.get(member.employeeId);
+      if (!employee || employee.projectId !== projectId || employee.isActive === false) continue;
+      for (const scope of scopes) {
+        const key = `${employee._id}:${scope.device._id}`;
+        if (seen.has(key)) { unknown.get(key)?.ruleIds.push(rule._id); continue; }
+        if (seen.size >= 1000) { capped = true; break outer; }
+        seen.add(key);
+        await visit(employee, scope.device._id, [rule._id]);
+      }
+    }
+  }
+  return { pairs: [...unknown.values()], people, capped };
+}
+
+const SCAN_CURSOR = /^grant-scan:\d+$/;
+// Scan paging: matches are collected completely (bounded), then sliced by an offset cursor.
+function scanWindow<T>(matched: T[], { cursor, numItems }: { cursor: string | null; numItems: number }) {
+  if (cursor !== null && !SCAN_CURSOR.test(cursor)) throw new ConvexError("Geçersiz yetki sayfa imleci");
+  const offset = cursor ? Number(cursor.slice("grant-scan:".length)) : 0;
+  const end = offset + numItems;
+  return { rows: matched.slice(offset, end), isDone: end >= matched.length, continueCursor: `grant-scan:${end}` };
+}
+
 export const listByProject = authedQuery({
-  args: { projectId: v.id("projects"), state: v.optional(grantState), departmentId: v.optional(v.id("departments")),
+  args: { projectId: v.id("projects"), state: v.optional(v.union(grantState, v.literal("unknown"))), departmentId: v.optional(v.id("departments")),
     deviceId: v.optional(v.id("devices")), ruleId: v.optional(v.id("accessRules")),
     search: v.optional(v.string()), paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
@@ -57,10 +127,31 @@ export const listByProject = authedQuery({
     if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 50) throw new ConvexError("Sayfa en fazla 50 satır olabilir");
     const deviceId = args.deviceId;
     const scopes: ScopeCache = new Map();
+    const search = args.search?.trim().toLocaleLowerCase("tr");
+    // A department filter always takes a scan path (never the indexed fast path below).
+    const department = args.departmentId
+      ? await departmentGrantCandidates(ctx, args.projectId, args.departmentId, deviceId) : undefined;
+    if (department?.capped) throw new ConvexError("Departman yetki okuma sınırı aşıldı (1000); departman ve cihaz seçerek kapsamı daraltın");
+    if (args.state === "unknown") {
+      // Unknown pairs have no stored row: enumerate the bounded rule graph, filter, then page.
+      const { pairs, capped } = await unknownGrantPairs(ctx, args.projectId, department?.employees, args.ruleId);
+      // Like the stored scan path: never page a truncated graph as if it were complete.
+      if (capped) throw new ConvexError("Bilinmiyor taraması sınırı aşıldı (1000); departman veya kural seçerek kapsamı daraltın");
+      const matched = pairs.filter(pair => (!deviceId || pair.deviceId === deviceId) && (!args.ruleId || pair.ruleIds.includes(args.ruleId))
+        && (!search || `${pair.employee.firstName} ${pair.employee.lastName}`.toLocaleLowerCase("tr").includes(search)));
+      const { rows, ...paging } = scanWindow(matched, args.paginationOpts);
+      const page = await Promise.all(rows.map(async pair => ({
+        ...await enrich(ctx, { _id: null, _creationTime: 0, projectId: args.projectId, employeeId: pair.employee._id, deviceId: pair.deviceId,
+          departmentId: pair.employee.departmentId, state: "pending", ruleIds: pair.ruleIds, updatedAt: 0 }, scopes, new Map([[pair.employee._id, pair.employee]])),
+        state: "unknown" as const,
+      })));
+      return { page, ...paging, boundedScan: true };
+    }
+    const state = args.state;
     const base = () => deviceId
       ? ctx.db.query("accessGrantStatus").withIndex("by_project_device", q => q.eq("projectId", args.projectId).eq("deviceId", deviceId))
-      : ctx.db.query("accessGrantStatus").withIndex("by_project_state", q => args.state ? q.eq("projectId", args.projectId).eq("state", args.state) : q.eq("projectId", args.projectId));
-    const scanRequired = !!(args.departmentId || args.ruleId || args.search?.trim() || (args.deviceId && args.state));
+      : ctx.db.query("accessGrantStatus").withIndex("by_project_state", q => state ? q.eq("projectId", args.projectId).eq("state", state) : q.eq("projectId", args.projectId));
+    const scanRequired = !!(args.departmentId || args.ruleId || search || (args.deviceId && state));
     if (!scanRequired) {
       const result = await base().paginate(args.paginationOpts);
       const employees = await grantEmployees(ctx, result.page);
@@ -68,28 +159,21 @@ export const listByProject = authedQuery({
     }
     // Non-indexed intersections/search scan the COMPLETE candidate set (max 1000),
     // THEN paginate matches. Never filter only a fetched page or silently truncate.
-    const department = args.departmentId
-      ? await departmentGrantCandidates(ctx, args.projectId, args.departmentId, deviceId) : undefined;
-    if (department?.capped) throw new ConvexError("Departman yetki okuma sınırı aşıldı (1000); departman ve cihaz seçerek kapsamı daraltın");
     const candidates = department?.rows ?? bounded(await base().take(1001));
     const employees = department?.employees ?? await grantEmployees(ctx, candidates);
     const matched = [];
-    const search = args.search?.trim().toLocaleLowerCase("tr");
     for (const row of candidates) {
       const employee = employees.get(row.employeeId);
       if (args.departmentId && (employee?.projectId !== args.projectId || employee.departmentId !== args.departmentId)) continue;
-      if ((args.deviceId !== undefined && row.deviceId !== args.deviceId) || args.state && row.state !== args.state || args.ruleId && !row.ruleIds.includes(args.ruleId)) continue;
+      if ((args.deviceId !== undefined && row.deviceId !== args.deviceId) || state && row.state !== state || args.ruleId && !row.ruleIds.includes(args.ruleId)) continue;
       if (search) {
         const name = employee?.projectId === row.projectId ? `${employee.firstName} ${employee.lastName}` : "Silinmiş kişi";
         if (!name.toLocaleLowerCase("tr").includes(search)) continue;
       }
       matched.push(row);
     }
-    const cursor = args.paginationOpts.cursor;
-    if (cursor !== null && !/^grant-scan:\d+$/.test(cursor)) throw new ConvexError("Geçersiz yetki sayfa imleci");
-    const offset = cursor ? Number(cursor.slice("grant-scan:".length)) : 0;
-    const end = offset + args.paginationOpts.numItems;
-    return { page: await Promise.all(matched.slice(offset, end).map(row => enrich(ctx, row, scopes, employees))), isDone: end >= matched.length, continueCursor: `grant-scan:${end}`, boundedScan: true };
+    const { rows, ...paging } = scanWindow(matched, args.paginationOpts);
+    return { page: await Promise.all(rows.map(row => enrich(ctx, row, scopes, employees))), ...paging, boundedScan: true };
   },
 });
 
@@ -124,56 +208,10 @@ export const counts = authedQuery({
     };
     const all = await count();
     const effective = await count("effective"), pending = await count("pending"), failed = await count("failed"), removed = await count("removed");
-    if (departmentEmployees) {
-      let unknown = 0;
-      let examinedPairs = 0;
-      department: for (const employee of departmentEmployees.values()) {
-        if (employee.isActive === false) continue;
-        let graph: Awaited<ReturnType<typeof employeeGrantGraph>>;
-        try { graph = await employeeGrantGraph(ctx, employee); } catch (error) {
-          if (!(error instanceof ConvexError)) throw error;
-          capped = true; continue;
-        }
-        for (const deviceId of graph.keys()) {
-          if (++examinedPairs > 1000) { capped = true; break department; }
-          const row = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employee._id).eq("deviceId", deviceId)).unique();
-          if (!row) unknown++;
-          people.add(employee._id);
-        }
-      }
-      return { personCount: people.size, all: Math.min(1000, all + unknown), effective, pending, failed, removed, unknown, capped: capped || all + unknown > 1000 };
-    }
-    // Graph enumeration has explicit rule/member/pair bounds. Unknown counts are
-    // lower bounds when capped, never asserted complete after a truncated scan.
-    const rules = await ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(101);
-    if (rules.length > 100) capped = true;
-    const seen = new Set<string>();
-    let unknown = 0;
-    let examinedMembers = 0;
-    outer: for (const rule of rules.slice(0, 100)) {
-      if (!rule.isActive) continue;
-      const members = await ctx.db.query("groupMembers").withIndex("by_project_group", q => q.eq("projectId", args.projectId).eq("groupId", rule._id)).take(1001);
-      if (members.length > 1000) capped = true;
-      let scopes: Awaited<ReturnType<typeof grantRuleScope>>;
-      try { scopes = await grantRuleScope(ctx, rule); } catch (error) {
-        if (!(error instanceof ConvexError)) throw error;
-        capped = true; continue;
-      }
-      for (const member of members.slice(0, 1000)) {
-        if (++examinedMembers > 1000) { capped = true; break outer; }
-        const employee = await ctx.db.get(member.employeeId);
-        if (!employee || employee.projectId !== args.projectId || employee.isActive === false || args.departmentId && employee.departmentId !== args.departmentId) continue;
-        for (const scope of scopes) {
-          const key = `${employee._id}:${scope.device._id}`;
-          if (seen.has(key)) continue;
-          if (seen.size >= 1000) { capped = true; break outer; }
-          seen.add(key);
-          const row = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employee._id).eq("deviceId", scope.device._id)).unique();
-          if (!row) unknown++;
-          people.add(employee._id);
-        }
-      }
-    }
+    const graph = await unknownGrantPairs(ctx, args.projectId, departmentEmployees);
+    for (const id of graph.people) people.add(id);
+    const unknown = graph.pairs.length;
+    capped ||= graph.capped;
     return { personCount: people.size, all: Math.min(1000, all + unknown), effective, pending, failed, removed, unknown, capped: capped || all + unknown > 1000 };
   },
 });

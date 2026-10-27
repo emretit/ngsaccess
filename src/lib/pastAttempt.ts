@@ -1,9 +1,10 @@
 import { formatTrDateTime } from "@/lib/date";
+import { skipReasons } from "../../convex/lib/syncReasons";
 
 /** Stored reasons describe the device at attempt time; reword the ones that read as current state. */
 const PAST_REASONS: Record<string, string> = {
-  "Cihaz çevrimdışı": "cihaz o sırada çevrimdışıydı",
-  "Cihaz pasif": "cihaz o sırada pasifti",
+  [skipReasons.offline]: "cihaz o sırada çevrimdışıydı",
+  [skipReasons.inactive]: "cihaz o sırada pasifti",
 };
 
 /** A stored failure is history, not live device state: always tie it to its attempt time.

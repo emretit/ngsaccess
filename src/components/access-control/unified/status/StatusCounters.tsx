@@ -20,7 +20,7 @@ export function StatusCounters({
       </p>
       <div className="flex flex-wrap gap-2" aria-label="Durum sayaçları">
         {(Object.keys(labels) as (keyof typeof labels)[]).filter((state) =>
-          (state !== "removed" && state !== "unknown") || (counts?.[state] ?? 0) > 0,
+          (state !== "removed" && state !== "unknown") || (counts?.[state] ?? 0) > 0 || filters.state === state,
         ).map((state) => {
           const active = state === "all" ? !filters.state : filters.state === state;
           return (
@@ -29,16 +29,7 @@ export function StatusCounters({
               key={state}
               variant={active ? "default" : "outline"}
               aria-pressed={active}
-              disabled={state === "unknown"}
-              title={
-                state === "unknown"
-                  ? "Cihaza gönderim bilgisi bulunmuyor. Kişi ayrıntısından inceleyebilir, tümünü yeniden gönderebilirsiniz."
-                  : undefined
-              }
-              onClick={() => {
-                if (state !== "unknown")
-                  change({ state: state === "all" ? undefined : state });
-              }}
+              onClick={() => change({ state: state === "all" ? undefined : state })}
             >
               {labels[state]}:{" "}
               {counts ? countText(counts[state], counts.capped) : "—"}

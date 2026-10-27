@@ -1,4 +1,5 @@
 import { deviceConnection } from "./deviceConnection";
+import { skipReasons } from "./syncReasons";
 
 export type TargetStatus = "queued" | "sent" | "verified" | "failed" | "skipped" | "unknown";
 export type RunStatus = "running" | "done" | "partial" | "failed";
@@ -8,11 +9,7 @@ export const targetLabels: Record<TargetStatus, string> = {
   queued: "Kuyrukta", sent: "Gönderildi · teslim kanıtı yok",
   verified: "Cihazda doğrulandı", failed: "Başarısız", skipped: "Atlandı", unknown: "Bilinmiyor",
 };
-export const skipReasons = {
-  inactive: "Cihaz pasif", unsupported: "Cihaz markası desteklenmiyor",
-  offline: "Cihaz çevrimdışı", configuration: "Cihaz bağlantı bilgileri eksik",
-  noRule: "Cihaza bağlı gönderilecek aktif kural yok",
-};
+export { skipReasons };
 
 export function skippedReason(device: {
   brand?: string; isActive?: boolean; status?: string; hikTransport?: string;

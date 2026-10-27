@@ -1,5 +1,6 @@
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => state.admin, loading: false }) }));
 import { readFileSync } from "node:fs";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../../../convex/_generated/dataModel";
@@ -167,7 +168,7 @@ describe("yetki durumu saf model", () => {
 describe("yetki durumu SSR", () => {
   it("eski gönderim notunu yalnız bilinmeyen kayıt varken gösterir", () => {
     expect(renderToStaticMarkup(<EmptyStatus unknownCount={0} />)).toBe("");
-    expect(renderToStaticMarkup(<EmptyStatus unknownCount={2} />)).toContain("özellik açılmadan önceki dağıtımlar");
+    expect(renderToStaticMarkup(<EmptyStatus unknownCount={2} />)).toContain("2 kişi–cihaz kaydının cihaza gönderildiğine dair kayıt yok");
   });
   it("proje ve departman özetleri arama ve durum filtreleriyle değişmez; rozet seçimini bildirir", () => {
     const counts = { all: 4, effective: 3, pending: 0, failed: 1, removed: 0, unknown: 0, capped: false, personCount: 2 };
@@ -244,6 +245,20 @@ describe("yetki durumu SSR", () => {
     expect(empty).not.toContain("Bilinmiyor");
     expect(empty).toContain("Bekliyor: 0");
   });
+  it("Bilinmiyor sayacı süzer; seçiliyken sıfır olsa da görünür kalır", () => {
+    const counts = { all: 1, effective: 0, pending: 0, failed: 0, removed: 0, unknown: 1, capped: false, personCount: 1 };
+    const change = vi.fn();
+    type El = ReactElement<{ children?: ReactNode; onClick?: () => void; disabled?: boolean }>;
+    const walk = (node: ReactNode): El[] =>
+      Array.isArray(node) ? node.flatMap(walk) : isValidElement<El["props"]>(node) ? [node, ...walk(node.props.children)] : [];
+    const unknownButton = walk(StatusCounters({ counts, filters: {}, change })).find((el) =>
+      [el.props.children].flat().includes("Bilinmiyor"));
+    expect(unknownButton?.props.disabled).toBeUndefined();
+    unknownButton?.props.onClick?.();
+    expect(change).toHaveBeenCalledWith({ state: "unknown" });
+    const selected = renderToStaticMarkup(<StatusCounters counts={{ ...counts, unknown: 0 }} filters={{ state: "unknown" }} change={() => {}} />);
+    expect(selected).toMatch(/aria-pressed="true"[^>]*>Bilinmiyor: 0/);
+  });
   it("okuyucuya status sekmesi ve dağıtım aksiyonlarını sunmaz, deep link de açılmaz", () => {
     state.admin = false;
     state.params = "tab=status";
@@ -260,8 +275,7 @@ describe("yetki durumu SSR", () => {
   });
   it("boş durum, mobil kartlar, masaüstü kolonları, tarih ve hata ipucunu gösterir", () => {
     const empty = renderToStaticMarkup(<EmptyStatus unknownCount={1} />);
-    expect(empty).toContain("özellik açılmadan önceki dağıtımlar");
-    expect(empty).toContain("Tümünü yeniden dağıt");
+    expect(empty).toContain("Bilinmiyor sayacına tıklayın");
     const html = renderToStaticMarkup(
       <GrantRows
         rows={[row]}

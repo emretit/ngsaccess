@@ -219,6 +219,23 @@ describe("grant status queries", () => {
     await write("effective"); await write("failed", ids.hikId);
     expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toEqual({ personCount: 1, all: 3, effective: 1, pending: 0, failed: 1, removed: 0, unknown: 1, capped: false });
   });
+  it("lists unknown graph pairs with filters and scan paging; stored pairs drop out", async () => {
+    const { admin, ids, write } = await fixture();
+    const args = { projectId: ids.projectId, state: "unknown" as const, paginationOpts: { numItems: 2, cursor: null } };
+    const first = await admin.query(api.accessGrantStatus.listByProject, args);
+    expect(first.page).toHaveLength(2); expect(first.isDone).toBe(false); expect(first.boundedScan).toBe(true);
+    expect(first.page[0]).toMatchObject({ _id: null, state: "unknown", employeeName: "Deniz Test", ruleNames: ["Mesai"] });
+    const second = await admin.query(api.accessGrantStatus.listByProject, { ...args, paginationOpts: { numItems: 2, cursor: first.continueCursor } });
+    expect(second.page).toHaveLength(1); expect(second.isDone).toBe(true);
+    expect(new Set([...first.page, ...second.page].map(row => row.deviceId))).toEqual(new Set([ids.ideId, ids.hikId, ids.bridgeId]));
+    const hik = await admin.query(api.accessGrantStatus.listByProject, { ...args, deviceId: ids.hikId, departmentId: ids.departmentId, ruleId: ids.ruleId, search: "deniz" });
+    expect(hik.page).toHaveLength(1); expect(hik.page[0]).toMatchObject({ deviceId: ids.hikId, doorNames: ["Hik seçili"], departmentName: "Arge" });
+    expect((await admin.query(api.accessGrantStatus.listByProject, { ...args, search: "yok" })).page).toEqual([]);
+    await write("effective");
+    const rest = await admin.query(api.accessGrantStatus.listByProject, { ...args, paginationOpts: { numItems: 50, cursor: null } });
+    expect(rest.page.map(row => row.deviceId).sort()).toEqual([ids.hikId, ids.bridgeId].sort());
+    expect((await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId })).unknown).toBe(rest.page.length);
+  });
   it("03-O2: counts unique people across stored and unknown pairs independently of list search", async () => {
     const { t, ids, admin, write } = await fixture();
     await write("effective");
@@ -359,6 +376,16 @@ describe("grant graph and dispatch boundaries", () => {
       }
     });
     expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId })).toMatchObject({ all: 1000, unknown: 1000, capped: true });
+    const list = { projectId: ids.projectId, state: "unknown" as const, paginationOpts: { numItems: 50, cursor: null } };
+    await expect(admin.query(api.accessGrantStatus.listByProject, list)).rejects.toThrow("Bilinmiyor taraması sınırı");
+    expect((await admin.query(api.accessGrantStatus.listByProject, { ...list, departmentId: ids.departmentId })).page).toHaveLength(3);
+    const smallRuleId = await t.run(async ctx => {
+      const ruleId = await ctx.db.insert("accessRules", { projectId: ids.projectId, name: "Küçük", isActive: true, updatedAt: now });
+      await ctx.db.insert("groupMembers", { projectId: ids.projectId, groupId: ruleId, employeeId: ids.employeeId, createdAt: now });
+      await ctx.db.insert("groupDevices", { projectId: ids.projectId, groupId: ruleId, deviceId: ids.ideId, createdAt: now });
+      return ruleId;
+    });
+    expect((await admin.query(api.accessGrantStatus.listByProject, { ...list, ruleId: smallRuleId })).page).toMatchObject([{ deviceId: ids.ideId, state: "unknown" }]);
   });
   it.each([99, 100, 101, 150])("onlyFailed batches %i failures in index order into one run", async (size) => {
     const { t, ids, admin } = await fixture();

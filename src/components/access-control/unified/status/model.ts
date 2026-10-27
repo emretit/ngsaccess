@@ -1,6 +1,7 @@
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
+import { skipReasons } from "../../../../../convex/lib/syncReasons";
 
 export type GrantRow = FunctionReturnType<
   typeof api.accessGrantStatus.listByProject
@@ -55,8 +56,8 @@ export const confirmationText = (count: number | string) =>
 /** Keep device diagnostics in the drawer; list reasons stay short and readable. */
 export function shortFailureReason(error?: string): string {
   if (error?.includes("door_io_unresolved")) return "Kapı eşleştirilemedi";
-  if (/çevrimdışı|offline/i.test(error ?? "")) return "Cihaz çevrimdışı";
-  if (/pasif/i.test(error ?? "")) return "Cihaz pasif";
+  if (/çevrimdışı|offline/i.test(error ?? "")) return skipReasons.offline;
+  if (/pasif/i.test(error ?? "")) return skipReasons.inactive;
   if (/yanıt|timeout|timed out/i.test(error ?? "")) return "Cihaz yanıt vermedi";
   return "Gönderim başarısız oldu";
 }
