@@ -118,13 +118,15 @@ export const counts = authedQuery({
       departmentRows = candidates.slice(0, 1000);
       capped = candidates.length > 1000;
     }
-    if (deviceId && departmentRows) return { all: departmentRows.length, effective: departmentRows.filter(row => row.state === "effective").length,
+    const people = new Set<Id<"employees">>(departmentRows?.map(row => row.employeeId));
+    if (deviceId && departmentRows) return { personCount: people.size, all: departmentRows.length, effective: departmentRows.filter(row => row.state === "effective").length,
       pending: departmentRows.filter(row => row.state === "pending").length, failed: departmentRows.filter(row => row.state === "failed").length,
       removed: departmentRows.filter(row => row.state === "removed").length, unknown: 0, capped };
     const count = async (state?: Doc<"accessGrantStatus">["state"]) => {
       if (departmentRows) return departmentRows.filter(row => !state || row.state === state).length;
       const rows = await ctx.db.query("accessGrantStatus").withIndex("by_project_state", q => state ? q.eq("projectId", args.projectId).eq("state", state) : q.eq("projectId", args.projectId)).take(1001);
       if (rows.length > 1000) capped = true;
+      if (!state) for (const row of rows.slice(0, 1000)) people.add(row.employeeId);
       return Math.min(rows.length, 1000);
     };
     const all = await count();
@@ -143,9 +145,10 @@ export const counts = authedQuery({
           if (++examinedPairs > 1000) { capped = true; break department; }
           const row = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employee._id).eq("deviceId", deviceId)).unique();
           if (!row) unknown++;
+          people.add(employee._id);
         }
       }
-      return { all: Math.min(1000, all + unknown), effective, pending, failed, removed, unknown, capped: capped || all + unknown > 1000 };
+      return { personCount: people.size, all: Math.min(1000, all + unknown), effective, pending, failed, removed, unknown, capped: capped || all + unknown > 1000 };
     }
     // Graph enumeration has explicit rule/member/pair bounds. Unknown counts are
     // lower bounds when capped, never asserted complete after a truncated scan.
@@ -174,10 +177,11 @@ export const counts = authedQuery({
           seen.add(key);
           const row = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employee._id).eq("deviceId", scope.device._id)).unique();
           if (!row) unknown++;
+          people.add(employee._id);
         }
       }
     }
-    return { all: Math.min(1000, all + unknown), effective, pending, failed, removed, unknown, capped: capped || all + unknown > 1000 };
+    return { personCount: people.size, all: Math.min(1000, all + unknown), effective, pending, failed, removed, unknown, capped: capped || all + unknown > 1000 };
   },
 });
 

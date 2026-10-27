@@ -23,7 +23,7 @@ function Members({
         {kind === "people"
           ? "Kişiler"
           : kind === "devices"
-            ? "Paneller (kapı seçimi yoksa tüm cihaz)"
+            ? "Cihazlar (kapı seçimi yoksa tüm cihaz)"
             : "Açık kapı seçimleri"}
       </h3>
       {status === "LoadingFirstPage" ? (
@@ -86,8 +86,8 @@ export function AccessRuleDetails({
       )}
       <Members key={`${ruleId}-people`} ruleId={ruleId} kind="people" />
       <section className="space-y-2">
-        <h3 className="font-semibold">Paneller ve kapılar</h3>
-        {rule.scopeTruncated && <p role="status">Kapsam çok geniş; tüm panel ve kapılar burada gösterilemiyor. Tam seçimleri düzenleme ekranından inceleyin.</p>}
+        <h3 className="font-semibold">Cihazlar ve kapılar</h3>
+        {rule.scopeTruncated && <p role="status">Kapsam çok geniş; tüm cihaz ve kapılar burada gösterilemiyor. Tam seçimleri düzenleme ekranından inceleyin.</p>}
         <ul className="space-y-3">
           {rule.panels.map((panel) => (
             <li key={panel.deviceId} className="break-words">
@@ -98,9 +98,9 @@ export function AccessRuleDetails({
               {panel.doorsTruncated && <p className="text-xs text-muted-foreground">Tüm kapılar gösterilemiyor.</p>}
             </li>
           ))}
-          {rule.unassignedDoors.map((door) => <li key={door.doorId}>{door.name} · Panel bağlantısı yok; cihaza uygulanamaz</li>)}
+          {rule.unassignedDoors.map((door) => <li key={door.doorId}>{door.name} · Cihaz bağlantısı yok; cihaza uygulanamaz</li>)}
         </ul>
-        {!rule.scopeTruncated && rule.panels.length === 0 && rule.unassignedDoors.length === 0 && <p className="text-xs text-muted-foreground">Kapı veya panel seçilmemiş.</p>}
+        {!rule.scopeTruncated && rule.panels.length === 0 && rule.unassignedDoors.length === 0 && <p className="text-xs text-muted-foreground">Kapı veya cihaz seçilmemiş.</p>}
       </section>
       <RecentRuns projectId={projectId} ruleId={ruleId} />
     </div>

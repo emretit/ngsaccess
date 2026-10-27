@@ -15,6 +15,9 @@ import {
 } from "../../../../convex/lib/doorStatusPlan";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { PDKS_SETTINGS_PATH } from "@/components/pdks/settings/route";
+import { formatTrDate } from "@/lib/date";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +51,9 @@ interface DoorPlanDialogProps {
   door: DoorPlanTarget;
 }
 
+/** YYYY-MM-DD takvim günü; tarayıcı saat diliminden bağımsız gün.ay.yıl metni. */
+const formatHolidayDate = (date: string) => formatTrDate(new Date(`${date}T12:00:00Z`));
+
 // hikDoorStatusPlan form state tipi — schema shape ile birebir
 type DoorStatusPlanState = DoorStatusPlan;
 
@@ -71,6 +77,7 @@ export function DoorPlanDialog({
   onSuccess,
   door,
 }: DoorPlanDialogProps) {
+  const navigate = useNavigate();
   const [saved, setSaved] = useState(false);
   const [persistedSendResolved, setPersistedSendResolved] = useState(false);
   const [planResults, setPlanResults] = useState<PlanResult[]>([]);
@@ -126,12 +133,10 @@ export function DoorPlanDialog({
     !!(door.plansPending || door.hikPlanApplyError);
   const failedResults = planResults.filter((result) => !result.ok);
   const failedKeys = failedResults.map((result) => result.key);
-  const failedErrors = failedResults.map((result) => result.error).filter((error): error is string => !!error);
   const pendingKeys = persistedSendPending ? persistedKeys : [];
   const retryKeys = [...new Set([...failedKeys, ...pendingKeys])];
-  const statusMessage = failedKeys.length === 0
-    ? door.hikPlanApplyError ? `Son gönderim başarısız: ${door.hikPlanApplyError}` : "Kaydedildi ama cihaza gönderilmedi"
-    : failedErrors.length > 0 ? `Son gönderim başarısız: ${failedErrors.join("; ")}` : "Cihaza gönderilemedi";
+  const statusMessage = failedKeys.length > 0 ? "Cihaza gönderilemedi"
+    : door.hikPlanApplyError ? `Son gönderim başarısız: ${door.hikPlanApplyError}` : "Kaydedildi ama cihaza gönderilmedi";
 
   const sendPlans = async (keys: PlanKey[]) => {
     const results = await applySelectedDoorPlans(
@@ -165,10 +170,10 @@ export function DoorPlanDialog({
         notify.info("Değişiklik yok; cihaza bir şey gönderilmedi.");
         return;
       }
-      setSaved(true);
+      setSaved(keys.length > 0);
       setPersistedSendResolved(true);
       if (!(await sendPlans(keysToSend))) return;
-      notify.success("Kapı planları kaydedildi ve cihaza uygulandı");
+      notify.success(keys.length > 0 ? "Kapı planları kaydedildi ve cihaza uygulandı" : "Zaman planları cihaza uygulandı");
       onSuccess();
       onOpenChange(false);
     },
@@ -181,9 +186,11 @@ export function DoorPlanDialog({
       setPersistedSendResolved(true);
       if (await sendPlans(retryKeys)) {
         notify.success("Zaman planları cihaza uygulandı");
-        onSuccess();
-        // Formda kaydedilmemiş düzenleme varsa açık kalır; yoksa kayıt gibi kapanır.
-        if (saved || !formDirty) onOpenChange(false);
+        // Üst bileşenin onSuccess çağrısı da formu kapatabildiği için düzenleme varken çağırma.
+        if (saved || !formDirty) {
+          onSuccess();
+          onOpenChange(false);
+        }
       }
     },
     { error: "Planlar gönderilemedi" },
@@ -395,7 +402,26 @@ export function DoorPlanDialog({
                       Cihaz desteği gönderimden önce denetlenir.
                     </p>
                   )}
-                  {holiday.enabled && holidayRanges?.length === 0 && <p role="alert">Seçilen yılda uygulanacak tatil yok</p>}
+                  {holiday.enabled && holidayRanges?.length === 0 && (
+                    <div className="space-y-2">
+                      <p role="alert">Seçilen yılda uygulanacak tatil yok</p>
+                      <Button type="button" variant="outline" onClick={() => guard.requestClose(() => {
+                        onOpenChange(false);
+                        navigate(PDKS_SETTINGS_PATH);
+                      })}>Tatil takvimini aç</Button>
+                    </div>
+                  )}
+                  {holiday.enabled && holidayRanges && holidayRanges.length > 0 && (
+                    <div className="text-sm" aria-label="Uygulanacak tatil tarihleri">
+                      <p className="font-medium">Uygulanacak tatil tarihleri</p>
+                      <ul>
+                        {holidayRanges.slice(0, 10).map((range) => (
+                          <li key={range.beginDate}>{formatHolidayDate(range.beginDate)}–{formatHolidayDate(range.endDate)} · tam gün</li>
+                        ))}
+                      </ul>
+                      {holidayRanges.length > 10 && <p>ve {holidayRanges.length - 10} tarih daha</p>}
+                    </div>
+                  )}
                   {holiday.enabled && (
                     <>
                       <label className="block">
@@ -455,6 +481,7 @@ export function DoorPlanDialog({
             </fieldset>
             {planResults.length > 0 && (
               <DoorSaveResults
+                saved={saved}
                 planResults={planResults}
                 isSubmitting={isSubmitting}
               />

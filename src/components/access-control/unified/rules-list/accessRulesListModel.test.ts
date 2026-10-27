@@ -24,7 +24,7 @@ describe("readRuleFilters", () => {
 
 it("scope labels preserve truncation, panel ordering and missing-panel warnings", () => {
   const rule = { panels: [], unassignedDoors: [] } as unknown as Summary;
-  expect(scopeText(rule)).toBe("Kapı veya panel seçilmemiş");
+  expect(scopeText(rule)).toBe("Kapı veya cihaz seçilmemiş");
   expect(
     scopeText({ ...rule, panels: [{ label: "B" }, { label: "A" }] } as Summary),
   ).toBe("B, A");

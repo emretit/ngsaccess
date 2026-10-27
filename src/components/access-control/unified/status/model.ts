@@ -48,11 +48,11 @@ export function togglePair(
   if (selected.some((p) => pairKey(p) === pairKey(pair)))
     return { pairs: selected.filter((p) => pairKey(p) !== pairKey(pair)) };
   if (selected.length >= 100)
-    return { pairs: selected, error: "En çok 100 kişi×cihaz seçebilirsiniz." };
+    return { pairs: selected, error: "En çok 100 kişi–cihaz kaydı seçebilirsiniz." };
   return { pairs: [...selected, pair] };
 }
 export const confirmationText = (count: number | string) =>
-  `${count} kişi×cihaz için tek gönderim başlatılacak.`;
+  `${count} kişi–cihaz kaydı için tek gönderim başlatılacak.`;
 export function grantBadge(
   row: Pick<EmployeeDetail["rows"][number], "state"> & Partial<Pick<GrantRow, "stale" | "lastError" | "doorUnresolved">>,
 ) {
@@ -80,8 +80,8 @@ export function failedConfirmationText(failed: number, capped: boolean): string 
   const total = countText(failed, capped);
   if (failed <= 100) return confirmationText(total);
   const remaining = `${failed - 100}${capped && failed >= 1000 ? "+" : ""}`;
-  return `${total} hatalı kişi×cihaz var. İlk 100 hatalı kişi×cihaz için tek gönderim başlatılacak; kalan ${remaining} sonraki turda.`;
+  return `${total} hatalı kişi–cihaz kaydı var. İlk 100 hatalı kişi–cihaz kaydı için tek gönderim başlatılacak; kalan ${remaining} sonraki turda.`;
 }
 export function redistributionSuccessText(result: Pick<FunctionReturnType<typeof api.accessGrantStatus.redistribute>, "pairCount" | "remainingFailed" | "remainingCapped">): string {
-  return `${result.pairCount ?? "Tüm yetkili"} kişi×cihaz için gönderim başlatıldı. Kalan ${result.remainingFailed}${result.remainingCapped ? "+" : ""} hatalı kişi×cihaz sonraki turda.`;
+  return `${result.pairCount ?? "Tüm yetkili"} kişi–cihaz kaydı için gönderim başlatıldı. Kalan ${result.remainingFailed}${result.remainingCapped ? "+" : ""} hatalı kişi–cihaz kaydı sonraki turda.`;
 }

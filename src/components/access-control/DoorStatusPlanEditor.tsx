@@ -74,9 +74,9 @@ function IntervalEditor({
               onChange({ ...value, mode });
           }}
         >
-          <option value="remainOpen">Sürekli Açık</option>
+          <option value="remainOpen">Sürekli açık</option>
           <option value="normal">Normal</option>
-          <option value="remainClosed">Sürekli Kapalı</option>
+          <option value="remainClosed">Sürekli kilitli</option>
         </NativeSelect>
       </Label>
     </div>

@@ -116,7 +116,7 @@ export function MoveReaderDialog({
             </Select>}
           </FormFieldWrapper>
           {availableTargets.length === 0 && (
-            <p className="text-xs text-muted-foreground">Bu panelde taşınabilecek boş kapı yok.</p>
+            <p className="text-xs text-muted-foreground">Bu cihazda taşınabilecek boş kapı yok.</p>
           )}
 
           <DialogFooter>

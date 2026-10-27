@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ruleDaysSummary,
   ruleTypeMatches,
   runSummary,
   runDisplay,
@@ -38,4 +39,11 @@ it("hiç gönderilmeyen kısmi işlemi başarısız gösterir", () => {
   expect(runDisplay("partial", { ...counts, sent: 1 })).toEqual({ label: "Kısmi sonuç", tone: "warning" });
   expect(runDisplay("partial", { ...counts, verified: 1 }).label).toBe("Kısmi sonuç");
   expect(runDisplay("running", counts).label).toBe("İşleniyor");
+});
+
+it("gün özetinde ardışık aralığı kısaltır ve aralıklı günleri korur", () => {
+  expect(ruleDaysSummary(["Friday", "Monday", "Tuesday", "Wednesday", "Thursday"])).toBe("Pzt–Cum");
+  expect(ruleDaysSummary(["Friday", "Monday"])).toBe("Pzt, Cum");
+  expect(ruleDaysSummary(["Monday"])).toBe("Pzt");
+  expect(ruleDaysSummary([])).toBe("Gün seçilmedi");
 });

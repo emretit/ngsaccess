@@ -83,8 +83,7 @@ export function SyncRunSheet({
         <SheetHeader>
           <SheetTitle>Gönderim sonucu</SheetTitle>
           <SheetDescription>
-            Gönderildi durumu teslim kanıtı değildir. Cihaz doğrulaması ayrıca
-            gösterilir.
+            Cihaz aldığını bildirene kadar “Gönderildi” görünür.
           </SheetDescription>
         </SheetHeader>
         <div className="mt-5">
@@ -177,8 +176,7 @@ export function ProjectSyncButton({
             {counts?.total ?? 0} cihaz. Marka dağılımı:{" "}
             {brandDistribution(counts?.brands ?? {})}. Projedeki tüm cihazlar
             değerlendirilir; liste filtreleri kapsamı daraltmaz. Aktif kurallar
-            gönderilir, uygun olmayan cihazlar gerekçesiyle atlanır. Hikvision
-            gönderimi teslim kanıtı değildir; IDE cihaz onayı ayrıca izlenir.
+            gönderilir, uygun olmayan cihazlar gerekçesiyle atlanır. Cihaz aldığını bildirene kadar “Gönderildi” görünür.
           </>
         }
         confirmLabel="Tüm proje cihazlarına gönder"

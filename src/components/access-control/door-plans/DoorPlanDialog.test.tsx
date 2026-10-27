@@ -1,6 +1,9 @@
 vi.mock("@/hooks/usePermissions", () => ({
   usePermissions: () => ({ can: () => true, loading: false }),
 }));
+import { renderToStaticMarkup } from "react-dom/server";
+import { DoorSaveResults } from "../door-dialog/DoorSaveResults";
+import { DoorPlansTab } from "./DoorPlansTab";
 import { isValidElement, type ReactNode, type ReactElement } from "react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { notify } from "@/lib/notify";
@@ -20,6 +23,9 @@ const state = vi.hoisted(() => ({
   save: vi.fn(),
   apply: vi.fn(),
   dirty: false,
+  navigate: vi.fn(),
+  requestClose: vi.fn(),
+  targets: null as DoorPlanTarget[] | null,
   holidays: [] as { beginDate: string; endDate: string }[],
 }));
 vi.mock("react", async (importOriginal) => ({
@@ -41,9 +47,13 @@ vi.mock("react", async (importOriginal) => ({
   },
 }));
 vi.mock("convex/react", () => ({
-  useQuery: () => state.holidays,
+  useQuery: () => state.targets ?? state.holidays,
   useMutation: () => state.save,
   useAction: () => state.apply,
+}));
+vi.mock("react-router-dom", () => ({ useNavigate: () => state.navigate }));
+vi.mock("@/hooks/useActiveProjectScope", () => ({
+  useActiveProjectScope: () => ({ projectId: "project", loading: false }),
 }));
 vi.mock("@/hooks/useProjectAccess", () => ({
   useProjectAccess: () => ({ canManage: true }),
@@ -57,7 +67,7 @@ vi.mock("@/hooks/useAsyncAction", () => ({
 vi.mock("@/components/shared/UnsavedChangesDialog", () => ({
   useUnsavedChangesGuard: (dirty: boolean) => {
     state.dirty = dirty;
-    return { requestClose: vi.fn(), dialog: null };
+    return { requestClose: state.requestClose, dialog: null };
   },
 }));
 vi.mock("@/lib/notify", () => ({
@@ -96,6 +106,10 @@ beforeEach(() => {
   state.slots = [];
   state.cursor = 0;
   state.dirty = false;
+  state.holidays = [];
+  state.targets = null;
+  state.navigate.mockReset();
+  state.requestClose.mockReset();
   vi.mocked(notify.success).mockClear();
   vi.mocked(notify.info).mockClear();
   state.save.mockReset().mockResolvedValue(["status"]);
@@ -164,7 +178,7 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     state.apply.mockResolvedValueOnce({ ok: false, error: "Çevrimdışı" });
     const overrides = { plansPending: true };
     await retrySend(dialog(overrides));
-    await vi.waitFor(() => expect(hasText(dialog(overrides), "Son gönderim başarısız: Çevrimdışı")).toBe(true));
+    await vi.waitFor(() => expect(hasText(dialog(overrides), "Cihaza gönderilemedi")).toBe(true));
     await retrySend(dialog(overrides));
     await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(2));
     expect(state.save).not.toHaveBeenCalled();
@@ -201,21 +215,80 @@ describe("DoorPlanDialog haftalık kayıt", () => {
   });
   it("R4 düzenleme yokken başarılı tekrar gönderim dialogu kapatır, düzenleme varken açık tutar", async () => {
     const onOpenChange = vi.fn();
+    const onSuccess = vi.fn();
     const render = () => {
       state.cursor = 0;
-      return DoorPlanDialog({ open: true, onOpenChange, onSuccess: vi.fn(), door: { ...door, plansPending: true } });
+      return DoorPlanDialog({ open: true, onOpenChange, onSuccess, door: { ...door, plansPending: true } });
     };
     await retrySend(render());
     await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
 
     state.slots = [];
     onOpenChange.mockClear();
+    onSuccess.mockClear();
     const change = find(render(), element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void;
     change({ ...legacy, endTime: "09:00" });
     await retrySend(render());
     await vi.waitFor(() => expect(state.apply).toHaveBeenCalledTimes(2));
     await vi.waitFor(() => expect(notify.success).toHaveBeenCalledTimes(2));
     expect(onOpenChange).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
+  it("04-O2 listede devre dışı planları kapı kilit modu ile karıştırmaz ve sekme başlığını gösterir", () => {
+    state.targets = [{ ...door, hikDoorStatusPlan: { ...legacy, enabled: false } }];
+    state.cursor = 0;
+    const tree = DoorPlansTab();
+    expect(nodes(tree).filter(element => (element.props.children === "Plan etkin değil" || (Array.isArray(element.props.children) && element.props.children.includes("Plan etkin değil"))))).toHaveLength(2);
+    expect(hasText(tree, "Kapalı")).toBe(false);
+    expect(find(tree, element => element.type === "h1").props.children).toBe("Kapı Planları");
+  });
+  it("04-O3 boş tatil takvimine geçişi kaydedilmemiş değişiklik korumasına bırakır", () => {
+    const overrides = { hikDoorHolidayPlan: { enabled: true, year: 2099, mode: "remainClosed" as const } };
+    const initial = dialog(overrides);
+    (find(initial, element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void)({ ...legacy, endTime: "09:00" });
+    const tree = dialog(overrides);
+    (find(tree, element => element.props.children === "Tatil takvimini aç").props.onClick as () => void)();
+    expect(state.dirty).toBe(true);
+    expect(state.requestClose).toHaveBeenCalledOnce();
+    expect(state.navigate).not.toHaveBeenCalled();
+    const [navigateAfterApproval] = state.requestClose.mock.calls[0] as [() => void];
+    navigateAfterApproval();
+    expect(state.navigate).toHaveBeenCalledWith("/pdks-records/settings");
+  });
+  it("04-O3 tatil tarih aralıklarını tam gün gösterir ve ilk ondan sonrasını sayar", () => {
+    state.holidays = Array.from({ length: 11 }, (_, index) => ({ beginDate: `2026-01-${String(index + 1).padStart(2, "0")}`, endDate: `2026-01-${String(index + 2).padStart(2, "0")}` }));
+    const tree = dialog({ hikDoorHolidayPlan: { enabled: true, year: 2026, mode: "remainClosed" } });
+    const preview = find(tree, element => element.props["aria-label"] === "Uygulanacak tatil tarihleri");
+    const html = renderToStaticMarkup(preview);
+    expect(nodes(preview).filter(element => element.type === "li")).toHaveLength(10);
+    expect(html).toContain("01.01.2026–02.01.2026 · tam gün");
+    expect(html).toContain("ve 1 tarih daha");
+    expect(html).not.toContain("12.01.2026");
+    expect(hasText(tree, "Tatil takvimini aç")).toBe(false);
+  });
+  it("tekrar gönderim sonucunda kaydedilmemiş düzenlemeyi kaydedildi olarak göstermez", async () => {
+    const overrides = { plansPending: true };
+    const initial = dialog(overrides);
+    (find(initial, element => element.type === DoorStatusPlanEditor).props.onChange as (plan: DoorStatusPlan) => void)({ ...legacy, endTime: "09:00" });
+    await retrySend(dialog(overrides));
+    await vi.waitFor(() => expect(notify.success).toHaveBeenCalledOnce());
+    const result = find(dialog(overrides), element => element.type === DoorSaveResults);
+    const html = renderToStaticMarkup(DoorSaveResults(result.props as Parameters<typeof DoorSaveResults>[0]));
+    expect(html).toContain("Cihaza uygulandı");
+    expect(html).not.toContain("veritabanına kaydedildi");
+    expect(html).not.toContain("Kaydedildi");
+    expect(state.save).not.toHaveBeenCalled();
+  });
+  it("gerçek kayıt sonrası kayıt bilgisini gösterir, hata ayrıntısını yalnız bir kez gösterir", async () => {
+    state.apply.mockResolvedValue({ ok: false, error: "Bağlantı kurulamadı" });
+    await submit(dialog());
+    const tree = dialog();
+    const result = find(tree, element => element.type === DoorSaveResults);
+    const html = renderToStaticMarkup(DoorSaveResults(result.props as Parameters<typeof DoorSaveResults>[0]));
+    expect(html).toContain("Ayarlar veritabanına kaydedildi.");
+    expect(html.match(/Bağlantı kurulamadı/g)).toHaveLength(1);
+    expect(hasText(tree, "Son gönderim başarısız: Bağlantı kurulamadı")).toBe(false);
+    expect(hasText(tree, "Cihaza gönderilemedi")).toBe(true);
   });
   it("04-H2 yalnız değişiklikte etki özeti ve açık gönderim düğmesi gösterir", () => {
     const tree = dialog();

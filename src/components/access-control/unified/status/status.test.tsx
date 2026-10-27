@@ -49,6 +49,7 @@ vi.mock("../AccessRulesList", () => ({
 vi.mock("../CreateRuleDialog", () => ({ default: () => null }));
 vi.mock("../templates/TemplatesPage", () => ({ default: () => null }));
 import StatusPage from "./StatusPage";
+import { StatusCounters } from "./StatusCounters";
 import UnifiedAccessControl from "../UnifiedAccessControl";
 const projectId = "p" as Id<"projects">;
 const pair: Pair = {
@@ -122,7 +123,7 @@ describe("yetki durumu saf model", () => {
   it("hatalı dağıtım onayı tur sınırını ve capped sayıları açıklar", () => {
     expect(failedConfirmationText(3, false)).toBe(confirmationText(3));
     expect(failedConfirmationText(100, false)).toBe(confirmationText(100));
-    expect(failedConfirmationText(250, false)).toContain("İlk 100 hatalı kişi×cihaz için tek gönderim başlatılacak; kalan 150 sonraki turda.");
+    expect(failedConfirmationText(250, false)).toContain("İlk 100 hatalı kişi–cihaz kaydı için tek gönderim başlatılacak; kalan 150 sonraki turda.");
     expect(failedConfirmationText(1000, true)).toContain("1000+ hatalı");
     expect(failedConfirmationText(1000, true)).toContain("kalan 900+ sonraki turda");
     expect(redistributionSuccessText({ pairCount: 100, remainingFailed: 1, remainingCapped: true })).toContain("Kalan 1+ hatalı");
@@ -146,7 +147,7 @@ describe("yetki durumu saf model", () => {
   });
   it("onay metni ve stale/hata rozetleri", () => {
     expect(confirmationText(3)).toBe(
-      "3 kişi×cihaz için tek gönderim başlatılacak.",
+      "3 kişi–cihaz kaydı için tek gönderim başlatılacak.",
     );
     expect(grantBadge(row)).toEqual({
       label: "Hata",
@@ -169,6 +170,35 @@ describe("yetki durumu saf model", () => {
   });
 });
 describe("yetki durumu SSR", () => {
+  it("eski gönderim notunu yalnız bilinmeyen kayıt varken gösterir", () => {
+    expect(renderToStaticMarkup(<EmptyStatus unknownCount={0} />)).toBe("");
+    expect(renderToStaticMarkup(<EmptyStatus unknownCount={2} />)).toContain("özellik açılmadan önceki dağıtımlar");
+  });
+  it("proje ve departman özetleri arama ve durum filtreleriyle değişmez; rozet seçimini bildirir", () => {
+    const counts = { all: 4, effective: 3, pending: 0, failed: 1, removed: 0, unknown: 0, capped: false, personCount: 2 };
+    const render = (filters: Filters) => renderToStaticMarkup(<StatusCounters counts={counts} filters={filters} change={() => undefined} />);
+    const initial = render({});
+    expect(initial).toContain("Proje özeti · 4 kişi–cihaz kaydı · 2 kişi");
+    expect(initial).toMatch(/aria-pressed="true"[^>]*>Tümü/);
+    const searched = render({ search: "Deniz", state: "failed" });
+    expect(searched).toContain("Proje özeti · 4 kişi–cihaz kaydı · 2 kişi");
+    expect(searched).toMatch(/aria-pressed="true"[^>]*>Hata/);
+    expect(searched).toMatch(/aria-pressed="false"[^>]*>Tümü/);
+    expect(searched.match(/aria-pressed=/g)).toHaveLength(6);
+    expect(render({ departmentId: "dep" as Id<"departments"> })).toContain("Departman özeti · 4 kişi–cihaz kaydı · 2 kişi");
+    expect(renderToStaticMarkup(<StatusCounters counts={{ ...counts, capped: true }} filters={{}} change={() => undefined} />)).toContain("2+ kişi");
+  });
+  it("eski Convex sürümü kişi sayısı döndürmezse özet 'undefined' yazmaz", () => {
+    const legacy = { all: 4, effective: 4, pending: 0, failed: 0, removed: 0, unknown: 0, capped: false } as Parameters<typeof StatusCounters>[0]["counts"];
+    const html = renderToStaticMarkup(<StatusCounters counts={legacy} filters={{}} change={() => undefined} />);
+    expect(html).toContain("Proje özeti · 4 kişi–cihaz kaydı");
+    expect(html).not.toContain("undefined");
+  });
+  it("şablonsuz kuralın kendi saatini tablo ve kişi ayrıntısında belirtir", () => {
+    const ownTime = { ...row, templateNames: [] };
+    expect(renderToStaticMarkup(<GrantRows rows={[ownTime]} selected={[]} onToggle={() => undefined} onEmployee={() => undefined} canManage />)).toContain("Kuralın kendi saati");
+    expect(renderToStaticMarkup(<EmployeeStatus detail={{ rows: [{ ...ownTime, authorized: true, removalRequired: false }], unauthorizedDoors: [] }} />)).toContain("Kuralın kendi saati");
+  });
   it("güncellik uyarısını saklanan durumdan ayrı gösterir", () => {
     const html = renderToStaticMarkup(<GrantBadge row={{ state: "effective", stale: true }} />);
     expect(html).toContain("Etkin");
@@ -202,7 +232,7 @@ describe("yetki durumu SSR", () => {
     );
   });
   it("boş durum, mobil kartlar, masaüstü kolonları, tarih ve hata ipucunu gösterir", () => {
-    const empty = renderToStaticMarkup(<EmptyStatus />);
+    const empty = renderToStaticMarkup(<EmptyStatus unknownCount={1} />);
     expect(empty).toContain("özellik açılmadan önceki dağıtımlar");
     expect(empty).toContain("Tümünü yeniden dağıt");
     const html = renderToStaticMarkup(
@@ -286,6 +316,7 @@ describe("yetki durumu SSR", () => {
   });
   it("ilk SSR abonelik açmaz; grants yalnız tek seferlik query kullanır", () => {
     const html = renderToStaticMarkup(<StatusPage />);
+    expect(html).toContain("Kişi yetkilerinin cihazlara ulaşıp ulaşmadığını kontrol edin.");
     expect(html).toContain("Son yenileme");
     expect(html).toContain("Yenile");
     expect(state.subscribe).not.toHaveBeenCalled();

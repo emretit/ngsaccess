@@ -1,3 +1,5 @@
+import { WEEKDAYS, formatWeekdaysAbbr, sortWeekdays } from "../components/weekdays";
+
 export type TargetStatus =
   | "queued"
   | "sent"
@@ -79,4 +81,14 @@ export function runDisplay(
     return { label: "Gönderilemedi", tone: "danger" } as const;
   }
   return { label: runLabels[status], tone: runTone(status) } as const;
+}
+
+export function ruleDaysSummary(days: string[]) {
+  const sorted = sortWeekdays([...new Set(days)]);
+  if (sorted.length === 0) return "Gün seçilmedi";
+  const indices = sorted.map((day) => WEEKDAYS.findIndex((item) => item.value === day));
+  if (sorted.length > 2 && indices.every((index, i) => index >= 0 && (i === 0 || index === indices[i - 1] + 1))) {
+    return `${formatWeekdaysAbbr(sorted.slice(0, 1))}–${formatWeekdaysAbbr(sorted.slice(-1))}`;
+  }
+  return formatWeekdaysAbbr(sorted);
 }

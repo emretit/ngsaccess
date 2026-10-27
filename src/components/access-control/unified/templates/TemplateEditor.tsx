@@ -227,11 +227,14 @@ export function TemplateEditor({
               {v}
             </p>
           ))}
-          <p role="status">
-            Hik: gün başına en çok {check.hik} aralık{" "}
-            {check.hik <= 8 ? "✓" : "✗"}(8) · IDE: {check.ide} izin kaydı{" "}
-            {check.ide <= 8 ? "✓" : "✗"}(8)
-          </p>
+          <section className="space-y-1" aria-label="Cihaz uyumluluğu">
+            <h3 className="font-medium">Cihaz uyumluluğu</h3>
+            <p>Hikvision: günde en fazla 8 aralık — bu şablonda en çok {check.hik} {check.hik <= 8 ? "✓" : "✗"}</p>
+            <p>IDE: en fazla 8 izin kaydı — bu şablon {check.ide} kullanıyor {check.ide <= 8 ? "✓" : "✗"}</p>
+            {(check.hik > 8 || check.ide > 8) && (
+              <p className="text-danger">Aralıkları birleştirin ya da azaltın.</p>
+            )}
+          </section>
           {check.error && (
             <p role="alert" className="text-danger">
               {check.error}
@@ -239,7 +242,7 @@ export function TemplateEditor({
           )}
           {check.week && (
             <>
-              <h3 className="font-medium">Birleştirilmiş önizleme</h3>
+              <h3 className="font-medium">Haftalık geçiş saatleri</h3>
               <WeekPreview week={check.week} />
               {check.ide === 0 && (
                 <p role="status">Bu şablon hiç erişim vermez</p>
@@ -309,7 +312,7 @@ export function ImpactConfirmation({
       </p>
       {impact.ideOverLimit.length > 0 && (
         <>
-          <p className="text-danger">IDE panelinde 16 izin sınırı aşılıyor</p>
+          <p className="text-danger">IDE cihazında 16 izin sınırı aşılıyor</p>
           <ul className="text-xs break-all">
             {impact.ideOverLimit.map((v) => (
               <li key={`${v.employeeId}/${v.deviceId}`}>

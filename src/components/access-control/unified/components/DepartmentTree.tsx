@@ -182,9 +182,8 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
     visibleOrphans.length > 0;
   const allIds = employees.map((employee) => employee._id);
   return (
-    <div className="space-y-3 min-w-0">
+    <div role="group" aria-label="Kişi seçimi" className="space-y-3 min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">Kim erişebilecek?</h3>
         <Button
           type="button"
           variant="outline"

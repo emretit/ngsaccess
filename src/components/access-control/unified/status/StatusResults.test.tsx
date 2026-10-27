@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import type { GrantRow } from "./model";
 import { StatusViewToggle, StatusResults } from "./StatusResults";
 
 vi.mock("./StatusViews", () => ({
@@ -7,11 +8,11 @@ vi.mock("./StatusViews", () => ({
   GrantRows: () => null,
 }));
 
-function render(cursor: string | null, busy = false) {
+function render(cursor: string | null, busy = false, rows: GrantRow[] = []) {
   return renderToStaticMarkup(
     <StatusResults
       view="person"
-      rows={[]}
+      rows={rows}
       selected={[]}
       toggle={() => {}}
       setEmployee={() => {}}
@@ -28,6 +29,14 @@ function render(cursor: string | null, busy = false) {
 }
 
 describe("StatusResults boş sonuç", () => {
+  it("filtre sonucu sayısını güncel kayıtlarla gösterir ve devam sayfasını açıklar", () => {
+    // GrantRows is mocked: these rows only supply result cardinality here.
+    const rows = [{}, {}] as GrantRow[];
+    expect(render(null, false, rows)).toContain("Filtre sonucu: 2 kayıt");
+    expect(render(null, false, rows.slice(0, 1))).toContain("Filtre sonucu: 1 kayıt");
+    expect(render(null)).toContain("Filtre sonucu: 0 kayıt");
+    expect(render("next-page", false, rows)).toContain("Filtre sonucu: 2 kayıt (yüklenenler; daha fazla kayıt olabilir)");
+  });
   it("devam sayfası varken yalnız yüklenen kayıtlar için boş durum bildirir", () => {
     const html = render("next-page");
     expect(html).toContain('role="status"');

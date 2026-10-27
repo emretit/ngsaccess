@@ -94,6 +94,16 @@ const template: Template = {
   updatedAt: "",
 };
 describe("şablon arayüzü SSR", () => {
+  it("boş liste şablonun amacını ve Kapı Planları farkını açıklar", () => {
+    state.admin = true;
+    state.rows = [];
+    const html = renderToStaticMarkup(<TemplatesPage />);
+    expect(html).toContain('<h1 class="text-xl font-semibold">Zaman Şablonları</h1>');
+    expect(html).toContain("Kurallarda tekrar kullanılan haftalık geçiş saatleri.");
+    expect(html).toContain("Kişilerin geçebileceği gün ve saatleri bir kez tanımlayın, sonra Kurallar&#x27;da bir kurala bağlayın.");
+    expect(html).toContain("Kapının herkes için açık ya da kilitli kalma saatleri Kapı Planları&#x27;nda ayarlanır.");
+  });
+
   it("bağlı şablonda silme pasif ve ipucu görünür", () => {
     state.admin = true;
     state.rows = [template];
@@ -127,9 +137,14 @@ describe("şablon arayüzü SSR", () => {
     );
     expect(html).toContain("Bu şablon hiç erişim vermez");
     expect(html).toContain(
-      "Hik: gün başına en çok 0 aralık ✓(8) · IDE: 0 izin kaydı ✓(8)",
+      "Hikvision: günde en fazla 8 aralık — bu şablonda en çok 0 ✓",
     );
     expect(html).toContain("Haftalık saat önizlemesi");
+    expect(html).toContain("Haftalık geçiş saatleri");
+    expect(html).toContain("Cihaz uyumluluğu");
+    expect(html).toContain("IDE: en fazla 8 izin kaydı — bu şablon 0 kullanıyor ✓");
+    expect(html).not.toContain("Hik:");
+    expect(html).not.toContain("Birleştirilmiş önizleme");
   });
   it("dokuzuncu aralığı ekleyen düğme pasiftir; 24:00 seçilebilir", () => {
     const week = emptyWeek();
@@ -170,7 +185,8 @@ describe("şablon arayüzü SSR", () => {
         onClose={() => undefined}
       />,
     );
-    expect(over).toContain("✗(8)");
+    expect(over).toContain("✗");
+    expect(over).toContain("Aralıkları birleştirin ya da azaltın.");
     expect(over).toMatch(/<button[^>]*disabled=""[^>]*>Kaydet<\/button>/);
   });
   it("etki onayında kişi/panel kapasite aşımı kaydı engeller", () => {
@@ -209,7 +225,7 @@ describe("şablon arayüzü SSR", () => {
         }}
       />,
     );
-    expect(blocked).toContain("IDE panelinde 16 izin sınırı aşılıyor");
+    expect(blocked).toContain("IDE cihazında 16 izin sınırı aşılıyor");
     expect(blocked).toContain("Ayşe Yılmaz — Ana giriş (toplam 17/16)");
     expect(blocked).toMatch(
       /<button[^>]*disabled=""[^>]*>Onayla ve kaydet<\/button>/,

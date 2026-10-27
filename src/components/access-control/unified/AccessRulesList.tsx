@@ -1,11 +1,10 @@
+import { Plus } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
-import { PageHeader } from "@/components/shared/PageHeader";
-import { StatInline } from "@/components/shared/StatInline";
+import { PageHeaderPrimaryButton } from "@/components/shared/PageHeader";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { ProjectSyncButton, RecentRuns } from "./SyncRuns";
 import { readRuleFilters } from "./rules-list/accessRulesListModel";
@@ -13,7 +12,7 @@ import { RulesFilters } from "./rules-list/RulesFilters";
 import { RulesPage } from "./rules-list/RulesPage";
 import type { Props } from "./rules-list/types";
 export default function AccessRulesList(props: Props) {
-  const { projectId, activeProject, loading } = useActiveProject();
+  const { projectId, loading } = useActiveProject();
   const { can } = usePermissions();
   const canManage = can("accessRules.manage");
   const [params, setParams] = useSearchParams();
@@ -35,33 +34,28 @@ export default function AccessRulesList(props: Props) {
       ["q", "by", "durum", "tur"].forEach((key) => next.delete(key));
       return next;
     });
-  const [pageCount, setPageCount] = useState<{
-    key: string;
-    count: number | undefined;
-  } | null>(null);
   const queryKey = JSON.stringify([projectId, search, searchBy, status, type]);
-  const onCount = useCallback(
-    (count: number | undefined) => setPageCount({ key: queryKey, count }),
-    [queryKey, setPageCount],
-  );
   return (
     <div className="space-y-4 min-w-0">
-      <PageHeader
-        className="max-md:[&_button]:min-h-11"
-        title="Geçiş Kontrol"
-        scope={`${activeProject?.name ?? "Proje seçilmedi"} · Erişim kuralları`}
-        primaryAction={
-          canManage && projectId
-            ? { label: "Yeni kural", onClick: props.onCreateRule }
-            : undefined
-        }
-      >
-        {canManage && projectId && (
-          <QuerySectionBoundary resetKey={projectId}>
-            <ProjectSyncButton projectId={projectId} />
-          </QuerySectionBoundary>
-        )}
-      </PageHeader>
+      <div className="flex flex-wrap justify-between gap-2 items-center max-md:[&_button]:min-h-11">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold">Kurallar</h1>
+          <p className="text-sm text-muted-foreground">Kişilerin hangi kapılardan hangi gün ve saatlerde geçebileceğini belirleyin.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {canManage && projectId && (
+            <>
+              <QuerySectionBoundary resetKey={projectId}>
+                <ProjectSyncButton projectId={projectId} />
+              </QuerySectionBoundary>
+              <PageHeaderPrimaryButton onClick={props.onCreateRule}>
+                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                Yeni kural
+              </PageHeaderPrimaryButton>
+            </>
+          )}
+        </div>
+      </div>
       {loading ? (
         <SectionSkeleton label="Proje yükleniyor" />
       ) : !projectId ? (
@@ -71,17 +65,6 @@ export default function AccessRulesList(props: Props) {
         />
       ) : (
         <>
-          <StatInline
-            items={[
-              {
-                label: "Bu sayfada",
-                value:
-                  pageCount?.key === queryKey && pageCount.count !== undefined
-                    ? `${pageCount.count} kural`
-                    : null,
-              },
-            ]}
-          />
           <RulesFilters
             search={search}
             searchBy={searchBy}
@@ -102,7 +85,6 @@ export default function AccessRulesList(props: Props) {
               status={status}
               type={type}
               clear={clear}
-              onCount={onCount}
               {...props}
             />
           </QuerySectionBoundary>

@@ -10,7 +10,7 @@ export function WeekPreview({ week }: { week: WeekSchedule }) {
     <div className="space-y-2 min-w-0" aria-label="Haftalık saat önizlemesi">
       <p className="text-sm break-words">{formatSchedule(week)}</p>
       <p className="text-xs text-muted-foreground">
-        Türkiye saati (Europe/Istanbul) · 00:00 — 24:00
+        Türkiye saati · 00:00 — 24:00
       </p>
       {WEEKDAYS.map((day, i) => (
         <div key={day} className="flex gap-2 items-center text-xs">

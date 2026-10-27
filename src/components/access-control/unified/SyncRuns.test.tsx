@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { RuleSaveNotice, RecentRuns, SyncRunSheet } from "./SyncRuns";
+import { RuleSaveNotice, RecentRuns, SyncRunSheet, ProjectSyncButton } from "./SyncRuns";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 const state = vi.hoisted(() => ({ runs: undefined as unknown[] | undefined, detail: undefined as unknown }));
@@ -54,6 +54,18 @@ it("çevrimdışı cihaz için yeniden gönderim yolunu açıklar", () => {
   const html = renderToStaticMarkup(<SyncRunSheet runId={"run" as Id<"deviceSyncRuns">} onClose={() => undefined} />);
   expect(html).toContain("Gönderilemedi");
   expect(html).toContain("Cihaz bağlanınca yeniden gönderin.");
+  expect(html).toContain("Cihaz aldığını bildirene kadar “Gönderildi” görünür.");
+  expect(html).not.toContain("teslim kanıtı değildir");
   expect(html).not.toContain("Kısmi sonuç");
   state.detail = undefined;
+});
+
+vi.mock("@/components/shared/ConfirmAction", () => ({
+  ConfirmAction: ({ description }: { description: ReactNode }) => <p>{description}</p>,
+}));
+it("proje gönderim onayını sade dille açıklar", () => {
+  const html = renderToStaticMarkup(<ProjectSyncButton projectId={"p" as Id<"projects">} />);
+  expect(html).toContain("Cihaz aldığını bildirene kadar “Gönderildi” görünür.");
+  expect(html).not.toContain("Hikvision gönderimi teslim kanıtı");
+  expect(html).not.toContain("IDE cihaz onayı");
 });

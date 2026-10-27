@@ -62,7 +62,10 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
   return (
     <div className="space-y-4 min-w-0">
       <div className="flex flex-wrap justify-between gap-2 items-center">
-        <h1 className="text-xl font-semibold">Yetki Durumu</h1>
+        <div>
+          <h1 className="text-xl font-semibold">Yetki Durumu</h1>
+          <p className="text-sm text-muted-foreground">Kişi yetkilerinin cihazlara ulaşıp ulaşmadığını kontrol edin.</p>
+        </div>
         <Button variant="outline" disabled={busy} onClick={refresh}>
           Yenile
         </Button>
@@ -95,12 +98,7 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
           {error}
         </p>
       )}
-      <EmptyStatus />
-      <p className="text-xs text-muted-foreground">
-        Hik kapı bilgisi kural kapsamından türetilir; dağıtım cihaz
-        düzeyindedir. Sayaçlar proje/departman kapsamındadır; diğer filtreler
-        kişi listesini daraltır.
-      </p>
+      <EmptyStatus unknownCount={counts?.unknown ?? 0} />
       {busy && <p role="status">Yükleniyor…</p>}
       <StatusResults
         view={view}

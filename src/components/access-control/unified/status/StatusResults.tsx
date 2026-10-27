@@ -61,6 +61,9 @@ export function StatusResults({
 }) {
   const rowView = (
     <>
+      <p className="text-sm text-muted-foreground">
+        Filtre sonucu: {rows.length} kayıt{cursor ? " (yüklenenler; daha fazla kayıt olabilir)" : ""}
+      </p>
       <GrantRows
         rows={rows}
         selected={selected}
@@ -91,8 +94,7 @@ export function StatusResults({
       ) : (
         <div className="space-y-3">
           <p className="text-xs">
-            Cihaz sayaçları kayıtlı çiftleri gösterir (departman filtresi
-            uygulanır).
+            Cihaz özetleri kişi–cihaz kayıtlarını gösterir; departman seçimi bu özeti daraltır.
           </p>
           {options.devices
             .filter((d) => !filters.deviceId || d._id === filters.deviceId)

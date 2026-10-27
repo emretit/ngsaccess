@@ -18,6 +18,7 @@ import { useRuleForm } from "./hooks/useRuleForm";
 import { RuleBasicInfo } from "./components/RuleBasicInfo";
 import { DepartmentTree } from "./components/DepartmentTree";
 import { ZoneDeviceTree } from "./components/ZoneDeviceTree";
+import { ruleDaysSummary } from "./lib/presentation";
 import { TimeSchedule } from "./components/TimeSchedule";
 import type { AccessRule } from "@/types/access-control";
 import type { RuleSaveResult } from "@/hooks/access-rules/useComplexAccessRuleMutations";
@@ -284,15 +285,14 @@ export default function CreateRuleDialog({
             {formData.target_type === "visitor"
               ? "Ziyaretçi üyelikleri korunur"
               : `${formData.selected_employees.length} kişi`}{" "}
-            · {formData.selected_devices.length} cihaz /{" "}
-            {formData.selected_doors.length} kapı ·{" "}
+            · {formData.selected_doors.length} kapı ·{" "}
             {formData.scheduleMode === "template"
               ? <span className={!formData.scheduleTemplateId ? "text-warning" : undefined}>
                   {formData.scheduleTemplateId
                     ? selectedTemplate?.name ?? "Zaman şablonu yükleniyor…"
                     : "Zaman şablonu seçilmedi"}
                 </span>
-              : `${formData.days.length} gün · ${formData.start_time || formData.end_time ? `${formData.start_time}–${formData.end_time}` : "Tüm gün"}`}
+              : `${ruleDaysSummary(formData.days)} ${formData.start_time || formData.end_time ? `${formData.start_time}–${formData.end_time}` : "tüm gün"}`}
           </div>
           <DialogFooter className="px-4 py-3 border-t flex-wrap">
             <Button

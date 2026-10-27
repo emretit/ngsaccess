@@ -109,8 +109,8 @@ export function RedistributeDialog({
         {action !== "selected" && (
           <p className="text-sm">
             {action === "failed"
-              ? "Projedeki hatalı kayıtlar indeks sırasıyla değerlendirilir (tur başına en çok 100)."
-              : "Projenin tüm yetkili kişi ve cihazları değerlendirilir. Görünen sayı kayıt ve bilinmeyen çiftlerin toplamıdır; gerçek kapsam güncel yetkilere göre belirlenir."}{" "}
+              ? "Projedeki hatalı kayıtlar sırayla gönderilir (her seferinde en fazla 100 kayıt)."
+              : "Projenin tüm yetkili kişi ve cihazları değerlendirilir. Görünen sayı, gönderim bilgisi olmayanlar dahil kişi–cihaz kayıtlarının toplamıdır. Gönderilecek kişiler ve cihazlar güncel kurallara göre belirlenir."}{" "}
             Liste filtreleri gönderim kapsamını daraltmaz.
           </p>
         )}

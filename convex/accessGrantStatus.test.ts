@@ -217,14 +217,35 @@ describe("grant status queries", () => {
   });
   it("counts unknown graph pairs and department filters", async () => {
     const { admin, ids, write } = await fixture();
-    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId })).toEqual({ all: 3, effective: 0, pending: 0, failed: 0, removed: 0, unknown: 3, capped: false });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId })).toEqual({ personCount: 1, all: 3, effective: 0, pending: 0, failed: 0, removed: 0, unknown: 3, capped: false });
     await write("effective"); await write("failed", ids.hikId);
-    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toEqual({ all: 3, effective: 1, pending: 0, failed: 1, removed: 0, unknown: 1, capped: false });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toEqual({ personCount: 1, all: 3, effective: 1, pending: 0, failed: 1, removed: 0, unknown: 1, capped: false });
+  });
+  it("03-O2: counts unique people across stored and unknown pairs independently of list search", async () => {
+    const { t, ids, admin, write } = await fixture();
+    await write("effective");
+    await t.run(async ctx => {
+      const secondEmployee = await ctx.db.insert("employees", { projectId: ids.projectId, departmentId: ids.departmentId, firstName: "Ayşe", lastName: "Yılmaz", email: "ayse@example.test", cardNumber: "234", isActive: true });
+      await ctx.db.insert("groupMembers", { projectId: ids.projectId, groupId: ids.ruleId, employeeId: secondEmployee, createdAt: now });
+      // A stored-only person remains part of the summary even without an active rule.
+      const storedEmployee = await ctx.db.insert("employees", { projectId: ids.projectId, firstName: "Ece", lastName: "Test", email: "ece@example.test", cardNumber: "345", isActive: false });
+      await upsertGrantStatus(ctx, { projectId: ids.projectId, employeeId: storedEmployee, deviceId: ids.ideId, state: "removed", ruleIds: [] });
+    });
+    const summary = await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId });
+    expect(summary).toMatchObject({ personCount: 3, all: 7, unknown: 5, capped: false });
+    const unfiltered = await admin.query(api.accessGrantStatus.listByProject, { projectId: ids.projectId, paginationOpts: { numItems: 50, cursor: null } });
+    const searched = await admin.query(api.accessGrantStatus.listByProject, { projectId: ids.projectId, search: "Deniz", paginationOpts: { numItems: 50, cursor: null } });
+    expect(unfiltered.page).toHaveLength(2);
+    expect(searched.page).toHaveLength(1);
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId })).toEqual(summary);
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toMatchObject({ personCount: 2, all: 6, unknown: 5 });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.ideId })).toMatchObject({ personCount: 2, all: 2 });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.hikId })).toMatchObject({ personCount: 0, all: 0 });
   });
   it("counts device-scoped persisted pairs without enumerating unknown graph pairs", async () => {
     const { admin, ids, write } = await fixture();
     await write("effective"); await write("failed", ids.hikId);
-    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.ideId, departmentId: ids.departmentId })).toEqual({ all: 1, effective: 1, pending: 0, failed: 0, removed: 0, unknown: 0, capped: false });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.ideId, departmentId: ids.departmentId })).toEqual({ personCount: 1, all: 1, effective: 1, pending: 0, failed: 0, removed: 0, unknown: 0, capped: false });
     expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.hikId })).toMatchObject({ all: 1, failed: 1, effective: 0 });
     expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.bridgeId })).toMatchObject({ all: 0, unknown: 0 });
   });
@@ -250,8 +271,8 @@ describe("grant status queries", () => {
         return result;
       } finally { queries.mockRestore(); }
     });
-    expect(counted).toEqual({ all: 1000, effective: 250, pending: 250, failed: 250, removed: 250, unknown: 0, capped: true });
-    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.ideId, departmentId: ids.departmentId })).toEqual({ all: 1000, effective: 250, pending: 250, failed: 250, removed: 250, unknown: 0, capped: true });
+    expect(counted).toEqual({ personCount: 1, all: 1000, effective: 250, pending: 250, failed: 250, removed: 250, unknown: 0, capped: true });
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.ideId, departmentId: ids.departmentId })).toEqual({ personCount: 1, all: 1000, effective: 250, pending: 250, failed: 250, removed: 250, unknown: 0, capped: true });
     expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.otherProjectId, deviceId: ids.ideId }).catch(() => null)).toBeNull();
     expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, deviceId: ids.hikId })).toMatchObject({ all: 0, capped: false });
   });
@@ -603,5 +624,5 @@ it("K-09: department unknown counts ignore unrelated rule members beyond the pro
     const unrelated = await ctx.db.insert("employees", { projectId: ids.projectId, firstName: "Diğer", lastName: "Kişi", email: "other@example.test", cardNumber: "456" });
     for (let i = 0; i < 1001; i++) await ctx.db.insert("groupMembers", { projectId: ids.projectId, employeeId: unrelated, groupId: ids.ruleId, createdAt: now });
   });
-  expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toEqual({ all: 3, effective: 1, pending: 0, failed: 0, removed: 0, unknown: 2, capped: false });
+  expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId, departmentId: ids.departmentId })).toEqual({ personCount: 1, all: 3, effective: 1, pending: 0, failed: 0, removed: 0, unknown: 2, capped: false });
 });

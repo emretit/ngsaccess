@@ -21,6 +21,10 @@ export function DoorStatusPlanSection({ statusPlan, setStatusPlan, isSubmitting,
                         }
                       />
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Kapı modu herkes için geçerlidir. Kişilerin hangi saatlerde geçebileceği Kurallar ve Zaman Şablonları’nda belirlenir.
+                      Belirlenen aralıkların dışında kapı normal çalışır; geçişler kişi yetkilerine göre yapılır.
+                    </p>
                     {children}
                   </div>
 

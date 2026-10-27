@@ -247,9 +247,8 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
   ];
   const hasResults = renderedZones.some((zone) => zone !== null);
   return (
-    <div className="space-y-3 min-w-0">
+    <div role="group" aria-label="Kapı ve cihaz seçimi" className="space-y-3 min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">Hangi kapılarda?</h3>
         <Button
           type="button"
           variant="outline"
@@ -274,13 +273,13 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
         seçili. Bölge seçimi yalnız o bölgenin kapılarını kapsar.
       </p>
       <Label htmlFor={`${prefix}-search`} className="sr-only">
-        Kapı, panel veya bölge ara
+        Kapı, cihaz veya bölge ara
       </Label>
       <Input
         id={`${prefix}-search`}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
-        placeholder="Kapı, panel veya bölge ara"
+        placeholder="Kapı, cihaz veya bölge ara"
       />
       {isLoading || loading ? (
         <SectionSkeleton rows={3} label="Kapılar yükleniyor" />
@@ -291,7 +290,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
             <EmptyState
               title={
                 searchText
-                  ? "Aramayla eşleşen kapı veya panel yok"
+                  ? "Aramayla eşleşen kapı veya cihaz yok"
                   : "Cihaz bulunamadı"
               }
             />

@@ -1,5 +1,5 @@
 import { RulesEmptyState } from "./RulesEmptyState";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
@@ -24,7 +24,6 @@ export function RulesPage({
   onEditRule,
   onCreateRule,
   clear,
-  onCount,
 }: Props & {
   projectId: Id<"projects">;
   search: string;
@@ -32,7 +31,6 @@ export function RulesPage({
   status: "all" | "active" | "inactive";
   type: "all" | "visitor" | "personnel";
   clear: () => void;
-  onCount: (count: number | undefined) => void;
 }) {
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const result = useQuery(api.accessRules.listSummaries, {
@@ -46,9 +44,6 @@ export function RulesPage({
       numItems: 20,
     },
   });
-  useEffect(() => {
-    onCount(result?.page.length);
-  }, [result, onCount]);
   if (!result)
     return <SectionSkeleton rows={4} label="Erişim kuralları yükleniyor" />;
   const rows = result.page;

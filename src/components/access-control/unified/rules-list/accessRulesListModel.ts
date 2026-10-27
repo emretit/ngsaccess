@@ -10,11 +10,11 @@ export function scopeText(rule: Summary) {
     [
       panels,
       rule.unassignedDoors.length
-        ? "Panel bağlantısı yok; cihaza uygulanamaz"
+        ? "Cihaz bağlantısı yok; cihaza uygulanamaz"
         : "",
     ]
       .filter(Boolean)
-      .join(" · ") || "Kapı veya panel seçilmemiş"
+      .join(" · ") || "Kapı veya cihaz seçilmemiş"
   );
 }
 

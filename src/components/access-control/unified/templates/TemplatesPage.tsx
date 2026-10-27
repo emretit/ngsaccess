@@ -73,7 +73,10 @@ export default function TemplatesPage() {
   return (
     <div className="space-y-4 min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Zaman Şablonları</h1>
+        <div>
+          <h1 className="text-xl font-semibold">Zaman Şablonları</h1>
+          <p className="text-sm text-muted-foreground">Kurallarda tekrar kullanılan haftalık geçiş saatleri.</p>
+        </div>
         {canManage && projectId && (
           <Button onClick={() => { setError(""); setCreating(true); }}>Yeni şablon</Button>
         )}
@@ -94,7 +97,10 @@ export default function TemplatesPage() {
       ) : (
         <div className="space-y-3">
           {visibleTemplates(rows, archived).length === 0 && (
-            <EmptyState title="Henüz zaman şablonu yok." />
+            <EmptyState
+              title="Henüz zaman şablonu yok."
+              description="Kişilerin geçebileceği gün ve saatleri bir kez tanımlayın, sonra Kurallar'da bir kurala bağlayın. Kapının herkes için açık ya da kilitli kalma saatleri Kapı Planları'nda ayarlanır."
+            />
           )}
           {visibleTemplates(rows, archived).map((t) => (
             <article

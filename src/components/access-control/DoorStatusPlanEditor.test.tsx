@@ -101,6 +101,13 @@ beforeEach(() => {
   state.apply.mockReset().mockResolvedValue({ ok: true });
 });
 describe("DoorStatusPlanEditor", () => {
+  it("04-O2 modları sürekli açık ve sürekli kilitli olarak adlandırır", () => {
+    const html = renderToStaticMarkup(edit().tree());
+    expect(html).toContain("Sürekli açık");
+    expect(html).toContain("Sürekli kilitli");
+    expect(html).not.toContain("Sürekli Kapalı");
+    expect(html).not.toContain("Sürekli Açık");
+  });
   it("Her gün aynı ile Gün bazında arasında geçer ve yedi günü doldurur", () => {
     const editor = edit();
     const change = (value: string) =>

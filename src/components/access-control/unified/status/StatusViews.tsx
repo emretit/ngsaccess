@@ -33,7 +33,8 @@ export function GrantBadge({ row }: { row: Parameters<typeof grantBadge>[0] }) {
     </span>
   );
 }
-export function EmptyStatus() {
+export function EmptyStatus({ unknownCount }: { unknownCount: number }) {
+  if (unknownCount === 0) return null;
   return (
     <p className="text-sm text-muted-foreground break-words">
       Bu özellik açılmadan önceki dağıtımlar 'Bilinmiyor' görünür; 'Tümünü
@@ -78,7 +79,7 @@ export function GrantRows({
       ? `Tüm kapılar (cihaz)${row.doorNames.length ? ` · ${row.doorNames.join(", ")}` : ""}`
       : row.doorNames.join(", ") || "—",
     row.ruleNames.join(", ") || "—",
-    row.templateNames.join(", ") || "—",
+    row.templateNames.join(", ") || (row.ruleNames.length ? "Kuralın kendi saati" : "—"),
     <GrantBadge row={row} />,
     row.updatedAt ? formatTrDateTime(row.updatedAt) : "—",
   ];
@@ -194,7 +195,7 @@ export function EmployeeStatus({ detail }: { detail: EmployeeDetail }) {
           <p>{row.doorNames.join(", ") || "Kapı bilgisi yok"}</p>
           <p className="text-xs">
             {row.ruleNames.join(", ") || "Kural yok"} ·{" "}
-            {row.templateNames.join(", ") || "Şablon yok"}
+            {row.templateNames.join(", ") || (row.ruleNames.length ? "Kuralın kendi saati" : "Kural yok")}
           </p>
         </article>
       ))}

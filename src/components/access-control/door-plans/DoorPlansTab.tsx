@@ -39,7 +39,7 @@ const modes: Record<string, string> = {
 };
 const days = WEEKDAYS.map((day) => day.short);
 function statusSummary(plan: DoorPlanTarget["hikDoorStatusPlan"]) {
-  if (!plan?.enabled) return "Kapalı";
+  if (!plan?.enabled) return "Plan etkin değil";
   const interval = (segment: DoorStatusInterval) =>
     `${segment.beginTime.slice(0, 5)}–${segment.endTime.slice(0, 5)} ${modes[segment.mode]}`;
   if (!plan.weekly) return `Her gün ${interval(plan)}`;
@@ -85,12 +85,19 @@ export function DoorPlansTab() {
           targets?.some((door) => door.doorId === id),
         )
       : [];
+  const heading = (
+    <div className="space-y-1">
+      <h1 className="text-xl font-semibold">Kapı Planları</h1>
+      <p className="text-sm text-muted-foreground">Kapının herkes için ne zaman sürekli açık ya da kilitli kalacağını belirleyin.</p>
+    </div>
+  );
   if (loading || (projectId && targets === undefined))
-    return <p role="status">Kapı planları yükleniyor…</p>;
+    return <div className="space-y-4 min-w-0">{heading}<p role="status">Kapı planları yükleniyor…</p></div>;
   if (!projectId || !targets?.length)
-    return <EmptyState title="Plan kurulabilecek Hikvision kapısı yok" />;
+    return <div className="space-y-4 min-w-0">{heading}<EmptyState title="Plan kurulabilecek Hikvision kapısı yok" /></div>;
   return (
-    <>
+    <div className="space-y-4 min-w-0">
+      {heading}
       <div className="flex items-center gap-3 mb-3">
         <span className="text-sm">
           {checked.length} kapı seçildi (en fazla {MAX_BULK_DOORS})
@@ -197,7 +204,7 @@ export function DoorPlansTab() {
                   ? door.hikVerifyPlan.weekly
                     ? `Haftalık · ${door.hikVerifyPlan.weekly.reduce((n, day) => n + day.segments.length, 0)} aralık`
                     : `${door.hikVerifyPlan.beginTime.slice(0, 5)}–${door.hikVerifyPlan.endTime.slice(0, 5)} ${modes[door.hikVerifyPlan.verifyMode] ?? door.hikVerifyPlan.verifyMode}`
-                  : "Kapalı"}
+                  : "Plan etkin değil"}
               </TableCell>
               <TableCell>
                 {door.hikPlanApplyError
@@ -231,6 +238,6 @@ export function DoorPlansTab() {
           door={selected.door}
         />
       )}
-    </>
+    </div>
   );
 }
