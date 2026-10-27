@@ -1,3 +1,4 @@
+import { DetailFieldList } from "@/components/shared/DetailFieldList";
 import { formatTrDateTime } from "@/lib/date";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -48,48 +49,18 @@ export function LeaveDetails({
         </SheetHeader>
         {row && (
           <>
-            <dl className="space-y-5 text-sm break-words">
-              <div>
-                <dt className="text-muted-foreground">İzin türü</dt>
-                <dd>{leaveTypes[row.leaveType]}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Durum</dt>
-                <dd>
-                  <StatusBadge tone={leaveStatuses[row.status].tone}>
-                    {leaveStatuses[row.status].label}
-                  </StatusBadge>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Tarih aralığı</dt>
-                <dd className="tabular-nums">
-                  {dateLabel(row.startDate)} – {dateLabel(row.endDate)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Takvim süresi</dt>
-                <dd>
-                  {row.calendarDays === null
-                    ? "— · Tarihler geçersiz; kayıt düzeltilmeli."
-                    : `${row.calendarDays} takvim günü · Başlangıç ve bitiş dahil.`}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Açıklama</dt>
-                <dd className="whitespace-pre-wrap">
-                  {row.notesHidden
-                    ? "Açıklama yalnız yöneticilere görünür."
-                    : row.notes || "Açıklama eklenmemiş."}
-                </dd>
-              </div>
-              {row.updatedAt && (
-                <div>
-                  <dt className="text-muted-foreground">Son güncelleme</dt>
-                  <dd>{formatTrDateTime(new Date(row.updatedAt))}</dd>
-                </div>
-              )}
-            </dl>
+            <DetailFieldList fields={[
+              { key: "type", label: "İzin türü", value: leaveTypes[row.leaveType] },
+              { key: "status", label: "Durum", value: <StatusBadge tone={leaveStatuses[row.status].tone}>{leaveStatuses[row.status].label}</StatusBadge> },
+              { key: "dates", label: "Tarih aralığı", numeric: true, value: `${dateLabel(row.startDate)} – ${dateLabel(row.endDate)}` },
+              { key: "duration", label: "Takvim süresi", value: row.calendarDays === null
+                ? "— · Tarihler geçersiz; kayıt düzeltilmeli."
+                : `${row.calendarDays} takvim günü · Başlangıç ve bitiş dahil.` },
+              { key: "notes", label: "Açıklama", value: <span className="whitespace-pre-wrap">{row.notesHidden
+                ? "Açıklama yalnız yöneticilere görünür."
+                : row.notes || "Açıklama eklenmemiş."}</span> },
+              ...(row.updatedAt ? [{ key: "updated", label: "Son güncelleme", value: formatTrDateTime(new Date(row.updatedAt)) }] : []),
+            ]} />
             {row.status !== "approved" && (
               <p className="text-sm text-muted-foreground">
                 Bu eski kayıt salt okunurdur.

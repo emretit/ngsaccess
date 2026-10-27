@@ -99,7 +99,7 @@ describe("visitor audit fixes", () => {
     const table = renderToStaticMarkup(<VisitorTable visitors={[detail]} onOpen={noop} />);
     expect(table).not.toContain("Seçilmedi"); expect(table).toContain("—");
     const html = renderToStaticMarkup(<VisitorDetailView now={0} detail={detail} canManage={false} onEdit={noop} onDeleted={noop} />);
-    expect(html).not.toContain("ngsaccess.local"); expect(html).toContain("Belirtilmedi");
+    expect(html).not.toContain("ngsaccess.local"); expect(html).toContain("—");
     expect(html).not.toContain("Kaydedilmedi");
   });
 });

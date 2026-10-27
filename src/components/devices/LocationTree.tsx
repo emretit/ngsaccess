@@ -1,3 +1,5 @@
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useMemo, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
@@ -216,11 +218,13 @@ export function LocationTree({
         </ul>
         <div role="presentation" className="border-t" />
         {zonesData === undefined ? (
-          <p className="px-2 py-3 text-xs text-muted-foreground">Yükleniyor…</p>
+          <SectionSkeleton rows={2} label="Yükleniyor…" className="px-2 py-3" />
         ) : zones.length === 0 ? (
-          <p className="px-2 py-3 text-xs text-muted-foreground">
-            Henüz bölge yok.{canManage ? " Eklemek için + düğmesini kullanın." : ""}
-          </p>
+          <EmptyState
+            compact
+            title="Henüz bölge yok."
+            description={canManage ? "Eklemek için + düğmesini kullanın." : undefined}
+          />
         ) : (
           <ul className="space-y-0.5">
             {zones.map((zone) => {

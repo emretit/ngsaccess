@@ -1,3 +1,4 @@
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Link } from "react-router-dom";
 import { CreditCard } from "lucide-react";
@@ -8,7 +9,6 @@ import { useDashboardReadings } from "@/hooks/useDashboard";
 import { useNow } from "@/hooks/useNow";
 import { formatTrDateTime } from "@/lib/date";
 import { feedTimeTr } from "@/lib/relativeTime";
-import { cn } from "@/lib/utils";
 import { DashboardPanel } from "./DashboardPanel";
 
 const FEED_SIZE = 7;
@@ -78,9 +78,9 @@ export default function LiveFeed() {
                   <p className="text-xs tabular-nums text-muted-foreground">
                     <time dateTime={reading.accessTime} title={Number.isFinite(Date.parse(reading.accessTime)) ? formatTrDateTime(new Date(reading.accessTime)) : undefined}>{feedTimeTr(reading.accessTime, now) ?? "—"}</time>
                   </p>
-                  <p className={cn("text-[11px] font-medium", granted ? "text-success" : denied ? "text-danger" : "text-muted-foreground")}>
+                  <StatusBadge tone={granted ? "success" : denied ? "danger" : "neutral"} className="gap-1 px-1 py-0 text-[11px] font-medium whitespace-nowrap">
                     {granted ? "İzin verildi" : denied ? "Reddedildi" : "Durum bilinmiyor"}
-                  </p>
+                  </StatusBadge>
                 </div>
               </li>
             );

@@ -16,9 +16,9 @@ vi.mock("./hooks/useDeviceFormLogic", () => ({
     };
   },
 }));
-vi.mock("@/components/employees/FormActions", async original => {
-  const Actual = (await original<typeof import("@/components/employees/FormActions")>()).default;
-  return { default: (props: Parameters<typeof Actual>[0]) => { mocks.undo = props.onClose; return <Actual {...props} />; } };
+vi.mock("@/components/shared/FormActions", async original => {
+  const Actual = (await original<typeof import("@/components/shared/FormActions")>()).FormActions;
+  return { FormActions: (props: Parameters<typeof Actual>[0]) => { mocks.undo = props.onClose; return <Actual {...props} />; } };
 });
 vi.mock("./form-sections/DeviceBasicSection", () => ({ DeviceBasicSection: () => null, DeviceTypeField: () => null }));
 vi.mock("./form-sections/DeviceLocationSection", () => ({ DeviceLocationSection: () => null }));

@@ -1,3 +1,4 @@
+import { MasterDetailListLayout } from "@/components/shared/MasterDetailListLayout";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
@@ -168,80 +169,77 @@ function EmployeePage() {
             : undefined
         }
       />
-      <div className="flex min-w-0 flex-col gap-6 min-[1100px]:flex-row min-[1100px]:gap-5">
-        <DepartmentTree
+      <MasterDetailListLayout sidebar={<DepartmentTree
           selectedValue={department}
           onSelectUnassigned={() => update({ department: "unassigned" })}
           onSelectDepartment={(id) => update({ department: id ?? "" })}
+        />}>
+        <EmployeeFilters
+          searchQuery={q}
+          onSearchChange={(value) => {
+            setPrivateQuery(safeSearchParam(value) !== value ? value : null);
+            update({ q: safeSearchParam(value) });
+          }}
+          status={status}
+          statusCounts={statusCounts}
+          onStatusChange={(value) => update({ status: value })}
+          sort={sort}
+          onSortChange={(value) => update({ sort: value })}
+          hasFilters={hasFilters}
+          hideClear={filtered.length === 0}
+          onClear={() => {
+            setPrivateQuery(null);
+            update({ q: "", department: "", status: "" });
+          }}
         />
-        <div className="min-w-0 flex-1 space-y-4">
-          <EmployeeFilters
-            searchQuery={q}
-            onSearchChange={(value) => {
-              setPrivateQuery(safeSearchParam(value) !== value ? value : null);
-              update({ q: safeSearchParam(value) });
+        {(canManage || canExport) && <div className="flex flex-wrap items-center gap-2">
+          {canManage && <Button variant="outline" onClick={() => setImportDialogOpen(true)}>İçe aktar</Button>}
+          {canExport && <Button variant="outline" disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onClick={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</Button>}
+          {canManage && <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>}
+          {exportError && <span role="alert" className="text-sm text-destructive">{exportError}</span>}
+        </div>}
+        {isLoading ? (
+          <SectionSkeleton label="Personel bilgileri yükleniyor…" />
+        ) : employees.length === 0 ? (
+          <EmptyState
+            title="Henüz personel eklenmedi"
+            description={`${activeProject?.name ?? "Bu proje"} için ilk personel kaydını oluşturun.`}
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title={q ? "Aramanızla eşleşen personel yok" : department && status === "all" ? "Bu departmanda doğrudan bağlı kişi yok" : "Seçili filtrelerle eşleşen personel yok"}
+            description="Aramayı veya departman seçimini değiştirin."
+            action={{
+              label: department && !q && status === "all" ? "Tüm personele dön" : "Filtreleri temizle",
+              onClick: () => {
+                setPrivateQuery(null);
+                update({ q: "", department: "", status: "" });
+              },
             }}
-            status={status}
-            statusCounts={statusCounts}
-            onStatusChange={(value) => update({ status: value })}
+          />
+        ) : (
+          <EmployeeTable
+            key={`${projectId}/${q}/${department}/${status}/${sort}/${page}/${size}`}
             sort={sort}
             onSortChange={(value) => update({ sort: value })}
-            hasFilters={hasFilters}
-            hideClear={filtered.length === 0}
-            onClear={() => {
-              setPrivateQuery(null);
-              update({ q: "", department: "", status: "" });
-            }}
+            showDepartment={!department}
+            employees={filtered.slice((page - 1) * size, page * size)}
+            onViewDetails={(employee) => open(employee)}
+            onRefresh={refetch}
           />
-          {(canManage || canExport) && <div className="flex flex-wrap items-center gap-2">
-            {canManage && <Button variant="outline" onClick={() => setImportDialogOpen(true)}>İçe aktar</Button>}
-            {canExport && <Button variant="outline" disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onClick={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</Button>}
-            {canManage && <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>}
-            {exportError && <span role="alert" className="text-sm text-destructive">{exportError}</span>}
-          </div>}
-          {isLoading ? (
-            <SectionSkeleton label="Personel bilgileri yükleniyor…" />
-          ) : employees.length === 0 ? (
-            <EmptyState
-              title="Henüz personel eklenmedi"
-              description={`${activeProject?.name ?? "Bu proje"} için ilk personel kaydını oluşturun.`}
-            />
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              title={q ? "Aramanızla eşleşen personel yok" : department && status === "all" ? "Bu departmanda doğrudan bağlı kişi yok" : "Seçili filtrelerle eşleşen personel yok"}
-              description="Aramayı veya departman seçimini değiştirin."
-              action={{
-                label: department && !q && status === "all" ? "Tüm personele dön" : "Filtreleri temizle",
-                onClick: () => {
-                  setPrivateQuery(null);
-                  update({ q: "", department: "", status: "" });
-                },
-              }}
-            />
-          ) : (
-            <EmployeeTable
-              key={`${projectId}/${q}/${department}/${status}/${sort}/${page}/${size}`}
-              sort={sort}
-              onSortChange={(value) => update({ sort: value })}
-              showDepartment={!department}
-              employees={filtered.slice((page - 1) * size, page * size)}
-              onViewDetails={(employee) => open(employee)}
-              onRefresh={refetch}
-            />
-          )}
-          <PaginationBar
-            summary={filtered.length === 0 ? "0 sonuç" : `${employees.length} personelden ${filtered.length} sonuç · ${pageRange(filtered.length, page, size)} gösteriliyor`}
-            page={page}
-            pageCount={Math.max(1, Math.ceil(filtered.length / size))}
-            onPrevious={() => update({ page: String(page - 1) }, false)}
-            onNext={() => update({ page: String(page + 1) }, false)}
-            pageSize={size}
-            pageSizes={[10, 25, 50, 100]}
-            onPageSizeChange={(value) => update({ size: String(value) })}
-            pageSizeLabel="Sayfadaki personel sayısı"
-          />
-        </div>
-      </div>
+        )}
+        <PaginationBar
+          summary={filtered.length === 0 ? "0 sonuç" : `${employees.length} personelden ${filtered.length} sonuç · ${pageRange(filtered.length, page, size)} gösteriliyor`}
+          page={page}
+          pageCount={Math.max(1, Math.ceil(filtered.length / size))}
+          onPrevious={() => update({ page: String(page - 1) }, false)}
+          onNext={() => update({ page: String(page + 1) }, false)}
+          pageSize={size}
+          pageSizes={[10, 25, 50, 100]}
+          onPageSizeChange={(value) => update({ size: String(value) })}
+          pageSizeLabel="Sayfadaki personel sayısı"
+        />
+      </MasterDetailListLayout>
       <SlideOverPanel
         isOpen={isPanelOpen}
         onClose={close}

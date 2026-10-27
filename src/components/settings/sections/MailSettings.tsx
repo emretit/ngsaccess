@@ -8,7 +8,8 @@ import { GOOGLE_SMTP_HOST, isGoogleSmtpHost } from "../../../../convex/lib/smtpC
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { notify } from "@/lib/notify";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,6 @@ function MailSettingsForm({ projectId }: { projectId: Id<"projects"> }) {
   const action = useAsyncAction(async (payload: MailValues) => {
     await save({ projectId, ...payload, password: payload.password.trim() || undefined });
   }, { success: "E-posta hesabı kaydedildi", error: "E-posta hesabı kaydedilemedi" });
-  const removeAction = useAsyncAction(async () => { await remove({ projectId }); }, { success: "E-posta hesabı kaldırıldı; raporlar NGS+ adresinden gidecek", error: "E-posta hesabı kaldırılamadı" });
   useSettingsFormState("mail", draft.dirty, action.pending);
   if (saved === undefined) return <SectionSkeleton label="E-posta ayarları yükleniyor" />;
 
@@ -124,20 +124,22 @@ function MailSettingsForm({ projectId }: { projectId: Id<"projects"> }) {
     </form>
     {saved && !draft.dirty && <TestMail projectId={projectId} />}
     {saved && <div className="border-t pt-4">
-      <Button type="button" variant="outline" disabled={removeAction.pending || action.pending} onClick={() => setConfirmRemove(true)}>Hesabı kaldır</Button>
+      <Button type="button" variant="outline" disabled={action.pending} onClick={() => setConfirmRemove(true)}>Hesabı kaldır</Button>
     </div>}
-    <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>E-posta hesabı kaldırılsın mı?</AlertDialogTitle>
-          <AlertDialogDescription>Kayıtlı SMTP bilgileri ve şifre silinir. Rapor e-postaları NGS+ adresinden gönderilmeye devam eder.</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Vazgeç</AlertDialogCancel>
-          <AlertDialogAction onClick={() => { void removeAction.run().then(success => { if (success) draft.reset(); }); }}>Kaldır</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDestructive
+      open={confirmRemove}
+      onOpenChange={setConfirmRemove}
+      title="E-posta hesabı kaldırılsın mı?"
+      objectName={saved?.fromEmail ?? "Kayıtlı SMTP hesabı"}
+      effects={["Kayıtlı SMTP bilgileri ve şifre silinir. Rapor e-postaları NGS+ adresinden gönderilmeye devam eder."]}
+      confirmLabel="Kaldır"
+      errorTitle="E-posta hesabı kaldırılamadı"
+      onConfirm={async () => {
+        await remove({ projectId });
+        draft.reset();
+        notify.success("E-posta hesabı kaldırıldı; raporlar NGS+ adresinden gidecek");
+      }}
+    />
   </div>;
 }
 

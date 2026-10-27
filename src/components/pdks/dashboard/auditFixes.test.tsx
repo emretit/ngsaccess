@@ -26,6 +26,17 @@ vi.mock("@/components/ui/dialog", () => {
   const Box = ({ children }: { children: ReactNode }) => <div>{children}</div>;
   return { Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => open ? <div>{children}</div> : null, DialogContent: Box, DialogDescription: Box, DialogFooter: Box, DialogHeader: Box, DialogTitle: Box };
 });
+vi.mock("@/components/ui/alert-dialog", () => {
+  const Box = ({ children }: { children: ReactNode }) => <div>{children}</div>;
+  return {
+    AlertDialog: ({ open, children, onOpenChange }: { open: boolean; children: ReactNode; onOpenChange: (open: boolean) => void }) => {
+      if (open) state.actions.push({ label: "Vazgeç", invoke: () => onOpenChange(false) });
+      return open ? <div>{children}</div> : null;
+    },
+    AlertDialogContent: Box, AlertDialogDescription: Box, AlertDialogFooter: Box,
+    AlertDialogHeader: Box, AlertDialogTitle: Box, AlertDialogCancel: Box,
+  };
+});
 vi.mock("@/components/ui/sheet", () => {
   const Box = ({ children }: { children: ReactNode }) => <div>{children}</div>;
   return { Sheet: ({ open, children }: { open: boolean; children: ReactNode }) => open ? <div>{children}</div> : null, SheetContent: Box, SheetDescription: Box, SheetHeader: Box, SheetTitle: Box };
@@ -51,7 +62,7 @@ const render = (node: ReactNode) => { state.cursor = 0; state.actions = []; retu
 beforeEach(() => { state.values = []; state.remove.mockReset(); state.apply.mockReset(); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 describe("08 UI denetim düzeltmeleri", () => {
-  it("O7: menü seçimi görünümü uygular, silme önce onay ister, iptal silmez", () => {
+  it("O7: menü seçimi görünümü uygular, silme önce onay ister, iptal silmez", async () => {
     const onApply = vi.fn(); state.apply.mockReturnValue(values);
     const component = <PDKSSavedViews filters={values} onApply={onApply} />;
     expect(render(component)).toContain('aria-label="Kayıtlı görünümler"');
@@ -63,15 +74,23 @@ describe("08 UI denetim düzeltmeleri", () => {
     state.actions.find(a => a.label === "Vazgeç")?.invoke(); render(component);
     expect(state.remove).not.toHaveBeenCalled();
     state.actions.find(a => a.label === "Geç kalanlar görünümünü sil")?.invoke(); render(component);
-    state.actions.find(a => a.label === "Sil")?.invoke();
+    state.remove.mockRejectedValueOnce(new Error("Görünüm silinemedi"));
+    await state.actions.find(a => a.label === "Sil")?.invoke();
     expect(state.remove).toHaveBeenCalledWith("saved");
+    expect(render(component)).toContain("Görünüm silinsin mi?");
+    state.remove.mockResolvedValueOnce(undefined);
+    await state.actions.find(a => a.label === "Sil")?.invoke();
+    expect(state.remove).toHaveBeenCalledTimes(2);
+    expect(render(component)).not.toContain("Görünüm silinsin mi?");
   });
   it("D5/D11: durum filtre çubuğundadır; mobil filtre düğmesi paneli açar", () => {
     const component = <PDKSFilterBar values={values} onChange={vi.fn()} />;
     const html = render(component);
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('aria-label="Durum"');
-    expect(html).toContain('class="hidden sm:block"');
+    const controls = html.match(/<button[^>]*aria-expanded="false" aria-controls="([^"]+)"[^>]*>Filtreler<\/button>/)?.[1];
+    expect(controls).toBeTruthy();
+    expect(html).toContain(`id="${controls}" class="hidden md:block"`);
     expect(html).not.toMatch(/<select(?! aria-hidden="true")/);
     state.actions.find(a => a.label === "Filtreler")?.invoke();
     expect(render(component)).toContain('aria-expanded="true"');

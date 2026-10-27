@@ -1,4 +1,5 @@
 import type { MouseEventHandler } from "react";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -18,6 +19,7 @@ export function PdksRulesConfirmation({
   error,
   onClose,
   onConfirm,
+  onDelete,
 }: {
   targets?: Targets;
   confirmation: RuleConfirmation;
@@ -25,8 +27,31 @@ export function PdksRulesConfirmation({
   error: string;
   onClose: () => void;
   onConfirm: MouseEventHandler<HTMLButtonElement>;
+  onDelete: () => Promise<unknown>;
 }) {
-  const selected = confirmation?.kind === "publish" ? confirmation.values : confirmation?.rule;
+  if (confirmation?.kind === "delete") {
+    const rule = confirmation.rule;
+    return (
+      <ConfirmDestructive
+        open
+        onOpenChange={open => { if (!open) onClose(); }}
+        title="Gelecek sürüm silinsin mi?"
+        objectName={`${rule.effectiveFrom} tarihli gelecek sürüm`}
+        effects={[
+          `${rule.effectiveFrom} tarihli gelecek sürüm silinecek.`,
+          "Geçmiş günler değişmez.",
+          calculationSummary(rule),
+          ...(rule.checkpointMode === "selected"
+            ? [`Seçili noktalar: ${checkpointSummary(rule.targets, targets)}`]
+            : []),
+        ]}
+        confirmLabel="Sürümü sil"
+        errorTitle="Gelecek sürüm silinemedi"
+        onConfirm={onDelete}
+      />
+    );
+  }
+  const selected = confirmation?.values;
   return (
     <AlertDialog
       open={confirmation !== null}
@@ -37,14 +62,10 @@ export function PdksRulesConfirmation({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {confirmation?.kind === "delete"
-              ? "Gelecek sürüm silinsin mi?"
-              : "Bu tarihteki sürüm değiştirilsin mi?"}
+            Bu tarihteki sürüm değiştirilsin mi?
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {confirmation?.kind === "delete"
-              ? `${confirmation.rule.effectiveFrom} tarihli gelecek sürüm silinecek.`
-              : `${confirmation?.values.effectiveFrom ?? ""} tarihindeki yayın, o tarihteki sürümün yerine geçer.`}{" "}
+            {`${confirmation?.values.effectiveFrom ?? ""} tarihindeki yayın, o tarihteki sürümün yerine geçer.`}{" "}
             Geçmiş günler değişmez.
             {selected && ` ${calculationSummary(selected)}`}
             {selected?.checkpointMode === "selected" &&
@@ -61,9 +82,7 @@ export function PdksRulesConfirmation({
           <AlertDialogAction disabled={pending} onClick={onConfirm}>
             {pending
               ? "Kaydediliyor…"
-              : confirmation?.kind === "delete"
-                ? "Sürümü sil"
-                : "Yerine yayınla"}
+              : "Yerine yayınla"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

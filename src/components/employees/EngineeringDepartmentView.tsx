@@ -1,3 +1,5 @@
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -26,13 +28,11 @@ export function EngineeringDepartmentView() {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="flex justify-center p-4">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-          </div>
+          <SectionSkeleton label="Yükleniyor" />
         ) : !engineeringDept ? (
           <div className="text-destructive p-4">Engineering departmanı sistemde kayıtlı değil</div>
         ) : employees.length === 0 ? (
-          <div className="text-center p-4">Engineering departmanında çalışan bulunamadı</div>
+          <EmptyState compact title="Engineering departmanında çalışan bulunamadı" />
         ) : (
           <Table>
             <TableHeader>

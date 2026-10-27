@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/shared/FormActions";
 import { EmployeePicker, selectClass } from "./EmployeePicker";
 import {
   calendarDays,
@@ -394,19 +395,7 @@ export function LeaveForm({
             değiştirebilir.
           </p>
         </fieldset>
-        <div className="flex shrink-0 justify-end gap-2 border-t bg-background p-4">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={pending}
-            onClick={close}
-          >
-            İptal
-          </Button>
-          <Button type="submit" disabled={pending || (checkConflict && conflict !== null)}>
-            {pending ? "Kaydediliyor…" : "Kaydet"}
-          </Button>
-        </div>
+        <FormActions className="static shrink-0 gap-2 p-4" isLoading={pending} onClose={close} cancelLabel="İptal" busyLabel="Kaydediliyor…" submitDisabled={checkConflict && conflict !== null} />
       </form>
     </>
   );

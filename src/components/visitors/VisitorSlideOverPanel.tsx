@@ -1,3 +1,4 @@
+import { DetailFieldList, type DetailField } from "@/components/shared/DetailFieldList";
 import { useCallback, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -60,22 +61,30 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
   const status = visitorStatusInfo[displayVisitorStatus(detail, now)];
   const needsCard = detail.cardNumber.startsWith("PRE:");
   const name = `${detail.firstName} ${detail.lastName}`;
-  const fields = [
-    ["Geçerlilik bitişi (TR)", formatVisitorTime(detail.visitEnd)],
-    ["Erişim bölgesi", detail.presetRuleName ?? "Belirtilmedi"],
-    ["Ziyaret edilen", detail.hostName ?? "Belirtilmedi"],
-    ...(detail.presence ? [["Son okumaya göre konum", visitorPresenceLabels[detail.presence]], ["Son izinli okuma", formatVisitorTime(detail.lastSeenAt)]] : []),
+  const fields: DetailField[] = [
+    { key: "expiry", label: "Geçerlilik bitişi (TR)", value: formatVisitorTime(detail.visitEnd), numeric: true },
+    { key: "zone", label: "Erişim bölgesi", value: detail.presetRuleName },
+    { key: "host", label: "Ziyaret edilen", value: detail.hostName },
   ];
+  if (detail.presence) fields.push(
+    { key: "presence", label: "Son okumaya göre konum", value: visitorPresenceLabels[detail.presence] },
+    { key: "lastSeen", label: "Son izinli okuma", value: formatVisitorTime(detail.lastSeenAt), numeric: true },
+  );
   return <div className="min-w-0 space-y-5 p-5">
     <div className="flex flex-wrap items-center justify-between gap-2"><StatusBadge tone={status.tone}>{status.label}</StatusBadge>{canManage && <Button variant="outline" onClick={onEdit}>{canAssignVisitorPreset(detail) ? "Kart ve erişim ata" : "Düzenle"}</Button>}</div>
-    <dl className="space-y-4">{fields.map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="break-words tabular-nums">{value}</dd></div>)}
-      <div><dt className="text-xs text-muted-foreground">Kart</dt><dd className="break-all tabular-nums">{detail.cardReleased ? "İade edildi" : needsCard ? "Henüz kart atanmadı" : showCard ? detail.cardNumber : `•••• ${detail.cardNumber.slice(-4)}`}
-        {!detail.cardReleased && !needsCard && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</dd></div>
-    </dl>
+    <DetailFieldList fields={[
+      ...fields,
+      { key: "card", label: "Kart", numeric: true, value: <span className="break-all">{detail.cardReleased ? "İade edildi" : needsCard ? "Henüz kart atanmadı" : showCard ? detail.cardNumber : `•••• ${detail.cardNumber.slice(-4)}`}
+        {!detail.cardReleased && !needsCard && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</span> },
+    ]} />
     {detail.presence && <p className="text-xs text-muted-foreground">Son konum izinli okumaya dayanır. Sürenin dolması veya manuel sonlandırma fiziksel çıkış okuması oluşturmaz.</p>}
-    <VisitorCollapsible title="Şirket, iletişim ve ek bilgiler"><dl className="space-y-3">
-      {[["Şirket", detail.visitorCompany], ["Ziyaret amacı", detail.visitPurpose], ["Telefon", detail.visitorPhone], ["E-posta", detail.email?.toLowerCase().endsWith("@ngsaccess.local") ? null : detail.email], ["Notlar", detail.notes]].map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="whitespace-pre-wrap break-words">{value || "Belirtilmedi"}</dd></div>)}
-    </dl></VisitorCollapsible>
+    <VisitorCollapsible title="Şirket, iletişim ve ek bilgiler"><DetailFieldList className="whitespace-pre-wrap" fields={[
+      { key: "company", label: "Şirket", value: detail.visitorCompany },
+      { key: "purpose", label: "Ziyaret amacı", value: detail.visitPurpose },
+      { key: "phone", label: "Telefon", value: detail.visitorPhone },
+      { key: "email", label: "E-posta", value: detail.email?.toLowerCase().endsWith("@ngsaccess.local") ? null : detail.email },
+      { key: "notes", label: "Notlar", value: detail.notes },
+    ]} /></VisitorCollapsible>
     <div className="space-y-1 border-t pt-3"><h3 className="font-medium">KVKK rıza kaydı</h3><p>{detail.kvkkConsent ? `Kayıt tarihi: ${formatVisitorTime(detail.kvkkConsent.grantedAt)}` : "Rıza kaydı bulunmuyor."}</p>
       {detail.kvkkConsent && <><p className="text-xs text-muted-foreground">Sürüm: {detail.kvkkConsent.version ?? "Kaydedilmedi"}</p>{detail.kvkkConsent.documentUrl && /^https?:\/\//i.test(detail.kvkkConsent.documentUrl) && <a className="underline" href={detail.kvkkConsent.documentUrl} target="_blank" rel="noopener noreferrer">Kayıtlı belgeyi aç</a>}</>}
     </div>

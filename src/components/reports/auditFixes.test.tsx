@@ -58,7 +58,8 @@ describe('reports audit fixes', () => {
   });
   it('collapses mobile filters, uses date pickers and displays a single range error', () => {
     const html = renderToStaticMarkup(<MemoryRouter initialEntries={['/?preset=custom&from=2026-10-20&to=2026-10-01']}><ReportScreen definition={report('gec-kalanlar')} /></MemoryRouter>);
-    expect(html).toContain('aria-controls="report-filters"'); expect(html).toContain('aria-expanded="false"'); expect(html).toContain('hidden sm:block');
+    const controls = html.match(/<button[^>]*aria-expanded="false" aria-controls="([^"]+)"[^>]*>Filtreler<\/button>/)?.[1];
+    expect(controls).toBeTruthy(); expect(html).toContain(`id="${controls}" class="hidden md:block"`);
     expect(html).toContain('Başlangıç tarihi bitiş tarihinden sonra olamaz.'); expect(html).not.toContain('Dönem seçimini düzeltin.');
     expect(html).toMatch(/<button[^>]*id="report-from"/); expect(html).toContain('20 Ekim 2026'); expect(html).not.toContain('GG.AA.YYYY');
   });

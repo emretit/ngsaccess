@@ -40,6 +40,7 @@ describe("settings user directory", () => {
       const bar = findElement<React.ComponentProps<typeof FilterBar>>(tree, FilterBar);
       const select = findElement<React.ComponentProps<typeof AdminSelect>>(tree, AdminSelect);
       if (!bar || !select) throw new Error('Missing filters');
+      if (!bar.props.onSearchChange || bar.props.search === undefined) throw new Error('FilterBar arama modunda olmalı');
       if (step === 0) { bar.props.onSearchChange('yeni arama'); setStep(1); }
       else if (step === 1) { select.props.onChange('viewer'); setStep(2); }
       else search = bar.props.search;

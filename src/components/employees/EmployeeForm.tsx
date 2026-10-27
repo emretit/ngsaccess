@@ -1,3 +1,4 @@
+import { FormFeedback } from "@/components/shared/FormFeedback";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
@@ -6,7 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { useEffect, useState, type RefObject } from "react";
 import { Employee } from "@/types/employee";
 import PhotoUpload from "./PhotoUpload";
-import FormActions from "./FormActions";
+import { FormActions } from "@/components/shared/FormActions";
 import EmployeeFormFields from "./EmployeeFormFields";
 import type { EmployeeFormDraft } from "./hooks/useEmployeeFormData";
 import { useEmployeeFormData } from "./hooks/useEmployeeFormData";
@@ -205,9 +206,9 @@ export default function EmployeeForm({
                     </p>
                   </div>
                   {photoError && (
-                    <p role="alert" className="text-sm text-destructive">
+                    <FormFeedback tone="error">
                       {photoError}
-                    </p>
+                    </FormFeedback>
                   )}
                 </>
               }
@@ -217,9 +218,9 @@ export default function EmployeeForm({
         </div>
       </fieldset>
       {serverError && (
-        <p role="alert" className={cn("py-2 text-sm text-destructive", !embedded && "px-5")}>
+        <div className={cn("py-2", !embedded && "px-5")}><FormFeedback tone="error">
           {serverError}
-        </p>
+        </FormFeedback></div>
       )}
       {stages.length > 0 && (
         <div

@@ -98,3 +98,17 @@ it("K-02: düzenlemede proje alanı pasiftir ve güvenli yeniden kayıt yolunu a
   expect(html).toContain("Kişi başka projeye taşınamaz. Yeni projede yeni kayıt açın, eski kaydı işten çıkarın.");
   expect(render(false)).not.toContain('id="employee-projectId"');
 });
+
+it("connects shared field errors and hints to the existing employee controls", () => {
+  const html = renderToStaticMarkup(<EmployeeFormFields canViewPay formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} errors={{ email: "E-posta geçersiz", hourlyRate: "Ücret geçersiz" }} />);
+  const emailInput = html.match(/<input[^>]*id="employee-email"[^>]*>/)?.[0];
+  expect(emailInput).toContain('name="email"');
+  expect(emailInput).toContain('aria-invalid="true"');
+  expect(emailInput).toContain('aria-describedby="employee-email-hint employee-email-error"');
+  expect(html).toMatch(/<p[^>]*id="employee-email-error"[^>]*role="alert">E-posta geçersiz/);
+  const payInput = html.match(/<input[^>]*id="employee-hourlyRate"[^>]*>/)?.[0];
+  expect(payInput).toContain('name="hourlyRate"');
+  expect(payInput).toContain('aria-describedby="employee-pay-hint employee-hourlyRate-error"');
+  expect(payInput).toContain('aria-invalid="true"');
+  expect(html).toMatch(/<p[^>]*id="employee-hourlyRate-error"[^>]*role="alert">Ücret geçersiz/);
+});

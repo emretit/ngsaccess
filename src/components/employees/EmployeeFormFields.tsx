@@ -7,7 +7,7 @@ import { DateInput } from "@/components/ui/date-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FieldError } from "@/components/shared/FormFieldWrapper";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import type { EmployeeFormData } from "./hooks/useEmployeeFormData";
 import { usePermissions } from "@/hooks/usePermissions";
 interface Option {
@@ -81,21 +81,14 @@ export default function EmployeeFormFields({
     type = "text",
     hint?: string,
   ) => {
-    const describedBy =
-      [hint && `employee-${key}-hint`, errors[key] && `employee-${key}-error`]
-        .filter(Boolean)
-        .join(" ") || undefined;
     return (
-    <div>
-      <Label htmlFor={`employee-${key}`}>{label}</Label>
+    <FormFieldWrapper htmlFor={`employee-${key}`} label={label} error={errors[key]} hint={hint}>
       {type === "date" ? (
         <DateInput
           className="max-sm:min-h-11"
           id={`employee-${key}`}
           value={formData[key] ?? ""}
           onChange={(value) => update(key, value)}
-          aria-invalid={!!errors[key]}
-          aria-describedby={describedBy}
         />
       ) : (
       <Input
@@ -109,19 +102,11 @@ export default function EmployeeFormFields({
         )}
         value={formData[key] ?? ""}
         onChange={(e) => update(key, e.target.value)}
-        aria-invalid={!!errors[key]}
-        aria-describedby={describedBy}
         maxLength={key === "tcNo" ? 11 : undefined}
         inputMode={key === "tcNo" ? "numeric" : undefined}
       />
       )}
-      {hint && (
-        <p id={`employee-${key}-hint`} className="mt-1 text-xs text-muted-foreground">
-          {hint}
-        </p>
-      )}
-      <FieldError id={`employee-${key}-error`} message={errors[key]} />
-    </div>
+    </FormFieldWrapper>
     );
   };
   const select = (
@@ -288,12 +273,7 @@ export default function EmployeeFormFields({
         <div className="mt-3 space-y-3">
           <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
             {canViewPay && (["hourlyRate", "monthlySalary"] as const).map((key) => (
-              <div key={key}>
-                <Label htmlFor={`employee-${key}`}>
-                  {key === "hourlyRate"
-                    ? "Saatlik ücret (TL)"
-                    : "Aylık maaş (TL)"}
-                </Label>
+              <FormFieldWrapper key={key} htmlFor={`employee-${key}`} label={key === "hourlyRate" ? "Saatlik ücret (TL)" : "Aylık maaş (TL)"} error={errors[key]}>
                 <Input
                   className="max-sm:min-h-11"
                   id={`employee-${key}`}
@@ -308,16 +288,9 @@ export default function EmployeeFormFields({
                       e.target.value === "" ? null : Number(e.target.value),
                     )
                   }
-                  aria-invalid={!!errors[key]}
-                  aria-describedby={[
-                    "employee-pay-hint",
-                    errors[key] && `employee-${key}-error`,
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
+                  aria-describedby="employee-pay-hint"
                 />
-                <FieldError id={`employee-${key}-error`} message={errors[key]} />
-              </div>
+              </FormFieldWrapper>
             ))}
           </div>
           {canViewPay && <p id="employee-pay-hint" className="-mt-2 text-xs text-muted-foreground">

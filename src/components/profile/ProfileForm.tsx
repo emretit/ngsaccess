@@ -1,3 +1,4 @@
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -69,21 +70,16 @@ export default function ProfileForm({ email, fullName, role, userId: _userId, on
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Ad Soyad</Label>
+          <FormFieldWrapper htmlFor="fullName" label="Ad Soyad" error={nameError}>
             <Input
               id="fullName"
               name="fullName"
               value={name}
               onChange={(e) => setDraft(e.target.value)}
-              aria-invalid={!!nameError}
-              aria-describedby="profile-name-error"
               placeholder="Ad Soyad"
               disabled={isUpdating}
             />
-          </div>
-
-          {nameError && <p id="profile-name-error" role="alert" className="text-sm text-destructive">{nameError}</p>}
+          </FormFieldWrapper>
           <Separator className="my-4" />
 
           <div className="space-y-2">

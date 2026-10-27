@@ -36,7 +36,9 @@ describe("leave audit controls", () => {
   it("collapses mobile filters behind an accessible toggle", () => {
     mocks.mobile = true;
     const html = renderFilters();
-    expect(html).toContain('aria-expanded="false" aria-controls="leave-filters"');
-    expect(html).toContain('class="hidden flex-wrap');
+    const controls = html.match(/<button[^>]*aria-expanded="false" aria-controls="([^"]+)"[^>]*>Filtreler<\/button>/)?.[1];
+    expect(controls).toBeTruthy();
+    expect(html).toContain(`id="${controls}" class="hidden md:block"`);
+    expect(html).toMatch(/<button[^>]*class="[^"]*md:hidden/);
   });
 });

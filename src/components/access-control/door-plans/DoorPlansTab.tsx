@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -173,7 +173,7 @@ export function DoorPlansTab() {
               <TableCell>
                 {door.deviceName}{" "}
                 {!door.deviceOnline && (
-                  <Badge variant="secondary">Çevrimdışı</Badge>
+                  <StatusBadge tone="warning">Çevrimdışı</StatusBadge>
                 )}
               </TableCell>
               <TableCell>{door.zoneName ?? "—"}</TableCell>

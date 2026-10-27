@@ -1,3 +1,6 @@
+import { SegmentedViewControl } from "@/components/shared/SegmentedViewControl";
+import { LoadMoreFooter } from "@/components/shared/LoadMoreFooter";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import {
@@ -18,20 +21,12 @@ export function StatusViewToggle({
   setView: (view: "person" | "device") => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2" aria-label="Görünüm">
-      <Button
-        variant={view === "person" ? "default" : "outline"}
-        onClick={() => setView("person")}
-      >
-        Kişi
-      </Button>
-      <Button
-        variant={view === "device" ? "default" : "outline"}
-        onClick={() => setView("device")}
-      >
-        Cihaz
-      </Button>
-    </div>
+    <SegmentedViewControl
+      label="Görünüm"
+      value={view}
+      options={[{ value: "person", label: "Kişi" }, { value: "device", label: "Cihaz" }]}
+      onChange={setView}
+    />
   );
 }
 
@@ -73,11 +68,12 @@ export function StatusResults({
         onEmployee={setEmployee}
         canManage
       />
-      {cursor && (
-        <Button variant="outline" disabled={busy} onClick={() => void more()}>
-          Daha fazla yükle
-        </Button>
-      )}
+      <LoadMoreFooter
+        hasMore={Boolean(cursor)}
+        loading={busy}
+        loadingLabel="Daha fazla yükle"
+        onLoadMore={() => void more()}
+      />
     </>
   );
   return (
@@ -85,7 +81,10 @@ export function StatusResults({
       {view === "person" ? (
         <>
           {!busy && rows.length === 0 && (
-            <p>Bu filtrelerde kayıt bulunamadı.</p>
+            <EmptyState
+              compact
+              title={cursor ? "Yüklenen kayıtlarda bu filtrelerde eşleşme bulunamadı." : "Bu filtrelerde kayıt bulunamadı."}
+            />
           )}
           {rowView}
         </>
@@ -135,7 +134,10 @@ export function StatusResults({
                 {expanded === device._id && (
                   <>
                     {!busy && !rows.length && (
-                      <p>Bu filtrelerde kayıt bulunamadı.</p>
+                      <EmptyState
+                        compact
+                        title={cursor ? "Yüklenen kayıtlarda bu filtrelerde eşleşme bulunamadı." : "Bu filtrelerde kayıt bulunamadı."}
+                      />
                     )}
                     {rowView}
                   </>

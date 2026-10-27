@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
+import { FilterBar } from "@/components/shared/FilterBar";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { DateInput, MonthPicker } from "@/components/ui/date-picker";
@@ -34,8 +35,6 @@ export function LeaveFilters({
   onChange: (values: Record<string, string | undefined>) => void;
   onClear: () => void;
 }) {
-  const mobile = useIsMobile();
-  const [expanded, setExpanded] = useState(false);
   const [custom, setCustom] = useState(false);
   const [range, setRange] = useState({
     start: filters.rangeStart,
@@ -44,8 +43,8 @@ export function LeaveFilters({
   const [error, setError] = useState("");
   return (
     <>
-      {mobile && <Button variant="outline" aria-expanded={expanded} aria-controls="leave-filters" onClick={() => setExpanded(!expanded)}>Filtreler{filters.employeeId || filters.leaveType ? " · Etkin" : ""}</Button>}
-      <div id="leave-filters" role="search" aria-label="İzin filtreleri" className={`${mobile && !expanded ? "hidden" : "flex"} flex-wrap items-end gap-3`}>
+      <CollapsibleFilters activeCount={Number(Boolean(filters.employeeId)) + Number(Boolean(filters.leaveType))}>
+      <FilterBar label="İzin filtreleri" onClear={onClear} hasFilters>
         <QuerySectionBoundary title="Kişiler yüklenemedi." resetKey={projectId} className="w-full min-w-0 md:w-[230px]">
           <FormFieldWrapper htmlFor="leave-filter-person" label="Kişi">
             {control => <EmployeePicker projectId={projectId} value={filters.employeeId ?? ""} onChange={value => onChange({ employee: value })} control={control} allowAll />}
@@ -80,8 +79,8 @@ export function LeaveFilters({
             </Button>
           </div>
         </div>
-        <Button type="button" variant="ghost" onClick={onClear}>Filtreleri temizle</Button>
-      </div>
+      </FilterBar>
+      </CollapsibleFilters>
       <Dialog open={custom} onOpenChange={setCustom}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto">
           <DialogHeader>

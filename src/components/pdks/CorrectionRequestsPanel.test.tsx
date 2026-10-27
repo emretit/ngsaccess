@@ -10,7 +10,9 @@ import {
 const state = vi.hoisted(() => ({
   result: undefined as unknown,
   decision: null as { id: string; approve: boolean } | null,
-  note: "", hook: 0,
+  note: "", hook: 0, busy: false,
+  setDecision: vi.fn(), setNote: vi.fn(),
+  onOpenChange: undefined as undefined | ((open: boolean) => void),
   submit: undefined as undefined | ((event: { preventDefault: () => void }) => Promise<void>),
   approve: vi.fn(), reject: vi.fn(), success: vi.fn(), error: vi.fn(),
 }));
@@ -18,14 +20,15 @@ vi.mock("react", async importOriginal => {
   const original = await importOriginal<typeof import("react")>();
   return { ...original, useState: (initial: unknown) => {
     const index = state.hook++;
-    if (state.decision && index === 1) return [state.decision, vi.fn()];
-    if (state.decision && index === 2) return [state.note, vi.fn()];
+    if (state.decision && index === 1) return [state.decision, state.setDecision];
+    if (state.decision && index === 2) return [state.note, state.setNote];
+    if (state.decision && index === 3) return [state.busy, vi.fn()];
     return original.useState(initial);
   } };
 });
 vi.mock("@/components/ui/dialog", () => {
   const Box = ({ children }: { children: import("react").ReactNode }) => <div>{children}</div>;
-  return { Dialog: Box, DialogHeader: Box, DialogTitle: Box, DialogDescription: Box, DialogFooter: Box,
+  return { Dialog: ({ children, onOpenChange }: { children: import("react").ReactNode; onOpenChange: typeof state.onOpenChange }) => { state.onOpenChange = onOpenChange; return <div>{children}</div>; }, DialogHeader: Box, DialogTitle: Box, DialogDescription: Box, DialogFooter: Box,
     DialogContent: ({ children }: { children: import("react").ReactElement<{ onSubmit: typeof state.submit }> }) => {
       state.submit = children.props.onSubmit;
       return <div>{children}</div>;
@@ -124,5 +127,52 @@ describe("panel karar gönderimi", () => {
     render(); await state.submit?.({ preventDefault: vi.fn() });
     expect(state.error).toHaveBeenCalledWith("Talep sonuçlandırılamadı", error);
     state.decision = null;
+  });
+});
+
+describe("karar dialog yaşam döngüsü", () => {
+  it.each([true, false])("onay=%s hatasında karar ve not korunur, başarıda kapanır", async approve => {
+    state.result = { page: [], isDone: true, continueCursor: "" };
+    state.decision = { id: "request-1", approve };
+    state.note = "  Kullanıcının karar notu  ";
+    state.setDecision.mockClear(); state.setNote.mockClear();
+    state.success.mockClear(); state.error.mockClear();
+    const mutation = approve ? state.approve : state.reject;
+    mutation.mockReset().mockRejectedValueOnce(new Error("network"));
+    render();
+    await state.submit?.({ preventDefault: vi.fn() });
+    expect(state.setDecision).not.toHaveBeenCalled();
+    expect(state.setNote).not.toHaveBeenCalled();
+    expect(state.error).toHaveBeenCalledOnce();
+    expect(state.success).not.toHaveBeenCalled();
+    mutation.mockResolvedValueOnce(null);
+    render();
+    await state.submit?.({ preventDefault: vi.fn() });
+    expect(state.setDecision).toHaveBeenCalledWith(null);
+    expect(state.success).toHaveBeenCalledOnce();
+    expect(mutation).toHaveBeenLastCalledWith({ id: "request-1", note: "Kullanıcının karar notu" });
+    state.decision = null;
+  });
+  it("art arda gönderim tek mutation üretir ve pending dialog kapanmaz", async () => {
+    state.result = { page: [], isDone: true, continueCursor: "" };
+    state.decision = { id: "request-1", approve: false }; state.note = "Karar notu";
+    let resolve: (() => void) | undefined;
+    state.reject.mockReset().mockImplementation(() => new Promise<void>(done => { resolve = done; }));
+    state.setDecision.mockClear();
+    render();
+    const submit = state.submit;
+    const first = submit?.({ preventDefault: vi.fn() });
+    await submit?.({ preventDefault: vi.fn() });
+    expect(state.reject).toHaveBeenCalledOnce();
+    state.busy = true;
+    const html = render();
+    state.onOpenChange?.(false);
+    expect(state.setDecision).not.toHaveBeenCalled();
+    expect(html).toMatch(/<textarea[^>]*disabled/);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Vazgeç/);
+    expect(html).toContain("Kaydediliyor…");
+    resolve?.(); await first;
+    expect(state.setDecision).toHaveBeenCalledWith(null);
+    state.busy = false; state.decision = null;
   });
 });

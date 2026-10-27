@@ -1,9 +1,9 @@
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormActions } from "@/components/shared/FormActions";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import {
   Select,
   SelectContent,
@@ -101,16 +101,14 @@ export function AssignLocationForm({
         <form onSubmit={handleSubmit} noValidate>
           {attempted && (!selectedZoneId || (!isPanel && !selectedDoorId)) && <p role="alert" className="text-sm text-destructive">Konum atanamadı. Bölge ve uygun kapıyı seçin.</p>}
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="zone" >
-                Bölge
-              </Label>
+            <FormFieldWrapper htmlFor="zone" label="Bölge" className="grid gap-2" error={attempted && !selectedZoneId ? "Bölge seçin." : undefined}>
+              {(control) => (
               <Select
                 value={selectedZoneId}
                 onValueChange={setSelectedZoneId}
                 disabled={loading || isSubmitting}
               >
-                <SelectTrigger id="zone" aria-invalid={attempted && !selectedZoneId} aria-describedby={attempted && !selectedZoneId ? "assign-zone-error" : undefined}>
+                <SelectTrigger {...control}>
                   <SelectValue placeholder="Bölge seçin" />
                 </SelectTrigger>
                 <SelectContent>
@@ -121,18 +119,16 @@ export function AssignLocationForm({
                   ))}
                 </SelectContent>
               </Select>
-              {attempted && !selectedZoneId && <p id="assign-zone-error" className="text-xs text-destructive">Bölge seçin.</p>}
-            </div>
-            {isPanel ? <p className="text-sm text-muted-foreground">Panelin tüm kapıları ve okuyucuları seçilen bölgeye taşınır. Kapı eşlemesi değiştirilmez.</p> : <div className="grid gap-2">
-              <Label htmlFor="door" >
-                Kapı
-              </Label>
+              )}
+            </FormFieldWrapper>
+            {isPanel ? <p className="text-sm text-muted-foreground">Panelin tüm kapıları ve okuyucuları seçilen bölgeye taşınır. Kapı eşlemesi değiştirilmez.</p> : <FormFieldWrapper htmlFor="door" label="Kapı" className="grid gap-2" error={attempted && !selectedDoorId ? "Kapı seçin." : undefined}>
+              {(control) => (
               <Select
                 value={selectedDoorId}
                 onValueChange={setSelectedDoorId}
                 disabled={!selectedZoneId || loading || isSubmitting}
               >
-                <SelectTrigger id="door" aria-invalid={attempted && !selectedDoorId} aria-describedby={attempted && !selectedDoorId ? "assign-door-error" : undefined}>
+                <SelectTrigger {...control}>
                   <SelectValue placeholder="Kapı seçin" />
                 </SelectTrigger>
                 <SelectContent>
@@ -143,17 +139,10 @@ export function AssignLocationForm({
                   ))}
                 </SelectContent>
               </Select>
-              {attempted && !selectedDoorId && <p id="assign-door-error" className="text-xs text-destructive">Kapı seçin.</p>}
-            </div>}
+              )}
+            </FormFieldWrapper>}
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={close} disabled={isSubmitting}>
-              İptal
-            </Button>
-            <Button type="submit" disabled={isSubmitting || loading}>
-              {isSubmitting ? "Atanıyor..." : "Konum Ata"}
-            </Button>
-          </DialogFooter>
+          <FormActions layout="dialog" isLoading={isSubmitting} onClose={close} cancelLabel="İptal" submitLabel="Konum Ata" busyLabel="Atanıyor..." submitDisabled={loading} />
         </form>
       </DialogContent>
     </Dialog>

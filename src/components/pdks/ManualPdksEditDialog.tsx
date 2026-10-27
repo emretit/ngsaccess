@@ -1,3 +1,4 @@
+import { FormFeedback } from "@/components/shared/FormFeedback";
 import { restorePdksFocus } from "./lib/focus";
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
@@ -7,13 +8,12 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/shared/FormActions";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { errorMessage, notify } from "@/lib/notify";
 import { displayTime, readableDate, validateManual } from "./lib/presentation";
@@ -190,31 +190,15 @@ function ManualForm({
               </div>
             </fieldset>
             {errors.server && (
-              <div
-                role="alert"
-                className="rounded-md border p-3 text-sm text-danger"
-              >
-                <p className="font-medium">Düzeltme kaydedilemedi.</p>
+              <FormFeedback tone="error" variant="panel" title="Düzeltme kaydedilemedi.">
                 <ul className="mt-1 list-disc pl-4">
                   {[errors.server].map((error) => (
                     <li key={error}>{error}</li>
                   ))}
                 </ul>
-              </div>
+              </FormFeedback>
             )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={close}
-                disabled={saving}
-              >
-                Vazgeç
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Kaydediliyor…" : "Kaydet"}
-              </Button>
-            </DialogFooter>
+            <FormActions layout="dialog" isLoading={saving} onClose={close} busyLabel="Kaydediliyor…" />
           </form>
         </DialogContent>
       </Dialog>

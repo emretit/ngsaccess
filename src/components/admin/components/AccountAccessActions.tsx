@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { userName, type User } from "../types/user-types";
 
 const dateFormat = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" });
@@ -33,21 +33,16 @@ export function AccountAccessDialog({ user, mode, onClose }: {
   const disabled = "disabledAt" in user && user.disabledAt !== undefined;
   const expiry = "accessExpiresAt" in user ? user.accessExpiresAt : undefined;
   const [value, setValue] = useState(() => expiry === undefined ? "" : new Date(expiry + 3 * 60 * 60 * 1000).toISOString().slice(0, 16));
-  const [pending, setPending] = useState(false);
+  const { run, pending } = useAsyncAction(async (clear = false) => {
+    if (mode === "freeze") await (disabled ? unfreeze : freeze)({ userId: user._id });
+    else {
+      const accessExpiresAt = clear ? null : new Date(`${value}:00+03:00`).getTime();
+      if (accessExpiresAt !== null && !Number.isFinite(accessExpiresAt)) throw new Error("Tarih ve saat seçin");
+      await setExpiry({ userId: user._id, accessExpiresAt });
+    }
+  }, { success: "Kullanıcı erişimi güncellendi", error: "İşlem tamamlanamadı" });
   const save = async (clear = false) => {
-    setPending(true);
-    try {
-      if (mode === "freeze") await (disabled ? unfreeze : freeze)({ userId: user._id });
-      else {
-        const accessExpiresAt = clear ? null : new Date(`${value}:00+03:00`).getTime();
-        if (accessExpiresAt !== null && !Number.isFinite(accessExpiresAt)) throw new Error("Tarih ve saat seçin");
-        await setExpiry({ userId: user._id, accessExpiresAt });
-      }
-      notify.success("Kullanıcı erişimi güncellendi");
-      onClose();
-    } catch (error) {
-      notify.error("İşlem tamamlanamadı", error);
-    } finally { setPending(false); }
+    if (await run(clear)) onClose();
   };
   return <Dialog open onOpenChange={open => { if (!open && !pending) onClose(); }}>
     <DialogContent>

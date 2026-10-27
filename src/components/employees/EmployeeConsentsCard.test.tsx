@@ -159,6 +159,8 @@ describe("çalışan rıza kartı", () => {
     mocks.grant.mockRejectedValueOnce(error);
     await mocks.buttons.find(button => typeof button.onClick === "function" && button["aria-label"] === undefined && button.disabled === false && button.children === "Rızayı kaydet")?.onClick?.();
     expect(mocks.error).toHaveBeenCalledWith("Rıza alınamadı", error);
+    expect(mocks.states[1]).toBe("biometric_face");
+    expect(mocks.document.reset).toHaveBeenCalledOnce();
   });
 });
 
@@ -226,4 +228,24 @@ it.each([
   expect(html.includes('aria-label="Fotoğraf rızası al"')).toBe(photo);
   expect(html.includes('aria-label="Yüz tanıma rızası al"')).toBe(biometric);
   expect(html.includes('aria-label="Parmak izi rızası al"')).toBe(biometric);
+});
+
+it("başarısız rıza kaydında not ve belge korunur, yeniden denemede başarıyla kapanır", async () => {
+  mocks.states = [null, "photo", "  İmzalı rıza notu  ", false];
+  mocks.document.storageId = "storage-a";
+  mocks.grant.mockRejectedValueOnce(new Error("network"));
+  render();
+  await mocks.buttons.find(button => button.children === "Rızayı kaydet")?.onClick?.();
+  expect(mocks.states[1]).toBe("photo");
+  expect(mocks.states[2]).toBe("  İmzalı rıza notu  ");
+  expect(mocks.document.reset).not.toHaveBeenCalled();
+  expect(mocks.success).not.toHaveBeenCalled();
+  mocks.grant.mockResolvedValueOnce(null);
+  render();
+  await mocks.buttons.find(button => button.children === "Rızayı kaydet")?.onClick?.();
+  expect(mocks.grant).toHaveBeenLastCalledWith({ employeeId, consentType: "photo", documentStorageId: "storage-a", notes: "İmzalı rıza notu" });
+  expect(mocks.states[1]).toBeNull();
+  expect(mocks.states[2]).toBe("");
+  expect(mocks.document.reset).toHaveBeenCalledOnce();
+  expect(mocks.success).toHaveBeenCalledExactlyOnceWith("Rıza alındı", "Fotoğraf");
 });

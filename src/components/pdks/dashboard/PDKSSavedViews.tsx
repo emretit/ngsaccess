@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { notify } from "@/lib/notify";
 import { usePdksSavedViews } from "@/hooks/usePdksSavedViews";
 import type { FilterValues } from "./PDKSFilterBar";
@@ -80,12 +81,15 @@ export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Görünüm silinsin mi?</DialogTitle><DialogDescription>Kaydedilen filtre seçimi silinir.</DialogDescription></DialogHeader>
-          <DialogFooter><Button variant="outline" onClick={() => setDeleteId(null)}>Vazgeç</Button><Button variant="destructive" onClick={() => { if (deleteId) remove(deleteId); setDeleteId(null); }}>Sil</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDestructive
+        open={deleteId !== null}
+        onOpenChange={open => { if (!open) setDeleteId(null); }}
+        title="Görünüm silinsin mi?"
+        objectName={views.find(view => view.id === deleteId)?.name ?? "Kayıtlı görünüm"}
+        effects={["Kaydedilen filtre seçimi silinir."]}
+        confirmLabel="Sil"
+        onConfirm={async () => { if (deleteId) await remove(deleteId); }}
+      />
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

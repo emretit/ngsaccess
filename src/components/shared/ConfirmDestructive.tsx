@@ -13,13 +13,14 @@ export interface ConfirmDestructiveProps {
   objectName: string;
   effects: string[];
   confirmLabel: string;
+  errorTitle?: string;
   onConfirm: () => Promise<unknown>;
 }
 
 export function ConfirmDestructive({
-  open, onOpenChange, title, objectName, effects, confirmLabel, onConfirm,
+  open, onOpenChange, title, objectName, effects, confirmLabel, errorTitle, onConfirm,
 }: ConfirmDestructiveProps) {
-  const { run, pending } = useAsyncAction(onConfirm);
+  const { run, pending } = useAsyncAction(onConfirm, { error: errorTitle });
   const trigger = useRef<HTMLElement | null>(null);
 
   return (

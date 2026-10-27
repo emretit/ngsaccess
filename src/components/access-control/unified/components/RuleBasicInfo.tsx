@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 
 interface RuleBasicInfoFormData {
   name: string;
@@ -21,12 +21,9 @@ export const RuleBasicInfo = <T extends RuleBasicInfoFormData>({
 }: RuleBasicInfoProps<T>) => {
   return (
     <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
-      <div className="space-y-1.5">
-        <Label htmlFor="name">Kural Adı</Label>
+      <FormFieldWrapper htmlFor="name" label="Kural Adı" error={errors.name}>
         <Input
           id="name"
-          aria-invalid={!!errors.name}
-          aria-describedby={errors.name ? "rule-name-error" : undefined}
           value={formData.name}
           onChange={(e) =>
             setFormData((prev) => ({ ...prev, name: e.target.value }))
@@ -34,15 +31,9 @@ export const RuleBasicInfo = <T extends RuleBasicInfoFormData>({
           placeholder="Erişim kuralı adı"
           required
         />
-        {errors.name && (
-          <p id="rule-name-error" role="alert" className="text-danger text-xs">
-            {errors.name}
-          </p>
-        )}
-      </div>
+      </FormFieldWrapper>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="description">Açıklama</Label>
+      <FormFieldWrapper htmlFor="description" label="Açıklama">
         <Input
           id="description"
           value={formData.description}
@@ -51,7 +42,7 @@ export const RuleBasicInfo = <T extends RuleBasicInfoFormData>({
           }
           placeholder="Kural açıklaması (opsiyonel)"
         />
-      </div>
+      </FormFieldWrapper>
     </div>
   );
 };

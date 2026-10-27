@@ -31,7 +31,7 @@ it("calculation choice and interval go to publish payload, summary and confirmat
   const summary = ruleSummary({ ...payload, _id: "rule" as Id<"pdksRuleVersions">, _creationTime: 0, createdAt: "", createdBy: "user" as Id<"users">, targets: [] }, undefined);
   expect(summary).toContain("Her giriş-çıkışı topla");
   expect(summary).toContain("3 dk");
-  const confirmation = renderToStaticMarkup(<PdksRulesConfirmation confirmation={{ kind: "publish", values }} pending={false} error="" onClose={() => undefined} onConfirm={() => undefined} />);
+  const confirmation = renderToStaticMarkup(<PdksRulesConfirmation confirmation={{ kind: "publish", values }} pending={false} error="" onClose={() => undefined} onConfirm={() => undefined} onDelete={async () => undefined} />);
   expect(confirmation).toContain("Her giriş-çıkışı topla");
   expect(confirmation).toContain("3 dk");
 });

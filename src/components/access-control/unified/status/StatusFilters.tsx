@@ -1,4 +1,4 @@
-import { Input } from "@/components/ui/input";
+import { FilterBar } from "@/components/shared/FilterBar";
 import {
   Select,
   SelectContent,
@@ -59,7 +59,7 @@ export function StatusFilters({
   change: (patch: Partial<Filters>) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+    <FilterBar layout="grid" search={search} onSearchChange={setSearch} searchLabel="Ad ara" placeholder="Ad ara">
       <StatusFilter
         label="Departman"
         value={filters.departmentId}
@@ -115,12 +115,6 @@ export function StatusFilters({
           })
         }
       />
-      <Input
-        aria-label="Ad ara"
-        placeholder="Ad ara"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-    </div>
+    </FilterBar>
   );
 }

@@ -35,7 +35,7 @@ it("selected reader defaults to both, selection changes publish payload and summ
   expect(payload.targets).toEqual([{ targetType: "reader", deviceId, doorId, readerId, pointType: "exit" }]);
   const summary = ruleSummary({ ...payload, _id: "rule" as Id<"pdksRuleVersions">, _creationTime: 0, createdAt: "", createdBy: "user" as Id<"users">, targets: [{ ...values.targets[0], _id: "target" as Id<"pdksCheckpointSelections">, _creationTime: 0, projectId: payload.projectId, ruleVersionId: "rule" as Id<"pdksRuleVersions"> }] }, targets);
   expect(summary).toContain("İç okuyucu: Yalnız çıkış");
-  expect(renderToStaticMarkup(<PdksRulesConfirmation confirmation={{ kind: "publish", values }} targets={targets} pending={false} error="" onClose={() => undefined} onConfirm={() => undefined} />)).toContain("İç okuyucu: Yalnız çıkış");
+  expect(renderToStaticMarkup(<PdksRulesConfirmation confirmation={{ kind: "publish", values }} targets={targets} pending={false} error="" onClose={() => undefined} onConfirm={() => undefined} onDelete={async () => undefined} />)).toContain("İç okuyucu: Yalnız çıkış");
 });
 it("device and door point types survive validation and untyped targets retain both summary", () => {
   const values = pdksRuleSchema.parse({ effectiveFrom: tomorrowInTurkey(), punchMode: "legacy", ...recommendedPunchRules, checkpointMode: "selected", targets: [{ targetType: "device", deviceId, pointType: "entry" }, { targetType: "door", deviceId, doorId, pointType: "both" }] });

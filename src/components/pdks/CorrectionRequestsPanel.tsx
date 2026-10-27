@@ -25,6 +25,7 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 export function requestsCursor(cursor: string | null, pageLength?: number) {
   return pageLength === 0 ? null : cursor;
@@ -50,23 +51,19 @@ export function CorrectionRequestsPanel({
     approve: boolean;
   } | null>(null);
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { run, pending: busy } = useAsyncAction(async (current: NonNullable<typeof decision>, decisionNote: string) => {
+    if (current.approve)
+      await approve({ id: current.id, note: decisionNote.trim() || undefined });
+    else await reject({ id: current.id, note: decisionNote.trim() });
+    notify.success(current.approve ? "Talep onaylandı" : "Talep reddedildi");
+  }, { error: "Talep sonuçlandırılamadı" });
   const validNote = note.trim().length >= 3 && note.trim().length <= 500;
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!decision || busy || (!decision.approve && !validNote)) return;
-    setBusy(true);
-    try {
-      if (decision.approve)
-        await approve({ id: decision.id, note: note.trim() || undefined });
-      else await reject({ id: decision.id, note: note.trim() });
-      notify.success(decision.approve ? "Talep onaylandı" : "Talep reddedildi");
+    if (await run(decision, note)) {
       setDecision(null);
       setCursor(null);
-    } catch (error: unknown) {
-      notify.error("Talep sonuçlandırılamadı", error);
-    } finally {
-      setBusy(false);
     }
   }
   function open(id: Id<"attendanceCorrections">, approve: boolean) {

@@ -1,15 +1,15 @@
+import { FormFeedback } from "@/components/shared/FormFeedback";
 import { useState } from "react";
 import { ConvexError } from "convex/values";
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/shared/FormActions";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -144,23 +144,11 @@ export function ProjectEditor({
               </select>
             </FormFieldWrapper>
             {error && (
-              <p role="alert" className="break-words text-sm text-destructive">
+              <FormFeedback tone="error">
                 {error}
-              </p>
+              </FormFeedback>
             )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={pending}
-                onClick={close}
-              >
-                Vazgeç
-              </Button>
-              <Button type="submit" disabled={pending}>
-                {pending ? "İşlem sürüyor…" : "Kaydet"}
-              </Button>
-            </DialogFooter>
+            <FormActions layout="dialog" isLoading={pending} onClose={close} busyLabel="İşlem sürüyor…" />
           </form>
         </DialogContent>
       </Dialog>

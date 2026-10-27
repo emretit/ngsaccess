@@ -1,34 +1,22 @@
-import { Button } from "@/components/ui/button";
-import type { FilterValues, ReportType } from "@/components/pdks/dashboard/PDKSFilterBar";
+import { SegmentedViewControl } from "@/components/shared/SegmentedViewControl";
+import type { FilterValues } from "@/components/pdks/dashboard/PDKSFilterBar";
+
 export function PdksPeriodSwitcher({ filters, setFilters }: { filters: FilterValues; setFilters: (values: FilterValues) => void }) {
   return (
-        <div
-          className="flex flex-wrap gap-1"
-          role="group"
-          aria-label="Rapor dönemi"
-        >
-          {(
-            [
-              ["daily", "Günlük"],
-              ["weekly", "Haftalık"],
-              ["monthly", "Aylık"],
-            ] as const
-          ).map(([value, label]) => (
-            <Button
-              key={value}
-              variant={filters.reportType === value ? "secondary" : "ghost"}
-              aria-pressed={filters.reportType === value}
-              onClick={() =>
-                setFilters({
-                  ...filters,
-                  reportType: value as ReportType,
-                  dateRange: { from: undefined, to: undefined },
-                })
-              }
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
+    <SegmentedViewControl
+      label="Rapor dönemi"
+      value={filters.reportType}
+      className="gap-1"
+      options={[
+        { value: "daily", label: "Günlük" },
+        { value: "weekly", label: "Haftalık" },
+        { value: "monthly", label: "Aylık" },
+      ]}
+      onChange={reportType => setFilters({
+        ...filters,
+        reportType,
+        dateRange: { from: undefined, to: undefined },
+      })}
+    />
   );
 }

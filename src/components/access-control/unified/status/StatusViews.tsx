@@ -17,7 +17,7 @@ export function GrantBadge({ row }: { row: Parameters<typeof grantBadge>[0] }) {
   return (
     <span className="inline-flex flex-wrap gap-1" title={badge.hint}>
       <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
-      {badge.stale && <Badge variant="outline">Güncel değil</Badge>}
+      {badge.stale && <StatusBadge tone="warning">Güncel değil</StatusBadge>}
       {badge.hint && (
         <span className="text-xs text-danger break-words">{badge.hint}</span>
       )}

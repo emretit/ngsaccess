@@ -2,12 +2,11 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/shared/FormActions";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useId, useState } from "react";
@@ -86,19 +85,7 @@ export function AddDepartmentDialog({
               onChange={(event) => setDepartmentName(event.target.value)}
             />
           </FormFieldWrapper>
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={pending}
-              onClick={() => close(false)}
-            >
-              İptal
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Ekleniyor…" : "Ekle"}
-            </Button>
-          </DialogFooter>
+          <FormActions layout="dialog" className="pt-2" isLoading={pending} onClose={() => close(false)} cancelLabel="İptal" submitLabel="Ekle" busyLabel="Ekleniyor…" />
         </form>
       </DialogContent>
     </Dialog>

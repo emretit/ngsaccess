@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import { usePermissions } from "@/hooks/usePermissions";
 import { notify } from "@/lib/notify";
 import { visibleTemplates } from "./model";
@@ -9,7 +10,7 @@ import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import {
   Dialog,
   DialogContent,
@@ -93,7 +94,7 @@ export default function TemplatesPage() {
       ) : (
         <div className="space-y-3">
           {visibleTemplates(rows, archived).length === 0 && (
-            <p>Henüz zaman şablonu yok.</p>
+            <EmptyState title="Henüz zaman şablonu yok." />
           )}
           {visibleTemplates(rows, archived).map((t) => (
             <article
@@ -102,7 +103,7 @@ export default function TemplatesPage() {
             >
               <div className="flex flex-wrap gap-2 items-center">
                 <h2 className="font-medium break-all">{t.name}</h2>
-                {t.isArchived && <Badge variant="secondary">Arşivli</Badge>}
+                {t.isArchived && <StatusBadge tone="neutral">Arşivli</StatusBadge>}
               </div>
               <p className="text-sm break-words">{formatSchedule(t.week)}</p>
               <p className="text-xs text-muted-foreground">

@@ -1,3 +1,4 @@
+import { DetailFieldList } from "@/components/shared/DetailFieldList";
 import { PdksDaySegments } from "./PdksDaySegments";
 import { PdksPlanSummary } from "./PdksPlanSummary";
 import { PdksFlexibleTarget } from "./PdksFlexibleTarget";
@@ -144,21 +145,14 @@ function Detail({
           <PdksPlanSummary day={day} />
           {!day.noShift && <PdksFlexibleTarget day={day} className="block text-sm tabular-nums" />}
           {reviewHint(day) && <p className="text-sm text-muted-foreground">{reviewHint(day)}</p>}
-          <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
-            {[
-              ["İlk giriş", displayTime(day.firstEntry)],
-              ["Son çıkış", `${displayTime(day.lastExit)}${day.exitNextDay ? " (ertesi gün)" : ""}`],
-              ["Brüt süre", displayDuration(day.rawTotalMinutes ?? day.totalMinutes, day.status, day.durationMeasured)],
-              ["Toplam süre (mola sonrası)", displayDuration(day.totalMinutes, day.status, day.durationMeasured)],
-              ["Fazla mesai", displayDuration(day.overtimeMinutes, day.status, day.durationMeasured)],
-              ["Gece süresi", displayDuration(day.nightMinutes ?? 0, day.status, day.durationMeasured)],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-xs text-muted-foreground">{label}</dt>
-                <dd>{day.noShift ? "—" : value}</dd>
-              </div>
-            ))}
-          </dl>
+          <DetailFieldList columns={2} fields={[
+            { key: "entry", label: "İlk giriş", value: displayTime(day.firstEntry) },
+            { key: "exit", label: "Son çıkış", value: `${displayTime(day.lastExit)}${day.exitNextDay ? " (ertesi gün)" : ""}` },
+            { key: "raw", label: "Brüt süre", value: displayDuration(day.rawTotalMinutes ?? day.totalMinutes, day.status, day.durationMeasured) },
+            { key: "total", label: "Toplam süre (mola sonrası)", value: displayDuration(day.totalMinutes, day.status, day.durationMeasured) },
+            { key: "overtime", label: "Fazla mesai", value: displayDuration(day.overtimeMinutes, day.status, day.durationMeasured) },
+            { key: "night", label: "Gece süresi", value: displayDuration(day.nightMinutes ?? 0, day.status, day.durationMeasured) },
+          ].map(field => ({ ...field, numeric: true, value: day.noShift ? "—" : field.value }))} />
           <PdksDaySegments day={day} />
           <div className="space-y-1 text-xs text-muted-foreground">
             {day.leaveType && <p>İzin türü: {leaveLabel(day.leaveType)}</p>}

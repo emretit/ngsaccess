@@ -8,10 +8,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/shared/FormActions";
 import { Input } from "@/components/ui/input";
 import { TimeSchedule } from "@/components/access-control/unified/components/TimeSchedule";
 import { ZoneDeviceTree } from "@/components/access-control/unified/components/ZoneDeviceTree";
@@ -21,7 +20,6 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { accessScheduleError } from "../../../convex/lib/accessRuleUx";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
-import { Loader2 } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 interface ZoneFormData {
@@ -112,21 +110,7 @@ export default function VisitorZoneDialog({ isOpen, onClose, onCreated }: Visito
           {fieldErrors.targets && <p role="alert" className="text-sm text-destructive">{fieldErrors.targets}</p>}
           {failed && <p role="alert" className="text-sm text-destructive">Bölge oluşturulamadı. Girişleriniz korundu; tekrar deneyin.</p>}
           </fieldset>
-          <DialogFooter className="sticky bottom-0 bg-surface pt-3">
-            <Button type="button" variant="outline" onClick={close} disabled={isSaving}>
-              Vazgeç
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  Kaydediliyor
-                </>
-              ) : (
-                "Oluştur"
-              )}
-            </Button>
-          </DialogFooter>
+          <FormActions layout="dialog" className="sticky bottom-0 bg-surface pt-3" isLoading={isSaving} onClose={close} submitLabel="Oluştur" />
         </form>
       </DialogContent>
     </Dialog>{guard.dialog}</>

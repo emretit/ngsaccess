@@ -1,3 +1,4 @@
+import { DetailFieldList } from "@/components/shared/DetailFieldList";
 import type { RefObject } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -10,7 +11,10 @@ export function AuditDetailPanel({ row, onClose, returnFocus }: { returnFocus: R
     <SheetHeader><SheetTitle>Olay ayrıntısı</SheetTitle><SheetDescription>Kayıtlı olay ve değişen alanlar · İstanbul saati</SheetDescription></SheetHeader>
     {row && <div className="mt-6 min-w-0 space-y-5">
       <div className="space-y-2"><StatusBadge tone={row.action === 'delete' ? 'danger' : row.action === 'create' ? 'success' : 'info'}>{actionLabels[row.action]}</StatusBadge><h2 className="text-base font-semibold">{AUDIT_TARGET_LABELS[row.targetTable] ?? row.targetTable}</h2><p className="text-sm tabular-nums text-muted-foreground">{timestampFormat.format(row.timestamp)}</p></div>
-      <dl className="grid min-w-0 gap-3 border-y py-4 sm:grid-cols-2"><div className="min-w-0"><dt className="text-xs text-muted-foreground">Kullanıcı</dt><dd className="break-words text-sm">{row.userName ?? (row.userId ? 'Silinmiş kullanıcı' : 'Sistem')}</dd></div><div className="min-w-0"><dt className="text-xs text-muted-foreground">Proje</dt><dd className="break-words text-sm">{row.projectName}</dd></div></dl>
+      <DetailFieldList columns={2} className="border-y py-4" fields={[
+        { key: "user", label: "Kullanıcı", value: row.userName ?? (row.userId ? 'Silinmiş kullanıcı' : 'Sistem') },
+        { key: "project", label: "Proje", value: row.projectName },
+      ]} />
       <AuditChangeDetail targetTable={row.targetTable} targetId={row.targetId} oldValue={row.oldValue} newValue={row.newValue} action={row.action} note={row.note} />
     </div>}
   </SheetContent></Sheet>;

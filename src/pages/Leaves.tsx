@@ -1,7 +1,7 @@
 import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Button } from "@/components/ui/button";
+import { SegmentedViewControl } from "@/components/shared/SegmentedViewControl";
 import { LeaveRequestsPanel } from "@/components/leaves/LeaveRequestsPanel";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -136,26 +136,15 @@ function LeavesProject({
         }
       />
       {canManage && (
-        <div role="group" aria-label="İzin görünümü" className="flex gap-2">
-          <Button
-            variant={!requests ? "secondary" : "ghost"}
-            aria-pressed={!requests}
-            onClick={() => setRequests(false)}
-          >
-            Kayıtlar
-          </Button>
-          <Button
-            variant={requests ? "secondary" : "ghost"}
-            aria-pressed={requests}
-            onClick={() => setRequests(true)}
-          >
-            Talepler (
-            {count
-              ? `${Math.min(count.count, 100)}${count.count > 100 ? "+" : ""}`
-              : "…"}
-            )
-          </Button>
-        </div>
+        <SegmentedViewControl
+          label="İzin görünümü"
+          value={requests ? "requests" : "records"}
+          options={[
+            { value: "records", label: "Kayıtlar" },
+            { value: "requests", label: <>Talepler ({count ? `${Math.min(count.count, 100)}${count.count > 100 ? "+" : ""}` : "…"})</> },
+          ]}
+          onChange={view => setRequests(view === "requests")}
+        />
       )}
       {canManage && requests ? (
         <LeaveQueryBoundary scope={`requests:${projectId}`}>

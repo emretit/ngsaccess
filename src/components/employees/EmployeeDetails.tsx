@@ -1,3 +1,4 @@
+import { DetailFieldList } from "@/components/shared/DetailFieldList";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -54,7 +55,7 @@ export default function EmployeeDetails({
     );
   }
   const current = listed ?? employee;
-  const items = [
+  const items: [string, string | null | undefined][] = [
     ["E-posta", current.email],
     ["Departman", current.departments?.name],
     ["Pozisyon", current.positions?.name],
@@ -94,14 +95,7 @@ export default function EmployeeDetails({
         ) : (
           <>
           <h3 className="mb-3 text-base font-semibold">Genel bilgiler</h3>
-          <dl className="grid min-w-0 gap-4 sm:grid-cols-2">
-            {items.map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <dt className="text-xs text-muted-foreground">{label}</dt>
-                <dd className="mt-1 break-words text-sm">{value || "—"}</dd>
-              </div>
-            ))}
-          </dl>
+          <DetailFieldList columns={2} fields={items.map(([label, value]) => ({ key: label, label, value }))} />
           </>
         )}
       </section>

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Loader2, Inbox } from "lucide-react";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -139,6 +139,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
     ...(isIde && !idePassword.trim() ? [{ id: "claim-password", message: "Panel şifresi gereklidir." }] : []),
     ...(zoneChoice === NEW_ZONE && (!newZoneName.trim() || newZoneName.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")) ? [{ id: "claim-zone-name", message: !newZoneName.trim() ? "Yeni bölge adı girin veya mevcut bir bölge seçin." : "Bölge adı cihaz adıyla aynı olamaz." }] : []),
   ];
+  const fieldError = (id: string) => attempted ? errors.find(error => error.id === id)?.message : undefined;
   const submit = () => { setAttempted(true); if (errors[0]) document.getElementById(errors[0].id)?.focus(); else void handleSubmit(); };
   const loading = claimable === undefined;
   const empty = !loading && (claimable ?? []).length === 0;
@@ -174,142 +175,220 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                 {!isSuperAdmin && <p className="text-sm text-muted-foreground">Proje: {activeProject?.name ?? "Proje seçilmedi"}</p>}
                 {attempted && errors.length > 0 && <div role="alert" className="rounded-md border border-danger p-3 text-sm"><p className="font-medium">Atama tamamlanamadı. Alanları kontrol edin.</p>{errors.map(error => <button key={error.id} type="button" className="block text-left underline" onClick={() => document.getElementById(error.id)?.focus()}>{error.message}</button>)}</div>}
                 {isSuperAdmin && (
-                  <div className="space-y-2">
-                    <Label htmlFor="claim-project">Proje</Label>
-                    <Select
-                      value={targetProjectId ?? undefined}
-                      onValueChange={(v) => {
-                        setTargetProjectId(v as Id<"projects">);
-                        // Proje değişince eski projeye ait seçili bölge geçersiz → sıfırla.
-                        setZoneChoice(NEW_ZONE);
-                      }}
-                    >
-                      <SelectTrigger id="claim-project" aria-invalid={attempted && errors.some(error => error.id === "claim-project")} aria-describedby={attempted && errors.some(error => error.id === "claim-project") ? "claim-project-error" : undefined}>
-                        <SelectValue placeholder="Projeyi seçin" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(projects ?? []).map((p) => (
-                          <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-  {attempted && errors.find(error => error.id === "claim-project") && <p id="claim-project-error" className="text-xs text-destructive">{errors.find(error => error.id === "claim-project")?.message}</p>}
-                </div>
+                  <FormFieldWrapper
+                    htmlFor="claim-project"
+                    label="Proje"
+                    error={fieldError("claim-project")}
+                  >
+                    {(control) => (
+                      <>
+                        <Select
+                          value={targetProjectId ?? undefined}
+                          onValueChange={(v) => {
+                            setTargetProjectId(v as Id<"projects">);
+                            // Proje değişince eski projeye ait seçili bölge geçersiz → sıfırla.
+                            setZoneChoice(NEW_ZONE);
+                          }}
+                        >
+                          <SelectTrigger {...control}>
+                            <SelectValue placeholder="Projeyi seçin" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(projects ?? []).map((p) => (
+                              <SelectItem key={p._id} value={p._id}>
+                                {p.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
+                  </FormFieldWrapper>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor="claim-device">Cihaz</Label>
-                  <Select value={selectedId ?? undefined} onValueChange={(v) => onSelectDevice(v as Id<"adminDevices">)}>
-                    <SelectTrigger id="claim-device" aria-invalid={attempted && errors.some(error => error.id === "claim-device")} aria-describedby={attempted && errors.some(error => error.id === "claim-device") ? "claim-device-error" : undefined}>
-                      <SelectValue placeholder="Havuzdan bir cihaz seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(claimable ?? []).map((d) => {
-                        const online = deviceConnection(d, nowMs) === "online";
-                        return (
-                          <SelectItem key={d._id} value={d._id}>
-                            <span className="flex items-center gap-2">
-                              <span
-                                className={`inline-block h-2 w-2 rounded-full ${online ? "bg-success" : "bg-muted-foreground/40"}`}
-                              />
-                              {d.name}
-                              {d.ideUuid && d.ideUuid !== d.name && (
-                                <span className="text-xs text-muted-foreground">({d.ideUuid})</span>
-                              )}
+                <FormFieldWrapper
+                  htmlFor="claim-device"
+                  label="Cihaz"
+                  error={fieldError("claim-device")}
+                >
+                  {(control) => (
+                    <>
+                      <Select
+                        value={selectedId ?? undefined}
+                        onValueChange={(v) =>
+                          onSelectDevice(v as Id<"adminDevices">)
+                        }
+                      >
+                        <SelectTrigger {...control}>
+                          <SelectValue placeholder="Havuzdan bir cihaz seçin" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(claimable ?? []).map((d) => {
+                            const online =
+                              deviceConnection(d, nowMs) === "online";
+                            return (
+                              <SelectItem key={d._id} value={d._id}>
+                                <span className="flex items-center gap-2">
+                                  <span
+                                    className={`inline-block h-2 w-2 rounded-full ${online ? "bg-success" : "bg-muted-foreground/40"}`}
+                                  />
+                                  {d.name}
+                                  {d.ideUuid && d.ideUuid !== d.name && (
+                                    <span className="text-xs text-muted-foreground">
+                                      ({d.ideUuid})
+                                    </span>
+                                  )}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      {selected && (
+                        <p className="text-xs text-muted-foreground">
+                          Marka: {selected.brand ?? "—"} ·{" "}
+                          {deviceConnection(selected, nowMs) ===
+                          "online" ? (
+                            <span className="text-success">Çevrimiçi</span>
+                          ) : (
+                            <span>
+                              {deviceConnection(selected, nowMs) === "never"
+                                ? "Henüz bağlanmadı"
+                                : "Çevrimdışı"}
                             </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  {selected && (
-                    <p className="text-xs text-muted-foreground">
-                      Marka: {selected.brand ?? "—"} ·{" "}
-                      {deviceConnection(selected, nowMs) === "online" ? (
-                        <span className="text-success">Çevrimiçi</span>
-                      ) : (
-                        <span>{deviceConnection(selected, nowMs) === "never" ? "Henüz bağlanmadı" : "Çevrimdışı"}</span>
+                          )}
+                        </p>
                       )}
-                    </p>
+                    </>
                   )}
-{attempted && errors.find(error => error.id === "claim-device") && <p id="claim-device-error" className="text-xs text-destructive">{errors.find(error => error.id === "claim-device")?.message}</p>}
-                </div>
+                </FormFieldWrapper>
 
-
-
-                <div className="space-y-2">
-                  <Label htmlFor="claim-device-name">Panel adı</Label>
-                  <Input id="claim-device-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Panel adı" />
-                </div>
+                <FormFieldWrapper
+                  htmlFor="claim-device-name"
+                  label="Panel adı"
+                >
+                  <Input
+                    id="claim-device-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Panel adı"
+                  />
+                </FormFieldWrapper>
 
                 {isIde && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="claim-user">Panel kullanıcı adı</Label>
-                      <Input id="claim-user" aria-invalid={attempted && errors.some(error => error.id === "claim-user")} aria-describedby={attempted && errors.some(error => error.id === "claim-user") ? "claim-user-error" : undefined}
+                    <FormFieldWrapper
+                      htmlFor="claim-user"
+                      label="Panel kullanıcı adı"
+                      error={fieldError("claim-user")}
+                    >
+                      <Input
+                        id="claim-user"
                         value={ideUser}
                         onChange={(e) => setIdeUser(e.target.value)}
                         placeholder="admin"
                         autoComplete="off"
                       />
-{attempted && errors.find(error => error.id === "claim-user") && <p id="claim-user-error" className="text-xs text-destructive">{errors.find(error => error.id === "claim-user")?.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="claim-password">Panel şifresi</Label>
-                      <PasswordField id="claim-password" aria-invalid={attempted && errors.some(error => error.id === "claim-password")} aria-describedby={attempted && errors.some(error => error.id === "claim-password") ? "claim-password-error" : undefined}
+                    </FormFieldWrapper>
+                    <FormFieldWrapper
+                      htmlFor="claim-password"
+                      label="Panel şifresi"
+                      error={fieldError("claim-password")}
+                    >
+                      <PasswordField
+                        id="claim-password"
                         value={idePassword}
                         onChange={(e) => setIdePassword(e.target.value)}
                         placeholder="Panel şifresi"
                         autoComplete="off"
                       />
-{attempted && errors.find(error => error.id === "claim-password") && <p id="claim-password-error" className="text-xs text-destructive">{errors.find(error => error.id === "claim-password")?.message}</p>}
-                    </div>
+                    </FormFieldWrapper>
                     <p className="sm:col-span-2 text-xs text-muted-foreground">
-                      Panelin MQTT giriş bilgisi. Boş bırakılırsa cihaza komut gönderilemez ve
-                      senkronizasyon takılı kalır.
+                      Panelin MQTT giriş bilgisi. Boş bırakılırsa cihaza
+                      komut gönderilemez ve senkronizasyon takılı kalır.
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="claim-zone">Bölge</Label>
-                  <Select value={zoneChoice} onValueChange={setZoneChoice}>
-                    <SelectTrigger id="claim-zone">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NEW_ZONE}>+ Yeni bölge oluştur</SelectItem>
-                      {projectZones.map((z) => (
-                        <SelectItem key={z._id} value={z._id}>{z.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormFieldWrapper htmlFor="claim-zone" label="Bölge">
+                    {(control) => (
+                      <Select
+                        value={zoneChoice}
+                        onValueChange={setZoneChoice}
+                      >
+                        <SelectTrigger {...control}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NEW_ZONE}>
+                            + Yeni bölge oluştur
+                          </SelectItem>
+                          {projectZones.map((z) => (
+                            <SelectItem key={z._id} value={z._id}>
+                              {z.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </FormFieldWrapper>
                   {zoneChoice === NEW_ZONE && (
-                    <div className="space-y-1">
-                    <Label htmlFor="claim-zone-name">Yeni bölge adı (zorunlu)</Label>
-                    <Input
-                      id="claim-zone-name"
-                      aria-describedby="claim-zone-error"
-                      aria-invalid={newZoneName.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")}
-                      value={newZoneName}
-                      onChange={(e) => setNewZoneName(e.target.value)}
-                      placeholder="Örn. Giriş katı"
-                    />
-                    {(!newZoneName.trim() || newZoneName.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")) && <p id="claim-zone-error" className="text-xs text-destructive">{!newZoneName.trim() ? "Yeni bölge adı girin veya mevcut bir bölge seçin." : "Bölge adı cihaz adıyla aynı olamaz."}</p>}
-                    </div>
+                    <FormFieldWrapper
+                      htmlFor="claim-zone-name"
+                      label="Yeni bölge adı (zorunlu)"
+                      error={
+                        !newZoneName.trim()
+                          ? "Yeni bölge adı girin veya mevcut bir bölge seçin."
+                          : newZoneName
+                                .trim()
+                                .toLocaleLowerCase("tr-TR") ===
+                              name.trim().toLocaleLowerCase("tr-TR")
+                            ? "Bölge adı cihaz adıyla aynı olamaz."
+                            : undefined
+                      }
+                    >
+                      {(control) => (
+                        <Input
+                          {...control}
+                          aria-invalid={
+                            newZoneName
+                              .trim()
+                              .toLocaleLowerCase("tr-TR") ===
+                            name.trim().toLocaleLowerCase("tr-TR")
+                          }
+                          value={newZoneName}
+                          onChange={(e) => setNewZoneName(e.target.value)}
+                          placeholder="Örn. Giriş katı"
+                        />
+                      )}
+                    </FormFieldWrapper>
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="claim-door-count">Kapı sayısı</Label>
-                  <Input id="claim-door-count"
+                <FormFieldWrapper
+                  htmlFor="claim-door-count"
+                  label="Kapı sayısı"
+                >
+                  <Input
+                    id="claim-door-count"
                     type="number"
                     min={1}
                     max={8}
                     value={doorCount}
-                    onChange={(e) => setDoorCount(Math.max(1, Math.min(Number(e.target.value) || 1, 8)))}
+                    onChange={(e) =>
+                      setDoorCount(
+                        Math.max(
+                          1,
+                          Math.min(Number(e.target.value) || 1, 8),
+                        ),
+                      )
+                    }
                   />
-                  <p className="text-xs text-muted-foreground">Panelin aktüatör sayısı (1–8). Her kapı bir IO'ya bağlanır.</p>
-                </div>
+                  <p className="text-xs text-muted-foreground">
+                    Panelin aktüatör sayısı (1–8). Her kapı bir IO'ya
+                    bağlanır.
+                  </p>
+                </FormFieldWrapper>
 
                 <div className="sticky bottom-0 flex justify-end gap-2 border-t border-line bg-surface py-4">
                   <Button type="button" variant="outline" onClick={close} disabled={submitting}>İptal</Button>

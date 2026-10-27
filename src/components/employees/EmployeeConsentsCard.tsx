@@ -25,6 +25,7 @@ import {
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 type ConsentType = "biometric_face" | "biometric_fingerprint" | "card" | "photo";
 
@@ -72,7 +73,6 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
 
   const [grantingType, setGrantingType] = useState<Exclude<ConsentType, "card"> | null>(null);
   const [notes, setNotes] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   const convex = useConvex();
   const document = useConsentDocumentUpload();
@@ -84,24 +84,21 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
     }
   }
 
+  const { run: runGrant, pending: submitting } = useAsyncAction(async (type: NonNullable<typeof grantingType>) => {
+    await grant({
+      employeeId,
+      consentType: type,
+      documentStorageId: document.storageId,
+      notes: notes.trim() || undefined,
+    });
+    notify.success("Rıza alındı", CONSENT_META[type].label);
+  }, { error: "Rıza alınamadı" });
   const handleGrant = async () => {
-    if (!grantingType || !canManageConsent(grantingType) || document.pending || document.error || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
-    setSubmitting(true);
-    try {
-      await grant({
-        employeeId,
-        consentType: grantingType,
-        documentStorageId: document.storageId,
-        notes: notes.trim() || undefined,
-      });
-      notify.success("Rıza alındı", CONSENT_META[grantingType].label);
+    if (!grantingType || submitting || !canManageConsent(grantingType) || document.pending || document.error || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
+    if (await runGrant(grantingType)) {
       document.reset();
       setGrantingType(null);
       setNotes("");
-    } catch (e) {
-      notify.error("Rıza alınamadı", e);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -234,7 +231,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
               </DialogHeader>
               <div className="space-y-2">
                 <label htmlFor={notesId} className="text-xs font-medium">Not (isteğe bağlı)</label>
-                <Textarea id={notesId}
+                <Textarea id={notesId} disabled={submitting}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Örn: Çalışan imzalı form arşivde, ref #1234"

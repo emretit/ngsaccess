@@ -4,7 +4,7 @@ import { useConvex, useQuery } from 'convex/react';
 import type { FunctionArgs, FunctionReturnType } from 'convex/server';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
-import { Button } from '@/components/ui/button';
+import { LoadMoreFooter } from '@/components/shared/LoadMoreFooter';
 import { ReportPage } from './ReportPage';
 import { monthlyRowsForReport, buildTransactionRows, dailyRowsForReport } from '@/lib/reports/rows';
 import { buildPersonMonthRows } from '@/lib/reports/personMonth';
@@ -77,8 +77,12 @@ function TransactionResults(props: ReportResultsProps) {
     setCursor(current.continueCursor);
   };
   return <ReportPage projectId={props.projectId} onClear={props.onClear} definition={props.definition} rows={rows} loading={current === undefined && cursor === null} hasMoreTransactions={!snapshot.isDone} loadedCount={snapshot.rows.length} meta={meta(props)}>
-    <p className="text-xs text-muted-foreground">Yalnız yüklenen kayıtlar dışa aktarılır.</p>
-    {!snapshot.isDone && <Button variant="outline" disabled={current === undefined} onClick={loadMore}>{current === undefined ? 'Yükleniyor…' : 'Daha fazla yükle'}</Button>}
+    <LoadMoreFooter
+      hasMore={!snapshot.isDone}
+      loading={current === undefined}
+      onLoadMore={loadMore}
+      summary={<p className="text-xs text-muted-foreground">Yalnız yüklenen kayıtlar dışa aktarılır.</p>}
+    />
   </ReportPage>;
 }
 export function ReportResults(props: ReportResultsProps) {

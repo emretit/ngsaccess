@@ -22,10 +22,15 @@ const state = vi.hoisted(() => ({
     invoke: (event: { preventDefault: () => void }) => unknown;
   }[],
   selects: new Map<string, (value: string) => void>(),
+  notifyError: vi.fn(),
   query: vi.fn(),
   mutate: vi.fn(),
   fetch: vi.fn(),
 }));
+vi.mock("@/lib/notify", async (original) => {
+  const actual = await original<typeof import("@/lib/notify")>();
+  return { ...actual, notify: { ...actual.notify, error: state.notifyError } };
+});
 vi.mock("react", async (original) => {
   const actual = await original<typeof import("react")>();
   return {
@@ -230,6 +235,7 @@ const values = (): PdksRuleValues => ({
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-10-22T12:00:00Z"));
+  state.notifyError.mockReset();
   state.admin = true;
   state.values = [];
   state.query.mockReset();
@@ -336,6 +342,40 @@ describe("PDKS kural ayarları", () => {
       .find((action) => action.label === "Sürümü sil")
       ?.invoke({ preventDefault: vi.fn() });
     expect(state.mutate).toHaveBeenCalledWith({ ruleVersionId: "future" });
+  });
+  it("silme sürerken onayı korur, butonu kilitler ve yalnız başarıda kapatır", async () => {
+    let finish: (() => void) | undefined;
+    state.mutate.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+    render(<PdksRulesSettings />);
+    state.actions.find(action => action.label === "2026-11-01 sürümünü sil")
+      ?.invoke({ preventDefault: vi.fn() });
+    render(<PdksRulesSettings />);
+    const running = state.actions.find(action => action.label === "Sürümü sil")
+      ?.invoke({ preventDefault: vi.fn() });
+    expect(render(<PdksRulesSettings />)).toContain("Gelecek sürüm silinsin mi?");
+    expect(state.actions.find(action => action.label === "İşlem sürüyor…")?.disabled).toBe(true);
+    finish?.();
+    await running;
+    const html = render(<PdksRulesSettings />);
+    expect(html).not.toContain("Gelecek sürüm silinsin mi?");
+    expect(html).toContain("Gelecek sürüm silindi.");
+  });
+  it("silme hatasında kuralı ve hata nedenini korur, tek toast gösterir", async () => {
+    state.mutate.mockRejectedValue(new Error("Bu sürüm artık yürürlükte."));
+    render(<PdksRulesSettings />);
+    state.actions.find(action => action.label === "2026-11-01 sürümünü sil")
+      ?.invoke({ preventDefault: vi.fn() });
+    render(<PdksRulesSettings />);
+    await state.actions.find(action => action.label === "Sürümü sil")
+      ?.invoke({ preventDefault: vi.fn() });
+    const html = render(<PdksRulesSettings />);
+    expect(html).toContain("Gelecek sürüm silinsin mi?");
+    expect(html).toContain("2026-11-01 tarihli gelecek sürüm");
+    expect(html).toContain("Bu sürüm artık yürürlükte.");
+    expect(state.notifyError).toHaveBeenCalledExactlyOnceWith(
+      "Gelecek sürüm silinemedi", expect.objectContaining({ message: "Bu sürüm artık yürürlükte." }),
+    );
+    expect(state.actions.find(action => action.label === "Sürümü sil")?.disabled).toBe(false);
   });
   it("aynı tarih onayında kayda alınmış payloadı yayınlar", async () => {
     render(<PdksRulesSettings />);

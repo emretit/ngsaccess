@@ -8,7 +8,7 @@ import { PROJECT_ROLES, ROLE_LABELS, isProjectRole } from "../../../convex/lib/r
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Button } from "@/components/ui/button";
-import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useUserManagement } from "./hooks/useUserManagement";
 import { UserFormDialog } from "./components/UserFormDialog";
 
@@ -18,14 +18,11 @@ export function MemberRoleSelect({ member, projectId }: { member: Member; projec
     const members = store.getQuery(api.roles.listProjectMembers, { projectId: args.projectId });
     if (members) store.setQuery(api.roles.listProjectMembers, { projectId: args.projectId }, members.map(item => item.userId === args.userId ? { ...item, role: args.role } : item));
   });
-  const [pending, setPending] = useState(false);
+  const { run, pending } = useAsyncAction(save, { success: "Proje rolü güncellendi", error: "Proje rolü değiştirilemedi" });
   return <label className="space-y-1"><span className="sr-only">{member.name ?? member.email ?? "Kullanıcı"} proje rolü</span><select className="h-9 rounded-md border bg-background px-3 text-sm" value={member.role} disabled={pending || member.isSuperAdmin} onChange={async event => {
     const role = event.target.value;
     if (!isProjectRole(role)) return;
-    setPending(true);
-    try { await save({ projectId, userId: member.userId, role }); notify.success("Proje rolü güncellendi"); }
-    catch (error) { notify.error("Proje rolü değiştirilemedi", error); }
-    finally { setPending(false); }
+    await run({ projectId, userId: member.userId, role });
   }}>{PROJECT_ROLES.map(role => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select>{member.isSuperAdmin && <span className="ml-2 text-xs text-muted-foreground">Süper Admin · değiştirilemez</span>}</label>;
 }
 

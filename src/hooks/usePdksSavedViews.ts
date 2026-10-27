@@ -99,7 +99,7 @@ export function usePdksSavedViews() {
   const removeView = useCallback(
     (id: string) => {
       const next = views.filter((v) => v.id !== id);
-      void persist(next);
+      return persist(next);
     },
     [views, persist],
   );

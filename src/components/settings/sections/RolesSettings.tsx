@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { ADMIN_ONLY_PERMISSIONS, LOCKED_ROLE, PERMISSIONS, PERMISSION_LABELS, PROJECT_ROLES, ROLE_DEFAULTS, ROLE_LABELS, type Permission, type ProjectRole } from "../../../../convex/lib/roleCatalog";
@@ -6,7 +5,7 @@ import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { usePermissions } from "@/hooks/usePermissions";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Button } from "@/components/ui/button";
-import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useSettingsFormState } from "../SettingsFormState";
 
 const STICKY_CELL = "sticky left-0 z-10 bg-background";
@@ -20,16 +19,12 @@ export function RolesSettings() {
     const current = store.getQuery(api.roles.listProjectRoles, { projectId: args.projectId });
     if (current) store.setQuery(api.roles.listProjectRoles, { projectId: args.projectId }, current.map(item => item.role === args.role ? { ...item, permissions: args.permissions } : item));
   });
-  const [pending, setPending] = useState(false);
+  const { run, pending } = useAsyncAction(save, { error: "Rol yetkileri kaydedilemedi" });
   useSettingsFormState("roles", false, pending);
   if (!projectId || !allowed) return null;
   if (!roles) return <SectionSkeleton label="Roller yükleniyor" />;
   const update = async (role: ProjectRole, permissions: readonly Permission[]) => {
-    if (pending) return;
-    setPending(true);
-    try { await save({ projectId, role, permissions: [...permissions] }); }
-    catch (error) { notify.error("Rol yetkileri kaydedilemedi", error); }
-    finally { setPending(false); }
+    await run({ projectId, role, permissions: [...permissions] });
   };
   return <section className="space-y-4" aria-busy={pending}>
     <p className="text-sm text-muted-foreground">Varsayılan yetkiler önerilir; ihtiyaca göre değiştirebilirsiniz.</p>

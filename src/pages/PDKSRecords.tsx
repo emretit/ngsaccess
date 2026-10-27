@@ -1,3 +1,4 @@
+import { MasterDetailListLayout } from "@/components/shared/MasterDetailListLayout";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { ShiftTree } from "@/components/shifts/ShiftTree";
@@ -113,40 +114,37 @@ function PDKSContent({
           </Button>
         )}
       </PageHeader>
-      <div className="flex min-w-0 flex-col gap-4 min-[1100px]:flex-row min-[1100px]:gap-5">
-        {projectId && <QuerySectionBoundary resetKey={projectId} title="Vardiyalar yüklenemedi" className="w-full min-w-0 shrink-0 min-[1100px]:w-[220px]">
+      <MasterDetailListLayout sidebar={projectId && <QuerySectionBoundary resetKey={projectId} title="Vardiyalar yüklenemedi" className="w-full min-w-0 shrink-0 min-[1100px]:w-[220px]">
           <ShiftTree key={projectId} projectId={projectId} selectedShiftId={filters.shiftId}
             onSelectShift={shiftId => setFilters({ ...filters, shiftId })}
             createOpen={createShiftOpen} onCreateOpenChange={setCreateShiftOpen} />
-        </QuerySectionBoundary>}
-        <div className="min-w-0 flex-1 space-y-4">
-          <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
-            <PdksPeriodSwitcher filters={filters} setFilters={setFilters} />
-            <PDKSDateNavigator values={filters} onChange={setFilters} />
-            <Button variant="ghost" onClick={() => setDatesOpen(true)}>
-              Tarih ve kayıtlı görünümler
+        </QuerySectionBoundary>}>
+        <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
+          <PdksPeriodSwitcher filters={filters} setFilters={setFilters} />
+          <PDKSDateNavigator values={filters} onChange={setFilters} />
+          <Button variant="ghost" onClick={() => setDatesOpen(true)}>
+            Tarih ve kayıtlı görünümler
+          </Button>
+        </div>
+        <PDKSFilterBar
+          values={filters}
+          onChange={setFilters}
+          onClear={() => setSmartPreset(null)}
+        />
+        {effectiveSmartPreset && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span>{effectiveSmartPreset.label}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSmartPreset(null)}
+            >
+              Uyarı filtresini kaldır
             </Button>
           </div>
-          <PDKSFilterBar
-            values={filters}
-            onChange={setFilters}
-            onClear={() => setSmartPreset(null)}
-          />
-          {effectiveSmartPreset && (
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span>{effectiveSmartPreset.label}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setSmartPreset(null)}
-              >
-                Uyarı filtresini kaldır
-              </Button>
-            </div>
-          )}
-          <PdksRecordsResults view={view} />
-        </div>
-      </div>
+        )}
+        <PdksRecordsResults view={view} />
+      </MasterDetailListLayout>
       {canApprove && projectId && <Dialog open={correctionsOpen} onOpenChange={setCorrectionsOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
           <DialogHeader>

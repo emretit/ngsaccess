@@ -1,3 +1,4 @@
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useQuery } from "convex/react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -30,7 +31,7 @@ export function PDKSAuditTimeline({
 
   if (events === undefined) {
     return (
-      <div className="text-xs text-muted-foreground py-2">Yükleniyor...</div>
+      <SectionSkeleton label="Yükleniyor..." />
     );
   }
   if (events.length === 0) {

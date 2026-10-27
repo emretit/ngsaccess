@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormActions } from "@/components/shared/FormActions";
 import { Input } from "@/components/ui/input";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
@@ -44,7 +44,7 @@ export function AddZoneDialog({ open, onOpenChange, onSuccess }: AddZoneDialogPr
             <FormFieldWrapper htmlFor="add-zone-name" label="Bölge adı" error={error}><Input ref={nameInput} id="add-zone-name" value={name} onChange={e => { setName(e.target.value); setError(undefined); }} /></FormFieldWrapper>
             <FormFieldWrapper htmlFor="add-zone-description" label="Açıklama"><Textarea id="add-zone-description" value={description} onChange={e => setDescription(e.target.value)} /></FormFieldWrapper>
           </fieldset>
-          <DialogFooter className="pt-2"><Button type="button" variant="outline" disabled={pending} onClick={close}>İptal</Button><Button type="submit" disabled={pending}>{pending ? "Ekleniyor…" : "Ekle"}</Button></DialogFooter>
+          <FormActions layout="dialog" className="pt-2" isLoading={pending} onClose={close} cancelLabel="İptal" submitLabel="Ekle" busyLabel="Ekleniyor…" />
         </form>
       </DialogContent>
     </Dialog>

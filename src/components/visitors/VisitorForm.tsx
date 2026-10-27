@@ -1,8 +1,9 @@
+import { FormFeedback } from "@/components/shared/FormFeedback";
 import { useEffect, useState } from "react";
 import type { VisitorDetail } from "@/types/visitor";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
-import { Button } from "@/components/ui/button";
+import { FormActions } from "@/components/shared/FormActions";
 import VisitorFormFields from "./VisitorFormFields";
 import VisitorZoneDialog from "./VisitorZoneDialog";
 import { useVisitorFormData } from "./hooks/useVisitorFormData";
@@ -43,12 +44,9 @@ export default function VisitorForm({ visitor, onClose, onSave, onStateChange }:
     <form onSubmit={onSubmit} className="min-w-0" noValidate>
       <fieldset disabled={isLoading} className="min-w-0 space-y-5 p-5">
         {optionsLoading ? <SectionSkeleton rows={5} label="Form bilgileri yükleniyor" /> : <VisitorFormFields formData={formData} setFormData={setFormData} presetRules={presetRules} hostEmployees={hostEmployees} isEditing={!!visitor} isPreRegistration={isPreRegistration} kvkkConsentAt={visitor?.kvkkConsent?.grantedAt} errors={fieldErrors} onNewZone={() => setZoneOpen(true)} />}
-        {failed && <p role="alert" className="text-sm text-destructive">Ziyaretçi kaydedilemedi. Girişleriniz korundu; bilgileri kontrol edip tekrar deneyin.</p>}
+        {failed && <FormFeedback tone="error">Ziyaretçi kaydedilemedi. Girişleriniz korundu; bilgileri kontrol edip tekrar deneyin.</FormFeedback>}
       </fieldset>
-      <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t bg-surface p-4">
-        <Button type="button" variant="outline" disabled={isLoading} onClick={onClose}>Vazgeç</Button>
-        <Button type="submit" disabled={isLoading || optionsLoading}>{isLoading ? "Kaydediliyor…" : isPreRegistration && formData.isActive ? "Erişimi etkinleştir" : visitor ? "Değişiklikleri kaydet" : "Ziyaretçiyi kaydet"}</Button>
-      </div>
+      <FormActions isLoading={isLoading} onClose={onClose} busyLabel="Kaydediliyor…" submitDisabled={optionsLoading} submitLabel={isPreRegistration && formData.isActive ? "Erişimi etkinleştir" : visitor ? "Değişiklikleri kaydet" : "Ziyaretçiyi kaydet"} />
     </form>
     {zoneOpen && <QuerySectionBoundary title="Erişim bölgeleri yüklenemedi"><VisitorZoneDialog isOpen onClose={() => setZoneOpen(false)} onCreated={id => { setFormData({ ...formData, presetRuleId: id }); setZoneOpen(false); }} /></QuerySectionBoundary>}
   </>;

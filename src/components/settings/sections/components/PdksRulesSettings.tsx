@@ -244,16 +244,21 @@ function RulesEditor({
             void save(confirmation.values);
             return;
           }
+        }}
+        onDelete={async () => {
+          if (confirmation?.kind !== "delete" || pending) return;
           setPending(true);
           setError("");
           setSuccess("");
-          void remove({ ruleVersionId: confirmation.rule._id })
-            .then(() => {
-              setConfirmation(null);
-              setSuccess("Gelecek sürüm silindi.");
-            })
-            .catch((cause) => setError(errorMessage(cause)))
-            .finally(() => setPending(false));
+          try {
+            await remove({ ruleVersionId: confirmation.rule._id });
+            setSuccess("Gelecek sürüm silindi.");
+          } catch (cause) {
+            setError(errorMessage(cause));
+            throw cause;
+          } finally {
+            setPending(false);
+          }
         }}
       />
     </section>

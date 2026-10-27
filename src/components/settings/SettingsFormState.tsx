@@ -1,3 +1,4 @@
+import { FormFeedback } from "@/components/shared/FormFeedback";
 import { createContext, useContext, useEffect, useState } from "react";
 
 export interface FormState { dirty: boolean; pending: boolean }
@@ -34,6 +35,6 @@ export function useSettingsDraft<T extends object>(source: T) {
 }
 
 export function DraftNotice({ remoteChanged, failed }: { remoteChanged?: boolean; failed?: boolean }) {
-  return <>{remoteChanged && <p role="status" className="text-sm text-muted-foreground">Bu bölüm başka bir oturumda değişti. Taslağınız korundu; güncel kaydı yüklemek için Vazgeç’i seçin.</p>}
-    {failed && <p role="alert" className="text-sm text-destructive">Değişiklikler kaydedilemedi. Bilgilerinizi koruduk; yeniden deneyin.</p>}</>;
+  return <>{remoteChanged && <FormFeedback tone="info">Bu bölüm başka bir oturumda değişti. Taslağınız korundu; güncel kaydı yüklemek için Vazgeç’i seçin.</FormFeedback>}
+    {failed && <FormFeedback tone="error">Değişiklikler kaydedilemedi. Bilgilerinizi koruduk; yeniden deneyin.</FormFeedback>}</>;
 }

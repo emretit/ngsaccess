@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { PdksStatusFilter } from "@/hooks/usePdksTableData";
 import { Button } from "@/components/ui/button";
+import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
 import { FilterBar } from "@/components/shared/FilterBar";
 import {
   Sheet,
@@ -47,14 +48,11 @@ export function PDKSFilterBar({
   onChange: (values: FilterValues) => void;
   onClear?: () => void;
 }) {
-  const [mobileFilters, setMobileFilters] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const { departments, companies, positions } = usePdksFilterOptions();
 
   return (
-    <>
-    <Button className="sm:hidden" variant="outline" aria-expanded={mobileFilters} onClick={() => setMobileFilters(v => !v)}>Filtreler</Button>
-    <div className={mobileFilters ? "block" : "hidden sm:block"}>
+    <CollapsibleFilters>
     <FilterBar
       search={values.person}
       onSearchChange={(person) => onChange({ ...values, person })}
@@ -130,7 +128,6 @@ export function PDKSFilterBar({
         </SheetContent>
       </Sheet>
     </FilterBar>
-    </div>
-    </>
+    </CollapsibleFilters>
   );
 }

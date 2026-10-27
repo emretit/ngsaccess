@@ -1,3 +1,4 @@
+import { MasterDetailListLayout } from "@/components/shared/MasterDetailListLayout";
 import type { ReactNode } from "react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DeviceAddMenu } from "./DeviceAddMenu";
@@ -80,58 +81,55 @@ export function DevicesContent({
           <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} onAddVirtualReader={onAddVirtualReader} />
         )}
       </PageHeader>
-      <div className="flex min-w-0 flex-col gap-4 min-[1100px]:flex-row min-[1100px]:gap-5">
-        {sidebar}
-        <div className="min-w-0 flex-1 space-y-4">
-          <DeviceFilters
-            onClearFilters={clearFilters}
-            locationActive={Boolean(selectedZoneId || selectedDoorId)}
-            statusCounts={{
-              all: locationDevices.length,
-              online: locationDevices.filter(
-                (d) => d.connectionStatus === "online",
-              ).length,
-              offline: locationDevices.filter(
-                (d) => d.connectionStatus === "offline",
-              ).length,
-              never: locationDevices.filter(
-                (d) => d.connectionStatus === "never",
-              ).length,
-            }}
-            search={search}
-            onSearchChange={setSearch}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            typeFilter={typeFilter}
-            onTypeFilterChange={setTypeFilter}
-            deviceTypes={deviceTypes}
-            onAddNew={onAddNew}
-            onAddFromCloud={onAddFromCloud}
-            showNewDevice={canManage}
-            deviceCount={devices.length}
-            filteredCount={filteredDevices.length}
-          />
+      <MasterDetailListLayout sidebar={sidebar}>
+        <DeviceFilters
+          onClearFilters={clearFilters}
+          locationActive={Boolean(selectedZoneId || selectedDoorId)}
+          statusCounts={{
+            all: locationDevices.length,
+            online: locationDevices.filter(
+              (d) => d.connectionStatus === "online",
+            ).length,
+            offline: locationDevices.filter(
+              (d) => d.connectionStatus === "offline",
+            ).length,
+            never: locationDevices.filter(
+              (d) => d.connectionStatus === "never",
+            ).length,
+          }}
+          search={search}
+          onSearchChange={setSearch}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+          deviceTypes={deviceTypes}
+          onAddNew={onAddNew}
+          onAddFromCloud={onAddFromCloud}
+          showNewDevice={canManage}
+          deviceCount={devices.length}
+          filteredCount={filteredDevices.length}
+        />
 
-          <div className="min-w-0">
-            <DeviceList
-              canManage={canManage}
-              filterKey={`${activeProject?._id}:${search}:${statusFilter}:${typeFilter}:${selectedZoneId}:${selectedDoorId}`}
-              onClearFilters={clearFilters}
-              onAddDevice={canManage ? onAddNew : undefined}
-              devices={devices}
-              filteredDevices={filteredDevices}
-              isLoading={isLoading}
-              zones={zones}
-              onDeleteDevice={onDeleteDevice}
-              onAssignLocation={onAssignLocation}
-              onEditDevice={onEditDevice}
-              onQRClick={onQRClick}
-              onReleaseDevice={onReleaseDevice}
-              hideZoneColumn={Boolean(selectedZoneId || selectedDoorId)}
-            />
-          </div>
+        <div className="min-w-0">
+          <DeviceList
+            canManage={canManage}
+            filterKey={`${activeProject?._id}:${search}:${statusFilter}:${typeFilter}:${selectedZoneId}:${selectedDoorId}`}
+            onClearFilters={clearFilters}
+            onAddDevice={canManage ? onAddNew : undefined}
+            devices={devices}
+            filteredDevices={filteredDevices}
+            isLoading={isLoading}
+            zones={zones}
+            onDeleteDevice={onDeleteDevice}
+            onAssignLocation={onAssignLocation}
+            onEditDevice={onEditDevice}
+            onQRClick={onQRClick}
+            onReleaseDevice={onReleaseDevice}
+            hideZoneColumn={Boolean(selectedZoneId || selectedDoorId)}
+          />
         </div>
-      </div>
+      </MasterDetailListLayout>
     </div>
   );
 }

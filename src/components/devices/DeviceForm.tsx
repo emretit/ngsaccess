@@ -1,3 +1,4 @@
+import { FormFeedback } from "@/components/shared/FormFeedback";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 
@@ -22,7 +23,7 @@ import {
 import { DeviceLocationSection } from "./form-sections/DeviceLocationSection";
 import { DeviceNetworkSection } from "./form-sections/DeviceNetworkSection";
 import { DeviceStatusSection } from "./form-sections/DeviceStatusSection";
-import FormActions from "@/components/employees/FormActions";
+import { FormActions } from "@/components/shared/FormActions";
 import { DeviceHikvisionSection } from "./form-sections/DeviceHikvisionSection";
 import { DeviceIdeSmartSection } from "./form-sections/DeviceIdeSmartSection";
 import { DeviceNameSection } from "./form-sections/DeviceNameSection";
@@ -164,13 +165,7 @@ export function DeviceForm({
             "Seçili proje"}
         </p>}
         {Object.keys(form.formState.errors).length > 0 && (
-          <div
-            role="alert"
-            className="rounded-md border border-danger p-3 text-sm"
-          >
-            <p className="font-medium">
-              Kaydedilemedi. İşaretli alanları kontrol edin.
-            </p>
+          <FormFeedback tone="error" variant="panel" title="Kaydedilemedi. İşaretli alanları kontrol edin.">
             <ul className="mt-1 list-disc pl-4">
               {Object.entries(form.formState.errors).map(([key, error]) =>
                 error && typeof error.message === "string" ? (
@@ -185,7 +180,7 @@ export function DeviceForm({
             >
               İlk hatalı alana git
             </button>
-          </div>
+          </FormFeedback>
         )}
         <fieldset
           aria-describedby={disabled ? "device-readonly-reason" : undefined}
@@ -293,9 +288,9 @@ export function DeviceForm({
           )}
         </fieldset>
         {connectionError && (
-          <p role="alert" className="text-sm text-destructive">
+          <FormFeedback tone="error">
             {connectionError}
-          </p>
+          </FormFeedback>
         )}
         {!device && (
           <section

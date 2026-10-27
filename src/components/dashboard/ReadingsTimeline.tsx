@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/shared/EmptyState";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
@@ -43,9 +44,7 @@ export default function ReadingsTimeline() {
         {loading ? (
           <SectionSkeleton rows={4} label="Saatlik okumalar yükleniyor" className="px-2" />
         ) : !timeline || timeline.total === 0 ? (
-          <p role="status" className="grid min-h-24 place-items-center px-2 py-6 text-center text-sm text-muted-foreground">
-            Bugün henüz kart okuması yok.
-          </p>
+          <EmptyState compact title="Bugün henüz kart okuması yok." className="min-h-24 px-2" />
         ) : (
           <ChartContainer config={chartConfig} className="aspect-auto h-[200px] w-full" aria-label={`Bugün ${timeline.total} kart okuması, saatlik dağılım`}>
             <BarChart data={timeline.hours} margin={{ top: 4, right: 8, bottom: 0, left: 0 }} barCategoryGap={3}>
