@@ -1,5 +1,5 @@
 import { Plus, Cloud, PlusCircle, ChevronDown, ScanLine } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { PageHeaderPrimaryButton } from "@/components/shared/PageHeader";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -24,11 +24,11 @@ export function DeviceAddMenu({ onAddNew, onAddFromCloud, onAddVirtualReader }: 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" className="min-h-11 md:min-h-8 gap-1.5 text-xs">
+        <PageHeaderPrimaryButton>
           <Plus className="h-3.5 w-3.5" />
           Cihaz ekle
           <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-        </Button>
+        </PageHeaderPrimaryButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuItem onSelect={onAddNew} className="gap-2 py-2">
