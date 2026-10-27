@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
 import { UNSAFE_NavigationContext } from "react-router-dom";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useProjectChangeGuard } from "@/contexts/ActiveProjectContext";
@@ -29,9 +29,20 @@ export function useGuardedFormNavigation(options: GuardedFormNavigationOptions) 
     if (decision.close !== "block") requestUnsavedClose(proceed);
   }, [decision.close, requestUnsavedClose]);
   useProjectChangeGuard(decision.interceptNavigation, requestClose);
+  const installed = useRef<(() => void) | undefined>(undefined);
   useEffect(() => {
     if (!decision.interceptNavigation) return;
-    return installNavigationGuard(navigator, requestClose, window, pending);
+    const cleanup = installNavigationGuard(navigator, requestClose, window, pending);
+    installed.current = cleanup;
+    return () => {
+      cleanup();
+      if (installed.current === cleanup) installed.current = undefined;
+    };
   }, [decision.interceptNavigation, navigator, requestClose, pending]);
-  return { requestClose, dialog: guard.dialog };
+  /** Drops route protection synchronously, for a confirmed exit that navigates before the form unmounts. */
+  const release = useCallback(() => {
+    installed.current?.();
+    installed.current = undefined;
+  }, []);
+  return { requestClose, release, dialog: guard.dialog };
 }

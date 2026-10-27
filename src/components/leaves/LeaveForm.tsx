@@ -1,6 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
-import { UNSAFE_NavigationContext } from "react-router-dom";
-import { installNavigationGuard } from "@/lib/navigationGuard";
+import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,9 +6,9 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useProjectChangeGuard } from "@/contexts/ActiveProjectContext";
-import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { useGuardedFormNavigation } from "@/hooks/useGuardedFormNavigation";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { DateRangeFields } from "@/components/shared/DateRangeFields";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import {
   Dialog,
@@ -27,7 +25,6 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { FormActions } from "@/components/shared/FormActions";
@@ -134,30 +131,11 @@ export function LeaveForm({
     },
     { success: "İzin kaydedildi", error: "İzin kaydedilemedi" },
   );
-  const dirty = form.formState.isDirty;
-  const guard = useUnsavedChangesGuard(dirty || pending);
-  const { requestClose } = guard;
-  const { navigator } = useContext(UNSAFE_NavigationContext);
-  const releaseNavigation = useRef<(() => void) | undefined>(undefined);
-  useEffect(() => {
-    if (!dirty && !pending) return;
-    const cleanup = installNavigationGuard(navigator, (proceed) => {
-      if (!pending) requestClose(proceed);
-    }, window, pending);
-    releaseNavigation.current = cleanup;
-    return () => {
-      cleanup();
-      if (releaseNavigation.current === cleanup)
-        releaseNavigation.current = undefined;
-    };
-  }, [dirty, pending, navigator, requestClose]);
-  useProjectChangeGuard(
-    form.formState.isDirty || pending,
-    pending ? () => {} : guard.requestClose,
-  );
-  const close = () => {
-    if (!pending) guard.requestClose(onClose);
-  };
+  const guard = useGuardedFormNavigation({
+    dirty: form.formState.isDirty || pending,
+    pending,
+  });
+  const close = () => guard.requestClose(onClose);
   const [startDate, endDate, employeeId] = useWatch({
     control: form.control,
     name: ["startDate", "endDate", "employeeId"],
@@ -229,7 +207,7 @@ export function LeaveForm({
                         event.preventDefault();
                         guard.requestClose(() => {
                           if (serverError.conflict) {
-                            releaseNavigation.current?.();
+                            guard.release();
                             onConflict(
                               serverError.conflict,
                               form.getValues("employeeId"),
@@ -329,44 +307,26 @@ export function LeaveForm({
               ))}
             </select>
           </FormFieldWrapper>
-          <FormFieldWrapper
-            htmlFor="leave-start"
-            label="Başlangıç tarihi"
-            error={form.formState.errors.startDate?.message}
-          >
-            <DateInput
-              className="min-w-0 max-w-full"
-              required
-              value={startDate}
-              onChange={(value) =>
-                form.setValue("startDate", value, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-            />
-          </FormFieldWrapper>
-          <FormFieldWrapper
-            htmlFor="leave-end"
-            label="Bitiş tarihi"
-            error={form.formState.errors.endDate?.message}
-          >
-            <DateInput
-              className="min-w-0 max-w-full"
-              required
-              value={endDate}
-              onChange={(value) =>
-                form.setValue("endDate", value, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
-            />
-          </FormFieldWrapper>
+          <DateRangeFields
+            idPrefix="leave"
+            required
+            value={{ start: startDate, end: endDate }}
+            errors={{
+              start: form.formState.errors.startDate?.message,
+              end: form.formState.errors.endDate?.message,
+            }}
+            onChange={(next, changed) =>
+              form.setValue(
+                changed === "start" ? "startDate" : "endDate",
+                next[changed],
+                { shouldDirty: true, shouldValidate: true },
+              )
+            }
+          />
           {checkConflict && conflict === undefined && <p role="status" className="text-sm">İzin çakışması kontrol ediliyor…</p>}
           {checkConflict && conflict && <div role="alert" className="rounded-md border border-danger p-3 text-sm">
             <p>Bu tarihler onaylı bir izinle çakışıyor: {dateLabel(conflict.start)} – {dateLabel(conflict.end)}.</p>
-            <Button type="button" variant="link" onClick={() => guard.requestClose(() => onConflict(conflict, employeeId))}>Kaydı aç</Button>
+            <Button type="button" variant="link" onClick={() => guard.requestClose(() => { guard.release(); onConflict(conflict, employeeId); })}>Kaydı aç</Button>
           </div>}
           {row && (days === null || days > 366) && (
             <p className="text-xs text-muted-foreground">

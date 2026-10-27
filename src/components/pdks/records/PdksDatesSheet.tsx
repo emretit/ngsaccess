@@ -2,7 +2,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import type { PdksRecordsView } from "./usePdksRecordsView";
 import { PDKSQuickPresets } from "@/components/pdks/dashboard/PDKSQuickPresets";
 import { PDKSSavedViews } from "@/components/pdks/dashboard/PDKSSavedViews";
-import { DateInput } from "@/components/ui/date-picker";
+import { DateRangeFields } from "@/components/shared/DateRangeFields";
 import { toLocalDateString } from "@/lib/date";
 export function PdksDatesSheet({ datesOpen, setDatesOpen, rangeError, setRangeError, filters, setFilters, dateRangeLabel, startDate, endDate }: PdksRecordsView) {
   return (
@@ -22,78 +22,32 @@ export function PdksDatesSheet({ datesOpen, setDatesOpen, rangeError, setRangeEr
               <legend className="text-sm font-medium">
                 Özel tarih aralığı
               </legend>
-              <label className="block text-xs">
-                Başlangıç
-                <DateInput
-                  required
-                  className="mt-1"
-                  value={
-                    filters.dateRange.from
-                      ? toLocalDateString(filters.dateRange.from)
-                      : startDate
+              <DateRangeFields
+                idPrefix="pdks-range"
+                required
+                constrainOrder
+                labels={{ start: "Başlangıç", end: "Bitiş" }}
+                value={{
+                  start: filters.dateRange.from ? toLocalDateString(filters.dateRange.from) : startDate,
+                  end: filters.dateRange.to ? toLocalDateString(filters.dateRange.to) : endDate,
+                }}
+                errors={{ range: rangeError || undefined }}
+                onChange={(next, changed) => {
+                  if (!next[changed]) return;
+                  const from = changed === "start"
+                    ? new Date(`${next.start}T12:00:00`)
+                    : filters.dateRange.from ?? new Date(`${startDate}T12:00:00`);
+                  const to = changed === "end"
+                    ? new Date(`${next.end}T12:00:00`)
+                    : filters.dateRange.to ?? new Date(`${endDate}T12:00:00`);
+                  if (from > to) {
+                    setRangeError(changed === "start" ? "Başlangıç tarihi bitişten sonra olamaz." : "Bitiş tarihi başlangıçtan önce olamaz.");
+                    return;
                   }
-                  max={
-                    filters.dateRange.to
-                      ? toLocalDateString(filters.dateRange.to)
-                      : undefined
-                  }
-                  onChange={(value) => {
-                    if (!value) return;
-                    const from = new Date(`${value}T12:00:00`);
-                    const to =
-                      filters.dateRange.to ?? new Date(`${endDate}T12:00:00`);
-                    if (from > to) {
-                      setRangeError("Başlangıç tarihi bitişten sonra olamaz.");
-                      return;
-                    }
-                    setRangeError("");
-                    setFilters({
-                      ...filters,
-                      reportType: "custom",
-                      dateRange: { from, to },
-                    });
-                  }}
-                />
-              </label>
-              <label className="block text-xs">
-                Bitiş
-                <DateInput
-                  required
-                  className="mt-1"
-                  value={
-                    filters.dateRange.to
-                      ? toLocalDateString(filters.dateRange.to)
-                      : endDate
-                  }
-                  min={
-                    filters.dateRange.from
-                      ? toLocalDateString(filters.dateRange.from)
-                      : undefined
-                  }
-                  onChange={(value) => {
-                    if (!value) return;
-                    const from =
-                      filters.dateRange.from ??
-                      new Date(`${startDate}T12:00:00`);
-                    const to = new Date(`${value}T12:00:00`);
-                    if (from > to) {
-                      setRangeError("Bitiş tarihi başlangıçtan önce olamaz.");
-                      return;
-                    }
-                    setRangeError("");
-                    setFilters({
-                      ...filters,
-                      reportType: "custom",
-                      dateRange: { from, to },
-                    });
-                  }}
-                />
-              </label>
-              {rangeError && (
-                <p role="alert" className="text-xs text-danger">
-                  {rangeError}
-                </p>
-              )}
+                  setRangeError("");
+                  setFilters({ ...filters, reportType: "custom", dateRange: { from, to } });
+                }}
+              />
             </fieldset>
           </div>
         </SheetContent>

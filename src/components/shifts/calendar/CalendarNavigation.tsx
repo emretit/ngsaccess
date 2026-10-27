@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-picker";
+import { SegmentedViewControl } from "@/components/shared/SegmentedViewControl";
 import { dayLabel, istanbulToday, nextPeriod, type Period, type visibleRange } from "../lib/planning";
 
 export function calendarRangeLabel(start: string, end: string, period: Period) {
@@ -37,10 +38,8 @@ export function CalendarNavigation({ day, effectivePeriod, period, compact, rang
         </Button>} />
       <span className="whitespace-nowrap text-[11px] text-muted-foreground">İstanbul saati</span>
     </div>
-    {!compact && <div role="group" aria-label="Dönem" className="flex gap-1">
-      {([ ["week", "Hafta"], ["month", "Ay"] ] as const).map(([value, label]) =>
-        <Button key={value} className="px-2" variant={period === value ? "secondary" : "ghost"}
-          aria-pressed={period === value} onClick={() => { setPeriod(value); clearSelection(); }}>{label}</Button>)}
-    </div>}
+    {!compact && <SegmentedViewControl label="Dönem" className="gap-1" value={period}
+      options={[{ value: "week", label: "Hafta" }, { value: "month", label: "Ay" }]}
+      onChange={(value) => { setPeriod(value); clearSelection(); }} />}
   </div>;
 }

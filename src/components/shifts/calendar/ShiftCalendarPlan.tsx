@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Button } from "@/components/ui/button";
 import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
+import { useListSelection } from "@/hooks/useListSelection";
 import { ShiftCalendarGrid, type CalendarProps } from "../ShiftCalendarGrid";
 import { ShiftAgendaView } from "../ShiftAgendaView";
 import { ShiftDayDetails } from "../ShiftDayDetails";
@@ -111,14 +112,7 @@ export function ShiftCalendarPlan({
     setDay(next);
     clearSelection();
   };
-  const select = (id: string) =>
-    setSelected((old) => {
-      const next = new Set(old);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  const allVisibleSelected = visible.length > 0 && visible.every((employee) => selected.has(employee._id));
+  const selection = useListSelection({ visibleIds: visible.map((employee) => employee._id), selected, onChange: setSelected });
   const calendarProps: CalendarProps = {
     employees: visible,
     days: range.days,
@@ -129,10 +123,10 @@ export function ShiftCalendarPlan({
     canAssign: canManage && active.length > 0,
     ...(canManage ? {
       selectAll: {
-        checked: allVisibleSelected ? true : visible.some((employee) => selected.has(employee._id)) ? "indeterminate" : false,
-        onToggle: () => setSelected(allVisibleSelected ? new Set() : new Set(visible.map((employee) => employee._id))),
+        checked: selection.checked,
+        onToggle: () => selection.selectAll(selection.checked !== true),
       },
-      onSelect: select,
+      onSelect: selection.toggle,
     } : {}),
     selected,
   };

@@ -74,6 +74,16 @@ describe("useGuardedFormNavigation", () => {
     mocks.effects[0]?.();
     expect(mocks.navigation).toHaveBeenCalledWith(navigator, result.requestClose, window, true);
   });
+  it("release drops route protection before the form unmounts", () => {
+    const result = render({ dirty: true, pending: false });
+    const dispose = mocks.effects[0]?.();
+    result.release();
+    expect(mocks.dispose).toHaveBeenCalledOnce();
+    result.release();
+    expect(mocks.dispose).toHaveBeenCalledOnce();
+    dispose?.();
+    expect(mocks.dispose).toHaveBeenCalledTimes(2);
+  });
   it("does not install protection for a closed drawer", () => {
     const result = render({ active: false, dirty: true, pending: true });
     const proceed = vi.fn();
