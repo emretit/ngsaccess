@@ -52,12 +52,13 @@ it("pending çubuğu görünür ve eylemleri kilitlidir; salt okunurda çubuk yo
   expect(render()).toContain('type="submit" disabled=""');
   expect(render(true, true)).not.toContain("sticky bottom-0");
 });
-it("yeni form temizken marka seç/Vazgeç/Kaydet çubuğunu ve bağlantı retry'sini korur", () => {
+it("yeni form temizken Geri/Vazgeç/Kaydet çubuğunu ve bağlantı retry'sini korur; özet bloğu yok", () => {
   const html = render(false);
-  expect(html).toContain("Marka seç");
+  expect(html).toContain("Geri");
   expect(html).toContain("Vazgeç");
   expect(html).toContain("Kaydet");
-  expect(html).toContain("Proje:");
+  expect(html).not.toContain("Proje:");
+  expect(html).not.toContain("Kaydetmeden önce gözden geçirin");
   mocks.error = "Kısmi başarı";
   expect(render(false)).toContain("Bağlantıyı tekrar dene");
 });

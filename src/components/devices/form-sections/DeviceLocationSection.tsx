@@ -92,7 +92,7 @@ export function DeviceLocationSection({
   };
 
   return (
-    <div className="space-y-4">
+    <>
       <FormField
         control={form.control}
         name="zone_id"
@@ -249,6 +249,6 @@ export function DeviceLocationSection({
           )}
         />
       )}
-    </div>
+    </>
   );
 }

@@ -3,6 +3,7 @@ import {
   FormItem,
   FormLabel,
   FormControl,
+  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
   MANUAL_MODEL_ID,
   getHikModelSpec,
 } from "../../../../convex/lib/hikModels";
+import { topologyPreview } from "../topologyPreview";
 
 interface DeviceHikModelFieldProps {
   form: UseFormReturn<FormValues>;
@@ -38,7 +40,6 @@ export function DeviceHikModelField({ form, isEdit }: DeviceHikModelFieldProps) 
 
   return (
     <>
-      <p className="text-sm text-muted-foreground">{isEdit ? "Model etiketi değiştirilebilir; mevcut kapı/okuyucular ve iletişim yöntemi korunur." : selectedModel ? `${getHikModelSpec(selectedModel)?.doorCount ?? form.watch("hik_door_count") ?? 4} kapı · her kapı için okuyucu oluşturulacak.` : "Model seçince oluşturulacak kapı sayısı gösterilir."}</p>
       <FormField
         control={form.control}
         name="hik_model"
@@ -75,6 +76,13 @@ export function DeviceHikModelField({ form, isEdit }: DeviceHikModelFieldProps) 
                 <SelectItem value={MANUAL_MODEL_ID}>Diğer (manuel)</SelectItem>
               </SelectContent>
             </Select>
+            {(isEdit || selectedModel) && (
+              <FormDescription className="text-xs">
+                {isEdit
+                  ? "Model etiketi değiştirilebilir; mevcut kapı/okuyucular ve iletişim yöntemi korunur."
+                  : topologyPreview(form.watch())}
+              </FormDescription>
+            )}
             <FormMessage />
           </FormItem>
         )}

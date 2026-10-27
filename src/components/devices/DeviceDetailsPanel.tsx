@@ -19,6 +19,7 @@ import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { ServerDevice } from "@/types/device";
 import { useQuery } from "convex/react";
+import { cn } from "@/lib/utils";
 import { api } from "../../../convex/_generated/api";
 import { BRAND_LABELS, type DeviceBrand } from "./hooks/useDeviceFormSchema";
 
@@ -236,7 +237,7 @@ export function DeviceDetailsPanel({
               )}
             </Tabs>
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 pt-4", step === "picker" && "pb-4")}>
               {step === "picker" && (
                 <BrandPickerStep onSelect={pickBrand} onCancel={close} />
               )}

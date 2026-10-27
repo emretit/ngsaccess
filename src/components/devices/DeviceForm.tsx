@@ -1,5 +1,6 @@
 import { FormFeedback } from "@/components/shared/FormFeedback";
 import { useEffect, useRef, type ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 
 import { Id } from "../../../convex/_generated/dataModel";
@@ -28,8 +29,6 @@ import { DeviceHikvisionSection } from "./form-sections/DeviceHikvisionSection";
 import { DeviceIdeSmartSection } from "./form-sections/DeviceIdeSmartSection";
 import { DeviceNameSection } from "./form-sections/DeviceNameSection";
 import { DeviceZoneSection } from "./form-sections/DeviceZoneSection";
-import { BRAND_LABELS } from "./hooks/useDeviceFormSchema";
-import { topologyPreview } from "./topologyPreview";
 import type { DeviceBrand } from "./hooks/useDeviceFormSchema";
 
 interface DeviceFormProps {
@@ -53,11 +52,11 @@ interface DeviceFormProps {
   adminMode?: boolean;
 }
 
-function DeviceFormSection({ title, children }: { title: string; children: ReactNode }) {
+function DeviceFormSection({ title, columns = false, children }: { title: string; columns?: boolean; children: ReactNode }) {
   return (
     <fieldset className="min-w-0 space-y-3">
       <legend className="mb-3 text-sm font-medium">{title}</legend>
-      {children}
+      {columns ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div> : children}
     </fieldset>
   );
 }
@@ -69,7 +68,6 @@ export function DeviceForm({
   onStateChange,
   onClose,
   device,
-  projects,
   defaultBrand,
   onBack,
   onSuccess,
@@ -84,7 +82,6 @@ export function DeviceForm({
     doors,
     locationLoading,
     selectedZoneId,
-    currentProjectId,
     onSubmit,
   } = useDeviceFormLogic({
     open,
@@ -159,11 +156,6 @@ export function DeviceForm({
         noValidate
         aria-busy={isLoading}
       >
-        {!device && <p className="text-sm text-muted-foreground">
-          Proje:{" "}
-          {projects.find((project) => project._id === currentProjectId)?.name ??
-            "Seçili proje"}
-        </p>}
         {Object.keys(form.formState.errors).length > 0 && (
           <FormFeedback tone="error" variant="panel" title="Kaydedilemedi. İşaretli alanları kontrol edin.">
             <ul className="mt-1 list-disc pl-4">
@@ -221,13 +213,13 @@ export function DeviceForm({
                 <DeviceNameSection form={form} />
                 <DeviceIdeSmartSection form={form} isEdit={!!device} section="identity" />
               </DeviceFormSection>
-              <DeviceFormSection title="Konum">
-              <DeviceZoneSection
-                form={form}
-                zones={zonesForForm}
-                allowCreate={!device}
-              />
-              <DeviceStatusSection form={form} />
+              <DeviceFormSection title="Konum" columns>
+                <DeviceZoneSection
+                  form={form}
+                  zones={zonesForForm}
+                  allowCreate={!device}
+                />
+                <DeviceStatusSection form={form} />
               </DeviceFormSection>
               <DeviceFormSection title="Bağlantı">
                 <DeviceIdeSmartSection form={form} isEdit={!!device} section="connection" />
@@ -238,7 +230,7 @@ export function DeviceForm({
               <DeviceFormSection title="Kimlik">
                 <DeviceBasicSection form={form} isEdit={!!device} />
               </DeviceFormSection>
-              <DeviceFormSection title="Konum">
+              <DeviceFormSection title="Konum" columns>
                 <DeviceLocationSection
                   form={form}
                   zones={zonesForForm}
@@ -275,8 +267,9 @@ export function DeviceForm({
                   <FormLabel className="sr-only">Açıklama</FormLabel>
                   <FormControl>
                     <Textarea
+                      rows={2}
                       placeholder="Cihaz hakkında açıklama giriniz"
-                      className="min-h-[80px]"
+                      className="min-h-14"
                       {...field}
                     />
                   </FormControl>
@@ -292,28 +285,7 @@ export function DeviceForm({
             {connectionError}
           </FormFeedback>
         )}
-        {!device && (
-          <section
-            className="space-y-1 border-t border-line pt-4 pb-24 text-sm"
-            aria-label="Kayıt özeti"
-          >
-            <h3 className="font-medium">Kaydetmeden önce gözden geçirin</h3>
-            <p className="break-words">
-              {form.watch("name") || "Cihaz adı girilmedi"} ·{" "}
-              {BRAND_LABELS[brand]}
-            </p>
-            <p className="break-words text-muted-foreground">
-              {selectedZoneId === "__new__"
-                ? `Yeni bölge: ${form.watch("new_zone_name") || "Ad girilmedi"}`
-                : (zones.find((zone) => zone._id === selectedZoneId)?.name ??
-                  "Bölge seçilmedi")}
-            </p>
-            <p className="text-muted-foreground">
-              {topologyPreview(form.watch())}
-            </p>
-          </section>
-        )}
-        {device && (
+        {device && brand !== "hikvision" && (
           <p className="text-sm text-muted-foreground">
             Model ve kapı sayısı mevcut kapı/okuyucu yapısını değiştirmez.
             Topoloji düzenleme bu ekranda desteklenmiyor.
@@ -344,7 +316,8 @@ export function DeviceForm({
                 onClick={onBack}
                 disabled={isLoading || !!connectionError}
               >
-                Marka seç
+                <ArrowLeft aria-hidden="true" className="mr-1.5 h-4 w-4" />
+                Geri
               </Button>
             ) : (
               <span />

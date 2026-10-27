@@ -32,9 +32,6 @@ export function DeviceHikvisionSection({
   const transport = form.watch("hik_transport");
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">Hikvision bağlantısı</h3>
-      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField
           control={form.control}
@@ -117,12 +114,6 @@ export function DeviceHikvisionSection({
           )}
         </>
       ) : null}
-      {device && (
-        <p className="text-sm text-muted-foreground">
-          Kapı açma, özellik tarama, kart okutma ve diğer tanılama işlemleri
-          İşlemler sekmesindedir.
-        </p>
-      )}
     </div>
   );
 }
