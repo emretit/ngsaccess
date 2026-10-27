@@ -96,10 +96,8 @@ export const useEmployeeFormData = (employee?: Employee | null, { saving = false
     api.accessRules.listMemberships,
     defaultProjectId && can("employees.manage") ? { projectId: defaultProjectId } : "skip",
   );
-  const positionsData = useQuery(
-    api.positions.list,
-    defaultProjectId ? { projectId: defaultProjectId } : "skip",
-  );
+  // Parametresiz çağrı eski Convex sürümüyle de çalışır; proje istemcide süzülür.
+  const positionsData = useQuery(api.positions.list, defaultProjectId ? {} : "skip");
 
   const optionsLoading =
     departmentsData === undefined ||
@@ -119,6 +117,7 @@ export const useEmployeeFormData = (employee?: Employee | null, { saving = false
     .filter((r: { isActive?: boolean }) => r.isActive !== false)
     .map((r: { _id: string; name: string }) => ({ id: r._id, name: r.name }));
   const positions = (positionsData ?? [])
+    .filter((p) => p.projectId === defaultProjectId)
     .map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
 
   const incoming = JSON.stringify(employeeFormValues(employee, defaultProjectId));

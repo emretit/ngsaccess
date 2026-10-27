@@ -30,7 +30,9 @@ export function useCompanies() {
 /** Seçili projenin pozisyonları ve yönetim işlemleri. */
 export function usePositions() {
   const { projectId, loading } = useActiveProjectScope();
-  const positions = useQuery(api.positions.list, !loading && projectId ? { projectId } : "skip");
+  // Parametresiz çağrı eski Convex sürümüyle de çalışır; proje istemcide süzülür.
+  const allPositions = useQuery(api.positions.list, !loading && projectId ? {} : "skip");
+  const positions = allPositions?.filter((position) => position.projectId === projectId);
   const create = useMutation(api.positions.create);
   const update = useMutation(api.positions.update);
   const remove = useMutation(api.positions.remove);

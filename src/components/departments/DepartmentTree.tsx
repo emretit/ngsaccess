@@ -42,9 +42,9 @@ export default function DepartmentTree(props: DepartmentTreeProps) {
   const { projectId } = useActiveProject();
   return (
     <div className="flex w-full min-w-0 shrink-0 flex-col gap-3 min-[1100px]:w-[220px]">
-      <OrgTree key={projectId ?? "none"} {...props} />
+      <OrgTree key={`org-${projectId ?? "none"}`} {...props} />
       {props.onSelectPosition && (
-        <PositionPanel key={projectId ?? "none"} selected={props.selectedPosition} onSelect={props.onSelectPosition} />
+        <PositionPanel key={`positions-${projectId ?? "none"}`} selected={props.selectedPosition} onSelect={props.onSelectPosition} />
       )}
     </div>
   );

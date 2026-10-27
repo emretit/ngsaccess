@@ -11,7 +11,9 @@ export function usePdksFilterOptions() {
     api.companies.list,
     projectId ? { projectId } : "skip",
   );
-  const positions = useQuery(api.positions.list, projectId ? { projectId } : "skip");
+  // Parametresiz çağrı eski Convex sürümüyle de çalışır; proje istemcide süzülür.
+  const allPositions = useQuery(api.positions.list, projectId ? {} : "skip");
+  const positions = allPositions?.filter((position) => position.projectId === projectId);
   const shifts = useQuery(api.shifts.list, projectId ? { projectId } : "skip");
   // Aynı departman adı birden çok şirkette olabilir: seçenekte şirket adı öne eklenir.
   const companyNames = new Map((companies ?? []).map((company) => [company._id, company.name]));
