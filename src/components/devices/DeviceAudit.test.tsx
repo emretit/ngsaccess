@@ -288,7 +288,7 @@ describe("cihaz audit görünümü", () => {
     expect(html).not.toContain("<option>Bağlantı:");
     expect(html).not.toContain("<option>Tip:");
   });
-  it("kapıyla aynı adı taşıyan okuyucunun adını ve durumunu görünür bırakır", () => {
+  it("kapıyla aynı adı taşıyan okuyucunun adını gösterir, çevrimiçi/çevrimdışı yazmaz", () => {
     const reader: ReaderRow = {
       readerId: "r" as Id<"readers">,
       doorId: "door" as Id<"doors">,
@@ -324,8 +324,8 @@ describe("cihaz audit görünümü", () => {
         />
       </ul>,
     );
-    expect(html).toContain('<span class="text-foreground">Giriş kapısı</span>');
-    expect(html).toContain('class="block text-[10px]">Çevrimdışı');
+    expect(html).toContain('text-foreground">Giriş kapısı</span>');
+    expect(html).not.toContain("Çevrimdışı");
     expect(html).toContain("[@media(hover:none)]:opacity-100!");
   });
 });

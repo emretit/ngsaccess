@@ -27,10 +27,10 @@ export type DoorAction =
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 
-/** Okuyucunun durum ve Hik teknik ayrıntıları; menü başlığında ve ipucunda gösterilir. */
+/** Okuyucunun son okuma ve Hik teknik ayrıntıları; menü başlığında ve ipucunda gösterilir. */
 function readerDetails(reader: ReaderRow): string[] {
   return [
-    `${reader.online ? "Çevrimiçi" : "Çevrimdışı"}${reader.lastReadAt ? ` · son okuma ${formatTime(reader.lastReadAt)}` : ""}`,
+    reader.lastReadAt ? `Son okuma ${formatTime(reader.lastReadAt)}` : null,
     reader.hikReaderNo !== null ? `Hik okuyucu #${reader.hikReaderNo}` : null,
     reader.hikCardReaderPlanTemplateNo !== null ? `Plan ${reader.hikCardReaderPlanTemplateNo}` : null,
     reader.hikCardReaderAntiSneakEnabled !== null ? `APB ${reader.hikCardReaderAntiSneakEnabled ? "açık" : "kapalı"}` : null,
@@ -135,22 +135,22 @@ export function LocationDoorItem({
               const fetching = reader.readerId !== null && fetchingReaderId === reader.readerId;
               return (
                 <li key={reader.readerId ?? `legacy-${door._id}`}>
-                  <div className={cn("group flex min-w-0 items-center gap-1.5 rounded-sm pl-2 hover:bg-muted", TREE_ROW_HEIGHT)} title={details.join(" · ")}>
-                    <span aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", reader.online ? "status-success-bg" : "bg-muted-foreground/40")} />
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                      <span className="text-foreground">{label}</span>
-                      <span className="block text-[10px]">{reader.online ? "Çevrimiçi" : "Çevrimdışı"}</span>
-                    </span>
+                  <div className={cn("group flex min-w-0 items-center gap-1.5 rounded-sm pl-2 hover:bg-muted", TREE_ROW_HEIGHT)} title={details.length > 0 ? details.join(" · ") : undefined}>
+                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">{label}</span>
                     {reader.hikCardReaderAntiSneakEnabled === true && (
                       <span className="status-warning-badge shrink-0 rounded-sm px-1 text-[10px] font-medium">APB</span>
                     )}
                     {onAction && canManage && reader.readerId !== null && (
                       <div className={TREE_ROW_ACTIONS}>
                         <RowActions label={`${reader.readerName} okuyucu işlemleri`}>
-                          <DropdownMenuLabel className="max-w-64 space-y-0.5 text-xs font-normal text-muted-foreground">
-                            {details.map((line) => <span key={line} className="block">{line}</span>)}
-                          </DropdownMenuLabel>
-                          <DropdownMenuSeparator />
+                          {details.length > 0 && (
+                            <>
+                              <DropdownMenuLabel className="max-w-64 space-y-0.5 text-xs font-normal text-muted-foreground">
+                                {details.map((line) => <span key={line} className="block">{line}</span>)}
+                              </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
                           <DropdownMenuItem onSelect={() => onAction({ type: "editReader", door, reader })}>
                             <Settings2 className="mr-2 h-4 w-4" />Düzenle
                           </DropdownMenuItem>
