@@ -36,11 +36,53 @@ const TRIGGER_CLASS = cn(
   "transition-all duration-200"
 );
 const POPOVER_CONTENT_CLASS =
-  "pointer-events-auto z-[9999] w-auto rounded-md border-input bg-popover shadow-popover";
+  "pointer-events-auto w-auto rounded-md border-input bg-popover shadow-popover";
+const LIST_TRIGGER_CLASS = cn(
+  "rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200",
+  "hover:bg-primary/10 hover:text-primary data-[state=open]:bg-primary/10 data-[state=open]:text-primary",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+);
+const LIST_CONTENT_CLASS = "pointer-events-auto relative w-auto rounded-md border-input p-2";
+const LIST_OPTION_CLASS = cn(
+  "rounded-lg px-2 py-2 text-xs font-medium transition-all duration-150 hover:bg-primary/15 hover:text-primary",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+);
 
 const START_YEAR = 1940;
 const END_YEAR = 2050;
 const YEARS = Array.from({ length: END_YEAR - START_YEAR + 1 }, (_, i) => START_YEAR + i);
+
+/** Açılışta seçili seçeneğe odaklan ve listeyi ona kaydır (sayfayı kaydırmadan). */
+function focusSelectedOption(event: Event, container: HTMLElement | null, selector: string) {
+  const option = container?.querySelector<HTMLElement>(selector);
+  if (!container || !option) return;
+  event.preventDefault();
+  option.focus({ preventScroll: true });
+  // Radix yükseklik sınırını (available-height) konumlandırmadan sonra uygular; kaydırmayı ona göre yap.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      container.scrollTop = option.offsetTop - (container.clientHeight - option.offsetHeight) / 2;
+    })
+  );
+}
+
+/** Ay/yıl ızgarasında ok tuşlarıyla gezinme. */
+function handleGridKeyDown(event: React.KeyboardEvent<HTMLElement>, columns: number) {
+  const steps: Record<string, number | undefined> = {
+    ArrowLeft: -1,
+    ArrowRight: 1,
+    ArrowUp: -columns,
+    ArrowDown: columns,
+  };
+  const step = steps[event.key];
+  if (step === undefined) return;
+  const options = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button"));
+  const next = options[options.findIndex((option) => option === document.activeElement) + step];
+  if (!next) return;
+  event.preventDefault();
+  next.focus();
+  next.scrollIntoView({ block: "nearest" });
+}
 
 function MonthYearSelector({
   currentMonth,
@@ -49,10 +91,8 @@ function MonthYearSelector({
   currentMonth: Date;
   onMonthChange: (date: Date) => void;
 }) {
-  const [showMonthPicker, setShowMonthPicker] = React.useState(false);
-  const [showYearPicker, setShowYearPicker] = React.useState(false);
-  const monthRef = React.useRef<HTMLDivElement>(null);
-  const yearRef = React.useRef<HTMLDivElement>(null);
+  const [openList, setOpenList] = React.useState<"month" | "year" | null>(null);
+  const monthListRef = React.useRef<HTMLDivElement>(null);
   const yearListRef = React.useRef<HTMLDivElement>(null);
 
   const selectedMonth = getMonth(currentMonth);
@@ -67,34 +107,14 @@ function MonthYearSelector({
     []
   );
 
-  React.useEffect(() => {
-    if (showYearPicker && yearListRef.current) {
-      const selectedButton = yearListRef.current.querySelector(`[data-year="${selectedYear}"]`);
-      selectedButton?.scrollIntoView({ block: "center", behavior: "auto" });
-    }
-  }, [showYearPicker, selectedYear]);
-
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (monthRef.current && !monthRef.current.contains(event.target as Node)) {
-        setShowMonthPicker(false);
-      }
-      if (yearRef.current && !yearRef.current.contains(event.target as Node)) {
-        setShowYearPicker(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const handleMonthSelect = (monthIndex: number) => {
     onMonthChange(setMonth(currentMonth, monthIndex));
-    setShowMonthPicker(false);
+    setOpenList(null);
   };
 
   const handleYearSelect = (year: number) => {
     onMonthChange(setYear(currentMonth, year));
-    setShowYearPicker(false);
+    setOpenList(null);
   };
 
   const handlePrevMonth = () => {
@@ -121,91 +141,80 @@ function MonthYearSelector({
       </button>
 
       <div className="flex items-center gap-1">
-        <div className="relative" ref={monthRef}>
-          <button
-            type="button"
-            onClick={() => {
-              setShowMonthPicker(!showMonthPicker);
-              setShowYearPicker(false);
-            }}
-            className={cn(
-              "rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200",
-              "hover:bg-primary/10 hover:text-primary",
-              showMonthPicker && "bg-primary/10 text-primary"
-            )}
+        <Popover open={openList === "month"} onOpenChange={(open) => setOpenList(open ? "month" : null)}>
+          <PopoverTrigger asChild>
+            <button type="button" aria-label={`Ay: ${monthNamesLong[selectedMonth]}`} className={LIST_TRIGGER_CLASS}>
+              {monthNamesLong[selectedMonth]}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            ref={monthListRef}
+            align="center"
+            sideOffset={8}
+            collisionPadding={8}
+            aria-label="Ay seç"
+            className={LIST_CONTENT_CLASS}
+            onOpenAutoFocus={(event) =>
+              focusSelectedOption(event, monthListRef.current, `[data-month="${selectedMonth}"]`)
+            }
           >
-            {monthNamesLong[selectedMonth]}
-          </button>
-
-          {showMonthPicker && (
-            <div className="pointer-events-auto absolute left-1/2 top-full z-[9999] mt-2 -translate-x-1/2 duration-200 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
-              <div className="grid min-w-[200px] grid-cols-3 gap-1 rounded-md border border-input bg-popover p-2 shadow-popover ">
-                {monthNamesShort.map((month, index) => (
-                  <button
-                    type="button"
-                    key={month}
-                    onClick={() => handleMonthSelect(index)}
-                    className={cn(
-                      "rounded-lg px-2 py-2 text-xs font-medium transition-all duration-150",
-                      " hover:bg-primary/15 hover:text-primary",
-                      selectedMonth === index
-                        ? "bg-primary text-primary-foreground "
-                        : "text-foreground/80"
-                    )}
-                  >
-                    {month.slice(0, 3)}
-                  </button>
-                ))}
-              </div>
+            <div className="grid min-w-[200px] grid-cols-3 gap-1" onKeyDown={(event) => handleGridKeyDown(event, 3)}>
+              {monthNamesShort.map((month, index) => (
+                <button
+                  type="button"
+                  key={month}
+                  data-month={index}
+                  aria-label={monthNamesLong[index]}
+                  aria-pressed={selectedMonth === index}
+                  onClick={() => handleMonthSelect(index)}
+                  className={cn(
+                    LIST_OPTION_CLASS,
+                    selectedMonth === index ? "bg-primary text-primary-foreground " : "text-foreground/80"
+                  )}
+                >
+                  {month.slice(0, 3)}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
+          </PopoverContent>
+        </Popover>
 
-        <div className="relative" ref={yearRef}>
-          <button
-            type="button"
-            onClick={() => {
-              setShowYearPicker(!showYearPicker);
-              setShowMonthPicker(false);
-            }}
-            className={cn(
-              "rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-200",
-              "hover:bg-primary/10 hover:text-primary",
-              showYearPicker && "bg-primary/10 text-primary"
-            )}
+        <Popover open={openList === "year"} onOpenChange={(open) => setOpenList(open ? "year" : null)}>
+          <PopoverTrigger asChild>
+            <button type="button" aria-label={`Yıl: ${selectedYear}`} className={LIST_TRIGGER_CLASS}>
+              {selectedYear}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            ref={yearListRef}
+            align="center"
+            sideOffset={8}
+            collisionPadding={8}
+            aria-label="Yıl seç"
+            className={cn(LIST_CONTENT_CLASS, "max-h-[min(240px,var(--radix-popover-content-available-height))]")}
+            onOpenAutoFocus={(event) =>
+              focusSelectedOption(event, yearListRef.current, `[data-year="${selectedYear}"]`)
+            }
           >
-            {selectedYear}
-          </button>
-
-          {showYearPicker && (
-            <div className="pointer-events-auto absolute left-1/2 top-full z-[9999] mt-2 -translate-x-1/2 duration-200 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2">
-              <div
-                ref={yearListRef}
-                className="max-h-[240px] overflow-y-auto rounded-md border border-input bg-popover p-2 shadow-popover "
-              >
-                <div className="grid min-w-[180px] grid-cols-4 gap-1">
-                  {YEARS.map((year) => (
-                    <button
-                      type="button"
-                      key={year}
-                      data-year={year}
-                      onClick={() => handleYearSelect(year)}
-                      className={cn(
-                        "rounded-lg px-2 py-2 text-xs font-medium transition-all duration-150",
-                        " hover:bg-primary/15 hover:text-primary",
-                        selectedYear === year
-                          ? "bg-primary text-primary-foreground "
-                          : "text-foreground/80"
-                      )}
-                    >
-                      {year}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="grid min-w-[180px] grid-cols-4 gap-1" onKeyDown={(event) => handleGridKeyDown(event, 4)}>
+              {YEARS.map((year) => (
+                <button
+                  type="button"
+                  key={year}
+                  data-year={year}
+                  aria-pressed={selectedYear === year}
+                  onClick={() => handleYearSelect(year)}
+                  className={cn(
+                    LIST_OPTION_CLASS,
+                    selectedYear === year ? "bg-primary text-primary-foreground " : "text-foreground/80"
+                  )}
+                >
+                  {year}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <button

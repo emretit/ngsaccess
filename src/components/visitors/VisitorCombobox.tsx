@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
-import { ChevronsUpDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
+import { ComboboxTrigger, COMBOBOX_CONTENT_CLASS } from "@/components/ui/combobox-trigger";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 
@@ -10,14 +10,15 @@ export function VisitorCombobox({ id, label, value, options, onChange, disabled,
 }) {
   const [open, setOpen] = useState(false);
   const listId = useId();
+  const selected = options.find(option => option.id === value);
   return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>
-    <Button type="button" id={id} role="combobox" aria-label={label} aria-controls={listId} aria-expanded={open} aria-invalid={!!error} aria-describedby={describedBy ?? (error ? `${id}-error` : undefined)} disabled={disabled} variant="outline" className="aria-[invalid=true]:border-destructive h-auto min-h-9 w-full justify-between whitespace-normal text-left font-normal">
-      <span className="min-w-0 break-words">{options.find(option => option.id === value)?.name ?? (value ? "Kayıtlı seçim" : "Seçilmedi")}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0" aria-hidden="true" />
-    </Button>
-  </PopoverTrigger><PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-32px)] p-0"><Command filter={(value, search) => value.toLocaleLowerCase("tr").includes(search.trim().toLocaleLowerCase("tr")) ? 1 : 0}>
+    <ComboboxTrigger wrap placeholder={!selected} id={id} aria-label={label} aria-controls={listId} aria-expanded={open} aria-invalid={!!error} aria-describedby={describedBy ?? (error ? `${id}-error` : undefined)} disabled={disabled}>
+      {selected?.name ?? (value ? "Kayıtlı seçim" : "Seçilmedi")}
+    </ComboboxTrigger>
+  </PopoverTrigger><PopoverContent align="start" className={COMBOBOX_CONTENT_CLASS}><Command filter={(value, search) => value.toLocaleLowerCase("tr").includes(search.trim().toLocaleLowerCase("tr")) ? 1 : 0}>
     <CommandInput placeholder={`${label} ara…`} aria-label={`${label} ara`} /><CommandList id={listId}><CommandEmpty>Eşleşen seçenek yok.</CommandEmpty>
-      {allowClear && <CommandItem value="Seçilmedi" onSelect={() => { onChange(null); setOpen(false); }}>Seçilmedi</CommandItem>}
-      {options.map(option => <CommandItem key={option.id} disabled={option.disabled} value={`${option.name} ${option.id}`} onSelect={() => { onChange(option.id); setOpen(false); }}>{option.name}</CommandItem>)}
+      {allowClear && <CommandItem value="Seçilmedi" onSelect={() => { onChange(null); setOpen(false); }}>Seçilmedi{!value && <><Check className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only">Seçili</span></>}</CommandItem>}
+      {options.map(option => <CommandItem key={option.id} disabled={option.disabled} value={`${option.name} ${option.id}`} onSelect={() => { onChange(option.id); setOpen(false); }}>{option.name}{value === option.id && <><Check className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only">Seçili</span></>}</CommandItem>)}
     </CommandList>
   </Command></PopoverContent></Popover>;
 }

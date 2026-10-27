@@ -152,6 +152,9 @@ export function DeviceLocationSection({
                     {form.watch("new_zone_name")} (taslak)
                   </SelectItem>
                 )}
+                {zones.length === 0 && (
+                  <SelectItem value="__empty" disabled>Bölge bulunamadı</SelectItem>
+                )}
                 {zones.map((zone) => (
                   <SelectItem key={zone.id} value={String(zone.id)}>
                     {zone.name}

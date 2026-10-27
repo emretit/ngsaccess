@@ -65,7 +65,7 @@ export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMes
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 gap-1"
+                    className="gap-1"
                   >
                     <Info className="h-3.5 w-3.5" />
                     <span>Debug Bilgisi</span>

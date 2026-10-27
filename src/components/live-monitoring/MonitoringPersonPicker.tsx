@@ -5,9 +5,10 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
+import { ComboboxTrigger, COMBOBOX_CONTENT_CLASS } from "@/components/ui/combobox-trigger";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
+import { Command, CommandInput, CommandList, CommandItem } from "@/components/ui/command";
 export type MonitoringPerson = FunctionReturnType<typeof api.cardReadings.searchMonitoringPeople>[number];
 export function MonitoringPersonPicker({ projectId, value, onChange, disabled, allowClear = false, buttonRef }: {
   projectId: Id<"projects">; value: string; onChange: (person: MonitoringPerson | null) => void;
@@ -22,8 +23,8 @@ export function MonitoringPersonPicker({ projectId, value, onChange, disabled, a
   useEffect(() => {
     if (allowClear && value && people !== undefined && !selected) onChange(null);
   }, [allowClear, value, people, selected, onChange]);
-  return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button ref={buttonRef} type="button" variant="outline" role="combobox" aria-label="Kişi" aria-expanded={open} disabled={disabled} className="w-full justify-start truncate">{selected ? `${selected.firstName} ${selected.lastName}` : allowClear ? "Tüm kişiler" : "Bir kişi seçin"}</Button></PopoverTrigger><PopoverContent className="w-[min(360px,calc(100vw-48px))] p-0"><Command shouldFilter={false}><CommandInput value={search} onValueChange={setSearch} placeholder="Ad veya soyad ara…" aria-label="Projede kişi ara" /><CommandList><CommandEmpty>{people === undefined || term !== search ? "Aranıyor…" : "Kişi bulunamadı"}</CommandEmpty>
-    {allowClear && <CommandItem onSelect={() => { onChange(null); setOpen(false); }}>Tüm kişiler</CommandItem>}
-    {term === search && people?.map(person => <CommandItem key={person._id} disabled={!allowClear && person.isActive === false} value={person._id} onSelect={() => { onChange(person); setOpen(false); }}>{person.firstName} {person.lastName}{person.isActive === false ? " · Pasif" : ""}</CommandItem>)}
+  return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><ComboboxTrigger ref={buttonRef} placeholder={!selected && !allowClear} aria-label="Kişi" aria-expanded={open} disabled={disabled}>{selected ? `${selected.firstName} ${selected.lastName}` : allowClear ? "Tüm kişiler" : "Bir kişi seçin"}</ComboboxTrigger></PopoverTrigger><PopoverContent className={COMBOBOX_CONTENT_CLASS}><Command shouldFilter={false}><CommandInput value={search} onValueChange={setSearch} placeholder="Ad veya soyad ara…" aria-label="Projede kişi ara" /><CommandList>{people === undefined || term !== search ? <p role="status" className="py-6 text-center text-sm">Aranıyor…</p> : people.length === 0 ? <p role="status" className="py-6 text-center text-sm">Kişi bulunamadı</p> : null}
+    {allowClear && <CommandItem onSelect={() => { onChange(null); setOpen(false); }}>Tüm kişiler{!value && <><Check className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only">Seçili</span></>}</CommandItem>}
+    {term === search && people?.map(person => <CommandItem key={person._id} disabled={!allowClear && person.isActive === false} value={person._id} onSelect={() => { onChange(person); setOpen(false); }}>{person.firstName} {person.lastName}{person.isActive === false ? " · Pasif" : ""}{value === person._id && <><Check className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" /><span className="sr-only">Seçili</span></>}</CommandItem>)}
   </CommandList></Command><p className="px-3 py-2 text-xs text-muted-foreground">En fazla 40 kişi gösterilir. Sonucu daraltmak için ad veya soyad yazın.</p></PopoverContent></Popover>;
 }

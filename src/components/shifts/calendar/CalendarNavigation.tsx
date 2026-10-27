@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-picker";
 import { SegmentedViewControl } from "@/components/shared/SegmentedViewControl";
@@ -35,6 +35,7 @@ export function CalendarNavigation({ day, effectivePeriod, period, compact, rang
       <DateInput required value={day} onChange={changeDay}
         trigger={<Button variant="ghost" className="px-2 text-xs" aria-label="Tarih seç">
           {calendarRangeLabel(range.rangeStart, range.rangeEnd, effectivePeriod)}
+          <CalendarIcon className="h-4 w-4 opacity-50" aria-hidden="true" />
         </Button>} />
       <span className="whitespace-nowrap text-[11px] text-muted-foreground">İstanbul saati</span>
     </div>

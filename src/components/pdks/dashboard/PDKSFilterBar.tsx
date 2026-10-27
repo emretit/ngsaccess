@@ -74,6 +74,8 @@ export function PDKSFilterBar({
         <Select value={values.departmentId ?? "all"} onValueChange={value => onChange({ ...values, departmentId: value === "all" ? undefined : value as Id<"departments"> })}>
                 <SelectTrigger className="mt-1" aria-label="Tüm departmanlar"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="all">Tüm departmanlar</SelectItem>
+                  {departments === undefined && <SelectItem value="__loading" disabled>Departmanlar yükleniyor…</SelectItem>}
+                  {values.departmentId && departments !== undefined && !departments.some(item => item._id === values.departmentId) && <SelectItem value={values.departmentId}>Kaldırılmış kayıt</SelectItem>}
                   {departments?.map(d => <SelectItem key={d._id} value={d._id}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -104,6 +106,8 @@ export function PDKSFilterBar({
               <Select value={values.companyId ?? "all"} onValueChange={value => onChange({ ...values, companyId: value === "all" ? undefined : value as Id<"companies"> })}>
                 <SelectTrigger className="mt-1" aria-label="Tüm şirketler"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="all">Tüm şirketler</SelectItem>
+                  {companies === undefined && <SelectItem value="__loading" disabled>Şirketler yükleniyor…</SelectItem>}
+                  {values.companyId && companies !== undefined && !companies.some(item => item._id === values.companyId) && <SelectItem value={values.companyId}>Kaldırılmış kayıt</SelectItem>}
                   {companies?.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -113,6 +117,8 @@ export function PDKSFilterBar({
               <Select value={values.positionId ?? "all"} onValueChange={value => onChange({ ...values, positionId: value === "all" ? undefined : value as Id<"positions"> })}>
                 <SelectTrigger className="mt-1" aria-label="Tüm pozisyonlar"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="all">Tüm pozisyonlar</SelectItem>
+                  {positions === undefined && <SelectItem value="__loading" disabled>Pozisyonlar yükleniyor…</SelectItem>}
+                  {values.positionId && positions !== undefined && !positions.some(item => item._id === values.positionId) && <SelectItem value={values.positionId}>Kaldırılmış kayıt</SelectItem>}
                   {positions?.map(p => <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>

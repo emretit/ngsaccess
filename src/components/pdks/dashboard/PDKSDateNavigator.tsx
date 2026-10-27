@@ -10,7 +10,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import { tr } from "date-fns/locale";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Button } from "@/components/ui/button";
 import type { FilterValues } from "./PDKSFilterBar";
@@ -79,6 +79,7 @@ export function PDKSDateNavigator({
               aria-label={`Tarih seç: ${label}`}
             >
               {label}
+              <CalendarIcon className="h-4 w-4 opacity-50" aria-hidden="true" />
             </Button>
           }
         />

@@ -13,11 +13,12 @@ interface Props {
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
   placeholder?: string;
+  emptyLabel?: string;
   invalid?: boolean;
   describedBy?: string;
 }
 
-export function ShiftSelect({ id, label, value, onChange, options, placeholder, invalid, describedBy }: Props) {
+export function ShiftSelect({ id, label, value, onChange, options, placeholder, emptyLabel = "Kayıt yok", invalid, describedBy }: Props) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
@@ -32,6 +33,7 @@ export function ShiftSelect({ id, label, value, onChange, options, placeholder, 
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
+        {options.length === 0 && <SelectItem value="__empty" disabled>{emptyLabel}</SelectItem>}
         {options.map(option => (
           <SelectItem key={option.value} value={option.value} className="min-h-11 sm:min-h-9">
             {option.label}

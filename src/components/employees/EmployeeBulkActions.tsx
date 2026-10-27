@@ -61,6 +61,7 @@ export function EmployeeBulkActions({
           <SelectValue placeholder="Departman seç" />
         </SelectTrigger>
         <SelectContent>
+          {!departments.some(dept => dept != null) && <SelectItem value="__empty" disabled>Departman bulunamadı</SelectItem>}
           {departments.map(
             (dept) =>
               dept && (

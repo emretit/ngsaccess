@@ -61,6 +61,9 @@ export function DeviceZoneSection({
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
+                {zones.length === 0 && (
+                  <SelectItem value="__empty" disabled>Bölge bulunamadı</SelectItem>
+                )}
                 {zones.map((zone) => (
                   <SelectItem key={zone._id} value={zone._id}>
                     {zone.name}

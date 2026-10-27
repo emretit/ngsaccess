@@ -71,7 +71,7 @@ export function RulesFilters({
         >
           <SelectTrigger
             aria-label={filter.label}
-            className="w-auto min-w-36 max-w-full text-base md:text-sm max-md:min-h-11"
+            className="w-auto min-w-36 max-w-full"
           >
             <SelectValue />
           </SelectTrigger>

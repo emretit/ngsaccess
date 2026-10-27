@@ -66,7 +66,7 @@ export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
           ) : (
             views.map((v) => (
               <div key={v.id}>
-                <DropdownMenuItem onSelect={() => onApply(apply(v))}>{v.name}</DropdownMenuItem>
+                <DropdownMenuItem aria-label={v.name} onSelect={() => onApply(apply(v))}><span className="min-w-0 truncate" title={v.name}>{v.name}</span></DropdownMenuItem>
                 <DropdownMenuItem aria-label={`${v.name} görünümünü sil`} onSelect={() => setDeleteId(v.id)} className="gap-2 text-destructive">
                   <Trash2 className="h-3.5 w-3.5" /> Sil
                 </DropdownMenuItem>
@@ -101,6 +101,7 @@ export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
           <Input
             autoFocus
             value={name}
+            maxLength={60}
             onChange={(e) => setName(e.target.value)}
             placeholder="Örn: Geç kalanlar — IT"
             onKeyDown={(e) => {

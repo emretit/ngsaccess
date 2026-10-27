@@ -154,6 +154,9 @@ export function AssignLocationForm({
                   <SelectValue placeholder="Bölge seçin" />
                 </SelectTrigger>
                 <SelectContent>
+                  {zones.length === 0 && (
+                    <SelectItem value="__empty" disabled>Bölge bulunamadı</SelectItem>
+                  )}
                   {zones.map((zone) => (
                     <SelectItem key={zone._id} value={zone._id}>
                       {zone.name}
@@ -185,6 +188,9 @@ export function AssignLocationForm({
                     <SelectValue placeholder="Kapı seçin" />
                   </SelectTrigger>
                   <SelectContent>
+                    {filteredDoors.length === 0 && (
+                      <SelectItem value="__empty" disabled>Bu bölgede kapı yok</SelectItem>
+                    )}
                     {filteredDoors.map((door) => (
                       <SelectItem key={door._id} value={door._id}>
                         {door.name}

@@ -194,6 +194,11 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                             <SelectValue placeholder="Projeyi seçin" />
                           </SelectTrigger>
                           <SelectContent>
+                            {projects === undefined ? (
+                              <SelectItem value="__loading" disabled>Projeler yükleniyor…</SelectItem>
+                            ) : projects.length === 0 ? (
+                              <SelectItem value="__empty" disabled>Proje bulunamadı</SelectItem>
+                            ) : null}
                             {(projects ?? []).map((p) => (
                               <SelectItem key={p._id} value={p._id}>
                                 {p.name}

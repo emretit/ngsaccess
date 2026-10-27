@@ -93,7 +93,7 @@ describe("visitor audit fixes", () => {
     expect(html).toContain("border-destructive");
     expect(html).toMatch(/id="v_card"[^>]*aria-invalid="true"/);
     expect(html).toContain('aria-describedby="v_card-error"');
-    expect(renderToStaticMarkup(<VisitorCombobox id="invalid" label="Bölge" options={[]} value={null} onChange={noop} error="Gerekli" />)).toContain("aria-[invalid=true]:border-destructive");
+    expect(renderToStaticMarkup(<VisitorCombobox id="invalid" label="Bölge" options={[]} value={null} onChange={noop} error="Gerekli" />)).toMatch(/role="combobox"[^>]*class="[^"]*aria-invalid:border-destructive[^"]*"[^>]*aria-invalid="true"/);
   });
   it("uses consistent missing values and conceals synthetic contact emails", () => {
     const table = renderToStaticMarkup(<VisitorTable visitors={[detail]} onOpen={noop} />);

@@ -1,0 +1,56 @@
+# W2 — Kişiler, Vardiya, PDKS, İzin, Ayarlar ve Admin dropdown audit'i
+
+## Özet
+
+Belirtilen 13 dizinde **250 üretim TypeScript/TSX dosyası** statik olarak tarandı; test dosyaları sayılmadı. **67 dropdown kullanım noktası** bulundu (65 ana açılır kontrol, 2 alt menü); `DateInput`, `MonthPicker`, `RowActions`, `ShiftSelect`, `EmployeePicker` çağrıları dahil, wrapper'ın kendi implementasyonu ikinci kez sayılmadı. Döngü/koşul içindeki JSX noktası bir kez sayıldı; bu sayı ekranda aynı anda görünen kontrol sayısı değildir. NativeSelect kapsam dışı tutuldu.
+
+**10 bulgu: Y=0, O=7, D=3.** En çok tekrar eden kök sebep veriyle dolan seçicilerde yüklenme, boş liste ve mevcut seçimin seçeneklerden kaybolması durumlarının tüketicide ele alınmaması. İkinci ortak sapma form seçicilerinin Button veya yerel wrapper ile standart SelectTrigger görünümünden ayrılmasıdır.
+
+Salt okunur kaynak incelemesi yapıldı; tarayıcı kullanılmadı. Aşağıdaki görsel taşma/katman sonuçları çalışır arayüzde **doğrulanmadı**; kanıtlar kaynak kodudur. Portal kullanan Select/Popover için yalnız z-50 eşitliğinden hareketle katman hatası çıkarılmadı. Primitive'ler sadece tüketici davranışını anlamak için okundu; ortak primitive kusurları W1'e bırakıldı.
+
+## Bulgular
+
+| # | Önem | Kat. | file:line | Öğe | Kanıt (class / ata / prop file:line) | Ekran | Öneri (tek satır) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | O | T | src/components/shifts/ShiftSelect.tsx:28 | Vardiya/departman seçici tetikleyicisi | `min-h-11 sm:min-h-9`; öğelerde de `min-h-11 sm:min-h-9` (:36); standart SelectTrigger `h-9` (`src/components/ui/select.tsx:21`). Mobilde 44px, diğer seçiciler 36px; görsel etki doğrulanmadı. | Vardiya atama/düzenleme, döngü, takvim filtresi | Mobil hedef boyutunu koruyan ortak bir form kontrol politikası belirleyip yükseklik sapmasını bütün kontrollerle birlikte giderin. |
+| 2 | O | E | src/components/shifts/ShiftSelect.tsx:34 | Veri tabanlı boş seçici listeleri | İçerik yalnız `options.map` (:35); `DepartmentTargetPicker.tsx:23` boş departman dizisini, `DayShiftsPicker.tsx:19-21` boş aktif vardiya dizisini aktarabiliyor; `src/components/employees/EmployeeBulkActions.tsx:63-72` yalnız `departments.map` render ediyor. Boş popup koşulu kaynakta mevcut, arayüzde doğrulanmadı. | Departmana vardiya atama, gün vardiyaları, kişi toplu departman değiştirme | Boş veri için açıklamalı devre dışı öğe veya seçicinin yanında durum mesajı gösterin. |
+| 3 | D | T | src/components/leaves/EmployeePicker.tsx:23 | Kişi combobox tetikleyicisi | `Button variant="outline"` görünümü değiştiren sınıf almıyor; Button outline `border-line`, focus `ring-offset-2` (`src/components/ui/button.tsx:8,15`), SelectTrigger `border-input`, `ring-offset-0` (`src/components/ui/select.tsx:21`); ikon font glifi `⌄` (:24), boş seçimde `text-muted-foreground` yok. | İzin formu/filtreleri, işlem raporunun kişi filtresi | Form combobox tetikleyicisini border-input, sıfır ring offset, ortak ChevronDown ve placeholder rengiyle eşitleyin. |
+| 4 | O | W | src/components/leaves/EmployeePicker.tsx:27 | Kişi seçenek paneli | Panel `w-[min(340px,calc(100vw-32px))]`, trigger `w-full` (:23); rapor atası `sm:w-64` (`src/components/reports/ReportScreen.tsx:64`), izin filtre atası `md:w-[230px]` (`src/components/leaves/LeaveFilters.tsx:49`). Panel trigger genişliğine bağlı değil; görsel etki doğrulanmadı. | İzin kişi filtresi ve işlem raporu | Genişliği `--radix-popover-trigger-width` üzerinden belirleyip viewport üst sınırını koruyun. |
+| 5 | O | K | src/components/pdks/dashboard/PDKSSavedViews.tsx:60 | Kayıtlı görünümler menüsü | İçerikte yalnız `w-64`; `views.map` her kayıt için iki öğe oluşturuyor (:67-73), tüketicide max-height/scroll yok; DropdownMenuContent `overflow-hidden` (`src/components/ui/dropdown-menu.tsx:66`). Çok kayıtla yükseklik/erişim sorunu tarayıcıda doğrulanmadı. | PDKS → Görünümler | Kullanılabilir Radix popup yüksekliğine göre max-height ve overflow-y-auto ekleyin. |
+| 6 | O | W | src/components/pdks/dashboard/PDKSSavedViews.tsx:69 | Uzun görünüm adı | `w-64` (:60) içinde `{v.name}` doğrudan render ediliyor; truncate/break-words/title yok; kayıt adı Input'unda uzunluk sınırı yok (:101-111). Uzun boşluksuz adın kırpılması doğrulanmadı. | PDKS → Görünümler | Adı kırılabilir yapın veya truncate ile tam adı erişilebilir açıklamada sunun. |
+| 7 | O | E | src/components/pdks/dashboard/PDKSFilterBar.tsx:76 | Departman/şirket/pozisyon yüklenmesi | `departments?.map` (:77), `companies?.map` (:107), `positions?.map` (:116); yüklenirken yalnız “Tüm …” öğesi görünüyor, disabled/loading mesajı yok. Rapor departmanında da `SelectValue placeholder="Departmanlar yükleniyor…"` mevcut ama value varsayılan `all` ve gerçek all öğesi olduğu için placeholder yüklenme bildirimi vermiyor (`src/components/reports/ReportScreen.tsx:68`). | PDKS filtreleri ve Diğer filtreler Sheet'i, rapor departman filtresi | Undefined seçenek durumunu açık loading mesajı ve/veya disabled tetikleyiciyle gösterin. |
+| 8 | O | E | src/components/pdks/dashboard/PDKSFilterBar.tsx:74 | Seçenekten kaybolan seçili filtre | `value={values.departmentId ?? "all"}` ve yalnız güncel `departments?.map` (:77); şirket (:104-107), pozisyon (:113-116) aynı. `SelectValue` placeholder/fallback almıyor (:75,105,114); seçili ID listede yoksa etiketi sağlayan SelectItem yok. Karşı örnek: rapor departmanında eksik seçime özel öğe var (`ReportScreen.tsx:68`). Arayüz sonucu doğrulanmadı. | PDKS, özellikle kayıtlı filtre uygulama veya seçenek silinmesi | Seçili ID listede bulunamazsa açıklamalı fallback öğesi ve filtre temizleme yolu sunun. |
+| 9 | D | T | src/components/pdks/chat/AiChatMessage.tsx:69 | Debug Bilgisi popover tetikleyicisi | `className="h-7 gap-1"`; standart form kontrolü h-9 iken bu dropdown tetikleyicisi 28px; görsel etki doğrulanmadı. | PDKS yapay zekâ sohbeti, veri içeren yanıt | Popup açan kompakt butonun hedef/yükseklik politikasını diğer dropdown tetikleyicileriyle eşitleyin. |
+| 10 | D | T | src/components/pdks/dashboard/PDKSDateNavigator.tsx:74 | Özel tarih seçici tetikleyicileri | `trigger={<Button ...>{label}</Button>}` (:75-82) takvim/chevron ikonunu atlıyor; `src/components/shifts/calendar/CalendarNavigation.tsx:35-38` benzer şekilde `variant="ghost"` özel trigger kullanıyor. DatePicker varsayılan takvim ikonu özel trigger verilince render edilmiyor (`src/components/ui/date-picker.tsx:363-377`). | PDKS dönem gezinmesi ve vardiya takvimi | Özel tarih tetikleyicilerine ortak takvim/chevron açılma işaretini ekleyin. |
+
+## Ortak kök sebepler
+
+- **Boş veri sözleşmesi eksikliği (#2):** `ShiftSelect.tsx:34-39` tek düzeltmeyle `DepartmentTargetPicker.tsx:22`, `DayShiftsPicker.tsx:20`, `AssignmentEditDialog.tsx:167`, `RotationEditor.tsx:55`, `calendar/ShiftCalendarPlan.tsx:161` tüketicilerine boş liste desteği sağlar. Somut boş dizi yolları departman ve gün vardiyası seçicilerinde var; tüm çağrıların boş olduğu iddia edilmiyor. Ayrı implementasyon olan `EmployeeBulkActions.tsx:63-72` aynı sözleşmeye alınmalı.
+- **Vardiya wrapper'ı kontrol boyutu (#1):** `ShiftSelect.tsx:28,36`; yukarıdaki beş çağrı dosyasını etkiler. Primitive hatası değil, tüketici wrapper'ında açık override'dır.
+- **Kişi wrapper'ı trigger/panel sözleşmesi (#3–4):** `EmployeePicker.tsx:23-27` tek yerde düzeltilebilir; `LeaveForm.tsx:282`, `LeaveFilters.tsx:51`, `ReportScreen.tsx:64` etkilenir. Command listesinde yüklenme ve eşleşmeme mesajları zaten var (:32,36); bunlar eksik diye raporlanmadı.
+- **Async filtre seçenekleri (#7–8):** `PDKSFilterBar.tsx:74-78,104-117` üç filtreyi tekrar ediyor; ortak loading/eksik seçili değer politikası hepsini çözer. Yüklenme kısmı `ReportScreen.tsx:68` için de geçerli; buradaki eksik seçili değer fallback'i mevcut.
+- **Dinamik menü boyutlandırma (#5–6):** `PDKSSavedViews.tsx:60-73`; kayıt sayısı ve ad metni için tüketici max-height/scroll/metin politikası gerekir. Aynı alandaki rapor kolon menüsü bunu kısmen zaten yapıyor (`ReportPage.tsx:53`: `max-h-80 max-w-[calc(100vw-32px)] overflow-y-auto`). Genel primitive değişikliği önerilecekse W1 ile birleştirilmeli.
+- **Primitive ortak bulguları bu raporda çoğaltılmadı:** DatePicker/MonthPicker'ın ortak `z-[9999]`, iç ay/yıl açılırları, Select genel popup genişliği veya DropdownMenuSubContent portal tasarımı W1 kapsamıdır. Tüketici override'ı olmayan bir z-index bulgusu yazılmadı.
+
+## Kapsama envanteri
+
+Aşağıdaki sayım kaynakta JSX kullanım noktasıdır. Paylaşılan `RowActions` implementasyonu kapsam dışındadır; bu alan içindeki çağrılarında label/prop sapmaları kontrol edildi. `EmployeePicker` ve `ShiftSelect` implementasyonları denetlendi ancak kendi trigger'ları çağrı sayılarına eklenmedi.
+
+| Alan | Dropdown kullanım noktaları (dosya: satırlar) |
+| --- | --- |
+| Kişiler | `EmployeeBulkActions.tsx:60`; `EmployeeFilters.tsx:18,28`; `EmployeeFormFields.tsx:90`; `EmployeeTerminateDialog.tsx:38,39`; `EmployeeTransferDialog.tsx:77,81`; `table/EmployeeTableRow.tsx:116` |
+| Vardiya | `AssignmentEditDialog.tsx:167`; `DayShiftsPicker.tsx:20`; `DepartmentTargetPicker.tsx:22`; `RotationEditor.tsx:50,55`; `ShiftTree.tsx:58`; `calendar/CalendarHeader.tsx:20,23` (ikinci alt menü); `calendar/CalendarNavigation.tsx:35`; `calendar/ShiftCalendarPlan.tsx:161` |
+| PDKS | `chat/AiChatMessage.tsx:64`; `dashboard/PDKSDateNavigator.tsx:68`; `dashboard/PDKSEnhancedExportPanel.tsx:159` (alt menü); `dashboard/PDKSFilterBar.tsx:75,83,105,114`; `dashboard/PDKSMobileCardList.tsx:77`; `dashboard/PDKSSavedViews.tsx:49`; `dashboard/PDKSTableView.tsx:168` |
+| İzin | `LeaveFilters.tsx:51,74,117,129`; `LeaveForm.tsx:282`; `LeaveList.tsx:30` |
+| Departman | `CompanyTreeItem.tsx:34`; `DepartmentTree.tsx:118,321`; `DepartmentTreeItem.tsx:70` |
+| Rapor | `ReportPage.tsx:52,55`; `ReportScreen.tsx:64,66` (ay ve dönem için iki alternatif), `:68,69,70,72` (iki tarih) |
+| Audit | `AuditFilters.tsx:24,43,44,46` (sonuncu tarih döngüsü tek kaynak noktası sayıldı) |
+| Ayarlar | `sections/ReportsSettings.tsx:154`; `sections/components/HolidayCalendarManager.tsx:117`; `sections/components/OvertimeSettingsForm.tsx:98,109,123`; `sections/components/pdksRulesChoice.tsx:27`; `sections/components/pdksRulesPunchFields.tsx:26` |
+| Admin | `AdminDeviceDialog.tsx:320`; `AdminDevicesPanel.tsx:121`; `components/AccountAccessActions.tsx:52`; `components/UserTable.tsx:50`; `projects/ProjectsTable.tsx:27` |
+| Sayfalar | `PDKSRecords.tsx:86`; `Reports.tsx:45` |
+| Sync, profil, public | Kapsamdaki dropdown türlerinde kullanım bulunmadı; public mobil navigasyonu Sheet, native select'ler ise kapsam dışı. |
+
+## Salt okuma kapısı
+
+Başlangıç `git status --porcelain src convex`: ` M convex/_generated/api.d.ts`.
+Ara kontrolde başlangıçla aynı çıktı görüldü. Son kontrolde ise `convex/accessGrantStatus.ts` ve `src/components/access-control/` altındaki çok sayıda dosya ayrıca değişmiş görünüyordu; bu worker bu dosyalara yazmadı ve geri alma yapmadı. Bu nedenle paylaşılan ağaçta durum eşitliği kapısı son kontrolde sağlanamadı; koordinatöre bildirildi. Koordinatör dış değişikliklerin başka oturuma ait olduğunu teyit edip yalnız rapora yazıldığı için succeeded kapanışını onayladı. Bu worker yalnız bu raporu yazdı. Kod/test değiştirmediği için tsc/eslint çalıştırılmadı.
