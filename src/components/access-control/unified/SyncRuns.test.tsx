@@ -28,3 +28,14 @@ it("şablon gönderimini kural gönderiminden ayırır", () => {
   expect(html).not.toContain("Kural gönderimi");
   state.runs = undefined;
 });
+
+it("yalnız son gönderimi sıfır olmayan sayılarla gösterir", () => {
+  state.runs = [{ _id: "run", kind: "rule_sync", status: "partial", startedAt: Date.parse("2026-10-22T10:09:00Z"), counts: { queued: 0, sent: 0, verified: 0, failed: 0, skipped: 2, unknown: 0 } }];
+  const html = renderToStaticMarkup(<RecentRuns projectId={"p" as Id<"projects">} />);
+  expect(html).toContain("Son gönderim");
+  expect(html).not.toContain("Son gönderimler");
+  expect(html).toContain("Kısmi sonuç");
+  expect(html).toContain("2 atlandı");
+  expect(html).not.toContain("0 kuyrukta");
+  state.runs = undefined;
+});

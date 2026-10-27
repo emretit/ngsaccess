@@ -20,8 +20,11 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import {
+  runCountParts,
+  runKindLabels,
   runLabels,
   runSummary,
+  runTone,
   targetLabels,
   targetTone,
 } from "./lib/presentation";
@@ -100,49 +103,36 @@ export function RecentRuns({
   const runs = useQuery(api.deviceSyncRuns.listRecent, {
     projectId,
     ruleId,
-    limit: ruleId ? 1 : 10,
+    limit: 1,
   });
   const [selected, setSelected] = useState<Id<"deviceSyncRuns"> | null>(null);
-  if (!runs)
-    return <SectionSkeleton rows={1} label="Son gönderimler yükleniyor" />;
-  const visible = runs;
+  if (!runs) return <SectionSkeleton rows={1} label="Son gönderim yükleniyor" />;
+  const run = runs[0];
   return (
     <section className="space-y-2 min-w-0">
       <h2 className="text-base font-semibold">
-        {ruleId ? "Kuralın son gönderimi" : "Son gönderimler"}
+        {ruleId ? "Kuralın son gönderimi" : "Son gönderim"}
       </h2>
-      {visible.length === 0 ? (
+      {!run ? (
         <p className="text-muted-foreground text-xs">
           {ruleId ? "Bu kural için henüz gönderim yok." : "Henüz gönderim yok."}
         </p>
       ) : (
-        <ul className="divide-y">
-          {visible.map((run) => (
-            <li
-              key={run._id}
-              className="flex flex-wrap items-center justify-between gap-2 py-2"
-            >
-              <div className="min-w-0 flex-1">
-                <p>
-                  {formatTrDateTime(run.startedAt)}{" "}
-                  ·{" "}
-                  {run.kind === "project_resync"
-                    ? "Proje gönderimi"
-                    : run.kind === "template_sync"
-                      ? "Şablon gönderimi"
-                      : "Kural gönderimi"}{" "}
-                  · {runLabels[run.status]}
-                </p>
-                <p className="text-xs text-muted-foreground break-words">
-                  {runSummary(run.counts)}
-                </p>
-              </div>
-              <Button variant="outline" onClick={() => setSelected(run._id)} aria-label={`${formatTrDateTime(run.startedAt)} gönderiminin ayrıntısı`}>
-                Ayrıntı
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border px-4 py-3">
+          <StatusBadge tone={runTone(run.status)}>{runLabels[run.status]}</StatusBadge>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="font-medium">{runKindLabels[run.kind]}</p>
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {formatTrDateTime(run.startedAt)}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground break-words">
+            {runCountParts(run.counts).join(" · ") || "Hedef cihaz yok"}
+          </p>
+          <Button variant="outline" onClick={() => setSelected(run._id)} aria-label={`${formatTrDateTime(run.startedAt)} gönderiminin ayrıntısı`}>
+            Ayrıntı
+          </Button>
+        </div>
       )}
       <SyncRunSheet runId={selected} onClose={() => setSelected(null)} />
     </section>
