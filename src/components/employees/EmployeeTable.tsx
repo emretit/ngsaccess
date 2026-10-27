@@ -2,6 +2,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { EmployeeSelectAll } from "./table/EmployeeSelectAll";
 import { EmployeeSortColumn } from "./table/EmployeeSortColumn";
 import { departmentPath } from "./lib/departmentPath";
+import { departmentLabels } from "@/lib/departmentLabel";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { errorMessage, notify } from "@/lib/notify";
@@ -34,6 +35,8 @@ interface EmployeeTableProps {
   onRefresh?: () => void;
   /** Departman filtresi aktifken sütun her satırda aynı değeri tekrarlar; gizlenir. */
   showDepartment?: boolean;
+  /** Şirket filtresi aktifken veya projede hiç şirket yokken gizlenir. */
+  showCompany?: boolean;
 }
 
 export default function EmployeeTable({
@@ -43,6 +46,7 @@ export default function EmployeeTable({
   onViewDetails,
   onRefresh,
   showDepartment = true,
+  showCompany = false,
 }: EmployeeTableProps) {
   const { projectId } = useActiveProjectScope();
   const { can } = usePermissions();
@@ -81,6 +85,8 @@ export default function EmployeeTable({
   );
   const allDepartments =
     useQuery(api.departments.list, projectId ? { projectId } : "skip") ?? []; // dropdown filter — empty during load is acceptable UX
+  const companies = useQuery(api.companies.list, projectId ? { projectId } : "skip");
+  const departmentNames = departmentLabels(allDepartments, companies, (d) => departmentPath(d._id, allDepartments));
 
   const syncAction = useAsyncAction(async (employee: Employee) => {
     const empId = employee._id;
@@ -249,7 +255,7 @@ export default function EmployeeTable({
           selectedCount={selectedEmployees.length}
           departments={allDepartments.map((d) => ({
             _id: d._id,
-            name: departmentPath(d._id, allDepartments),
+            name: departmentNames.get(d._id) ?? d.name,
           }))}
           selectedDepartment={selectedDepartment}
           onDepartmentChange={setSelectedDepartment}
@@ -323,6 +329,8 @@ export default function EmployeeTable({
               />
               {column("name", "Ad soyad")}
               {column("email", "E-posta", "hidden min-[1100px]:table-cell")}
+              {showCompany &&
+                column("company", "Şirket", "hidden min-[1100px]:table-cell")}
               {showDepartment &&
                 column(
                   "department",
@@ -356,6 +364,7 @@ export default function EmployeeTable({
                 handleSelectEmployee={handleSelectEmployee}
                 onViewDetails={onViewDetails}
                 showDepartment={showDepartment}
+                showCompany={showCompany}
                 biometrics={
                   canSeeBiometrics
                     ? (biometricsByEmployee.get(employee._id) ?? null)

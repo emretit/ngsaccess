@@ -4,6 +4,7 @@ import type { FunctionReturnType } from 'convex/server';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { departmentPath } from '@/components/employees/lib/departmentPath';
+import { departmentLabels } from '@/lib/departmentLabel';
 import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
 import { ShiftSelect } from './ShiftSelect';
 import { Button } from '@/components/ui/button';
@@ -17,10 +18,12 @@ export function departmentPreviewSummary(preview: DepartmentPreview) {
 }
 export function DepartmentTargetPicker({ projectId, value, onChange, error, previewValues }: { projectId: Id<'projects'>; value: string; onChange: (value: string) => void; error?: string; previewValues?: BulkAssignmentFormValues }) {
   const departments = useQuery(api.departments.list, { projectId });
+  const companies = useQuery(api.companies.list, { projectId });
   if (!departments) return <SectionSkeleton label="Departmanlar yükleniyor" />;
+  const labels = departmentLabels(departments, companies, item => departmentPath(item._id, departments));
   return <div className="space-y-2">
     <ShiftSelect label="Departman" value={value} onChange={onChange} placeholder="Departman seçin" invalid={Boolean(error)} describedBy={error ? 'assignment-department-error' : undefined}
-      options={departments.map(item => ({ value: item._id, label: departmentPath(item._id, departments) })).sort((a, b) => a.label.localeCompare(b.label, 'tr'))} />
+      options={departments.map(item => ({ value: item._id, label: labels.get(item._id) ?? item.name })).sort((a, b) => a.label.localeCompare(b.label, 'tr'))} />
     {previewValues ? <PlanQueryBoundary resetKey={JSON.stringify(previewValues)}><DepartmentLiveSummary projectId={projectId} values={previewValues} /></PlanQueryBoundary> : <p className="text-xs text-muted-foreground">Alt departmanlar da alır. Kişisel atamalar önceliklidir.</p>}
     {error && <p id="assignment-department-error" role="alert" className="text-xs text-danger">{error}</p>}
   </div>;

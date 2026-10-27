@@ -9,12 +9,12 @@ export async function createEmployeesExportWorkbook(employees: readonly Employee
   const sheet = workbook.addWorksheet("Kişiler", { views: [{ state: "frozen", ySplit: 1 }] });
   // Ücret alanları bilinçli olarak dışa aktarılmaz; API maskesinden bağımsız olarak yetkisiz veri dosyaya girmez.
   sheet.addRow(includeTcNo
-    ? ["Ad", "Soyad", "E-posta", "T.C. Kimlik No", "Sicil/Bordro Kodu", "Kart No", "Departman", "Pozisyon", "Aktif"]
-    : ["Ad", "Soyad", "E-posta", "Sicil/Bordro Kodu", "Kart No", "Departman", "Pozisyon", "Aktif"]);
+    ? ["Ad", "Soyad", "E-posta", "T.C. Kimlik No", "Sicil/Bordro Kodu", "Kart No", "Firma", "Departman", "Pozisyon", "Aktif"]
+    : ["Ad", "Soyad", "E-posta", "Sicil/Bordro Kodu", "Kart No", "Firma", "Departman", "Pozisyon", "Aktif"]);
   for (const employee of employees) {
     const values = [employee.firstName, employee.lastName, employee.email];
     if (includeTcNo) values.push(employee.tcNo ?? "");
-    values.push(employee.payrollCode ?? "", employee.cardNumber, employee.departments?.name ?? "", employee.positions?.name ?? "", employee.isActive === false ? "Hayır" : "Evet");
+    values.push(employee.payrollCode ?? "", employee.cardNumber, employee.companies?.name ?? "", employee.departments?.name ?? "", employee.positions?.name ?? "", employee.isActive === false ? "Hayır" : "Evet");
     sheet.addRow(values);
   }
   sheet.getRow(1).font = { bold: true };

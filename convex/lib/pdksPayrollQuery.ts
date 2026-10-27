@@ -20,6 +20,7 @@ export type PdksPayrollQueryArgs = {
   projectId: Id<"projects">;
   year: number;
   month: number;
+  companyId?: Id<"companies">;
 };
 
 /** Preserve this query's own calculation and database read ordering. */
@@ -73,7 +74,8 @@ export async function getMonthlyPayrollSheet(
     return { days: [], rows: [], year: args.year, month: args.month };
   }
 
-  employees = employees.filter(employee => employedDuring(employee, startDate, endDate));
+  employees = employees.filter(employee => employedDuring(employee, startDate, endDate)
+    && (!args.companyId || employee.companyId === args.companyId));
   const payrollBoundaryShiftResolver = await buildShiftResolver(ctx, employees);
   const payrollHasFlexible = [...payrollBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") && hasFlexiblePdksShift(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
   if (payrollHasFlexible) readings = [...await flexiblePreviousReadings(ctx, overtimeRange.startDate, allowedProjectIds), ...readings];

@@ -1,5 +1,6 @@
 import { usePermissions } from "@/hooks/usePermissions";
 import { departmentPath } from "../lib/departmentPath";
+import { departmentLabels } from "@/lib/departmentLabel";
 import { useState, useEffect, type RefObject } from "react";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -105,12 +106,8 @@ export const useEmployeeFormData = (employee?: Employee | null, { saving = false
     (can("employees.manage") && accessRulesData === undefined) ||
     positionsData === undefined;
 
-  const companyNames = new Map((companiesData ?? []).map((c) => [c._id, c.name]));
-  const departments = (departmentsData ?? []).map((d) => {
-    const path = departmentPath(d._id, departmentsData ?? []);
-    const companyName = d.companyId && companyNames.get(d.companyId);
-    return { id: d._id, name: companyName ? `${companyName} / ${path}` : path, companyId: d.companyId };
-  });
+  const departmentNames = departmentLabels(departmentsData, companiesData, (d) => departmentPath(d._id, departmentsData ?? []));
+  const departments = (departmentsData ?? []).map((d) => ({ id: d._id, name: departmentNames.get(d._id) ?? d.name, companyId: d.companyId }));
   const companies = (companiesData ?? []).map(
     (c: { _id: string; name: string }) => ({ id: c._id, name: c.name }),
   );

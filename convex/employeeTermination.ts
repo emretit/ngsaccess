@@ -127,16 +127,17 @@ export const closeEndedEmployments = internalMutation({
   },
 });
 
-async function validateTransferPlan(ctx: Pick<MutationCtx, "db">, projectId: Id<"projects">, accessRuleIds: Id<"accessRules">[], departmentId?: Id<"departments">): Promise<void> {
+/** Returns the target department's company so the moved person keeps a consistent branch. */
+async function validateTransferPlan(ctx: Pick<MutationCtx, "db">, projectId: Id<"projects">, accessRuleIds: Id<"accessRules">[], departmentId?: Id<"departments">): Promise<Id<"companies"> | undefined> {
   transferBound(accessRuleIds, 100);
   for (const id of new Set(accessRuleIds)) {
     const rule = await ctx.db.get(id);
     if (!rule || rule.projectId !== projectId) transferError("TRANSFER_RULE_PROJECT", "Seçilen erişim kurallarının tümü hedef projeye ait olmalıdır.");
   }
-  if (departmentId) {
-    const department = await ctx.db.get(departmentId);
-    if (!department || department.projectId !== projectId) transferError("TRANSFER_DEPARTMENT_PROJECT", "Seçilen departman hedef projeye ait olmalıdır.");
-  }
+  if (!departmentId) return undefined;
+  const department = await ctx.db.get(departmentId);
+  if (!department || department.projectId !== projectId) transferError("TRANSFER_DEPARTMENT_PROJECT", "Seçilen departman hedef projeye ait olmalıdır.");
+  return department.companyId;
 }
 
 async function transferManager(ctx: MutationCtx & { user: Doc<"users"> }, transferId: Id<"accessTransfers">): Promise<Doc<"accessTransfers">> {
@@ -163,7 +164,7 @@ export const startTransfer = authedMutation({
     if (first) transferError(first.code, first.message);
     if (!employee.projectId) transferError("TRANSFER_NO_SOURCE", "Kaynak proje bulunamadı.");
     if (args.accessRuleIds.length && !await hasPermission(ctx, ctx.user, args.targetProjectId, "accessRules.manage")) transferError("TRANSFER_RULE_PERMISSION", "Hedef projede erişim kuralı yönetme yetkiniz yok.");
-    await validateTransferPlan(ctx, args.targetProjectId, args.accessRuleIds, args.departmentId);
+    const companyId = await validateTransferPlan(ctx, args.targetProjectId, args.accessRuleIds, args.departmentId);
     // Transfer lineage is allowed to share profile identifiers; unrelated people are not.
     for (const [field, index, value] of [["email", "by_email", normalizeEmployeeEmail(employee.email) ?? ""], ["tcNo", "by_tc", employee.tcNo]] as const) {
       if (!value) continue;
@@ -187,7 +188,7 @@ export const startTransfer = authedMutation({
       email: normalizeEmployeeEmail(employee.email) ?? "", tcNo: employee.tcNo, payrollCode: employee.payrollCode,
       photoUrl: employee.photoUrl, photoStorageId: employee.photoStorageId, notes: employee.notes,
       hourlyRate: employee.hourlyRate, monthlySalary: employee.monthlySalary,
-      departmentId: args.departmentId, cardNumber: "", isActive: true, transferredFromEmployeeId: employee._id,
+      departmentId: args.departmentId, companyId, cardNumber: "", isActive: true, transferredFromEmployeeId: employee._id,
       createdAt: now, updatedAt: now,
     });
     const transferId = await ctx.db.insert("accessTransfers", {
@@ -225,9 +226,10 @@ async function finishTransfer(ctx: MutationCtx, transferId: Id<"accessTransfers"
   const [source, target] = await Promise.all([ctx.db.get(transfer.employeeId), ctx.db.get(transfer.targetEmployeeId)]);
   const conflict = transfer.cardNumber ? await findDuplicateCard(ctx, transfer.cardNumber, transfer.employeeId) : null;
   let error: string | undefined;
+  let companyId: Id<"companies"> | undefined;
   if (!source || !target || source.projectId !== transfer.sourceProjectId || target.projectId !== transfer.targetProjectId || source.cardNumber !== transfer.cardNumber || target.cardNumber !== "") error = "Taşıma kayıtları değişti. Taşımayı iptal edip tekrar başlatın.";
   else if (conflict) error = "Kart numarası başka bir kişide kullanılıyor. Çakışmayı giderip yeniden deneyin.";
-  try { await validateTransferPlan(ctx, transfer.targetProjectId, transfer.targetPlan.accessRuleIds, transfer.targetPlan.departmentId); }
+  try { companyId = await validateTransferPlan(ctx, transfer.targetProjectId, transfer.targetPlan.accessRuleIds, transfer.targetPlan.departmentId); }
   catch { error = "Hedef kural veya departman artık hedef projede değil. Taşımayı iptal edip yeniden başlatın."; }
   if (error || !source || !target) {
     await ctx.db.patch(transferId, { status: "stuck", stuckReason: error, lastError: error });
@@ -236,7 +238,7 @@ async function finishTransfer(ctx: MutationCtx, transferId: Id<"accessTransfers"
   await ctx.db.patch(transferId, { status: "provisioning" });
   const now = new Date().toISOString();
   await ctx.db.patch(source._id, { cardNumber: "", transferredCardNumber: transfer.cardNumber, updatedAt: now });
-  await ctx.db.patch(target._id, { cardNumber: transfer.cardNumber, departmentId: transfer.targetPlan.departmentId, updatedAt: now });
+  await ctx.db.patch(target._id, { cardNumber: transfer.cardNumber, departmentId: transfer.targetPlan.departmentId, companyId, updatedAt: now });
   for (const ruleId of transfer.targetPlan.accessRuleIds) await upsertGroupMembership(ctx, target._id, ruleId, transfer.targetProjectId);
   await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: target._id });
   await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId: target._id });

@@ -441,6 +441,7 @@ export const getMonthlyPayrollSheet = authedQuery({
     projectId: v.id("projects"),
     year: v.number(),
     month: v.number(), // 1-12
+    companyId: v.optional(v.id("companies")),
   },
   handler: async (ctx, args) => {
     return getMonthlyPayrollSheetQuery(ctx, args, { scopedPdksShift, flexiblePreviousReadings });
@@ -854,6 +855,7 @@ export const listReportTransactions = authedQuery({
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
     employeeId: v.optional(v.id("employees")),
+    companyId: v.optional(v.id("companies")),
     departmentId: v.optional(v.id("departments")),
     result: v.optional(v.union(v.literal("granted"), v.literal("denied"), v.literal("unknown"))),
     sources: v.optional(v.array(v.union(v.literal("card"), v.literal("pin"), v.literal("qr"), v.literal("mobile"), v.literal("manual"), v.literal("unknown")))),
@@ -865,6 +867,10 @@ export const listReportTransactions = authedQuery({
     if (args.departmentId) {
       const department = await ctx.db.get(args.departmentId);
       if (department?.projectId !== args.projectId) throw new ConvexError("Departman seçili projede bulunamadı");
+    }
+    if (args.companyId) {
+      const company = await ctx.db.get(args.companyId);
+      if (company?.projectId !== args.projectId) throw new ConvexError("Şirket seçili projede bulunamadı");
     }
     if (args.employeeId) {
       const employee = await ctx.db.get(args.employeeId);
@@ -896,11 +902,13 @@ export const listReportTransactions = authedQuery({
       if (row.projectId !== args.projectId
         || (args.employeeId !== undefined && row.employeeId !== args.employeeId)
         || !matchesReadingResult(row.accessStatus, args.result)) return false;
-      if (args.departmentId) {
+      if (args.departmentId || args.companyId) {
         if (!row.employeeId) return false;
         if (!employees.has(row.employeeId)) employees.set(row.employeeId, await ctx.db.get(row.employeeId));
         const employee = employees.get(row.employeeId);
-        if (employee?.projectId !== args.projectId || employee.departmentId !== args.departmentId) return false;
+        if (employee?.projectId !== args.projectId
+          || (args.departmentId && employee.departmentId !== args.departmentId)
+          || (args.companyId && employee.companyId !== args.companyId)) return false;
       }
       return matchesReadingSources(classifyReadingSource(row), args.sources);
     }).paginate({ ...args.paginationOpts, numItems: Math.min(args.paginationOpts.numItems, 200), maximumRowsRead: 2000, maximumBytesRead: 2_000_000 });

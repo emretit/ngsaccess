@@ -16,7 +16,7 @@ import type { ReportExportMeta } from '@/lib/reports/export';
 export interface ReportResultsProps {
   violationsOnly?: boolean;
   definition: ReportDefinition; projectId: Id<'projects'>; from: string; to: string; person: string;
-  employeeId?: Id<'employees'>; onClear?: () => void; departmentId?: Id<'departments'>; departmentName?: string;
+  employeeId?: Id<'employees'>; onClear?: () => void; companyId?: Id<'companies'>; departmentId?: Id<'departments'>; departmentName?: string;
   result?: 'granted' | 'denied' | 'unknown'; year: number; month: number; projectName?: string;
 }
 function meta(props: ReportResultsProps): Omit<ReportExportMeta, 'columns'> {

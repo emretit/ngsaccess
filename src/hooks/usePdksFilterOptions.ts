@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { departmentLabels } from "@/lib/departmentLabel";
 export function usePdksFilterOptions() {
   const { projectId } = useActiveProject();
   const departmentRows = useQuery(
@@ -16,10 +17,7 @@ export function usePdksFilterOptions() {
   const positions = allPositions?.filter((position) => position.projectId === projectId);
   const shifts = useQuery(api.shifts.list, projectId ? { projectId } : "skip");
   // Aynı departman adı birden çok şirkette olabilir: seçenekte şirket adı öne eklenir.
-  const companyNames = new Map((companies ?? []).map((company) => [company._id, company.name]));
-  const departments = departmentRows?.map((department) => {
-    const companyName = department.companyId && companyNames.get(department.companyId);
-    return companyName ? { ...department, name: `${companyName} / ${department.name}` } : department;
-  });
+  const labels = departmentLabels(departmentRows, companies);
+  const departments = departmentRows?.map((department) => ({ ...department, name: labels.get(department._id) ?? department.name }));
   return { departments, companies, positions, shifts };
 }

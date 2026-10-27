@@ -22,6 +22,11 @@ export function useDepartments() {
     api.departments.list,
     !projectLoading && projectId ? { projectId } : "skip",
   );
+  // Departman etiketlerindeki şirket öneki için (departmentLabels).
+  const companies = useQuery(
+    api.companies.list,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
 
   const createDept = useMutation(api.departments.create);
   const updateDept = useMutation(api.departments.update);
@@ -69,6 +74,7 @@ export function useDepartments() {
 
   return {
     departments: (departments ?? []) as Department[],
+    companies: companies ?? [],
     isLoading:
       projectLoading || Boolean(projectId && departments === undefined),
     error: null,

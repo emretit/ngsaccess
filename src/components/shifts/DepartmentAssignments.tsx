@@ -9,6 +9,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { onRowActivate, ROW_CLICK_CLASS } from '@/lib/tableRowClick';
 import { notify } from '@/lib/notify';
 import { departmentPath } from '@/components/employees/lib/departmentPath';
+import { departmentLabels } from '@/lib/departmentLabel';
 import { AssignmentEditDialog } from './AssignmentEditDialog';
 import { planSummary } from './lib/planForm';
 import { shortDate, type DepartmentAssignment } from './lib/planning';
@@ -16,12 +17,14 @@ import { shortDate, type DepartmentAssignment } from './lib/planning';
 export function DepartmentAssignments({ projectId }: { projectId: Id<'projects'> }) {
   const assignments = useQuery(api.shiftPlans.listDepartmentAssignments, { projectId });
   const departments = useQuery(api.departments.list, { projectId });
+  const companies = useQuery(api.companies.list, { projectId });
   const shifts = useQuery(api.shifts.list, { projectId });
   const remove = useMutation(api.shiftPlans.removeDepartmentAssignment);
   const { can } = usePermissions();
   const [edit, setEdit] = useState<DepartmentAssignment | null>(null);
   const [deleting, setDeleting] = useState<DepartmentAssignment | null>(null);
-  const name = (row: DepartmentAssignment) => departmentPath(row.departmentId, departments ?? []);
+  const labels = departmentLabels(departments, companies, item => departmentPath(item._id, departments ?? []));
+  const name = (row: DepartmentAssignment) => labels.get(row.departmentId) ?? departmentPath(row.departmentId, departments ?? []);
   return <section className="mt-6 space-y-3 border-t pt-4" aria-label="Departman atamaları">
     <h3 className="font-semibold">Departman atamaları</h3>
     {!assignments || !departments || !shifts ? <SectionSkeleton label="Departman atamaları yükleniyor" /> : !assignments.length ? <p className="text-sm text-muted-foreground">Henüz departman ataması yok.</p> : <div className="overflow-x-auto"><table className="w-full text-sm">

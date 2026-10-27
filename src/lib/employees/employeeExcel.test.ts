@@ -4,6 +4,7 @@ import { createEmployeesExportWorkbook, getEmployeeExportFilename } from "./expo
 import { createEmployeeImportTemplate } from "./importTemplate";
 import { EMPLOYEE_IMPORT_MAX_FILE_BYTES, parseEmployeesXlsx } from "./parseEmployeesXlsx";
 import type { Employee } from "@/types/employee";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 async function asFile(workbook: ExcelJS.Workbook, name = "kisiler.xlsx") {
   const buffer = await workbook.xlsx.writeBuffer();
@@ -65,6 +66,10 @@ describe("employee Excel helpers", () => {
     expect(headers).not.toContain("saatlik ücret");
     expect(headers).not.toContain("maaş");
     expect(headers).not.toContain("t.c. kimlik no");
+    expect(headers).toContain("firma");
+    const withCompany = await createEmployeesExportWorkbook([{ ...employee, companies: { _id: "companies:1" as Id<"companies">, name: "NGS" }, departments: { _id: "departments:1" as Id<"departments">, name: "Yönetim" } }]);
+    const row = withCompany.worksheets[0]?.getRow(2);
+    expect([row?.getCell(6).text, row?.getCell(7).text]).toEqual(["NGS", "Yönetim"]);
     expect(getEmployeeExportFilename(new Date("2026-10-18T22:30:00.000Z"))).toBe("kisiler-2026-10-19.xlsx");
   });
 });

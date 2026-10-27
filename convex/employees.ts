@@ -130,6 +130,9 @@ export const list = authedQuery({
         const position = emp.positionId
           ? await ctx.db.get(emp.positionId) as Doc<"positions"> | null
           : null;
+        // Eski kayıtlarda kişi companyId'si boş olabilir; departmanın şirketi gösterilir.
+        const companyId = emp.companyId ?? department?.companyId;
+        const company = companyId ? await ctx.db.get(companyId) : null;
         return {
           ...emp,
           terminationReason: permissions?.canManage ? emp.terminationReason : undefined,
@@ -142,6 +145,9 @@ export const list = authedQuery({
             : null,
           positions: position
             ? { _id: position._id, name: position.name }
+            : null,
+          companies: company
+            ? { _id: company._id, name: company.name }
             : null,
         };
       })

@@ -155,3 +155,26 @@ describe("embedded reading redaction", () => {
     expect(summary.total).toBe(1);
   });
 });
+
+describe("report company filter", () => {
+  it("keeps only readings and payroll rows of the selected company's people", async () => {
+    const f = await fixture("admin");
+    const { companyId, otherCompanyId } = await f.t.run(async ctx => {
+      const companyId = await ctx.db.insert("companies", { projectId: f.projectId, name: "NGS" });
+      const otherCompanyId = await ctx.db.insert("companies", { projectId: f.projectId, name: "Fabrika" });
+      await ctx.db.patch(f.employeeId, { companyId });
+      // Vardiyasız kişi aylık tabloda satır almaz.
+      const shiftId = await ctx.db.insert("shifts", { projectId: f.projectId, name: "Gündüz", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" });
+      await ctx.db.insert("shiftAssignments", { projectId: f.projectId, employeeId: f.employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
+      return { companyId, otherCompanyId };
+    });
+    const transactions = (id: typeof companyId) => f.caller.query(api.cardReadings.listReportTransactions, { projectId: f.projectId, companyId: id, paginationOpts: page });
+    expect((await transactions(companyId)).page.map(row => row._id)).toEqual([f.readingId]);
+    expect((await transactions(otherCompanyId)).page).toHaveLength(0);
+    const payroll = (id: typeof companyId) => f.caller.query(api.cardReadings.getMonthlyPayrollSheet, { projectId: f.projectId, year: 2026, month: 10, companyId: id });
+    expect((await payroll(companyId)).rows.map(row => row.employeeId)).toEqual([f.employeeId]);
+    expect((await payroll(otherCompanyId)).rows).toHaveLength(0);
+    const foreign = await f.t.run(ctx => ctx.db.insert("companies", { projectId: f.otherProjectId, name: "Yabancı" }));
+    await expect(transactions(foreign)).rejects.toThrow("Şirket seçili projede bulunamadı");
+  });
+});

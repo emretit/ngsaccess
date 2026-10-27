@@ -265,6 +265,18 @@ describe("transfer rejection and locks", () => {
     await another.t.run(ctx => ctx.db.insert("employees", { projectId: another.ids.targetProjectId, firstName: "Başka", lastName: "Kişi", email: "ada@example.test", cardNumber: "9999", isActive: true }));
     await expectTransferError(another.start(), "TRANSFER_PROFILE_CONFLICT");
   });
+
+  it("gives the moved person the target department's company", async () => {
+    const f = await fixture({ noDevices: true });
+    const companyId = await f.t.run(async ctx => {
+      const id = await ctx.db.insert("companies", { projectId: f.ids.targetProjectId, name: "B şube" });
+      await ctx.db.patch(f.ids.departmentId, { companyId: id });
+      return id;
+    });
+    const transfer = await f.start();
+    expect(await f.state(transfer.transferId)).toMatchObject({ status: "done" });
+    expect(await f.t.run(ctx => ctx.db.get(transfer.targetEmployeeId))).toMatchObject({ departmentId: f.ids.departmentId, companyId });
+  });
 });
 
 describe("stuck, cancellation, late success and device removal", () => {

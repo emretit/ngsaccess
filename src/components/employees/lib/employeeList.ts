@@ -23,6 +23,8 @@ export function filterAndSortEmployees(
     switch (key) {
       case "email":
         return employee.email;
+      case "company":
+        return employee.companies?.name ?? "";
       case "department":
         return employee.departments?.name ?? "";
       case "position":

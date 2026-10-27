@@ -65,7 +65,7 @@ function EmployeePage() {
     ? (params.get("status") ?? "all")
     : "all";
   const requestedSort = params.get("sort") ?? "name:asc";
-  const sort = /^(name|email|department|position|card|status):(asc|desc)$/.test(
+  const sort = /^(name|email|company|department|position|card|status):(asc|desc)$/.test(
     requestedSort,
   )
     ? requestedSort
@@ -228,6 +228,7 @@ function EmployeePage() {
             sort={sort}
             onSortChange={(value) => update({ sort: value })}
             showDepartment={!department}
+            showCompany={!company && !department && employees.some((item) => item.companies)}
             employees={filtered.slice((page - 1) * size, page * size)}
             onViewDetails={(employee) => open(employee)}
             onRefresh={refetch}

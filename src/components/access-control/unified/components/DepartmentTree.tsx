@@ -8,6 +8,7 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDepartments } from "@/hooks/useDepartments";
+import { departmentLabels } from "@/lib/departmentLabel";
 import {
   departmentScope,
   selectionState,
@@ -31,7 +32,8 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
   const [includeChildren, setIncludeChildren] = useState(true);
   const [search, setSearch] = useState("");
   const { employees, isLoading: employeesLoading } = useEmployees();
-  const { departments, isLoading: departmentsLoading } = useDepartments();
+  const { departments, companies, isLoading: departmentsLoading } = useDepartments();
+  const labels = departmentLabels(departments, companies);
   const searchText = search.trim().toLocaleLowerCase("tr");
   const matches = (name: string) =>
     name.toLocaleLowerCase("tr").includes(searchText);
@@ -96,6 +98,8 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
     const open = Boolean(searchText) || expanded.has(department._id);
     const contentId = `${prefix}-children-${department._id}`;
     const id = `${prefix}-department-${department._id}`;
+    // Alt departman zaten üstünün altında durur; şirket öneki yalnız kök satırda.
+    const label = ancestors.size === 0 ? (labels.get(department._id) ?? department.name) : department.name;
     return (
       <div key={department._id} className="space-y-1">
         <div className="flex items-center gap-2">
@@ -104,7 +108,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
             size="icon"
             variant="ghost"
             className="h-11 w-11 shrink-0"
-            aria-label={`${department.name} departmanını ${open ? "daralt" : "genişlet"}`}
+            aria-label={`${label} departmanını ${open ? "daralt" : "genişlet"}`}
             aria-expanded={open}
             aria-controls={contentId}
             onClick={() =>
@@ -137,7 +141,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
             }
           />
           <Label htmlFor={id} className="flex flex-1 min-h-11 items-center cursor-pointer min-w-0 break-words">
-            {department.name} ({scopedEmployees.length} kişi)
+            {label} ({scopedEmployees.length} kişi)
           </Label>
         </div>
         <div id={contentId} hidden={!open} className="ml-3 border-l pl-2">

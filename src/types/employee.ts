@@ -33,4 +33,8 @@ export interface Employee {
     _id: Id<"positions">;
     name: string;
   } | null;
+  companies?: {
+    _id: Id<"companies">;
+    name: string;
+  } | null;
 }

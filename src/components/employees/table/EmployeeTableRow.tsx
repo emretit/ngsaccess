@@ -20,6 +20,7 @@ interface Props {
   handleSelectEmployee: (checked: boolean, id: Id<"employees">) => void;
   onViewDetails: (employee: Employee) => void;
   showDepartment: boolean;
+  showCompany: boolean;
   /** undefined = kolon gizli (yönetici değil). */
   biometrics?: EmployeeBiometrics | null;
   onSync: (employee: Employee) => void;
@@ -37,6 +38,7 @@ export function EmployeeTableRow({
   handleSelectEmployee,
   onViewDetails,
   showDepartment,
+  showCompany,
   biometrics,
   onSync,
   handlePasswordResetClick,
@@ -92,6 +94,11 @@ export function EmployeeTableRow({
       <TableCell className="hidden truncate min-[1100px]:table-cell">
         {employee.email}
       </TableCell>
+      {showCompany && (
+        <TableCell className="hidden truncate min-[1100px]:table-cell">
+          {employee.companies?.name ?? "—"}
+        </TableCell>
+      )}
       {showDepartment && (
         <TableCell className="hidden truncate min-[760px]:table-cell">
           {employee.departments?.name ?? "Atanmamış"}

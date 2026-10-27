@@ -5,18 +5,18 @@ import type { ReportDefinition } from './registry';
 
 export interface ReportQueryFilters {
   projectId: Id<'projects'>; from: string; to: string; person: string;
-  employeeId?: Id<'employees'>; departmentId?: Id<'departments'>; result?: 'granted' | 'denied' | 'unknown';
+  employeeId?: Id<'employees'>; companyId?: Id<'companies'>; departmentId?: Id<'departments'>; result?: 'granted' | 'denied' | 'unknown';
   year: number; month: number;
 }
 export function dailyReportArgs(filters: ReportQueryFilters, definition?: ReportDefinition): FunctionArgs<typeof api.cardReadings.getPdksTableData> {
-  return { projectId: filters.projectId, startDate: filters.from, endDate: filters.to, viewMode: 'matrix' as const, departmentId: filters.departmentId, person: filters.person || undefined,
+  return { projectId: filters.projectId, startDate: filters.from, endDate: filters.to, viewMode: 'matrix' as const, companyId: filters.companyId, departmentId: filters.departmentId, person: filters.person || undefined,
     ...(definition?.includePunches ? { includePunches: true } : {}) };
 }
 export function monthlyReportArgs(filters: ReportQueryFilters): FunctionArgs<typeof api.cardReadings.getMonthlyPayrollSheet> {
-  return { projectId: filters.projectId, year: filters.year, month: filters.month };
+  return { projectId: filters.projectId, year: filters.year, month: filters.month, companyId: filters.companyId };
 }
 export function transactionReportArgs(filters: ReportQueryFilters, definition?: ReportDefinition) {
-  return { projectId: filters.projectId, startDate: filters.from, endDate: filters.to, result: filters.result, employeeId: filters.employeeId, departmentId: filters.departmentId,
+  return { projectId: filters.projectId, startDate: filters.from, endDate: filters.to, result: filters.result, employeeId: filters.employeeId, companyId: filters.companyId, departmentId: filters.departmentId,
     ...(definition?.transactionSources ? { sources: [...definition.transactionSources] } : {}) };
 }
 /** Only server filters and explicit refreshes may discard accumulated pages. */

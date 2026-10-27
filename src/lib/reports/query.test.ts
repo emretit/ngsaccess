@@ -24,6 +24,15 @@ describe('server query identity', () => {
     }
     expect(dailyReportArgs(filters)).not.toHaveProperty('includePunches');
   });
+  it('sends the company filter to every report source and keys it', () => {
+    const scoped = { ...filters, companyId: 'company-a' as Id<'companies'> };
+    expect(dailyReportArgs(scoped)).toHaveProperty('companyId', 'company-a');
+    expect(monthlyReportArgs(scoped)).toHaveProperty('companyId', 'company-a');
+    expect(transactionReportArgs(scoped)).toHaveProperty('companyId', 'company-a');
+    for (const source of ['transactions', 'monthlyPayroll', 'pdksMatrix'] as const) {
+      expect(reportQueryKey(definition(source), scoped, 0)).not.toBe(reportQueryKey(definition(source), filters, 0));
+    }
+  });
   it('passes mobile and QR sources to the server and includes them in query identity', () => {
     const mobile = REPORTS.find(report => report.slug === 'mobil-okutmalar');
     if (!mobile) throw new Error('Missing mobile report');
