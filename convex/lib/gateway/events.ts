@@ -47,6 +47,17 @@ export interface SearchAcsEventsResult {
   error?: string;
 }
 
+// Firmware'ler alan tiplerinde tutarsız (DS-K1T804AMF `cardType: 1` sayı döner);
+// backfill mutation validator'ı katı olduğu için tipler burada normalize edilir.
+function eventText(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : undefined;
+}
+function eventNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return typeof value === "string" && /^\d+$/.test(value) ? Number(value) : undefined;
+}
+
 export async function searchAcsEventsOnDevice(
   devIndex: string,
   opts: {
@@ -111,20 +122,19 @@ export async function searchAcsEventsOnDevice(
       const serialNo = row.serialNo as number | undefined;
       if (typeof serialNo !== "number") continue;
       infoList.push({
-        time: (row.time as string | undefined) ?? "",
-        cardNo: (row.cardNo as string | undefined) ?? "",
-        cardType: row.cardType as string | undefined,
-        name: row.name as string | undefined,
-        employeeNoString: row.employeeNoString as string | undefined,
-        major: (row.major as number | undefined) ?? 0,
-        minor: (row.minor as number | undefined) ?? 0,
-        doorNo: row.doorNo as number | undefined,
-        cardReaderNo: typeof row.cardReaderNo === "number" ? row.cardReaderNo
-          : typeof row.cardReaderNo === "string" && /^\d+$/.test(row.cardReaderNo) ? Number(row.cardReaderNo) : undefined,
-        currentVerifyMode: row.currentVerifyMode as string | undefined,
+        time: eventText(row.time) ?? "",
+        cardNo: eventText(row.cardNo) ?? "",
+        cardType: eventText(row.cardType),
+        name: eventText(row.name),
+        employeeNoString: eventText(row.employeeNoString),
+        major: eventNumber(row.major) ?? 0,
+        minor: eventNumber(row.minor) ?? 0,
+        doorNo: eventNumber(row.doorNo),
+        cardReaderNo: eventNumber(row.cardReaderNo),
+        currentVerifyMode: eventText(row.currentVerifyMode),
         serialNo,
-        pictureURL: row.pictureURL as string | undefined,
-        attendanceStatus: row.attendanceStatus as string | undefined,
+        pictureURL: eventText(row.pictureURL),
+        attendanceStatus: eventText(row.attendanceStatus),
       });
     }
   }
