@@ -58,6 +58,16 @@ function eventNumber(value: unknown): number | undefined {
   return typeof value === "string" && /^\d+$/.test(value) ? Number(value) : undefined;
 }
 
+/**
+ * AcsEvent zaman sınırı: milisaniyesiz TR duvar saati (+03:00). DS-K1T804AMF `.987Z` gibi
+ * milisaniyeli bitiş zamanını yakın tarihli başlangıçla `badParameters` ile reddediyor.
+ */
+export function hikSearchTime(value: string): string {
+  const at = Date.parse(value);
+  if (!Number.isFinite(at)) return value;
+  return `${new Date(Math.floor(at / 1000) * 1000 + 3 * 60 * 60 * 1000).toISOString().slice(0, 19)}+03:00`;
+}
+
 export async function searchAcsEventsOnDevice(
   devIndex: string,
   opts: {
@@ -75,8 +85,8 @@ export async function searchAcsEventsOnDevice(
       searchID: opts.searchID,
       searchResultPosition: opts.position,
       maxResults: opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE,
-      ...(opts.startTime ? { startTime: opts.startTime } : {}),
-      ...(opts.endTime ? { endTime: opts.endTime } : {}),
+      ...(opts.startTime ? { startTime: hikSearchTime(opts.startTime) } : {}),
+      ...(opts.endTime ? { endTime: hikSearchTime(opts.endTime) } : {}),
       ...(opts.major !== undefined ? { major: opts.major } : {}),
       ...(opts.minor !== undefined ? { minor: opts.minor } : {}),
     },
