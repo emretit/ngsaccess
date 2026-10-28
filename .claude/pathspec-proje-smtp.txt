@@ -1,0 +1,27 @@
+# >>> COMMIT EDİLDİ (2026-10-26 ~16:20 TR, ngsaccess-4d, Emre onayıyla): 1df865ee K-02 taşıma · a3eb253b Hik raporları · 83b207a1 proje SMTP. TEKRAR COMMIT ATMA. Yayın (Convex+web) ve test turu ngsaccess-4d'de yürüyor.
+
+# Proje SMTP (müşterinin kendi Google Workspace / kurumsal maili ile rapor maili) — 2026-10-26
+# Yayın tabanı: HEAD (≥ 4427397f, sistem audit Faz 0-2-4 canlıda 13:15) — eski tabandan yayın güvenlik düzeltmelerini geri çeker
+# auditLabels.ts'te artık yalnız mailSettings satırı var (diğer hunk 4427397f ile commit'lendi)
+# convex/_generated/api.d.ts elle güncellendi (codegen canlıda index kurdurduğu için çalıştırılmadı); yayındaki dev --once aynısını üretir
+package.json
+package-lock.json
+convex/_generated/api.d.ts
+convex/mailSettings.ts
+convex/mailSettings.test.ts
+convex/actions/projectMail.ts
+convex/actions/sendScheduledReports.ts
+convex/actions/sendEmail.ts
+convex/lib/smtpConfig.ts
+convex/lib/mailSecret.ts
+convex/lib/projectMailer.ts
+convex/lib/emailTemplate.ts
+convex/lib/auditLogQuery.ts
+convex/lib/auditLogQuery.test.ts
+src/components/audit/auditLabels.ts
+src/components/settings/sections/MailSettings.tsx
+src/components/settings/sections/reports/ReportReminderSettings.tsx
+src/components/settings/SettingsSidebar.tsx
+src/components/settings/settings.test.tsx
+src/lib/capabilities.ts
+src/lib/permissionsUI.test.ts

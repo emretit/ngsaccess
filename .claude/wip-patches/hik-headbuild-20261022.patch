@@ -1,0 +1,2673 @@
+diff --git a/convex/__snapshots__/w5aLegacyEquivalence.test.ts.snap b/convex/__snapshots__/w5aLegacyEquivalence.test.ts.snap
+new file mode 100644
+index 00000000..e8775526
+--- /dev/null
++++ b/convex/__snapshots__/w5aLegacyEquivalence.test.ts.snap
+@@ -0,0 +1,316 @@
++// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
++
++exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > annual 1`] = `
++{
++  "reads": [
++    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2025-12-31T21:00:00.000Z"],["lte","accessTime","2026-12-31T20:59:59.999Z"],["export"],["collect"]]",
++    "["departments",["collect"]]",
++    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["filter"],["collect"]]",
++    "["leaves",["filter"],["collect"]]",
++    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
++    "["shifts",["collect"]]",
++    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
++    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++  ],
++  "result": [
++    {
++      "employeeId": "employeeId",
++      "exceedsDaily11h": [],
++      "firstName": "Ada",
++      "lastName": "Test",
++      "limitHours": 270,
++      "remainingHours": 270,
++      "totalOvertimeHours": 0,
++      "totalOvertimeMinutes": 0,
++      "utilizationPct": 0,
++    },
++  ],
++}
++`;
++
++exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > attendanceReport 1`] = `
++{
++  "reads": [
++    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-11-01T20:59:59.999Z"],["export"],["collect"]]",
++    "["cardReadings",["withIndex","by_project_employee_time"],["eq","projectId","projectId"],["eq","employeeId","employeeId"],["export"],["order","asc"],["take",20]]",
++    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
++    "["generalSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++    "["holidays",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
++    "["holidays",["withIndex","by_project"],["eq","projectId",null],["export"],["collect"]]",
++    "["leaves",["withIndex","by_employee_start"],["eq","employeeId","employeeId"],["lte","startDate","2026-10-31"],["export"],["collect"]]",
++    "["overtimeRates",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++    "["pdksRecords",["withIndex","by_employee_date"],["eq","employeeId","employeeId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",
++    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
++    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
++    "["shifts",["collect"]]",
++    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
++    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++  ],
++  "result": {
++    "completedThrough": "2026-10-22",
++    "endDate": "2026-10-31",
++    "month": 10,
++    "reliabilityNote": "Güvenilirlik sınırı: İşe giriş tarihi tutulmadığından ay ortasında işe başlayanlar ayrıştırılamaz; ayrılanların son çalışma gününden sonraki günleri hesaplanmaz. Günler PDKS tablo motoruyla hesaplanır; yarım tatil günleri PDKS gibi tatil sayılır. Devam oranı, tamamlanmış beklenen günlerden izinler çıkarılarak hesaplanır. Tek izinli okuma veya manuel giriş devam kabul edilir; bu bir bordro onayı değildir.",
++    "rows": [
++      {
++        "absentDays": 0,
++        "department": "Departmansız",
++        "devamOrani": null,
++        "employeeId": "employeeId",
++        "expectedDays": 0,
++        "leaveDays": 0,
++        "name": "Ada Test",
++        "presentDays": 0,
++        "projectId": "projectId",
++        "reliabilityNote": "",
++      },
++    ],
++    "scopeLabel": "Legacy",
++    "startDate": "2026-10-01",
++    "year": 2026,
++  },
++}
++`;
++
++exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > dashboard 1`] = `
++{
++  "reads": [
++    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-10-22T21:00:00.000Z"],["lte","accessTime","2026-10-23T20:59:59.999Z"],["export"],["collect"]]",
++    "["departments",["collect"]]",
++    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["filter"],["collect"]]",
++    "["leaves",["filter"],["collect"]]",
++    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
++    "["shifts",["collect"]]",
++    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
++    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++  ],
++  "result": {
++    "averageFirstEntry": "08:00",
++    "averageLastExit": "17:00",
++    "insideBuilding": 0,
++    "lateArrivals": 0,
++    "presentToday": 1,
++    "workHours": null,
++  },
++}
++`;
++
++exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > departmentReport 1`] = `
++{
++  "reads": [
++    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
++    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
++    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++  ],
++  "result": {
++    "hourlyRate": null,
++    "month": 10,
++    "overtimeMultiplier": null,
++    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
++    "rows": [
++      {
++        "cost": 0,
++        "department": "Belirtilmemiş",
++        "employeeCount": 1,
++        "overtimeHours": 1,
++      },
++    ],
++    "scopeLabel": "Legacy",
++    "year": 2026,
++  },
++}
++`;
++
++exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > overtimeReport 1`] = `
++{
++  "reads": [
++    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
++    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
++    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++  ],
++  "result": {
++    "endDate": "2026-10-31",
++    "month": 10,
++    "overtimeMultiplier": null,
++    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
++    "rows": [
++      {
++        "department": "Bilinmiyor",
++        "employeeId": "projectId:employeeId",
++        "name": "Ada Test",
++        "overtimeHours": 1,
++        "overtimePayTRY": null,
++      },
++    ],
++    "scopeLabel": "Legacy",
++    "startDate": "2026-10-01",
++    "totalOvertimeHours": 1,
++    "totalOvertimePayTRY": 0,
++    "year": 2026,
++  },
++}
++`;
++
++exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > sgk 1`] = `
++{
++  "reads": [
++    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
++    "["companies",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
++    "["generalSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++    "["holidays",["withIndex","by_project_date"],["eq","projectId","projectId"],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",
++    "["holidays",["withIndex","by_project_date"],["eq","projectId",null],["gte","date","2026-10-01"],["lte","date","2026-10-31"],["export"],["collect"]]",
++    "["leaves",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
++    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
++  ],
++  "result": {
++    "filename": "aphb-2026-10.xml",
++    "warnings": [
++      "Ada Test: T.C. kimlik numarası eksik; bildirimden önce tamamlayın.",
++    ],
++    "xml": "<?xml version="1.0" encoding="UTF-8"?>
++<aphb year="2026" month="10">
++  <isveren>
++    <unvan>Şirket</unvan>
++  </isveren>
++  <calisanlar>
++    <calisan>
++      <tcKimlikNo></tcKimlikNo>
++      <adSoyad>Ada Test</adSoyad>
++      <calismaGunu>9</calismaGunu>
++      <fazlaMesaiSaati>0.0</fazlaMesaiSaati>
++      <eksikGunSayisi>21</eksikGunSayisi>
++      <eksikGunNedeni>15</eksikGunNedeni>
++    </calisan>
++  </calisanlar>
++</aphb>",
++  },
++}
++`;
++
++exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > sgkReport 1`] = `
++{
++  "reads": [
++    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-09-30T21:00:00.000Z"],["lte","accessTime","2026-10-31T20:59:59.999Z"],["export"],["collect"]]",
++    "["leaves",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
++    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
++  ],
++  "result": {
++    "endDate": "2026-10-31",
++    "month": 10,
++    "reliabilityNote": "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
++    "rows": [
++      {
++        "adSoyad": "Ada Test",
++        "calismaGunu": 1,
++        "departman": "Bilinmiyor",
++        "fazlaMesaiSaat": 1,
++        "izinGunu": 0,
++        "sicilNo": "123",
++        "tcNo": "-",
++        "toplamSaat": 9,
++      },
++    ],
++    "scopeLabel": "Legacy",
++    "startDate": "2026-10-01",
++    "year": 2026,
++  },
++}
++`;
++
++exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır > table 1`] = `
++{
++  "reads": [
++    "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-10-18T21:00:00.000Z"],["lte","accessTime","2026-10-24T20:59:59.999Z"],["export"],["collect"]]",
++    "["cardReadings",["withIndex","by_project_employee_time"],["eq","projectId","projectId"],["eq","employeeId","employeeId"],["export"],["order","asc"],["take",20]]",
++    "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
++    "["generalSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++    "["holidays",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["collect"]]",
++    "["holidays",["withIndex","by_project"],["eq","projectId",null],["export"],["collect"]]",
++    "["leaves",["withIndex","by_employee_start"],["eq","employeeId","employeeId"],["lte","startDate","2026-10-23"],["export"],["collect"]]",
++    "["overtimeRates",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++    "["pdksRecords",["withIndex","by_employee_date"],["eq","employeeId","employeeId"],["gte","date","2026-10-19"],["lte","date","2026-10-23"],["export"],["collect"]]",
++    "["shiftAssignments",["withIndex","by_employee"],["eq","employeeId","employeeId"],["export"],["collect"]]",
++    "["shifts",["collect"]]",
++    "["userProjects",["withIndex","by_user"],["eq","userId","userId"],["export"],["collect"]]",
++    "["workSettings",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["first"]]",
++  ],
++  "result": [
++    {
++      "cardNumber": "123",
++      "days": [
++        {
++          "date": "2026-10-23",
++          "detail": {
++            "breakViolation": false,
++            "dayType": "workday",
++            "earlyExitMinutes": 0,
++            "isEarlyExit": false,
++            "isManual": false,
++            "plannedBreakEnd": null,
++            "plannedBreakStart": null,
++            "plannedEnd": "17:00",
++            "plannedStart": "08:00",
++            "punches": [],
++            "readingCount": 2,
++            "shiftName": "Gündüz",
++          },
++          "firstEntry": "08:00",
++          "isLate": false,
++          "lastExit": "17:00",
++          "lateMinutes": 0,
++          "leaveType": null,
++          "nightMinutes": 0,
++          "overtimeMinutes": 0,
++          "payrollCode": "N",
++          "rawTotalMinutes": 540,
++          "status": "present",
++          "totalMinutes": 480,
++        },
++      ],
++      "department": "",
++      "detailedLogs": [
++        {
++          "action": "Giriş",
++          "direction": "entry",
++          "location": "Bilinmiyor",
++          "time": "08:00",
++        },
++        {
++          "action": "Çıkış",
++          "direction": "exit",
++          "location": "Bilinmiyor",
++          "time": "17:00",
++        },
++      ],
++      "employeeId": "123",
++      "excludedUnknownReadings": 0,
++      "firstEntry": "08:00",
++      "hourlyRate": null,
++      "id": "employeeId",
++      "isEarlyExit": false,
++      "isLate": false,
++      "isManual": false,
++      "lastExit": "17:00",
++      "leaveType": "",
++      "manualEditedBy": null,
++      "manualNote": null,
++      "name": "Ada Test",
++      "nightMinutes": 0,
++      "overtime": "0m",
++      "overtimeHours": 0,
++      "overtimeMinutes": 0,
++      "overtimeMultiplier": 0,
++      "overtimePayTRY": null,
++      "payrollCode": "N",
++      "payrollEmployeeCode": "",
++      "rawTotalMinutes": 540,
++      "status": "present",
++      "totalHours": "8h 0m",
++      "totalMinutes": 480,
++      "yearlyOvertimeLimit": 270,
++    },
++  ],
++}
++`;
+diff --git a/convex/_generated/api.d.ts b/convex/_generated/api.d.ts
+index db15ba1b..d1048abd 100644
+--- a/convex/_generated/api.d.ts
++++ b/convex/_generated/api.d.ts
+@@ -187,6 +187,7 @@ import type * as mobileAccessGateway from "../mobileAccessGateway.js";
+ import type * as mobileAttendance from "../mobileAttendance.js";
+ import type * as mobileVisitors from "../mobileVisitors.js";
+ import type * as onboarding from "../onboarding.js";
++import type * as pdksRules from "../pdksRules.js";
+ import type * as pdksRecords from "../pdksRecords.js";
+ import type * as peopleActivity from "../peopleActivity.js";
+ import type * as positions from "../positions.js";
+@@ -394,6 +395,7 @@ declare const fullApi: ApiFromModules<{
+   mobileAttendance: typeof mobileAttendance;
+   mobileVisitors: typeof mobileVisitors;
+   onboarding: typeof onboarding;
++  pdksRules: typeof pdksRules;
+   pdksRecords: typeof pdksRecords;
+   peopleActivity: typeof peopleActivity;
+   positions: typeof positions;
+diff --git a/convex/cardReadings.ts b/convex/cardReadings.ts
+index f54ba900..2b2bfe78 100644
+--- a/convex/cardReadings.ts
++++ b/convex/cardReadings.ts
+@@ -1,3 +1,4 @@
++import { loadPdksPolicies } from "./lib/pdksRules";
+ import { employedDuring, employedOn } from "./lib/employment";
+ import { genericReaderTokenAllowed } from "./lib/mobileAccess";
+ import { stream } from "convex-helpers/server/stream";
+@@ -374,7 +375,8 @@ export const getPdksTableData = authedQuery({
+         v.literal("holiday"),
+         v.literal("future"),
+         v.literal("noData"),
+-        v.literal("notEmployed")
++        v.literal("notEmployed"),
++        v.literal("incomplete")
+       )
+     ),
+     person: v.optional(v.string()),
+@@ -465,7 +467,10 @@ export const getPdksTableData = authedQuery({
+     }
+ 
+     const sourceReadings = readings;
+-    readings = filterPdksReadings(readings, args.projectId);
++    const tableBoundaryShiftResolver = await buildShiftResolver(ctx, availabilityEmployees);
++    const tableBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId));
++    const policies = await loadPdksPolicies(ctx, availabilityEmployees.map(e => e.projectId), overtimeRange.startDate, overtimeRange.endDate);
++    readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, tableBoundaryWorkDate(r)));
+ 
+     readings.sort(
+       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
+@@ -486,7 +491,7 @@ export const getPdksTableData = authedQuery({
+           .query("generalSettings")
+           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
+           .first(),
+-        buildShiftResolver(ctx, availabilityEmployees),
++        Promise.resolve(tableBoundaryShiftResolver),
+       ]);
+     const workingDays =
+       generalSettings?.workingDays && generalSettings.workingDays.length > 0
+@@ -525,7 +530,7 @@ export const getPdksTableData = authedQuery({
+     const tableDepartments = await Promise.all([...new Set(employees.flatMap(e => e.departmentId ? [e.departmentId] : []))].map(id => ctx.db.get(id)));
+     const tableDeptById = new Map(tableDepartments.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [String(d._id), d]));
+ 
+-    const tableWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(shiftResolver.resolve(id, date), args.projectId));
++    const tableWorkDate = tableBoundaryWorkDate;
+     const tablePeriodDates = new Set(periodDateKeys);
+     const sourceReadingsByEmployee = buildPdksEmployeeReadingMap({
+       employees,
+@@ -548,8 +553,9 @@ export const getPdksTableData = authedQuery({
+           ? await ctx.db.get(manualToday.editedBy)
+           : null;
+ 
+-        const firstRecordDate = employee ? await pdksFirstRecordDate(ctx, employee, empReadings, tableManualDates.get(employee._id) ?? [], tableWorkDate) : null;
++        const firstRecordDate = employee ? await pdksFirstRecordDate(ctx, employee, empReadings, tableManualDates.get(employee._id) ?? [], tableWorkDate, policies) : null;
+         const row = computePdksTableRow({
++          policyFor: date => policies(employee?.projectId, date),
+           availableDateKeys: tableAvailableDates.get(employee?.projectId) ?? new Set<string>(),
+           firstRecordDate,
+           empKey,
+@@ -663,7 +669,10 @@ export const getMonthlyPayrollSheet = authedQuery({
+     }
+ 
+     employees = employees.filter(employee => employedDuring(employee, startDate, endDate));
+-    readings = filterPdksReadings(readings, args.projectId);
++    const payrollBoundaryShiftResolver = await buildShiftResolver(ctx, employees);
++    const payrollBoundaryWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId));
++    const policies = await loadPdksPolicies(ctx, employees.map(e => e.projectId), overtimeRange.startDate, overtimeRange.endDate);
++    readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, payrollBoundaryWorkDate(r)));
+ 
+     const [workSettings, holidayMap, generalSettings, payrollShiftResolver] =
+       await Promise.all([
+@@ -673,7 +682,7 @@ export const getMonthlyPayrollSheet = authedQuery({
+           .query("generalSettings")
+           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
+           .first(),
+-        buildShiftResolver(ctx, employees),
++        Promise.resolve(payrollBoundaryShiftResolver),
+       ]);
+     const workingDays =
+       generalSettings?.workingDays && generalSettings.workingDays.length > 0
+@@ -707,7 +716,7 @@ export const getMonthlyPayrollSheet = authedQuery({
+ 
+     const payrollEmployeesById = new Map(employees.map(e => [String(e._id), e]));
+     const payrollEmployeeReadings = buildPdksEmployeeReadingMap({ employees, readings });
+-    const payrollWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId));
++    const payrollWorkDate = payrollBoundaryWorkDate;
+     const payrollAvailableDates = pdksAvailableDatesByProject(readings, payrollWorkDate);
+     const payrollManualDates = pdksManualDatesByEmployee(manualByEmpDate.values());
+     const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
+@@ -733,10 +742,11 @@ export const getMonthlyPayrollSheet = authedQuery({
+           monthlyHoursBase: workSettings.monthlyHoursBase,
+         }) : null;
+ 
+-        const firstRecordDate = await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate);
++        const firstRecordDate = await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate, policies);
+         const availableDateKeys = payrollAvailableDates.get(emp.projectId) ?? new Set<string>();
+         const allCells = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).filter(date => employedOn(emp, date)).map((d) =>
+           computePayrollCell({
++            policyFor: date => policies(emp.projectId, date),
+             availableDateKeys,
+             firstRecordDate,
+             date: d,
+@@ -775,18 +785,21 @@ export const getMonthlyPayrollSheet = authedQuery({
+           (acc, c) => {
+             acc.totalMinutes += c.totalMinutes;
+             if (c.payrollCode === "İZN") acc.leaveDays += 1;
++            if (c.status === "incomplete") acc.incompleteDays += 1;
+             if (c.payrollCode === "DV") acc.absentDays += 1;
+-            if (c.isLate) acc.lateDays += 1;
++            if (c.isLate && c.status !== "incomplete") acc.lateDays += 1;
+             return acc;
+           },
+           {
+             totalMinutes: 0,
+             leaveDays: 0,
++            incompleteDays: 0,
+             absentDays: 0,
+             lateDays: 0,
+           }
+         );
+ 
++        const { incompleteDays, ...legacyTotals } = totals;
+         return {
+           employeeId: emp._id,
+           payrollCode: emp.payrollCode ?? "",
+@@ -796,7 +809,8 @@ export const getMonthlyPayrollSheet = authedQuery({
+           hourlyRate: empHourlyRate,
+           cells,
+           totals: {
+-            ...totals,
++            ...legacyTotals,
++            ...(cells.some(c => c.durationMeasured !== undefined) ? { incompleteDays } : {}),
+             overtimeMinutes: periodOvertime.overtimeMinutes,
+             overtimePayTRY: periodOvertime.overtimePayTRY,
+             exceedsDaily11h: periodOvertime.exceedsDaily11h,
+@@ -1323,7 +1337,10 @@ export const getEmployeeAttendanceDetail = authedQuery({
+       .withIndex("by_project", q => q.eq("projectId", employee.projectId)).collect();
+ 
+     const sourceReadings = readings;
+-    readings = filterPdksReadings(readings, args.projectId);
++    const detailBoundaryShiftResolver = await buildShiftResolver(ctx, availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate)));
++    const detailBoundaryWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(detailBoundaryShiftResolver.resolve(id, date), args.projectId));
++    const policies = await loadPdksPolicies(ctx, availabilityEmployees.map(e => e.projectId), overtimeRange.startDate, overtimeRange.endDate);
++    readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, detailBoundaryWorkDate(r)));
+ 
+     readings.sort(
+       (a, b) =>
+@@ -1357,7 +1374,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
+         employee.companyId ? ctx.db.get(employee.companyId) : Promise.resolve(null),
+         employee.positionId ? ctx.db.get(employee.positionId) : Promise.resolve(null),
+         employee.shiftId ? ctx.db.get(employee.shiftId) : Promise.resolve(null),
+-        buildShiftResolver(ctx, availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate))),
++        Promise.resolve(detailBoundaryShiftResolver),
+       ]);
+ 
+     const workingDays =
+@@ -1380,11 +1397,12 @@ export const getEmployeeAttendanceDetail = authedQuery({
+       sourceReadings.filter(r => detailPeriodDates.has(detailWorkDate(r))),
+       employee.projectId,
+     );
+-    const availableDateKeys = await readPdksAvailableDateKeys(ctx, employee.projectId, periodDateKeys, detailWorkDate);
+-    const firstRecordDate = await pdksFirstRecordDate(ctx, employee, readings, [...manualByDate.keys()], detailWorkDate);
++    const availableDateKeys = await readPdksAvailableDateKeys(ctx, employee.projectId, periodDateKeys, detailWorkDate, policies);
++    const firstRecordDate = await pdksFirstRecordDate(ctx, employee, readings, [...manualByDate.keys()], detailWorkDate, policies);
+     const scopedLeaves = leaves.filter(l => pdksLeaveMatchesProject(l, employee.projectId));
+     const allDays = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).filter(date => employedOn(employee, date)).map((dk) =>
+       computeAttendanceDetailDay({
++        policyFor: date => policies(employee.projectId, date),
+         availableDateKeys,
+         firstRecordDate,
+         date: dk,
+@@ -1431,6 +1449,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
+         workedDays: summary.workedDays,
+         lateDays: summary.lateDays,
+         absentDays: summary.absentDays,
++        incompleteDays: summary.incompleteDays,
+         leaveDays: summary.leaveDays,
+         overtimeMinutes: summary.overtimeMinutes,
+         overtimePayTRY: summary.overtimePayTRY,
+diff --git a/convex/dashboard.ts b/convex/dashboard.ts
+index b922a9fa..79b9df5d 100644
+--- a/convex/dashboard.ts
++++ b/convex/dashboard.ts
+@@ -1,3 +1,7 @@
++import { loadRuleReportDays } from "./lib/reportAttendance";
++import { resolveAttendanceEvidence } from "./lib/pdksEvidence";
++import { buildPdksWorkDateResolver, groupPdksWorkDays } from "./lib/pdksWorkDay";
++import type { PdksTableRow } from "./lib/pdksTable";
+ import { filterPdksReadings } from "./lib/pdksSource";
+ import { summarizeDailyReadings } from "./lib/dashboardActivity";
+ import { countDashboardRows } from "./lib/dashboardCounts";
+@@ -164,12 +168,15 @@ async function loadPdksDataset(
+ ): Promise<{
+   employees: Doc<"employees">[];
+   readings: Doc<"cardReadings">[];
++  activityReadings: Doc<"cardReadings">[];
+   leaves: Doc<"leaves">[];
+   deptNameById: Map<string, string>;
+   shiftResolver: ShiftResolver;
+   workSettings: EffectiveWorkSettings;
++  ruleRows: Map<Id<"employees">, PdksTableRow>;
+ }> {
+   const allowedProjectIds = await resolveProjectScope(ctx, filters.projectId);
++  const ruleReport = await loadRuleReportDays(ctx, allowedProjectIds, trDateKey(rangeStartISO), trDateKey(rangeEndISO), { includeLegacyReadings: false });
+   let employees: Doc<"employees">[] = [];
+   let readings: Doc<"cardReadings">[] = [];
+ 
+@@ -244,7 +251,22 @@ async function loadPdksDataset(
+     ? await getEffectiveWorkSettings(ctx, settingsProjectId)
+     : DEFAULT_WORK_SETTINGS;
+ 
+-  return { employees, readings: filterPdksReadings(readings, filters.projectId), leaves, deptNameById, shiftResolver, workSettings };
++  const workDate = buildPdksWorkDateResolver(employees, shiftResolver.resolve);
++  const filtered = filterPdksReadings(readings, filters.projectId, r => ruleReport.policies(r.projectId, workDate(r)));
++  const legacy = filtered.filter(r => ruleReport.policies(r.projectId, workDate(r)).punchMode !== "requirements");
++  const versioned: Doc<"cardReadings">[] = [];
++  for (const employee of employees) {
++    for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve)) {
++      const policy = ruleReport.policies(employee.projectId, date);
++      if (policy.punchMode !== "requirements") continue;
++      const cell = ruleReport.ruleRows.get(employee._id)?.days.find(day => day.date === date);
++      if (cell?.status !== "present" && cell?.status !== "late") continue;
++      const evidence = resolveAttendanceEvidence(list, undefined, policy);
++      const selected = list.filter(r => r.accessTime === evidence.firstISO || r.accessTime === evidence.lastISO);
++      versioned.push(...(evidence.durationMeasured ? selected : selected.slice(0, 1)));
++    }
++  }
++  return { employees, readings: [...legacy, ...versioned], activityReadings: filtered, leaves, deptNameById, shiftResolver, workSettings, ruleRows: ruleReport.ruleRows };
+ }
+ 
+ function computePdksCoreInMemory(
+@@ -355,7 +377,7 @@ export const getAnnualOvertimeBalance = authedQuery({
+     const targetYear = args.year ?? Number(trTodayKey().slice(0, 4));
+     const { startISO, endISO } = trDayRangeISO(`${targetYear}-01-01`, `${targetYear}-12-31`);
+ 
+-    const { employees, readings, shiftResolver } =
++    const { employees, readings, shiftResolver, ruleRows } =
+       await loadPdksDataset(ctx, startISO, endISO, { projectId: args.projectId });
+ 
+     const targetEmployees = args.employeeId
+@@ -389,10 +411,10 @@ export const getAnnualOvertimeBalance = authedQuery({
+         const net = netWorkMinutes(rawMin, shift);
+         const dow = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+         const classification: DayEntry["classification"] = dow === 0 || dow === 6 ? "weekend" : "workday";
+-        dayEntries.push({ date, netMinutes: net, classification });
++        if (!ruleRows.get(emp._id)?.days.some(day => day.date === date)) dayEntries.push({ date, netMinutes: net, classification });
+       }
+       const buckets = bucketWeeklyOvertime(dayEntries);
+-      const totalMin = buckets.reduce((s, b) => s + b.overtimeMinutes + b.premiumMinutes, 0);
++      const totalMin = buckets.reduce((s, b) => s + b.overtimeMinutes + b.premiumMinutes, 0) + (ruleRows.get(emp._id)?.days.reduce((sum, day) => sum + day.overtimeMinutes, 0) ?? 0);
+       const limitMin = ANNUAL_OVERTIME_LIMIT_MINUTES;
+       return {
+         employeeId: emp._id,
+@@ -430,7 +452,7 @@ export const getRepeatLateOffenders = authedQuery({
+     start.setUTCDate(start.getUTCDate() - daysBack);
+     const { startISO, endISO } = trDayRangeISO(trDateKey(start.toISOString()), trDateKey(end.toISOString()));
+ 
+-    const { employees, readings, shiftResolver, workSettings } =
++    const { employees, readings, shiftResolver, workSettings, ruleRows } =
+       await loadPdksDataset(ctx, startISO, endISO, { projectId: args.projectId });
+ 
+     const empById = new Map(employees.map((e) => [String(e._id), e]));
+@@ -446,6 +468,7 @@ export const getRepeatLateOffenders = authedQuery({
+       const [empKey, dateKey] = key.split("__");
+       const emp = empById.get(empKey);
+       if (!emp) continue;
++      if (ruleRows.get(emp._id)?.days.some(day => day.date === dateKey)) continue;
+       const shift = shiftResolver.resolve(emp._id, dateKey);
+       const { lateThresholdMin } = thresholdsForShift(shift, workSettings);
+       const arrivalMin = isoTimeToTRMinutes(accessTime);
+@@ -454,6 +477,11 @@ export const getRepeatLateOffenders = authedQuery({
+       }
+     }
+ 
++    for (const [employeeId, row] of ruleRows) {
++      if (!empById.has(employeeId)) continue;
++      const count = row.days.filter(day => day.status === "late").length;
++      if (count) lateCountByEmp.set(employeeId, (lateCountByEmp.get(employeeId) ?? 0) + count);
++    }
+     return [...lateCountByEmp.entries()]
+       .filter(([, count]) => count >= minCount)
+       .map(([empKey, count]) => {
+@@ -590,14 +618,27 @@ export const getActivitySummary = authedQuery({
+     const { startISO, endISO } = trDayRangeISO(today, today);
+     const dataset = await loadPdksDataset(ctx, startISO, endISO, args);
+     const employeeIds = new Set(dataset.employees.map((employee) => employee._id));
+-    const readings = dataset.readings.filter((reading) =>
++    const readings = dataset.activityReadings.filter((reading) =>
+       reading.employeeId && employeeIds.has(reading.employeeId) && reading.accessStatus === "izin_verildi"
+     ).sort((a, b) => a.accessTime.localeCompare(b.accessTime));
+-    const daily = summarizeDailyReadings(readings);
++    const daily = summarizeDailyReadings(readings.filter(r => r.direction === "entry" || r.direction === "exit" || (!r.employeeId || !dataset.ruleRows.has(r.employeeId))));
+     const { core } = computePdksCoreInMemory(
+       dataset.employees, readings.filter((reading) => reading.direction !== "exit"), dataset.leaves,
+       { start: startISO, end: endISO }, dataset.deptNameById, dataset.shiftResolver, dataset.workSettings,
+     );
++    const ruleCells = [...dataset.ruleRows].filter(([id]) => employeeIds.has(id)).flatMap(([id, row]) => row.days.map(day => ({ id, day })));
++    const governedIds = new Set(ruleCells.map(cell => cell.id));
++    const legacyPresent = new Set(readings.filter(r => r.employeeId && !governedIds.has(r.employeeId)).map(r => r.employeeId));
++    const presentRules = new Set(readings.filter(r => r.employeeId && governedIds.has(r.employeeId) && r.direction === "entry").map(r => r.employeeId));
++    if (governedIds.size) {
++      core.presentToday = legacyPresent.size + presentRules.size;
++      const firstEntries = new Map<Id<"employees">, Doc<"cardReadings">>();
++      for (const reading of readings) {
++        if (!reading.employeeId || reading.direction === "exit" || (governedIds.has(reading.employeeId) && reading.direction !== "entry") || firstEntries.has(reading.employeeId)) continue;
++        firstEntries.set(reading.employeeId, reading);
++      }
++      core.lateArrivals = new Set([...firstEntries].filter(([id, reading]) => isoTimeToTRMinutes(reading.accessTime) > thresholdsForShift(dataset.shiftResolver.resolve(id, today), dataset.workSettings).lateThresholdMin).map(([id]) => id)).size;
++    }
+     const settingsProjectId = args.projectId ?? dataset.employees[0]?.projectId;
+     const settings = settingsProjectId
+       ? await ctx.db.query("workSettings").withIndex("by_project", (q) => q.eq("projectId", settingsProjectId)).first()
+@@ -609,7 +650,8 @@ export const getActivitySummary = authedQuery({
+       averageFirstEntry: daily.averageFirstEntry,
+       averageLastExit: daily.averageLastExit,
+       lateArrivals: hasReadings ? core.lateArrivals : null,
+-      presentToday: hasReadings ? core.presentToday : null,
++      presentToday: hasReadings || ruleCells.length ? core.presentToday : null,
++      incompleteDays: ruleCells.filter(c => c.day.status === "incomplete").length,
+       insideBuilding: hasReadings ? daily.insideBuilding : null,
+     };
+   },
+diff --git a/convex/lib/auditLogQuery.test.ts b/convex/lib/auditLogQuery.test.ts
+index a52d6953..dea51413 100644
+--- a/convex/lib/auditLogQuery.test.ts
++++ b/convex/lib/auditLogQuery.test.ts
+@@ -80,6 +80,7 @@ describe("denetim sorgusu", () => {
+       "leaves",
+       "overtimeRates",
+       "pdksRecords",
++      "pdksRuleVersions",
+       "projectPrivacySettings",
+       "users",
+     ]);
+diff --git a/convex/lib/auditLogQuery.ts b/convex/lib/auditLogQuery.ts
+index f3920d23..d7d44a66 100644
+--- a/convex/lib/auditLogQuery.ts
++++ b/convex/lib/auditLogQuery.ts
+@@ -1,6 +1,7 @@
+ import { trDayRangeISO } from "./trDate";
+ 
+ export const AUDIT_TARGET_LABELS: Record<string, string> = {
++  pdksRuleVersions: "PDKS kuralları",
+   users: "Kullanıcılar",
+   projectPrivacySettings: "Proje gizlilik ayarları",
+   cardReadings: "Kart okumaları",
+diff --git a/convex/lib/mobileAttendance.ts b/convex/lib/mobileAttendance.ts
+index 2745e7af..1b1492d5 100644
+--- a/convex/lib/mobileAttendance.ts
++++ b/convex/lib/mobileAttendance.ts
+@@ -1,6 +1,7 @@
+ import { ConvexError } from "convex/values";
+ import type { Doc } from "../_generated/dataModel";
+-import { isPdksEligibleReading } from "./pdksSource";
++import type { PdksPolicyResolver } from "./pdksRules";
++import { filterPdksReadings } from "./pdksSource";
+ 
+ export const ATTENDANCE_TIME_ZONE = "Europe/Istanbul" as const;
+ export const SUMMARY_MAX_DAYS = 93;
+@@ -110,7 +111,8 @@ export type MovementDay = {
+  * pairing (pdksWorkDay). A 01:00 exit belongs to its own Istanbul calendar day. */
+ export function summarizeMovements(
+   readings: readonly Doc<"cardReadings">[], startDate: string, endDate: string,
+-  projectId: Doc<"employees">["projectId"], generatedAt: string,
++  projectId: Doc<"employees">["projectId"], generatedAt: string, policyFor?: PdksPolicyResolver,
++  rules?: { workDate: (reading: Doc<"cardReadings">) => string; presentDates: ReadonlySet<string> },
+ ) {
+   attendanceDateRange(startDate, endDate, SUMMARY_MAX_DAYS);
+   const days: MovementDay[] = [];
+@@ -135,7 +137,7 @@ export function summarizeMovements(
+     if (reading.accessStatus === "reddedildi") {
+       day.deniedCount++;
+     } else if (reading.accessStatus !== "izin_verildi" || !projectId || reading.projectId !== projectId ||
+-        !isPdksEligibleReading(reading) || (reading.direction !== "entry" && reading.direction !== "exit")) {
++        !filterPdksReadings([reading], projectId, policyFor ? r => policyFor(rules?.workDate(r) ?? new Date(Date.parse(r.accessTime) + ISTANBUL_OFFSET_MS).toISOString().slice(0, 10)) : undefined).length || (reading.direction !== "entry" && reading.direction !== "exit")) {
+       day.unknownCount++;
+       day.lastDirection = "unknown";
+     } else if (reading.direction === "entry") {
+@@ -155,7 +157,10 @@ export function summarizeMovements(
+     totals.exitCount += day.exitCount;
+     totals.deniedCount += day.deniedCount;
+     totals.unknownCount += day.unknownCount;
+-    if (day.entryCount > 0) totals.presentDays++;
++    const policy = policyFor?.(day.date);
++    if (policy?.punchMode === "requirements") {
++      if (rules?.presentDates.has(day.date)) totals.presentDays++;
++    } else if (day.entryCount > 0) totals.presentDays++;
+   }
+   return { startDate, endDate, timeZone: ATTENDANCE_TIME_ZONE, generatedAt, days, totals };
+ }
+diff --git a/convex/lib/pdksAvailability.ts b/convex/lib/pdksAvailability.ts
+index a99592ab..c27d88fb 100644
+--- a/convex/lib/pdksAvailability.ts
++++ b/convex/lib/pdksAvailability.ts
+@@ -1,6 +1,7 @@
+ import type { Doc, Id } from "../_generated/dataModel";
+ import type { QueryCtx } from "../_generated/server";
+-import { isPdksEligibleReading } from "./pdksSource";
++import { loadPdksRulePolicy, type PdksPolicyResolver, type PdksProjectPolicies } from "./pdksRules";
++import { isPdksIncludedReading } from "./pdksSource";
+ import { pdksWorkDayRange } from "./pdksWorkDay";
+ import { trDateKey } from "./trDate";
+ 
+@@ -11,12 +12,20 @@ export function pdksAvailableDateKeys(readings: readonly Doc<"cardReadings">[],
+ 
+ /** Scan at most 20 indexed candidates; if all are excluded, use the selected period.
+  * Unproven earlier history stays noData instead of manufacturing absences. */
+-export async function pdksFirstRecordDate(ctx: QueryCtx, employee: Doc<"employees">, readings: readonly Doc<"cardReadings">[], manualDates: readonly string[] = [], workDay: (reading: Doc<"cardReadings">) => string = reading => trDateKey(reading.accessTime)): Promise<string | null> {
++export async function pdksFirstRecordDate(ctx: QueryCtx, employee: Doc<"employees">, readings: readonly Doc<"cardReadings">[], manualDates: readonly string[] = [], workDay: (reading: Doc<"cardReadings">) => string = reading => trDateKey(reading.accessTime), policies?: PdksProjectPolicies): Promise<string | null> {
+   const candidates = await ctx.db.query("cardReadings")
+     .withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", employee._id))
+     .order("asc").take(20);
+-  const eligibleCandidates = candidates.filter(r => r.projectId === employee.projectId && isPdksEligibleReading(r));
+-  const periodReadings = readings.filter(r => r.projectId === employee.projectId && (r.employeeId === employee._id || r.cardNo === employee.cardNumber) && isPdksEligibleReading(r));
++  // At most 20 historical dates, each with one predecessor lookup and bounded targets.
++  const historical = new Map<string, PdksPolicyResolver>();
++  const historyStart = policies?.historyStart(employee.projectId);
++  if (historyStart) {
++    const dates = [...new Set(candidates.map(workDay).filter(date => date < historyStart))];
++    await Promise.all(dates.map(async date => historical.set(date, await loadPdksRulePolicy(ctx, employee.projectId, date, date))));
++  }
++  const policyFor = (reading: Doc<"cardReadings">) => historical.get(workDay(reading))?.(workDay(reading)) ?? policies?.(reading.projectId, workDay(reading));
++  const eligibleCandidates = candidates.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r)));
++  const periodReadings = readings.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r))).filter(r => r.employeeId === employee._id || r.cardNo === employee.cardNumber);
+   const allowed = [...eligibleCandidates, ...periodReadings].filter(r => r.accessStatus === "izin_verildi");
+   // Rejected attempts only preserve the legacy fallback when no granted record is known.
+   const history = allowed.length > 0 ? allowed : [...eligibleCandidates.slice(0, 1), ...periodReadings];
+@@ -52,12 +61,12 @@ export function pdksLeaveMatchesProject(leave: Pick<Doc<"leaves">, "projectId">,
+ 
+ /** Indexed existence checks stop at the first eligible reading for each work day.
+  * Include next-calendar-day exits and use all project employees' shift assignments. */
+-export async function readPdksAvailableDateKeys(ctx: QueryCtx, projectId: Id<"projects"> | undefined, dates: readonly string[], workDate: (reading: Doc<"cardReadings">) => string): Promise<Set<string>> {
++export async function readPdksAvailableDateKeys(ctx: QueryCtx, projectId: Id<"projects"> | undefined, dates: readonly string[], workDate: (reading: Doc<"cardReadings">) => string, policies?: PdksProjectPolicies): Promise<Set<string>> {
+   const available = await Promise.all(dates.map(async date => {
+     const { startISO, endISO } = pdksWorkDayRange(date, date);
+     const candidates = ctx.db.query("cardReadings").withIndex("by_project_access_time", q => q.eq("projectId", projectId).gte("accessTime", startISO).lte("accessTime", endISO));
+     for await (const reading of candidates) {
+-      if (isPdksEligibleReading(reading) && workDate(reading) === date) return date;
++      if (isPdksIncludedReading(reading, projectId, policies?.(reading.projectId, workDate(reading))) && workDate(reading) === date) return date;
+     }
+     return null;
+   }));
+diff --git a/convex/lib/pdksCalc.ts b/convex/lib/pdksCalc.ts
+index bd922912..d5a37629 100644
+--- a/convex/lib/pdksCalc.ts
++++ b/convex/lib/pdksCalc.ts
+@@ -18,7 +18,8 @@ export type DayStatus =
+   | "absent"
+   | "leave"
+   | "weekend"
+-  | "holiday";
++  | "holiday"
++  | "incomplete";
+ 
+ /**
+  * `startDate`..`endDate` (dahil) arası YYYY-MM-DD anahtarları, UTC gün döngüsüyle.
+@@ -112,10 +113,11 @@ export function computeBreakViolation(params: {
+   });
+ }
+ 
+-/** summary modu yalnız bu 4 değeri üretir (hafta sonu/tatil yok). */
+-export type SummaryDayStatus = "present" | "late" | "absent" | "leave";
++/** Legacy summary has four states; requirements may additionally need review. */
++export type SummaryDayStatus = "present" | "late" | "absent" | "leave" | "incomplete";
+ 
+ interface DayStatusInput {
++  attendanceDecision?: "present" | "absent" | "incomplete";
+   classification: "workday" | "weekend" | "holiday" | "halfDayHoliday";
+   hasAttendance: boolean;
+   hasLeave: boolean;
+@@ -142,6 +144,12 @@ export function resolveDayStatus(
+   opts: { mode: "summary" | "calendar" } & DayStatusInput,
+ ): DayStatus {
+   const { mode, classification, hasAttendance, hasLeave, isLate } = opts;
++  if (opts.attendanceDecision !== undefined) {
++    if (mode === "calendar" && (classification === "holiday" || classification === "halfDayHoliday")) return "holiday";
++    if (mode === "calendar" && classification === "weekend") return "weekend";
++    if (hasLeave) return "leave";
++    if (opts.attendanceDecision === "incomplete") return "incomplete";
++  }
+ 
+   if (mode === "summary") {
+     if (hasLeave && !hasAttendance) return "leave";
+diff --git a/convex/lib/pdksDay.ts b/convex/lib/pdksDay.ts
+index 8e4bcdd6..b861daef 100644
+--- a/convex/lib/pdksDay.ts
++++ b/convex/lib/pdksDay.ts
+@@ -1,3 +1,5 @@
++import { resolveAttendanceEvidence } from "./pdksEvidence";
++import { LEGACY_PDKS_POLICY, type PdksDayPolicy } from "./pdksRules";
+ import type { Doc } from "../_generated/dataModel";
+ import { legalBreakMinutes } from "./breakDeduction";
+ import { minutesBetweenISO } from "./pdksCalc";
+@@ -45,6 +47,7 @@ function recurringWindows(
+ /** One calculation for table, detail and payroll. All minutes are on the shift-start
+  * day's timeline; legal breaks without a scheduled window are allocated proportionally. */
+ export function computePdksDay(params: {
++  policy?: PdksDayPolicy;
+   date: string;
+   readings: readonly Doc<"cardReadings">[];
+   manual?: Doc<"pdksRecords">;
+@@ -73,10 +76,15 @@ export function computePdksDay(params: {
+       : undefined,
+     shift,
+   );
+-  const firstISO = manual?.entryTime
++  const directedEntry = readings.find(r => r.direction === "entry")?.accessTime;
++  const directedFallback = directedEntry ? `${String(Math.floor(isoTimeToTRMinutes(directedEntry) / 60)).padStart(2, "0")}:${String(isoTimeToTRMinutes(directedEntry) % 60).padStart(2, "0")}` : undefined;
++  const evidenceManualTimes = manualPdksTimes(date, manual ? { ...manual, entryTime: manual.entryTime ?? directedFallback } : undefined, shift);
++  const evidence = (params.policy ?? LEGACY_PDKS_POLICY).punchMode === "requirements"
++    ? resolveAttendanceEvidence(readings, { entryISO: manual?.entryTime ? evidenceManualTimes.entryISO : undefined, exitISO: evidenceManualTimes.exitISO }, params.policy ?? LEGACY_PDKS_POLICY) : null;
++  const firstISO = evidence ? evidence.firstISO : manual?.entryTime
+     ? (manualTimes.entryISO ?? null)
+     : (rawEntry ?? null);
+-  const lastISO =
++  const lastISO = evidence ? evidence.lastISO :
+     manualTimes.exitISO ??
+     (readings.length > 1
+       ? (readings[readings.length - 1]?.accessTime ?? null)
+@@ -249,7 +257,10 @@ export function computePdksDay(params: {
+     earlyExitMinutes,
+     exitNextDay: exit !== undefined && exit >= 1440,
+     isOvernightShift: isOvernightShift(shift),
+-    hasAttendance: !!firstISO || !!lastISO,
++    hasAttendance: evidence ? evidence.attendanceCredit : !!firstISO || !!lastISO,
++    attendanceDecision: evidence?.decision,
++    durationMeasured: evidence?.durationMeasured ?? (!!firstISO && !!lastISO),
++    punchQuality: evidence?.punchQuality ?? (firstISO && lastISO ? "ok" as const : firstISO ? "missingExit" as const : lastISO ? "missingEntry" as const : "noPunch" as const),
+     overtimePayTRY:
+       params.hourlyRate != null && overtimeMinutes > 0
+         ? (weightedOvertimeMinutes / 60) * params.hourlyRate
+diff --git a/convex/lib/pdksDetail.ts b/convex/lib/pdksDetail.ts
+index d7bcc949..924a7a7f 100644
+--- a/convex/lib/pdksDetail.ts
++++ b/convex/lib/pdksDetail.ts
+@@ -1,3 +1,4 @@
++import type { PdksPolicyResolver } from "./pdksRules";
+ // Reading inputs must already be source-filtered at the handler/loader boundary.
+ import { classifyPdksDay } from "./pdksTable";
+ import type { Doc } from "../_generated/dataModel";
+@@ -12,6 +13,7 @@ import { calculatePeriodOvertime, type OvertimeDay } from "./overtimeCalc";
+ import { computePdksDay } from "./pdksDay";
+ 
+ export function computeAttendanceDetailDay(params: {
++  policyFor?: PdksPolicyResolver;
+   date: string;
+   availableDateKeys: ReadonlySet<string>;
+   firstRecordDate?: string | null;
+@@ -27,6 +29,7 @@ export function computeAttendanceDetailDay(params: {
+ }) {
+   const { date, dayShift, workSettings } = params;
+   const day = computePdksDay({
++      policy: params.policyFor?.(date),
+     date,
+     readings: params.dayReadings,
+     manual: params.manualDay,
+@@ -43,13 +46,16 @@ export function computeAttendanceDetailDay(params: {
+   const settings = settingsForShift(dayShift, workSettings);
+   const status = classifyPdksDay({
+     date,
+-    dataAvailable: params.availableDateKeys.has(date),
++    dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manualDay),
+     firstRecordDate: params.firstRecordDate,
+-    shiftStart: dayShift?.startTime,
++    shiftStart: dayShift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
++    shiftEnd: settings.workEndTime,
++    earlyExitTolerance: settings.earlyExitToleranceMinutes,
+     hasAssignedShift:
+       params.firstRecordDate !== undefined ? dayShift !== null : undefined,
+     lateTolerance: settings.maxLateMinutes,
+     classification: day.classification,
++    attendanceDecision: day.attendanceDecision,
+     hasAttendance: day.hasAttendance,
+     hasLeave: !!leave,
+     isLate: day.isLate,
+@@ -61,6 +67,8 @@ export function computeAttendanceDetailDay(params: {
+   });
+   return {
+     date,
++    durationMeasured: day.durationMeasured,
++    punchQuality: day.punchQuality,
+     overtimeSegments: day.overtimeSegments,
+     firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
+     lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
+@@ -72,7 +80,7 @@ export function computeAttendanceDetailDay(params: {
+     isLate: day.isLate,
+     isEarlyExit: day.isEarlyExit,
+     payrollCode:
+-      status === "future" || status === "noData" || status === "notEmployed"
++      status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
+         ? "—"
+         : code,
+     overtimeMinutes: day.overtimeMinutes,
+@@ -103,10 +111,12 @@ export function summarizeAttendanceDays(
+       if (d.status === "present" || d.status === "late") acc.workedDays += 1;
+       if (d.status === "late") acc.lateDays += 1;
+       if (d.status === "absent") acc.absentDays += 1;
++      if (d.status === "incomplete") acc.incompleteDays += 1;
+       if (d.status === "leave") acc.leaveDays += 1;
+       return acc;
+     },
+-    { totalMinutes: 0, workedDays: 0, lateDays: 0, absentDays: 0, leaveDays: 0 },
++    { incompleteDays: 0, totalMinutes: 0, workedDays: 0, lateDays: 0, absentDays: 0, leaveDays: 0 },
+   );
+-  return { ...totals, ...calculatePeriodOvertime(days, options) };
++  const { incompleteDays, ...legacyTotals } = totals;
++  return { ...legacyTotals, ...(days.length ? { incompleteDays } : {}), ...calculatePeriodOvertime(days, options) };
+ }
+diff --git a/convex/lib/pdksEvidence.test.ts b/convex/lib/pdksEvidence.test.ts
+new file mode 100644
+index 00000000..cf9864f4
+--- /dev/null
++++ b/convex/lib/pdksEvidence.test.ts
+@@ -0,0 +1,34 @@
++import { describe, expect, it } from "vitest";
++import { resolveAttendanceEvidence } from "./pdksEvidence";
++import { LEGACY_PDKS_POLICY, type PdksDayPolicy } from "./pdksRules";
++const entry = { accessTime: "2026-10-23T05:00:00.000Z", direction: "entry" };
++const exit = { accessTime: "2026-10-23T14:00:00.000Z", direction: "exit" };
++const policy = (requireCheckIn: boolean, requireCheckOut: boolean, missingRequiredPunch: "absent" | "review" = "review", noPunch: "absent" | "review" = "absent"): PdksDayPolicy => ({ ...LEGACY_PDKS_POLICY, punchMode: "requirements", requireCheckIn, requireCheckOut, missingRequiredPunch, noPunch });
++describe("PDKS yön kanıtı", () => {
++  for (const requireIn of [true, false]) for (const requireOut of [true, false]) for (const missing of ["absent", "review"] as const) {
++    const p = policy(requireIn, requireOut, missing);
++    const fail = missing === "review" ? "incomplete" : "absent";
++    it(`matris ${requireIn}/${requireOut}/${missing}`, () => {
++      expect(resolveAttendanceEvidence([entry, exit], undefined, p)).toMatchObject({ decision: "present", durationMeasured: true, punchQuality: "ok" });
++      expect(resolveAttendanceEvidence([entry], undefined, p)).toMatchObject({ decision: requireOut ? fail : "present", durationMeasured: false, punchQuality: "missingExit" });
++      expect(resolveAttendanceEvidence([exit], undefined, p)).toMatchObject({ decision: requireIn ? fail : "present", durationMeasured: false, punchQuality: "missingEntry" });
++      expect(resolveAttendanceEvidence([], undefined, p)).toMatchObject({ decision: "absent", durationMeasured: false, punchQuality: "noPunch" });
++      expect(resolveAttendanceEvidence([], undefined, { ...p, noPunch: "review" }).decision).toBe("incomplete");
++    });
++  }
++  it("iki giriş ve ters çift süre üretmez", () => {
++    expect(resolveAttendanceEvidence([entry, { ...exit, direction: "entry" }], undefined, policy(true, true))).toMatchObject({ decision: "incomplete", durationMeasured: false });
++    expect(resolveAttendanceEvidence([{ ...entry, direction: "exit" }, { ...exit, direction: "entry" }], undefined, policy(true, true))).toMatchObject({ decision: "incomplete", durationMeasured: false });
++  });
++  it("yönsüz kayıt otomatik devamsız olmaz", () => {
++    expect(resolveAttendanceEvidence([{ accessTime: entry.accessTime }], undefined, policy(true, true, "absent"))).toMatchObject({ decision: "incomplete", punchQuality: "undirected", durationMeasured: false });
++  });
++  it("manuel kendi yönünü tamamlar ve uygun son çıkışı seçer", () => {
++    expect(resolveAttendanceEvidence([exit], { entryISO: "2026-10-23T08:00:00+03:00" }, policy(true, true))).toMatchObject({ firstISO: entry.accessTime, lastISO: exit.accessTime, durationMeasured: true, decision: "present" });
++    expect(resolveAttendanceEvidence([entry], { exitISO: exit.accessTime }, policy(true, true))).toMatchObject({ durationMeasured: true, decision: "present" });
++    expect(resolveAttendanceEvidence([], { exitISO: exit.accessTime }, policy(true, true))).toMatchObject({ durationMeasured: false, punchQuality: "missingEntry" });
++  });
++  it("legacy tek çıkışı bugünkü gibi giriş kabul eder", () => {
++    expect(resolveAttendanceEvidence([exit], undefined, LEGACY_PDKS_POLICY)).toMatchObject({ firstISO: exit.accessTime, lastISO: null, decision: "present", durationMeasured: false });
++  });
++});
+diff --git a/convex/lib/pdksEvidence.ts b/convex/lib/pdksEvidence.ts
+new file mode 100644
+index 00000000..234567a3
+--- /dev/null
++++ b/convex/lib/pdksEvidence.ts
+@@ -0,0 +1,34 @@
++import type { PdksDayPolicy } from "./pdksRules";
++export type PunchQuality = "ok" | "missingEntry" | "missingExit" | "noPunch" | "undirected";
++export type AttendanceEvidence = {
++  firstISO: string | null;
++  lastISO: string | null;
++  durationMeasured: boolean;
++  punchQuality: PunchQuality;
++  attendanceCredit: boolean;
++  decision: "present" | "absent" | "incomplete";
++};
++/** Manual timestamps have explicit directions and override that side only. */
++export function resolveAttendanceEvidence(
++  dayReadings: readonly { accessTime: string; direction?: string; accessStatus?: string }[],
++  manual: { entryISO?: string; exitISO?: string } | undefined,
++  policy: PdksDayPolicy,
++): AttendanceEvidence {
++  const readings = dayReadings.filter(r => !r.accessStatus || r.accessStatus === "izin_verildi")
++    .slice().sort((a, b) => a.accessTime.localeCompare(b.accessTime));
++  if (policy.punchMode === "legacy") {
++    const firstISO = manual?.entryISO ?? readings[0]?.accessTime ?? null;
++    const lastISO = manual?.exitISO ?? (readings.length > 1 ? readings[readings.length - 1]?.accessTime ?? null : null);
++    const attendanceCredit = !!firstISO || !!lastISO;
++    return { firstISO, lastISO, durationMeasured: !!firstISO && !!lastISO, punchQuality: firstISO && lastISO ? "ok" : firstISO ? "missingExit" : lastISO ? "missingEntry" : "noPunch", attendanceCredit, decision: attendanceCredit ? "present" : "absent" };
++  }
++  const firstISO = (manual?.entryISO ? new Date(manual.entryISO).toISOString() : undefined) ?? readings.find(r => r.direction === "entry")?.accessTime ?? null;
++  const lastISO = (manual?.exitISO ? new Date(manual.exitISO).toISOString() : undefined) ?? [...readings].reverse().find(r => r.direction === "exit" && (!firstISO || r.accessTime > firstISO))?.accessTime ?? null;
++  const durationMeasured = !!firstISO && !!lastISO && lastISO > firstISO;
++  const undirected = readings.some(r => r.direction !== "entry" && r.direction !== "exit");
++  const noPunch = readings.length === 0 && !manual?.entryISO && !manual?.exitISO;
++  const punchQuality: PunchQuality = undirected ? "undirected" : durationMeasured ? "ok" : noPunch ? "noPunch" : !firstISO ? "missingEntry" : "missingExit";
++  const missing = (policy.requireCheckIn && !firstISO) || (policy.requireCheckOut && (!lastISO || (!!firstISO && !durationMeasured)));
++  const decision = undirected && missing ? "incomplete" : noPunch ? (policy.noPunch === "review" ? "incomplete" : "absent") : missing ? (policy.missingRequiredPunch === "review" ? "incomplete" : "absent") : "present";
++  return { firstISO, lastISO: lastISO && firstISO && lastISO <= firstISO ? null : lastISO, durationMeasured, punchQuality, attendanceCredit: decision === "present", decision };
++}
+diff --git a/convex/lib/pdksPayroll.ts b/convex/lib/pdksPayroll.ts
+index 3c5f58db..dcb69559 100644
+--- a/convex/lib/pdksPayroll.ts
++++ b/convex/lib/pdksPayroll.ts
+@@ -1,3 +1,4 @@
++import type { PdksPolicyResolver } from "./pdksRules";
+ // Reading inputs must already be source-filtered at the handler/loader boundary.
+ import { classifyPdksDay } from "./pdksTable";
+ import type { Doc } from "../_generated/dataModel";
+@@ -10,6 +11,7 @@ import { settingsForShift } from "./shiftResolver";
+ import { computePdksDay } from "./pdksDay";
+ 
+ export function computePayrollCell(params: {
++  policyFor?: PdksPolicyResolver;
+   date: string;
+   availableDateKeys: ReadonlySet<string>;
+   firstRecordDate?: string | null;
+@@ -26,6 +28,7 @@ export function computePayrollCell(params: {
+ }) {
+   const { date, dayShift, workSettings } = params;
+   const day = computePdksDay({
++      policy: params.policyFor?.(date),
+     date,
+     readings: params.dayReadings,
+     manual: params.manual,
+@@ -40,13 +43,16 @@ export function computePayrollCell(params: {
+   const settings = settingsForShift(dayShift, workSettings);
+   const status = classifyPdksDay({
+     date,
+-    dataAvailable: params.availableDateKeys.has(date),
++    dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manual),
+     firstRecordDate: params.firstRecordDate,
+-    shiftStart: dayShift?.startTime,
++    shiftStart: dayShift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
++    shiftEnd: settings.workEndTime,
++    earlyExitTolerance: settings.earlyExitToleranceMinutes,
+     hasAssignedShift:
+       params.firstRecordDate !== undefined ? dayShift !== null : undefined,
+     lateTolerance: settings.maxLateMinutes,
+     classification: day.classification,
++    attendanceDecision: day.attendanceDecision,
+     hasAttendance: day.hasAttendance,
+     hasLeave: params.hasLeave,
+     isLate: day.isLate,
+@@ -58,10 +64,11 @@ export function computePayrollCell(params: {
+   });
+   return {
+     date,
++    ...(params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
+     overtimeSegments: day.overtimeSegments,
+     status,
+     payrollCode:
+-      status === "future" || status === "noData" || status === "notEmployed"
++      status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
+         ? "—"
+         : code,
+     totalMinutes: day.totalMinutes,
+diff --git a/convex/lib/pdksRules.test.ts b/convex/lib/pdksRules.test.ts
+new file mode 100644
+index 00000000..1dae996d
+--- /dev/null
++++ b/convex/lib/pdksRules.test.ts
+@@ -0,0 +1,26 @@
++import { expect, it } from "vitest";
++import type { Id } from "../_generated/dataModel";
++import { createPdksRulePolicy, LEGACY_PDKS_POLICY, matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
++import { filterPdksReadings } from "./pdksSource";
++const deviceId = "d" as Id<"devices">;
++const selected: PdksDayPolicy = { ...LEGACY_PDKS_POLICY, checkpointMode: "selected", targets: [{ targetType: "door", deviceId, doorId: "deleted" as Id<"doors">, ioId: 2 }] };
++it("IDE snapshot kapı silindikten sonra da yalnız cihaz+IO eşler", () => {
++  expect(matchesPdksCheckpoint({ deviceId, ideIoId: 2 }, selected)).toBe(true);
++  expect(matchesPdksCheckpoint({ deviceId, ideIoId: 1 }, selected)).toBe(false);
++  expect(matchesPdksCheckpoint({ deviceId: "other", ideIoId: 2 }, selected)).toBe(false);
++  expect(matchesPdksCheckpoint({}, selected)).toBe(false);
++});
++it("cihaz hedefi ve tek kapılı cihaz tüm geçişlerini eşler", () => {
++  for (const targetType of ["door", "device"] as const) expect(matchesPdksCheckpoint({ deviceId, ideIoId: 0 }, { ...selected, targets: [{ targetType, deviceId }] })).toBe(true);
++});
++it("proje+kaynak+check point aynı sınırda; mobil/QR selected'da hariç", () => {
++  const readings = [ { projectId: "p" as Id<"projects">, cardNo: "1", deviceId, ideIoId: 2 }, { projectId: "p" as Id<"projects">, cardNo: "1", deviceId, ideIoId: 1 }, { projectId: "p" as Id<"projects">, cardNo: "1", rawData: '{"source":"mobile"}' }, { projectId: "other" as Id<"projects">, cardNo: "1", deviceId, ideIoId: 2 } ];
++  expect(filterPdksReadings(readings, "p", () => selected)).toEqual([readings[0]]);
++  expect(filterPdksReadings(readings.slice(1), "p", () => selected)).toEqual([]);
++});
++it("sürüm yoksa legacy+all; sınırdaki gece çıkışı giriş gününün sürümünü alır", () => {
++  const forDay = createPdksRulePolicy([{ ...selected, effectiveFrom: "2026-10-23" }, { ...LEGACY_PDKS_POLICY, effectiveFrom: "2026-10-24" }]);
++  expect(forDay("2026-10-22")).toEqual(LEGACY_PDKS_POLICY);
++  expect(forDay("2026-10-23")).toMatchObject(selected);
++  expect(forDay("2026-10-24")).toMatchObject(LEGACY_PDKS_POLICY);
++});
+diff --git a/convex/lib/pdksRules.ts b/convex/lib/pdksRules.ts
+new file mode 100644
+index 00000000..8d9fc256
+--- /dev/null
++++ b/convex/lib/pdksRules.ts
+@@ -0,0 +1,57 @@
++import type { Doc, Id } from "../_generated/dataModel";
++import type { QueryCtx, MutationCtx } from "../_generated/server";
++import { addWorkDate } from "./pdksWorkDay";
++
++export type PdksCheckpoint = Pick<Doc<"pdksCheckpointSelections">, "targetType" | "deviceId" | "doorId" | "ioId">;
++export type PdksDayPolicy = {
++  punchMode: "legacy" | "requirements";
++  requireCheckIn?: boolean;
++  requireCheckOut?: boolean;
++  missingRequiredPunch?: "absent" | "review";
++  noPunch?: "absent" | "review";
++  checkpointMode: "all" | "selected";
++  targets: readonly PdksCheckpoint[];
++};
++export const LEGACY_PDKS_POLICY: PdksDayPolicy = { punchMode: "legacy", checkpointMode: "all", targets: [] };
++export type PdksPolicyResolver = ((dateKey: string) => PdksDayPolicy) & { historyStart?: string };
++export function createPdksRulePolicy(versions: readonly (PdksDayPolicy & { effectiveFrom: string })[]): PdksPolicyResolver {
++  const sorted = [...versions].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
++  return dateKey => sorted.find(version => version.effectiveFrom <= dateKey) ?? LEGACY_PDKS_POLICY;
++}
++export function matchesPdksCheckpoint(reading: { deviceId?: string; ideIoId?: number }, policy: PdksDayPolicy): boolean {
++  if (policy.checkpointMode === "all") return true;
++  if (!reading.deviceId) return false;
++  return policy.targets.some(target => target.deviceId === reading.deviceId &&
++    (target.targetType === "device" || target.ioId === undefined || reading.ideIoId === target.ioId));
++}
++export async function loadPdksRulePolicy(ctx: QueryCtx | MutationCtx, projectId: Id<"projects"> | undefined, startDate: string, endDate: string): Promise<PdksPolicyResolver> {
++  if (!projectId) return () => LEGACY_PDKS_POLICY;
++  const [before, within] = await Promise.all([
++    ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).lte("effectiveFrom", addWorkDate(startDate, -1))).order("desc").take(1),
++    ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).gte("effectiveFrom", startDate).lte("effectiveFrom", endDate)).take(65),
++  ]);
++  if (within.length > 64) throw new Error("Dönemde 64'ten fazla PDKS kural sürümü var; tarih aralığını daraltın");
++  const versions = await Promise.all([...before, ...within].map(async version => {
++    const targets = version.checkpointMode === "all" ? [] : await ctx.db.query("pdksCheckpointSelections").withIndex("by_ruleVersionId", q => q.eq("ruleVersionId", version._id)).take(501);
++    if (targets.length > 500) throw new Error("PDKS kural sürümü en fazla 500 hedef içerebilir");
++    return { ...version, targets };
++  }));
++  return Object.assign(createPdksRulePolicy(versions), { historyStart: before[0]?.effectiveFrom });
++}
++export async function loadPdksPolicies(ctx: QueryCtx, projectIds: readonly (Id<"projects"> | undefined)[], startDate: string, endDate: string) {
++  const entries = await Promise.all([...new Set(projectIds)].map(async id => [id, await loadPdksRulePolicy(ctx, id, startDate, endDate)] as const));
++  const map = new Map(entries);
++  return Object.assign((projectId: Id<"projects"> | undefined, date: string) => map.get(projectId)?.(date) ?? LEGACY_PDKS_POLICY, {
++    historyStart: (projectId: Id<"projects"> | undefined) => map.get(projectId)?.historyStart,
++  });
++}
++export type PdksProjectPolicies = Awaited<ReturnType<typeof loadPdksPolicies>>;
++
++/** Policies are resolved first, so ordinary legacy scopes retain their old loaders. */
++export function hasVersionedPdksPolicy(policies: PdksProjectPolicies, projectId: Id<"projects"> | undefined, startDate: string, endDate: string) {
++  for (let date = startDate; date <= endDate; date = addWorkDate(date, 1)) {
++    const policy = policies(projectId, date);
++    if (policy.punchMode === "requirements" || policy.checkpointMode === "selected") return true;
++  }
++  return false;
++}
+diff --git a/convex/lib/pdksSource.ts b/convex/lib/pdksSource.ts
+index f85e93f2..67e63c3b 100644
+--- a/convex/lib/pdksSource.ts
++++ b/convex/lib/pdksSource.ts
+@@ -1,9 +1,10 @@
++import { matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
+ import { parseCardReaderBody } from "./cardReaderParse";
+ import type { Doc } from "../_generated/dataModel";
+ 
+ export type PdksReadingSource = "card" | "pin" | "qr" | "mobile" | "manual" | "biometric" | "unknown";
+ export type PdksSourceReading = Partial<Pick<Doc<"cardReadings">,
+-  "projectId" | "cardNo" | "rawData" | "ideIoId" | "hikCurrentVerifyMode" | "hikMajorEventType" | "hikSubEventType" | "hikDevIndex" | "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL"
++  "deviceId" | "accessTime" | "projectId" | "cardNo" | "rawData" | "ideIoId" | "hikCurrentVerifyMode" | "hikMajorEventType" | "hikSubEventType" | "hikDevIndex" | "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL"
+ >>;
+ 
+ function object(value: unknown): Record<string, unknown> {
+@@ -75,10 +76,12 @@ export function isPdksEligibleReading(reading: PdksSourceReading): boolean {
+   return source !== "biometric" && source !== "unknown";
+ }
+ 
+-/** Shared calculation boundary. An explicit project excludes unassigned and foreign rows too. */
+-export function filterPdksReadings<T extends PdksSourceReading>(readings: readonly T[], projectId?: string): T[] {
+-  return readings.filter(reading =>
+-    (projectId === undefined || reading.projectId === projectId) && isPdksEligibleReading(reading));
++/** Shared source, tenant and checkpoint decision; no database access. */
++export function isPdksIncludedReading(reading: PdksSourceReading, projectId?: string, policy?: PdksDayPolicy): boolean {
++  return (projectId === undefined || reading.projectId === projectId) && isPdksEligibleReading(reading) && (!policy || matchesPdksCheckpoint(reading, policy));
++}
++export function filterPdksReadings<T extends PdksSourceReading>(readings: readonly T[], projectId?: string, policyFor?: (reading: T) => PdksDayPolicy): T[] {
++  return readings.filter(reading => isPdksIncludedReading(reading, projectId, policyFor?.(reading)));
+ }
+ 
+ export function countPdksReadingSources(readings: readonly PdksSourceReading[]): Record<PdksReadingSource, number> {
+diff --git a/convex/lib/pdksTable.ts b/convex/lib/pdksTable.ts
+index 906823c7..249b0574 100644
+--- a/convex/lib/pdksTable.ts
++++ b/convex/lib/pdksTable.ts
+@@ -1,3 +1,5 @@
++import { employedOn } from "./employment";
++import type { PdksPolicyResolver } from "./pdksRules";
+ // Reading inputs must already be source-filtered at the handler/loader boundary.
+ import { trTodayKey } from "./trDate";
+ import type { Doc, Id } from "../_generated/dataModel";
+@@ -19,7 +21,7 @@ import {
+ import { calculatePeriodOvertime, overtimePeriodRange } from "./overtimeCalc";
+ import { computePdksDay } from "./pdksDay";
+ import { pdksLeaveMatchesProject } from "./pdksAvailability";
+-import { groupPdksWorkDays } from "./pdksWorkDay";
++import { addWorkDate, groupPdksWorkDays } from "./pdksWorkDay";
+ 
+ export type PdksDayStatus =
+   | "present"
+@@ -30,15 +32,19 @@ export type PdksDayStatus =
+   | "holiday"
+   | "future"
+   | "noData"
+-  | "notEmployed";
++  | "notEmployed"
++  | "incomplete";
+ 
+ /** Absence needs project data and a known employment period; time before shift start is pending. */
+ export function classifyPdksDay(params: {
++  attendanceDecision?: "present" | "absent" | "incomplete";
+   date: string;
+   today?: string;
+   dataAvailable: boolean;
+   firstRecordDate?: string | null;
+   shiftStart?: string;
++  shiftEnd?: string;
++  earlyExitTolerance?: number;
+   hasAssignedShift?: boolean;
+   lateTolerance?: number;
+   now?: number;
+@@ -53,6 +59,20 @@ export function classifyPdksDay(params: {
+     mode: "calendar",
+     classification: params.classification === "halfDayHoliday" ? "holiday" : params.classification,
+   });
++  if (params.attendanceDecision !== undefined) {
++    // Rest days and approved leave never become missing-data/review days.
++    if (status === "weekend" || status === "holiday" || status === "leave") return status;
++    if (params.attendanceDecision !== "present" && params.shiftEnd) {
++      const endDate = params.shiftStart && params.shiftEnd <= params.shiftStart
++        ? addWorkDate(params.date, 1) : params.date;
++      const threshold = Date.parse(`${endDate}T${params.shiftEnd}:00+03:00`) + (params.earlyExitTolerance ?? 0) * 60000;
++      if ((params.now ?? Date.now()) <= threshold) return "future";
++    }
++    if (status === "absent" && params.firstRecordDate === null && !params.hasAttendance) return "noData";
++    if (!params.hasAttendance && params.firstRecordDate && params.date < params.firstRecordDate) return "notEmployed";
++    if (status === "absent" && !params.dataAvailable) return "noData";
++    return status;
++  }
+   if (status !== "absent") return status;
+   if (!params.hasAttendance && params.firstRecordDate && params.date < params.firstRecordDate)
+     return "notEmployed";
+@@ -96,6 +116,8 @@ export type PdksDayDetail = {
+ };
+ 
+ export type PdksTableDayCell = {
++  durationMeasured?: boolean;
++  punchQuality?: import("./pdksEvidence").PunchQuality;
+   date: string;
+   firstEntry: string | null;
+   lastExit: string | null;
+@@ -113,6 +135,9 @@ export type PdksTableDayCell = {
+ };
+ 
+ export type PdksTableRow = {
++  incompleteDays?: number;
++  durationMeasured?: boolean;
++  punchQuality?: import("./pdksEvidence").PunchQuality;
+   id: string;
+   name: string;
+   employeeId: string;
+@@ -160,7 +185,8 @@ export type PdksTableStatusFilter =
+   | "holiday"
+   | "future"
+   | "noData"
+-  | "notEmployed";
++  | "notEmployed"
++  | "incomplete";
+ 
+ const LEAVE_TYPE_LABELS: Record<string, string> = {
+   annual: "Yıllık",
+@@ -207,6 +233,7 @@ export function buildPdksEmployeeReadingMap(params: {
+ }
+ 
+ export function computePdksTableRow(params: {
++  policyFor?: PdksPolicyResolver;
+   today?: string;
+   now?: number;
+   firstRecordDate?: string | null;
+@@ -248,14 +275,16 @@ export function computePdksTableRow(params: {
+   const periodEnd = sortedDates[sortedDates.length - 1] ?? params.startDate;
+   const range = overtimePeriodRange(periodStart, periodEnd, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
+   const allCalculations = buildPeriodDateKeys(range.startDate, range.endDate).map((date) => {
+-    const readings = byDate.get(date) ?? [];
++    const outsideEmployment = params.policyFor?.(date).punchMode === "requirements" && employee !== null && !employedOn(employee, date);
++    const readings = outsideEmployment ? [] : byDate.get(date) ?? [];
+     const shift = empId ? params.resolveShift(empId, date) : null;
+-    const manual = params.manualPdksByEmpDate.get(`${empKey}__${date}`);
++    const manual = outsideEmployment ? undefined : params.manualPdksByEmpDate.get(`${empKey}__${date}`);
+     const leave = params.allLeaves.find(
+       (l) => l.employeeId === empId && pdksLeaveMatchesProject(l, employee?.projectId) && date >= l.startDate && date <= l.endDate,
+     );
+     const settings = settingsForShift(shift, workSettings);
+     const day = computePdksDay({
++      policy: params.policyFor?.(date),
+       date,
+       readings,
+       manual,
+@@ -267,18 +296,21 @@ export function computePdksTableRow(params: {
+       holiday: params.holidayMap.get(date),
+       holidayMap: params.holidayMap,
+     });
+-    const status = classifyPdksDay({
++    const status = outsideEmployment ? "notEmployed" : classifyPdksDay({
+       date,
+       firstRecordDate: params.firstRecordDate,
+-      shiftStart: shift?.startTime,
++      shiftStart: shift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
++      shiftEnd: settings.workEndTime,
++      earlyExitTolerance: settings.earlyExitToleranceMinutes,
+       hasAssignedShift:
+         params.firstRecordDate !== undefined ? shift !== null : undefined,
+       lateTolerance: settings.maxLateMinutes,
+       now: params.now,
+       today: params.today,
+-      dataAvailable: employee !== null && params.availableDateKeys.has(date),
++      dataAvailable: employee !== null && (params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!manual)),
+       classification: day.classification,
+-      hasAttendance: day.hasAttendance,
++      attendanceDecision: day.attendanceDecision,
++    hasAttendance: day.hasAttendance,
+       hasLeave: !!leave,
+       isLate: day.isLate,
+     });
+@@ -289,6 +321,7 @@ export function computePdksTableRow(params: {
+     });
+     const cell: PdksTableDayCell = {
+       date,
++      ...(params.policyFor?.(date).punchMode === "requirements" ? { durationMeasured: day.durationMeasured, punchQuality: day.punchQuality } : {}),
+       firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
+       lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
+       totalMinutes: day.totalMinutes,
+@@ -300,7 +333,7 @@ export function computePdksTableRow(params: {
+       isLate: day.isLate,
+       lateMinutes: day.lateMinutes,
+       payrollCode:
+-        status === "future" || status === "noData" || status === "notEmployed"
++        status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
+           ? "—"
+           : code,
+       detail: {
+@@ -360,6 +393,9 @@ export function computePdksTableRow(params: {
+   const leaveRecord = calculations.find((c) => c.leave)?.leave;
+   const status = first?.cell.status ?? "noData";
+   return {
++    incompleteDays: calculations.filter(c => c.cell.status === "incomplete").length,
++    durationMeasured: calculations.every(c => c.day.durationMeasured),
++    punchQuality: first?.day.punchQuality ?? "noPunch",
+     id: empKey,
+     name: employee
+       ? `${employee.firstName} ${employee.lastName}`.trim()
+diff --git a/convex/lib/reportAttendance.ts b/convex/lib/reportAttendance.ts
+index 310ebf6f..e5b203f9 100644
+--- a/convex/lib/reportAttendance.ts
++++ b/convex/lib/reportAttendance.ts
+@@ -1,3 +1,4 @@
++import { hasVersionedPdksPolicy, loadPdksPolicies } from "./pdksRules";
+ import { employedDuring, employedOn } from "./employment";
+ import { pdksAvailableDateKeys, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
+ import type { enrichReadingsForList } from "./cardReadingAudit";
+@@ -11,10 +12,10 @@ import type { QueryCtx } from "../_generated/server";
+ import { buildPdksEmployeeReadingMap, computePdksTableRow } from "./pdksTable";
+ import { buildPeriodDateKeys } from "./pdksCalc";
+ import { getEffectiveWorkSettings, getEffectiveOvertimeRates, getHolidaysMap, classifyDay } from "./pdksHelpers";
+-import { buildShiftResolver, assignmentAppliesOnDate } from "./shiftResolver";
++import { buildBoundedShiftResolver, buildShiftResolver, assignmentAppliesOnDate } from "./shiftResolver";
+ import { getTurkishHolidaysForYear, hasReligiousData } from "./turkishHolidays";
+-import { trTodayKey } from "./trDate";
+-import { buildPdksWorkDateResolver, pdksWorkDayRange } from "./pdksWorkDay";
++import { trDateKey, trDayRangeISO, trTodayKey } from "./trDate";
++import { buildPdksWorkDateResolver, pdksWorkDayRange, addWorkDate } from "./pdksWorkDay";
+ import { readReportReadings, reportPeriod } from "./reportScope";
+ 
+ export const ATTENDANCE_RELIABILITY_NOTE = "Güvenilirlik sınırı: İşe giriş tarihi tutulmadığından ay ortasında işe başlayanlar ayrıştırılamaz; ayrılanların son çalışma gününden sonraki günleri hesaplanmaz. Günler PDKS tablo motoruyla hesaplanır; yarım tatil günleri PDKS gibi tatil sayılır. Devam oranı, tamamlanmış beklenen günlerden izinler çıkarılarak hesaplanır. Tek izinli okuma veya manuel giriş devam kabul edilir; bu bir bordro onayı değildir.";
+@@ -35,6 +36,7 @@ export function summarizeAttendance(params: TableParams, today: string, issues:
+     department: row.department,
+     presentDays,
+     leaveDays,
++    ...(params.policyFor ? { incompleteDays: row.days.filter(day => day.status === "incomplete").length } : {}),
+     expectedDays: issues.length ? null : expectedDays,
+     absentDays: issues.length ? null : workDays.filter((day) => day.payrollCode === "DV").length,
+     devamOrani: issues.length || expectedDays === 0 ? null : Math.round(presentDays / expectedDays * 100),
+@@ -65,16 +67,14 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
+   const periodDateKeys = buildPeriodDateKeys(startDate, endDate).filter((date) => date < today);
+   const { startISO, endISO } = pdksWorkDayRange(startDate, endDate);
+   const projectRows = await Promise.all(projectIds.map(async (projectId) => {
+-    const [allEmployees, readings, workSettings, overtimeRates, holidayMap, generalSettings] = await Promise.all([
++    const [allEmployees, workSettings, overtimeRates, holidayMap, generalSettings] = await Promise.all([
+       ctx.db.query("employees").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect(),
+-      readReportReadings(ctx, [projectId], startISO, endISO),
+       getEffectiveWorkSettings(ctx, projectId),
+       getEffectiveOvertimeRates(ctx, projectId),
+       getHolidaysMap(ctx, projectId, startDate, endDate),
+       ctx.db.query("generalSettings").withIndex("by_project", (q) => q.eq("projectId", projectId)).first(),
+     ]);
+     const employees = allEmployees.filter((employee) => employedDuring(employee, startDate, endDate) && employee.isVisitor !== true);
+-    const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
+     const shiftResolver = await buildShiftResolver(ctx, allEmployees.filter(e => employedDuring(e, startDate, endDate)));
+     const workingDays = generalSettings?.workingDays?.length ? generalSettings.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
+     const leaveLists = await Promise.all(employees.map(employee => ctx.db.query("leaves")
+@@ -83,6 +83,9 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
+       leaveLists[index].filter(leave => pdksLeaveMatchesProject(leave, projectId) && leave.status === "approved" && leave.endDate >= startDate)]));
+     const calendarIssues = attendanceCalendarIssues(year, periodDateKeys, holidayMap);
+     const workDate = buildPdksWorkDateResolver(allEmployees.filter(e => employedDuring(e, startDate, endDate)), (id, date) => { const shift = shiftResolver.resolve(id, date); return shift?.projectId === projectId ? shift : null; });
++    const policies = await loadPdksPolicies(ctx, [projectId], startDate, endDate);
++    const readings = await readReportReadings(ctx, [projectId], startISO, endISO, { policies, workDate });
++    const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
+     const availableDateKeys = pdksAvailableDateKeys(readings, workDate);
+     return await Promise.all(employees.map(async (employee) => {
+       const [records, department, assignments] = await Promise.all([
+@@ -97,8 +100,9 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
+       const manualPdksByEmpDate = new Map(records.filter((record) => record.manualEntry && record.projectId === projectId).map((record) => [`${employee._id}__${record.date}`, record]));
+       return {
+         ...summarizeAttendance({
++          policyFor: date => policies(projectId, date),
+           availableDateKeys,
+-          firstRecordDate: await pdksFirstRecordDate(ctx, employee, employeeMap.get(employee._id) ?? [], records.filter(r => r.manualEntry && r.projectId === projectId).map(r => r.date), workDate),
++          firstRecordDate: await pdksFirstRecordDate(ctx, employee, employeeMap.get(employee._id) ?? [], records.filter(r => r.manualEntry && r.projectId === projectId).map(r => r.date), workDate, policies),
+           empKey: employee._id,
+           employee,
+           empReadings: employeeMap.get(employee._id) ?? [],
+@@ -209,3 +213,58 @@ export function splitPdksEligible<T extends PdksSourceReading>(
+   }
+   return { eligible, hiddenBiometricCount };
+ }
++
++/** Versioned report adapter. Legacy report rows keep their existing aggregations. */
++export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects">[], startDate: string, endDate: string, options: { includeLegacyReadings?: boolean } = {}) {
++  const policies = await loadPdksPolicies(ctx, projectIds, addWorkDate(startDate, -7), addWorkDate(endDate, 1));
++  const dates = buildPeriodDateKeys(startDate, endDate);
++  const activeProjects = projectIds.filter(id => hasVersionedPdksPolicy(policies, id, addWorkDate(startDate, -1), endDate));
++  const ruleEmployees = new Map<Id<"employees">, Doc<"employees">>();
++  const result = new Map<Id<"employees">, ReturnType<typeof computePdksTableRow>>();
++  const readingsByProject = new Map<Id<"projects">, Doc<"cardReadings">[]>();
++  const workDates = new Map<string, string>();
++  const legacyProjects = projectIds.filter(id => !activeProjects.includes(id));
++  if (options.includeLegacyReadings !== false && legacyProjects.length) {
++    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
++    const readings = await readReportReadings(ctx, legacyProjects, startISO, endISO, { policies, workDate: r => trDateKey(r.accessTime) });
++    for (const id of legacyProjects) readingsByProject.set(id, readings.filter(r => r.projectId === id));
++  }
++  for (const projectId of activeProjects) {
++    const allEmployees = await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).take(10001);
++    if (allEmployees.length > 10000) throw new Error("Rapor personel sınırı aşıldı");
++    const shifts = await buildBoundedShiftResolver(ctx, allEmployees);
++    const workDate = buildPdksWorkDateResolver(allEmployees, shifts.resolve);
++    const range = pdksWorkDayRange(addWorkDate(startDate, -7), endDate);
++    const readings = await readReportReadings(ctx, [projectId], range.startISO, range.endISO, { policies, workDate });
++    for (const reading of readings) workDates.set(reading._id, workDate(reading));
++    readingsByProject.set(projectId, readings.filter(reading => workDate(reading) >= startDate && workDate(reading) <= endDate));
++    if (!dates.some(date => policies(projectId, date).punchMode === "requirements")) continue;
++    const [workSettings, overtimeRates, holidayMap, general] = await Promise.all([
++      getEffectiveWorkSettings(ctx, projectId), getEffectiveOvertimeRates(ctx, projectId), getHolidaysMap(ctx, projectId, startDate, endDate),
++      ctx.db.query("generalSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first(),
++    ]);
++    const availableDateKeys = pdksAvailableDateKeys(readings, workDate);
++    const employeeReadings = buildPdksEmployeeReadingMap({ employees: allEmployees, readings });
++    for (const employee of allEmployees.filter(e => employedDuring(e, startDate, endDate))) {
++      const [manual, leaves] = await Promise.all([
++        ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", startDate).lte("date", endDate)).take(1001),
++        ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", endDate)).take(1001),
++      ]);
++      if (manual.length > 1000 || leaves.length > 1000) throw new Error("Rapor kayıt sınırı aşıldı");
++      const records = manual.filter(r => r.manualEntry && r.projectId === projectId);
++      const empReadings = employeeReadings.get(employee._id) ?? [];
++      const row = computePdksTableRow({
++        policyFor: date => policies(projectId, date), availableDateKeys,
++        firstRecordDate: await pdksFirstRecordDate(ctx, employee, empReadings, records.map(r => r.date), workDate, policies),
++        employee, empKey: employee._id, empReadings, departmentName: "", periodDateKeys: dates.filter(date => employedOn(employee, date)),
++        startDate, isSingleDay: false, viewMode: "matrix", manualPdksByEmpDate: new Map(records.map(r => [`${employee._id}__${r.date}`, r])),
++        allLeaves: leaves.filter(l => l.status === "approved" && pdksLeaveMatchesProject(l, projectId)), holidayMap,
++        workingDays: general?.workingDays?.length ? general.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"],
++        workSettings, overtimeRates, resolveShift: shifts.resolve, manualEditedBy: null,
++      });
++      ruleEmployees.set(employee._id, employee);
++      result.set(employee._id, { ...row, days: row.days.filter(day => policies(projectId, day.date).punchMode === "requirements") });
++    }
++  }
++  return { policies, workDate: (reading: Doc<"cardReadings">) => workDates.get(reading._id) ?? trDateKey(reading.accessTime), ruleRows: result, ruleEmployees, readings: [...readingsByProject.values()].flat() };
++}
+diff --git a/convex/lib/reportScope.test.ts b/convex/lib/reportScope.test.ts
+index 2cd54dd1..8e106551 100644
+--- a/convex/lib/reportScope.test.ts
++++ b/convex/lib/reportScope.test.ts
+@@ -87,7 +87,7 @@ describe("PDKS source filtering at loader/handler boundaries", () => {
+     const card = { ...reportReadings[0], hikCurrentVerifyMode: "card" };
+     const raw = [...reportReadings, card];
+     const spy = vi.spyOn(pdksSource, "filterPdksReadings");
+-    expect(await readReportReadings(readingContext(raw), [projectId], "start", "end")).toEqual([card]);
++    expect(await readReportReadings(readingContext(raw), [projectId], "2026-06-21T21:00:00.000Z", "2026-06-22T20:59:59.999Z")).toEqual([card]);
+     expect(spy).toHaveBeenCalledTimes(1);
+     expect(raw).toHaveLength(3);
+   });
+diff --git a/convex/lib/reportScope.ts b/convex/lib/reportScope.ts
+index 164e8b70..71031849 100644
+--- a/convex/lib/reportScope.ts
++++ b/convex/lib/reportScope.ts
+@@ -1,3 +1,7 @@
++import { hasVersionedPdksPolicy, loadPdksPolicies, type PdksProjectPolicies } from "./pdksRules";
++import { buildBoundedShiftResolver } from "./shiftResolver";
++import { buildPdksWorkDateResolver, addWorkDate } from "./pdksWorkDay";
++import { trDateKey } from "./trDate";
+ import type { Doc, Id } from "../_generated/dataModel";
+ import type { QueryCtx } from "../_generated/server";
+ import { resolveProjectScope, selectProjectScope } from "./projectScope";
+@@ -26,11 +30,27 @@ export async function resolveReportScope(ctx: QueryCtx, projectId?: Id<"projects
+   return { projectIds, scopeLabel: await reportScopeLabel(ctx, projectIds, projectId === undefined) };
+ }
+ 
+-export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects">[], startISO: string, endISO: string) {
+-  const readings = (await Promise.all(projectIds.map((projectId) => ctx.db.query("cardReadings")
+-    .withIndex("by_project_access_time", (q) => q.eq("projectId", projectId).gte("accessTime", startISO).lte("accessTime", endISO))
+-    .collect()))).flat();
+-  return filterPdksReadings(readings);
++export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects">[], startISO: string, endISO: string, prepared?: { policies: PdksProjectPolicies; workDate: (reading: Doc<"cardReadings">) => string }) {
++  const startDate = addWorkDate(trDateKey(startISO), -1);
++  const endDate = trDateKey(endISO);
++  const policies = prepared?.policies ?? await loadPdksPolicies(ctx, projectIds, startDate, endDate);
++  const activeProjects = projectIds.filter(id => hasVersionedPdksPolicy(policies, id, startDate, endDate));
++  const readings = (await Promise.all(projectIds.map(projectId => {
++    const query = ctx.db.query("cardReadings").withIndex("by_project_access_time", q => q.eq("projectId", projectId).gte("accessTime", startISO).lte("accessTime", endISO));
++    // Preserve the pre-W5 legacy bound/range exactly; only versioned projects use the new cap.
++    return activeProjects.includes(projectId) ? query.take(20001) : query.collect();
++  }))).flat();
++  if (!activeProjects.length) return filterPdksReadings(readings);
++  if (readings.filter(r => r.projectId && activeProjects.includes(r.projectId)).length > 20000) throw new Error("Rapor okuma sınırı aşıldı; tarih aralığını daraltın");
++  let workDate = prepared?.workDate;
++  if (!workDate) {
++    const employees = (await Promise.all(activeProjects.map(projectId => ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).take(10001)))).flat();
++    if (employees.length > 10000) throw new Error("Rapor personel sınırı aşıldı; proje seçin");
++    const shifts = await buildBoundedShiftResolver(ctx, employees);
++    workDate = buildPdksWorkDateResolver(employees, shifts.resolve);
++  }
++  const dateFor = workDate;
++  return filterPdksReadings(readings, undefined, r => policies(r.projectId, dateFor(r)));
+ }
+ 
+ export function selectScheduleProjectIds(user: Doc<"users"> | null, allowed: Id<"projects">[], projectId?: Id<"projects">) {
+diff --git a/convex/lib/shiftResolver.ts b/convex/lib/shiftResolver.ts
+index c8acc0bc..c953bb49 100644
+--- a/convex/lib/shiftResolver.ts
++++ b/convex/lib/shiftResolver.ts
+@@ -44,6 +44,20 @@ export async function buildShiftResolver(
+     ),
+   ]);
+ 
++  return createShiftResolver(employees, allShifts, assignmentLists);
++}
++
++/** Extra versioned/mobile paths load only referenced shifts and bounded assignments. */
++export async function buildBoundedShiftResolver(ctx: AnyCtx, employees: Doc<"employees">[]): Promise<ShiftResolver> {
++  const assignmentLists = await Promise.all(employees.map(employee => ctx.db.query("shiftAssignments").withIndex("by_employee", q => q.eq("employeeId", employee._id)).take(1001)));
++  if (assignmentLists.some(list => list.length > 1000) || assignmentLists.flat().length > 10000) throw new Error("Vardiya atama sınırı aşıldı; tarih aralığını daraltın");
++  const ids = [...new Set([...employees.flatMap(employee => employee.shiftId ? [employee.shiftId] : []), ...assignmentLists.flat().map(assignment => assignment.shiftId)])];
++  const allShifts = (await Promise.all(ids.map(id => ctx.db.get(id)))).filter((shift): shift is NonNullable<typeof shift> => shift !== null);
++  return createShiftResolver(employees, allShifts, assignmentLists);
++}
++
++function createShiftResolver(employees: Doc<"employees">[], allShifts: Doc<"shifts">[], assignmentLists: Doc<"shiftAssignments">[][]): ShiftResolver {
++  const employeeIds = employees.map(employee => employee._id);
+   const shiftMap = new Map<string, Doc<"shifts">>();
+   for (const s of allShifts) shiftMap.set(String(s._id), s);
+ 
+diff --git a/convex/mobileAttendance.ts b/convex/mobileAttendance.ts
+index fe51dbc1..d0918efb 100644
+--- a/convex/mobileAttendance.ts
++++ b/convex/mobileAttendance.ts
+@@ -1,3 +1,10 @@
++import { addWorkDate, buildPdksWorkDateResolver } from "./lib/pdksWorkDay";
++import { buildPeriodDateKeys } from "./lib/pdksCalc";
++import { buildBoundedShiftResolver } from "./lib/shiftResolver";
++import { computePdksTableRow } from "./lib/pdksTable";
++import { filterPdksReadings } from "./lib/pdksSource";
++import { DEFAULT_OVERTIME_RATES, getEffectiveWorkSettings } from "./lib/pdksHelpers";
++import { hasVersionedPdksPolicy, loadPdksPolicies } from "./lib/pdksRules";
+ import { v } from "convex/values";
+ import { stream } from "convex-helpers/server/stream";
+ import schema from "./schema";
+@@ -105,10 +112,47 @@ export const summary = employeeAuthedQuery({
+   handler: async (ctx, args) => {
+     const { startISO, endISO } = attendanceDateRange(args.startDate, args.endDate, SUMMARY_MAX_DAYS);
+     if (!startISO || !endISO) throw attendanceError("INVALID_ARGUMENT");
++    const employee = ctx.employee;
++    const projectId = employee.projectId;
++    const policies = await loadPdksPolicies(ctx, [projectId], addWorkDate(args.startDate, -1), args.endDate);
++    const policyFor = (date: string) => policies(projectId, date);
++    const dates = buildPeriodDateKeys(args.startDate, args.endDate);
++    const versioned = hasVersionedPdksPolicy(policies, projectId, addWorkDate(args.startDate, -1), args.endDate);
++    const range = versioned ? attendanceDateRange(addWorkDate(args.startDate, -1), addWorkDate(args.endDate, 1)) : { startISO, endISO };
+     const rows = await ctx.db.query("cardReadings").withIndex("by_employee_accessTime", q =>
+-      q.eq("employeeId", ctx.employee._id).gte("accessTime", startISO).lt("accessTime", endISO))
++      q.eq("employeeId", employee._id).gte("accessTime", range.startISO ?? startISO).lt("accessTime", range.endISO ?? endISO))
+       .paginate({ numItems: SUMMARY_MAX_READINGS + 1, cursor: null, maximumRowsRead: SUMMARY_MAX_READINGS + 1, maximumBytesRead: 8 * 1024 * 1024 });
+     if (!rows.isDone || rows.page.length > SUMMARY_MAX_READINGS) throw attendanceError("SUMMARY_TOO_LARGE");
+-    return summarizeMovements(rows.page, args.startDate, args.endDate, ctx.employee.projectId, new Date().toISOString());
++    const calendarReadings = rows.page.filter(reading => reading.accessTime >= startISO && reading.accessTime < endISO);
++    if (!versioned) {
++      return summarizeMovements(calendarReadings, args.startDate, args.endDate, projectId, new Date().toISOString(), policyFor);
++    }
++    const shifts = await buildBoundedShiftResolver(ctx, [employee]);
++    const resolveShift = (id: Id<"employees">, date: string) => {
++      const shift = shifts.resolve(id, date);
++      return shift?.projectId === projectId ? shift : null;
++    };
++    const workDate = buildPdksWorkDateResolver([employee], resolveShift);
++    const [manual, leaves, projectHolidays, globalHolidays, workSettings, general] = await Promise.all([
++      ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", args.startDate).lte("date", args.endDate)).take(1001),
++      ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", args.endDate)).take(1001),
++      ctx.db.query("holidays").withIndex("by_project_date", q => q.eq("projectId", projectId).gte("date", args.startDate).lte("date", args.endDate)).take(1001),
++      ctx.db.query("holidays").withIndex("by_project_date", q => q.eq("projectId", undefined).gte("date", args.startDate).lte("date", args.endDate)).take(1001),
++      getEffectiveWorkSettings(ctx, projectId),
++      ctx.db.query("generalSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first(),
++    ]);
++    if ([manual, leaves, projectHolidays, globalHolidays].some(list => list.length > 1000)) throw attendanceError("SUMMARY_TOO_LARGE");
++    const included = filterPdksReadings(rows.page, projectId, reading => policyFor(workDate(reading)));
++    const row = computePdksTableRow({
++      policyFor, employee, empKey: employee._id, empReadings: included, departmentName: "", periodDateKeys: dates,
++      availableDateKeys: new Set(included.map(workDate)), startDate: args.startDate, isSingleDay: false, viewMode: "matrix",
++      manualPdksByEmpDate: new Map(manual.filter(record => record.manualEntry && record.projectId === projectId).map(record => [`${employee._id}__${record.date}`, record])),
++      allLeaves: leaves.filter(leave => leave.status === "approved" && (!leave.projectId || leave.projectId === projectId)),
++      holidayMap: new Map([...globalHolidays, ...projectHolidays].map(holiday => [holiday.date, holiday])),
++      workingDays: general?.workingDays?.length ? general.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"],
++      workSettings, overtimeRates: DEFAULT_OVERTIME_RATES, resolveShift, manualEditedBy: null,
++    });
++    const presentDates = new Set(row.days.filter(day => day.status === "present" || day.status === "late").map(day => day.date));
++    return summarizeMovements(calendarReadings, args.startDate, args.endDate, projectId, new Date().toISOString(), policyFor, { workDate, presentDates });
+   },
+ });
+diff --git a/convex/pdksRules.test.ts b/convex/pdksRules.test.ts
+new file mode 100644
+index 00000000..bf9ed82f
+--- /dev/null
++++ b/convex/pdksRules.test.ts
+@@ -0,0 +1,145 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from "convex-test";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { api } from "./_generated/api";
++import schema from "./schema";
++import { loadPdksRulePolicy } from "./lib/pdksRules";
++const modules = import.meta.glob("./**/*.ts");
++beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-22T12:00:00Z")); });
++afterEach(() => vi.useRealTimers());
++async function fixture(role: "project_admin" | "project_user" | "super_admin" = "project_admin") {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async ctx => {
++    const projectId = await ctx.db.insert("projects", { name: "A" });
++    const foreignId = await ctx.db.insert("projects", { name: "B" });
++    const userId = await ctx.db.insert("users", { role });
++    const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 100 * 86400000 });
++    await ctx.db.insert("userProjects", { userId, projectId });
++    const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gündüz", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "" });
++    const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "123", isActive: true, shiftId });
++    const deviceId = await ctx.db.insert("devices", { projectId, name: "IDE", brand: "ide_smart", createdAt: "", updatedAt: "" });
++    const doorId = await ctx.db.insert("doors", { projectId, name: "Dış kapı", deviceId, ioId: 2 });
++    const otherDevice = await ctx.db.insert("devices", { projectId: foreignId, name: "Başka", createdAt: "", updatedAt: "" });
++    return { projectId, foreignId, userId, sessionId, employeeId, shiftId, deviceId, doorId, otherDevice };
++  });
++  const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
++  const args = { projectId: ids.projectId, effectiveFrom: "2026-10-23", punchMode: "requirements" as const, requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "review" as const, noPunch: "absent" as const, checkpointMode: "selected" as const, targets: [{ targetType: "door" as const, deviceId: ids.deviceId, doorId: ids.doorId }] };
++  return { t, caller, args, ...ids };
++}
++describe("PDKS sürüm API", () => {
++  it("yarından önceyi, geçersiz tarihi, eksik tercihleri ve boş seçimi reddeder", async () => {
++    const f = await fixture();
++    for (const effectiveFrom of ["2026-10-22", "2026-10-21", "2026-02-30", "2026-13-01", "x"]) await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, effectiveFrom })).rejects.toThrow();
++    await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, requireCheckOut: undefined })).rejects.toThrow("zorunlu");
++    await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, targets: [] })).rejects.toThrow("En az");
++    await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, targets: Array.from({ length: 501 }, () => f.args.targets[0]) })).rejects.toThrow("500");
++  });
++  it("yetki, yabancı proje ve yabancı hedef reddi", async () => {
++    const user = await fixture("project_user");
++    await expect(user.caller.mutation(api.pdksRules.publishRuleVersion, user.args)).rejects.toThrow("yetkiniz");
++    const f = await fixture();
++    await expect(f.caller.query(api.pdksRules.getRules, { projectId: f.foreignId })).rejects.toThrow("erişim");
++    await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, projectId: f.foreignId })).rejects.toThrow("erişim");
++    await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, targets: [{ targetType: "device", deviceId: f.otherDevice }] })).rejects.toThrow("projeye");
++    await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, targets: [{ targetType: "door", deviceId: f.deviceId, doorId: await f.t.run(ctx => ctx.db.insert("doors", { name: "Yabancı", projectId: f.foreignId, deviceId: f.deviceId, ioId: 1 })) }] })).rejects.toThrow("proje");
++  });
++  it("aynı gelecek tarihi atomik değiştirir, tek audit yazar, senkron işi başlatmaz", async () => {
++    const f = await fixture();
++    const id = await f.caller.mutation(api.pdksRules.publishRuleVersion, f.args);
++    const replacement = await f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, requireCheckOut: false });
++    expect(replacement).toBe(id);
++    const rules = await f.caller.query(api.pdksRules.getRules, { projectId: f.projectId });
++    expect(rules).toMatchObject({ current: null, history: [], future: [{ _id: id, requireCheckOut: false, targets: [{ ioId: 2 }] }] });
++    expect(await f.t.run(ctx => ctx.db.query("pdksRuleVersions").collect())).toHaveLength(1);
++    expect(await f.t.run(ctx => ctx.db.query("pdksCheckpointSelections").collect())).toHaveLength(1);
++    expect(await f.t.run(ctx => ctx.db.query("auditLog").collect())).toHaveLength(2);
++    expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(0);
++    await f.caller.mutation(api.pdksRules.deleteFutureRuleVersion, { ruleVersionId: id });
++    expect(await f.t.run(ctx => ctx.db.query("pdksCheckpointSelections").collect())).toHaveLength(0);
++  });
++  it("yürürlükteki sürümü silemez/değiştiremez; super_admin yabancı projeye erişir", async () => {
++    const f = await fixture("super_admin");
++    const id = await f.caller.mutation(api.pdksRules.publishRuleVersion, f.args);
++    await f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, projectId: f.foreignId, checkpointMode: "all", targets: [] });
++    vi.setSystemTime(new Date("2026-10-23T12:00:00Z"));
++    await expect(f.caller.mutation(api.pdksRules.deleteFutureRuleVersion, { ruleVersionId: id })).rejects.toThrow("Yürürlüğe");
++    await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, f.args)).rejects.toThrow("yarın");
++    expect((await f.caller.query(api.pdksRules.getRules, { projectId: f.projectId })).current?._id).toBe(id);
++  });
++  it("çok kapılı Hik kapısını reddeder, cihaz hedefini kabul eder; sırları döndürmez", async () => {
++    const f = await fixture();
++    await f.t.run(async ctx => { await ctx.db.patch(f.deviceId, { brand: "hikvision", doorCount: 2, devicePassword: "SECRET" }); });
++    const targets = await f.caller.query(api.pdksRules.listCheckpointTargets, { projectId: f.projectId });
++    expect(targets.doors[0]).toMatchObject({ selectable: false, reason: expect.stringContaining("kapı numarası") });
++    expect(JSON.stringify(targets)).not.toContain("SECRET");
++    await expect(f.caller.mutation(api.pdksRules.publishRuleVersion, f.args)).rejects.toThrow("Çok kapılı");
++    await f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, targets: [{ targetType: "device", deviceId: f.deviceId }] });
++  });
++  it("yükleyici 64 sürüm/500 hedef bütçesini uygular", async () => {
++    const f = await fixture();
++    await f.t.run(async ctx => {
++      for (let i = 0; i < 65; i++) await ctx.db.insert("pdksRuleVersions", { projectId: f.projectId, effectiveFrom: `2026-${String(1 + Math.floor(i / 28)).padStart(2, "0")}-${String(1 + i % 28).padStart(2, "0")}`, punchMode: "legacy", checkpointMode: "all", createdAt: "", createdBy: f.userId });
++    });
++    await expect(f.t.run(ctx => loadPdksRulePolicy(ctx, f.projectId, "2026-01-01", "2026-12-31"))).rejects.toThrow("64");
++    const version = await f.caller.mutation(api.pdksRules.publishRuleVersion, f.args);
++    await f.t.run(async ctx => {
++      for (let i = 0; i < 500; i++) await ctx.db.insert("pdksCheckpointSelections", { projectId: f.projectId, ruleVersionId: version, targetType: "device", deviceId: f.deviceId });
++    });
++    await expect(f.t.run(ctx => loadPdksRulePolicy(ctx, f.projectId, "2026-10-23", "2026-10-24"))).rejects.toThrow("500");
++  });
++  for (const mode of ["missing", "excluded", "manual", "complete", "undirected", "holiday", "ended"] as const) it(`tablo/detay/bordro/rapor/SGK ortak karar: ${mode}`, async () => {
++    const f = await fixture();
++    await f.caller.mutation(api.pdksRules.publishRuleVersion, f.args);
++    await f.t.run(async ctx => {
++      if (mode === "ended") await ctx.db.patch(f.employeeId, { employmentEndDate: "2026-10-22", isActive: false });
++      if (mode === "holiday") await ctx.db.insert("holidays", { projectId: f.projectId, name: "Tatil", date: "2026-10-23", type: "company", createdAt: "" });
++      if (mode === "manual") await ctx.db.insert("pdksRecords", { projectId: f.projectId, employeeId: f.employeeId, date: "2026-10-23", employeeFirstName: "Ada", employeeLastName: "Test", status: "present", createdAt: "", updatedAt: "", entryTime: "08:00", exitTime: "17:00", manualEntry: true });
++      await ctx.db.insert("cardReadings", { projectId: f.projectId, employeeId: f.employeeId, cardNo: "123", deviceId: f.deviceId, ideIoId: mode === "excluded" || mode === "manual" ? 1 : 2, direction: mode === "undirected" ? undefined : "entry", accessTime: "2026-10-23T05:00:00.000Z", accessStatus: "izin_verildi" });
++      if (mode === "complete") await ctx.db.insert("cardReadings", { projectId: f.projectId, employeeId: f.employeeId, cardNo: "123", deviceId: f.deviceId, ideIoId: 2, direction: "exit", accessTime: "2026-10-23T14:00:00.000Z", accessStatus: "izin_verildi" });
++    });
++    vi.setSystemTime(new Date("2026-11-01T12:00:00Z"));
++    const [table, detail, payroll, report, sgk] = await Promise.all([
++      f.caller.query(api.cardReadings.getPdksTableData, { projectId: f.projectId, startDate: "2026-10-23", endDate: "2026-10-23", viewMode: "matrix" }),
++      f.caller.query(api.cardReadings.getEmployeeAttendanceDetail, { projectId: f.projectId, employeeId: f.employeeId, startDate: "2026-10-23", endDate: "2026-10-23" }),
++      f.caller.query(api.cardReadings.getMonthlyPayrollSheet, { projectId: f.projectId, year: 2026, month: 10 }),
++      f.caller.query(api.reports.getAttendanceSummaryReport, { projectId: f.projectId, year: 2026, month: 10 }),
++      f.caller.query(api.sgkExport.buildAphbForMonth, { projectId: f.projectId, year: 2026, month: 10 }),
++    ]);
++    if (mode === "ended") { expect(table).toHaveLength(0); expect(report.rows[0]?.incompleteDays ?? 0).toBe(0); expect(payroll.rows[0]?.cells.some(c => c.date > "2026-10-22")).toBe(false); return; }
++    const expected = mode === "excluded" ? "noData" : mode === "manual" || mode === "complete" ? "present" : mode === "holiday" ? "holiday" : "incomplete";
++    expect(table[0]?.days[0]?.status).toBe(expected);
++    expect(detail?.days[0]?.status).toBe(expected);
++    expect(payroll.rows[0]?.cells.find(c => c.date === "2026-10-23")?.status).toBe(expected);
++    if (expected === "incomplete") {
++      expect(table[0]?.days[0]).toMatchObject({ durationMeasured: false, totalMinutes: 0, payrollCode: "—" });
++      expect(await f.caller.query(api.cardReadings.getPdksTableData, { projectId: f.projectId, date: "2026-10-23", statusFilter: "incomplete" })).toHaveLength(1);
++      expect(report.rows[0]?.incompleteDays).toBe(1);
++      expect(sgk.employees[0]?.reviewDays).toContain("2026-10-23");
++      expect(payroll.rows[0]?.totals.incompleteDays).toBe(1);
++    } else if (expected !== "noData") expect(sgk.employees[0]?.reviewDays).not.toContain("2026-10-23");
++  });
++});
++
++it("gece çıkışı yeni takvim sürümü yerine giriş gününün check point sürümünü taşır", async () => {
++  const f = await fixture();
++  await f.caller.mutation(api.pdksRules.publishRuleVersion, f.args);
++  const secondDoor = await f.t.run(ctx => ctx.db.insert("doors", { name: "İç", projectId: f.projectId, deviceId: f.deviceId, ioId: 1 }));
++  await f.caller.mutation(api.pdksRules.publishRuleVersion, { ...f.args, effectiveFrom: "2026-10-24", targets: [{ targetType: "door", deviceId: f.deviceId, doorId: secondDoor }] });
++  await f.t.run(async ctx => {
++    await ctx.db.patch(f.shiftId, { startTime: "22:00", endTime: "06:00" });
++    for (const [accessTime, direction] of [["2026-10-23T19:00:00.000Z", "entry"], ["2026-10-24T03:00:00.000Z", "exit"]] as const) await ctx.db.insert("cardReadings", { projectId: f.projectId, employeeId: f.employeeId, cardNo: "123", deviceId: f.deviceId, ideIoId: 2, accessStatus: "izin_verildi", accessTime, direction });
++  });
++  vi.setSystemTime(new Date("2026-11-01T12:00:00Z"));
++  const table = await f.caller.query(api.cardReadings.getPdksTableData, { projectId: f.projectId, startDate: "2026-10-23", endDate: "2026-10-23", viewMode: "matrix" });
++  const detail = await f.caller.query(api.cardReadings.getEmployeeAttendanceDetail, { projectId: f.projectId, employeeId: f.employeeId, startDate: "2026-10-23", endDate: "2026-10-23" });
++  expect(table[0]?.days[0]).toMatchObject({ firstEntry: "22:00", lastExit: "06:00", durationMeasured: true, punchQuality: "ok", status: "present" });
++  expect(detail?.days[0]).toMatchObject({ durationMeasured: true, exitNextDay: true, status: "present" });
++});
++it("dashboard bugün geleni inceleme gününde de sayar", async () => {
++  const f = await fixture();
++  await f.caller.mutation(api.pdksRules.publishRuleVersion, f.args);
++  await f.t.run(ctx => ctx.db.insert("cardReadings", { projectId: f.projectId, employeeId: f.employeeId, cardNo: "123", deviceId: f.deviceId, ideIoId: 2, accessStatus: "izin_verildi", accessTime: "2026-10-23T05:00:00.000Z", direction: "entry" }));
++  vi.setSystemTime(new Date("2026-10-23T17:00:00Z"));
++  expect(await f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId })).toMatchObject({ presentToday: 1, incompleteDays: 1, insideBuilding: 1, averageFirstEntry: "08:00" });
++});
+diff --git a/convex/pdksRules.ts b/convex/pdksRules.ts
+new file mode 100644
+index 00000000..34963240
+--- /dev/null
++++ b/convex/pdksRules.ts
+@@ -0,0 +1,106 @@
++import { v } from "convex/values";
++import type { Doc, Id } from "./_generated/dataModel";
++import type { QueryCtx, MutationCtx } from "./_generated/server";
++import { adminMutation, adminQuery } from "./lib/customFunctions";
++import { resolveProjectScope } from "./lib/projectScope";
++import { writeAudit } from "./lib/audit";
++import { trTodayKey } from "./lib/trDate";
++import { addWorkDate } from "./lib/pdksWorkDay";
++
++const choice = v.union(v.literal("absent"), v.literal("review"));
++const target = v.object({ targetType: v.union(v.literal("door"), v.literal("device")), deviceId: v.id("devices"), doorId: v.optional(v.id("doors")) });
++async function selections(ctx: QueryCtx | MutationCtx, ruleVersionId: Id<"pdksRuleVersions">) {
++  const rows = await ctx.db.query("pdksCheckpointSelections").withIndex("by_ruleVersionId", q => q.eq("ruleVersionId", ruleVersionId)).take(501);
++  if (rows.length > 500) throw new Error("PDKS kural sürümü en fazla 500 hedef içerebilir");
++  return rows;
++}
++export function checkpointDoorReason(device: Doc<"devices"> | null, door: Pick<Doc<"doors">, "ioId">, linkedDoorCount: number): string | null {
++  if (!device) return "Kapı bir cihaza bağlı değil";
++  if (device.brand === "ide_smart") return door.ioId === undefined ? "Kapının fiziksel IO eşlemesi eksik" : null;
++  return Math.max(device.doorCount ?? 0, device.hikDoorCount ?? 0, linkedDoorCount) === 1 ? null : "Çok kapılı cihazda okumalar kapı numarası taşımıyor; cihazın tüm geçişlerini seçin";
++}
++export const getRules = adminQuery({
++  args: { projectId: v.id("projects") },
++  handler: async (ctx, { projectId }) => {
++    await resolveProjectScope(ctx, projectId);
++    const today = trTodayKey();
++    const [past, future] = await Promise.all([
++      ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).lte("effectiveFrom", today)).order("desc").take(21),
++      ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).gt("effectiveFrom", today)).take(65),
++    ]);
++    if (future.length > 64) throw new Error("64'ten fazla gelecek PDKS sürümü var");
++    const enrich = async (version: Doc<"pdksRuleVersions">) => ({ ...version, targets: await selections(ctx, version._id) });
++    return { current: past[0] ? await enrich(past[0]) : null, future: await Promise.all(future.map(enrich)), history: await Promise.all(past.slice(1).map(enrich)) };
++  },
++});
++export const listCheckpointTargets = adminQuery({
++  args: { projectId: v.id("projects") },
++  handler: async (ctx, { projectId }) => {
++    await resolveProjectScope(ctx, projectId);
++    const [devices, doors] = await Promise.all([
++      ctx.db.query("devices").withIndex("by_project", q => q.eq("projectId", projectId)).take(1001),
++      ctx.db.query("doors").withIndex("by_project", q => q.eq("projectId", projectId)).take(2001),
++    ]);
++    if (devices.length > 1000 || doors.length > 2000) throw new Error("Kontrol noktası listeleme sınırı aşıldı");
++    const devicesById = new Map(devices.map(device => [device._id, device]));
++    const doorCounts = new Map<Id<"devices">, number>();
++    for (const door of doors) if (door.deviceId) doorCounts.set(door.deviceId, (doorCounts.get(door.deviceId) ?? 0) + 1);
++    return {
++      devices: devices.map(d => ({ deviceId: d._id, name: d.name, selectable: true, reason: null })),
++      doors: doors.map(door => {
++        const device = door.deviceId ? devicesById.get(door.deviceId) ?? null : null;
++        const reason = checkpointDoorReason(device, door, door.deviceId ? doorCounts.get(door.deviceId) ?? 0 : 0);
++        return { doorId: door._id, deviceId: door.deviceId ?? null, name: door.name, selectable: reason === null, reason };
++      }),
++    };
++  },
++});
++export const publishRuleVersion = adminMutation({
++  args: { projectId: v.id("projects"), effectiveFrom: v.string(), punchMode: v.union(v.literal("legacy"), v.literal("requirements")), requireCheckIn: v.optional(v.boolean()), requireCheckOut: v.optional(v.boolean()), missingRequiredPunch: v.optional(choice), noPunch: v.optional(choice), checkpointMode: v.union(v.literal("all"), v.literal("selected")), targets: v.optional(v.array(target)) },
++  handler: async (ctx, args) => {
++    await resolveProjectScope(ctx, args.projectId);
++    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.effectiveFrom) || !Number.isFinite(Date.parse(args.effectiveFrom)) || new Date(args.effectiveFrom).toISOString().slice(0, 10) !== args.effectiveFrom || args.effectiveFrom < addWorkDate(trTodayKey(), 1)) throw new Error("Yürürlük tarihi en erken yarın olmalıdır");
++    if (args.punchMode === "requirements" && [args.requireCheckIn, args.requireCheckOut, args.missingRequiredPunch, args.noPunch].some(value => value === undefined)) throw new Error("Giriş, çıkış ve eksik okutma tercihleri zorunludur");
++    if ((args.targets?.length ?? 0) > 500) throw new Error("En fazla 500 kontrol noktası seçilebilir");
++    if (args.checkpointMode === "selected" && !args.targets?.length) throw new Error("En az bir kontrol noktası seçin");
++    const snapshots = await Promise.all((args.targets ?? []).map(async selection => {
++      const device = await ctx.db.get(selection.deviceId);
++      if (!device || device.projectId !== args.projectId) throw new Error("Cihaz bu projeye ait değil");
++      if (selection.targetType === "device") return { targetType: selection.targetType, deviceId: device._id };
++      if (!selection.doorId) throw new Error("Kapı seçimi zorunludur");
++      const door = await ctx.db.get(selection.doorId);
++      if (!door || door.projectId !== args.projectId || door.deviceId !== device._id) throw new Error("Kapı bu proje ve cihaza ait değil");
++      const linked = await ctx.db.query("doors").withIndex("by_device", q => q.eq("deviceId", device._id)).take(501);
++      if (linked.length > 500) throw new Error("Cihaz kapı sınırı aşıldı");
++      const reason = checkpointDoorReason(device, door, linked.length);
++      if (reason) throw new Error(reason);
++      return { targetType: selection.targetType, deviceId: device._id, doorId: door._id, ...(device.brand === "ide_smart" ? { ioId: door.ioId } : {}) };
++    }));
++    const existing = await ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", args.projectId).eq("effectiveFrom", args.effectiveFrom)).unique();
++    const { targets: _targets, ...fields } = args;
++    const data = { ...fields, createdAt: new Date().toISOString(), createdBy: ctx.user._id };
++    let id: Id<"pdksRuleVersions">;
++    if (existing) {
++      if (existing.effectiveFrom <= trTodayKey()) throw new Error("Yürürlüğe girmiş kural değiştirilemez");
++      id = existing._id;
++      for (const row of await selections(ctx, id)) await ctx.db.delete(row._id);
++      await ctx.db.replace(id, data);
++    } else id = await ctx.db.insert("pdksRuleVersions", data);
++    for (const snapshot of snapshots) await ctx.db.insert("pdksCheckpointSelections", { ...snapshot, projectId: args.projectId, ruleVersionId: id });
++    await writeAudit(ctx, { user: ctx.user, projectId: args.projectId, action: existing ? "update" : "create", targetTable: "pdksRuleVersions", targetId: id, oldValue: existing, newValue: data });
++    return id;
++  },
++});
++export const deleteFutureRuleVersion = adminMutation({
++  args: { ruleVersionId: v.id("pdksRuleVersions") },
++  handler: async (ctx, { ruleVersionId }) => {
++    const version = await ctx.db.get(ruleVersionId);
++    if (!version) throw new Error("Kural sürümü bulunamadı");
++    await resolveProjectScope(ctx, version.projectId);
++    if (version.effectiveFrom <= trTodayKey()) throw new Error("Yürürlüğe girmiş kural silinemez");
++    for (const row of await selections(ctx, ruleVersionId)) await ctx.db.delete(row._id);
++    await ctx.db.delete(ruleVersionId);
++    await writeAudit(ctx, { user: ctx.user, projectId: version.projectId, action: "delete", targetTable: "pdksRuleVersions", targetId: ruleVersionId, oldValue: version });
++    return null;
++  },
++});
+diff --git a/convex/reports.ts b/convex/reports.ts
+index 58876a25..7215ad2f 100644
+--- a/convex/reports.ts
++++ b/convex/reports.ts
+@@ -1,12 +1,11 @@
+ import { canSeePay, maskPay } from "./lib/payVisibility";
+-import { trDateKey, trDayRangeISO } from "./lib/trDate";
+ import { v } from "convex/values";
+ import { internalQuery, internalMutation } from "./_generated/server";
+ import { internal } from "./_generated/api";
+ import { authedQuery, authedMutation } from "./lib/customFunctions";
+ import { requireAdmin } from "./lib/auth";
+-import { resolveReportScope, readReportReadings, reportPeriod, resolveScheduleScope } from "./lib/reportScope";
+-import { loadAttendanceReport } from "./lib/reportAttendance";
++import { resolveReportScope, reportPeriod, resolveScheduleScope } from "./lib/reportScope";
++import { loadAttendanceReport, loadRuleReportDays } from "./lib/reportAttendance";
+ import {
+   getEffectiveWorkSettings,
+   resolveHourlyRate,
+@@ -34,10 +33,10 @@ export const getSgkMonthlyReport = authedQuery({
+     const lastDay = new Date(year, month, 0).getDate();
+     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+ 
+-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
+ 
+     const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
+-    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
++    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
++    const readings = ruleReport.readings;
+ 
+     readings.sort(
+       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
+@@ -50,11 +49,17 @@ export const getSgkMonthlyReport = authedQuery({
+       employeeMap.get(key)?.push(r);
+     }
+ 
++    for (const [id, employee] of ruleReport.ruleEmployees) {
++      const key = `${employee.projectId}:${id}`;
++      if (!employeeMap.has(key)) employeeMap.set(key, []);
++    }
++
+     const allLeaves = (await Promise.all(projectIds.map((projectId) => ctx.db.query("leaves").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect()))).flat().filter((l) => l.status === "approved");
+ 
+     const reportRows = await Promise.all(
+-      Array.from(employeeMap.entries()).map(async ([, empReadings]) => {
+-        const first = empReadings[0];
++      Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
++        const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
++        const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
+         const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+         const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
+         const foundDepartment = employee?.departmentId
+@@ -83,11 +88,11 @@ export const getSgkMonthlyReport = authedQuery({
+               }, 0)
+           : 0;
+ 
+-        const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
++        const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
+ 
+         const dayReadingsMap = new Map<string, typeof granted>();
+         for (const r of granted) {
+-          const dateKey = trDateKey(r.accessTime);
++          const dateKey = ruleReport.workDate(r);
+           if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
+           dayReadingsMap.get(dateKey)?.push(r);
+         }
+@@ -106,10 +111,12 @@ export const getSgkMonthlyReport = authedQuery({
+           }
+         }
+ 
+-        const workDays = dayReadingsMap.size;
+-        const overtimeMinutes = workDays <= 1
+-          ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
+-          : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
++        const ruleDays = empId ? ruleReport.ruleRows.get(empId)?.days ?? [] : [];
++        totalMinutes += ruleDays.reduce((sum, day) => sum + day.totalMinutes, 0);
++        const incompleteDays = ruleDays.filter(day => day.status === "incomplete").length;
++        const workDays = dayReadingsMap.size + ruleDays.filter(day => day.status === "present" || day.status === "late").length;
++        const legacyMinutes = totalMinutes - ruleDays.reduce((sum, day) => sum + day.totalMinutes, 0);
++        const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, legacyMinutes - STANDARD_DAY_MINUTES) : Math.max(0, legacyMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
+ 
+         const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
+         const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
+@@ -119,6 +126,7 @@ export const getSgkMonthlyReport = authedQuery({
+           adSoyad: first.employeeName ?? (employee ? `${employee.firstName} ${employee.lastName}` : "Bilinmiyor"),
+           sicilNo: employee?.cardNumber ?? first.cardNo ?? "-",
+           departman: department?.name ?? "Bilinmiyor",
++          incompleteDays,
+           calismaGunu: workDays,
+           toplamSaat: totalHours,
+           fazlaMesaiSaat: overtimeHours,
+@@ -162,9 +170,9 @@ export const getOvertimeSummaryReport = authedQuery({
+       ? `${year}-${String(month).padStart(2, "0")}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`
+       : `${year}-12-31`;
+ 
+-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
+ 
+-    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
++    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
++    const readings = ruleReport.readings;
+ 
+     const employeeMap = new Map<string, typeof readings>();
+     for (const r of readings) {
+@@ -174,6 +182,10 @@ export const getOvertimeSummaryReport = authedQuery({
+     }
+ 
+ 
++    for (const [id, employee] of ruleReport.ruleEmployees) {
++      const key = `${employee.projectId}:${id}`;
++      if (!employeeMap.has(key)) employeeMap.set(key, []);
++    }
+     let totalOvertimeHours = 0;
+     let totalOvertimePayTRY = 0;
+     const rows: {
+@@ -185,7 +197,8 @@ export const getOvertimeSummaryReport = authedQuery({
+     }[] = [];
+ 
+     for (const [empKey, empReadings] of employeeMap) {
+-      const first = empReadings[0];
++      const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
++      const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
+       const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+       const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
+       const foundDepartment = employee?.departmentId
+@@ -194,10 +207,10 @@ export const getOvertimeSummaryReport = authedQuery({
+       const department = foundDepartment?.projectId === first.projectId ? foundDepartment : null;
+       const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
+ 
+-      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
++      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
+       const dayReadingsMap = new Map<string, typeof granted>();
+       for (const r of granted) {
+-        const dateKey = trDateKey(r.accessTime);
++        const dateKey = ruleReport.workDate(r);
+         if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
+         dayReadingsMap.get(dateKey)?.push(r);
+       }
+@@ -216,10 +229,8 @@ export const getOvertimeSummaryReport = authedQuery({
+         }
+       }
+ 
+-      const workDays = dayReadingsMap.size;
+-      const overtimeMinutes = workDays <= 1
+-        ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
+-        : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
++      const ruleDays = employee ? ruleReport.ruleRows.get(employee._id)?.days ?? [] : [];
++      const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES) : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
+       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
+       totalOvertimeHours += overtimeHours;
+ 
+@@ -293,9 +304,9 @@ export const getDepartmentCostReport = authedQuery({
+     reportPeriod(args.year, args.month);
+     const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
+     const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(new Date(args.year, args.month, 0).getDate()).padStart(2, "0")}`;
+-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
+ 
+-    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
++    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
++    const readings = ruleReport.readings;
+ 
+     const employeeMap = new Map<string, typeof readings>();
+     for (const r of readings) {
+@@ -304,14 +315,19 @@ export const getDepartmentCostReport = authedQuery({
+       employeeMap.get(key)?.push(r);
+     }
+ 
++    for (const [id, employee] of ruleReport.ruleEmployees) {
++      const key = `${employee.projectId}:${id}`;
++      if (!employeeMap.has(key)) employeeMap.set(key, []);
++    }
+     const fallbackRate = args.hourlyRate;
+     const byDept = new Map<
+       string,
+       { overtimeHours: number; cost: number; employeeCount: number }
+     >();
+ 
+-    for (const empReadings of employeeMap.values()) {
+-      const first = empReadings[0];
++    for (const [empKey, empReadings] of employeeMap) {
++      const fallback = [...ruleReport.ruleEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
++      const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
+       const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+       const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
+       const foundDepartment = employee?.departmentId
+@@ -321,10 +337,10 @@ export const getDepartmentCostReport = authedQuery({
+       const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
+       const deptName = department?.name ?? "Belirtilmemiş";
+ 
+-      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
++      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && ruleReport.policies(r.projectId, ruleReport.workDate(r)).punchMode !== "requirements");
+       const dayReadingsMap = new Map<string, typeof granted>();
+       for (const r of granted) {
+-        const dateKey = trDateKey(r.accessTime);
++        const dateKey = ruleReport.workDate(r);
+         if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
+         dayReadingsMap.get(dateKey)?.push(r);
+       }
+@@ -343,10 +359,8 @@ export const getDepartmentCostReport = authedQuery({
+         }
+       }
+ 
+-      const workDays = dayReadingsMap.size;
+-      const overtimeMinutes = workDays <= 1
+-        ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
+-        : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
++      const ruleDays = employee ? ruleReport.ruleRows.get(employee._id)?.days ?? [] : [];
++      const overtimeMinutes = (dayReadingsMap.size <= 1 ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES) : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES)) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
+       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
+ 
+       if (overtimeHours > 0) {
+diff --git a/convex/schema.ts b/convex/schema.ts
+index 02c76649..248bc2db 100644
+--- a/convex/schema.ts
++++ b/convex/schema.ts
+@@ -237,6 +237,27 @@ export default defineSchema({
+     .index("by_project", ["projectId"])
+     .index("by_ide_device", ["ideDeviceId"]),
+ 
++  pdksRuleVersions: defineTable({
++    projectId: v.id("projects"),
++    effectiveFrom: v.string(),
++    punchMode: v.union(v.literal("legacy"), v.literal("requirements")),
++    requireCheckIn: v.optional(v.boolean()),
++    requireCheckOut: v.optional(v.boolean()),
++    missingRequiredPunch: v.optional(v.union(v.literal("absent"), v.literal("review"))),
++    noPunch: v.optional(v.union(v.literal("absent"), v.literal("review"))),
++    checkpointMode: v.union(v.literal("all"), v.literal("selected")),
++    createdAt: v.string(),
++    createdBy: v.id("users"),
++  }).index("by_projectId_and_effectiveFrom", ["projectId", "effectiveFrom"]),
++  pdksCheckpointSelections: defineTable({
++    projectId: v.id("projects"),
++    ruleVersionId: v.id("pdksRuleVersions"),
++    targetType: v.union(v.literal("door"), v.literal("device")),
++    deviceId: v.id("devices"),
++    doorId: v.optional(v.id("doors")),
++    ioId: v.optional(v.number()),
++  }).index("by_ruleVersionId", ["ruleVersionId"]),
++
+   doors: defineTable({
+     name: v.string(),
+     projectId: v.optional(v.id("projects")),
+diff --git a/convex/sgkExport.ts b/convex/sgkExport.ts
+index 07c933a0..93425ae1 100644
+--- a/convex/sgkExport.ts
++++ b/convex/sgkExport.ts
+@@ -3,10 +3,9 @@ import { v } from "convex/values";
+ import type { Id } from "./_generated/dataModel";
+ import { authedQuery } from "./lib/customFunctions";
+ import { resolveProjectScope } from "./lib/projectScope";
+-import { filterPdksReadings } from "./lib/pdksSource";
+-import { buildAphbXml, type AphbEmployeeEntry } from "./lib/sgkCodes";
++import { loadRuleReportDays } from "./lib/reportAttendance";
++import { buildAphbXml } from "./lib/sgkCodes";
+ import { calculateSgkEksikGun } from "./lib/sgkEksikGun";
+-import { trDateKey, trDayRangeISO } from "./lib/trDate";
+ 
+ export const buildAphbForMonth = authedQuery({
+   args: {
+@@ -31,22 +30,17 @@ export const buildAphbForMonth = authedQuery({
+     const lastDay = new Date(Date.UTC(args.year, args.month, 0)).getUTCDate();
+     const startDate = `${args.year}-${monthStr}-01`;
+     const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
+     const monthDays = Array.from({ length: lastDay }, (_, i) =>
+       `${args.year}-${monthStr}-${String(i + 1).padStart(2, "0")}`,
+     );
+ 
+     // Aylık bildirimin tüm kayıtları gerekir; sorgular seçili proje/ay ile sınırlıdır.
+-    const [company, projectEmployees, readings, generalSettings, projectHolidays, globalHolidays] =
++    const [company, projectEmployees, generalSettings, projectHolidays, globalHolidays] =
+       await Promise.all([
+         ctx.db.query("companies")
+           .withIndex("by_project", (q) => q.eq("projectId", targetProjectId)).first(),
+         ctx.db.query("employees")
+           .withIndex("by_project", (q) => q.eq("projectId", targetProjectId)).collect(),
+-        ctx.db.query("cardReadings")
+-          .withIndex("by_project_access_time", (q) =>
+-            q.eq("projectId", targetProjectId).gte("accessTime", startISO).lte("accessTime", endISO),
+-          ).collect(),
+         ctx.db.query("generalSettings")
+           .withIndex("by_project", (q) => q.eq("projectId", targetProjectId)).first(),
+         ctx.db.query("holidays")
+@@ -61,22 +55,23 @@ export const buildAphbForMonth = authedQuery({
+     const holidayMap = new Map(
+       [...globalHolidays, ...projectHolidays].map((holiday) => [holiday.date, holiday]),
+     );
++    const ruleReport = await loadRuleReportDays(ctx, [targetProjectId], startDate, endDate);
+     const empIds = new Set(projectEmployees.map((employee) => employee._id));
+     const employeesWithReadings = new Set<Id<"employees">>();
+     const readingsByEmpDay = new Map<Id<"employees">, Set<string>>();
+-    for (const reading of filterPdksReadings(readings, targetProjectId)) {
++    for (const reading of ruleReport.readings) {
+       if (!reading.employeeId || !empIds.has(reading.employeeId)) continue;
+       employeesWithReadings.add(reading.employeeId);
+-      if (reading.accessStatus !== "izin_verildi") continue;
++      if (reading.accessStatus !== "izin_verildi" || ruleReport.policies(targetProjectId, ruleReport.workDate(reading)).punchMode === "requirements") continue;
+       const workedDays = readingsByEmpDay.get(reading.employeeId) ?? new Set<string>();
+-      workedDays.add(trDateKey(reading.accessTime));
++      workedDays.add(ruleReport.workDate(reading));
+       readingsByEmpDay.set(reading.employeeId, workedDays);
+     }
+     const employees = projectEmployees.filter(
+       (employee) => employedDuring(employee, startDate, endDate) || employeesWithReadings.has(employee._id),
+     );
+     const warnings: string[] = [];
+-    const entries: AphbEmployeeEntry[] = await Promise.all(employees.map(async (employee) => {
++    const entries = await Promise.all(employees.map(async (employee) => {
+       // Çalışana bağlı eski (projectId'siz) izinler de korunur.
+       const employeeLeaves = await ctx.db.query("leaves")
+         .withIndex("by_employee", (q) => q.eq("employeeId", employee._id)).collect();
+@@ -85,14 +80,23 @@ export const buildAphbForMonth = authedQuery({
+         (leave.projectId === undefined || leave.projectId === targetProjectId) &&
+         leave.startDate <= endDate && leave.endDate >= startDate,
+       );
++      const ruleDays = ruleReport.ruleRows.get(employee._id)?.days ?? [];
++      const reviewDays = ruleDays.filter(day => day.status === "incomplete" || day.status === "noData").map(day => day.date);
++      const workedDays = readingsByEmpDay.get(employee._id) ?? new Set<string>();
++      for (const day of ruleDays) {
++        workedDays.delete(day.date);
++        if (day.status === "present" || day.status === "late") workedDays.add(day.date);
++      }
+       const result = calculateSgkEksikGun({
+         monthDays: employee.employmentEndDate ? monthDays.filter(date => employedOn(employee, date)) : monthDays,
+         workingDays: generalSettings?.workingDays,
+         holidayMap,
+-        workedDays: readingsByEmpDay.get(employee._id) ?? new Set<string>(),
++        workedDays,
+         approvedLeaves,
+       });
+       return {
++        employeeId: employee._id,
++        reviewDays,
+         tcKimlikNo: employee.tcNo?.trim() ?? "",
+         adSoyad: `${employee.firstName} ${employee.lastName}`.trim(),
+         cumulativeWorkdays: employee.employmentEndDate && employee.employmentEndDate < endDate
+@@ -104,13 +108,16 @@ export const buildAphbForMonth = authedQuery({
+       };
+     }));
+     for (const entry of entries) {
++      if (entry.reviewDays.length) warnings.push(`${entry.adSoyad}: ${entry.reviewDays.length} gün inceleme bekliyor; APHB XML üretimi engellendi, bildirimden önce düzeltin.`);
+       if (!entry.tcKimlikNo) {
+         warnings.push(`${entry.adSoyad}: T.C. kimlik numarası eksik; bildirimden önce tamamlayın.`);
+       }
+     }
+ 
++    const blockedByReview = entries.some(entry => entry.reviewDays.length > 0);
+     return {
+-      xml: buildAphbXml({
++      blockedByReview,
++      xml: blockedByReview ? "" : buildAphbXml({
+         year: args.year,
+         month: args.month,
+         companyName: company?.name ?? "Şirket",
+@@ -118,6 +125,7 @@ export const buildAphbForMonth = authedQuery({
+       }),
+       filename: `aphb-${args.year}-${monthStr}.xml`,
+       warnings,
++      employees: entries.map(entry => ({ employeeId: entry.employeeId, reviewDays: entry.reviewDays })),
+     };
+   },
+ });
+diff --git a/convex/w5aFix1.test.ts b/convex/w5aFix1.test.ts
+new file mode 100644
+index 00000000..201b1d4c
+--- /dev/null
++++ b/convex/w5aFix1.test.ts
+@@ -0,0 +1,261 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from "convex-test";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import type { Doc } from "./_generated/dataModel";
++import { api } from "./_generated/api";
++import schema from "./schema";
++import { classifyPdksDay } from "./lib/pdksTable";
++import { resolveAttendanceEvidence } from "./lib/pdksEvidence";
++import { computePayrollCell } from "./lib/pdksPayroll";
++import { computeAttendanceDetailDay } from "./lib/pdksDetail";
++import { LEGACY_PDKS_POLICY, loadPdksPolicies, type PdksDayPolicy } from "./lib/pdksRules";
++import { DEFAULT_OVERTIME_RATES, DEFAULT_WORK_SETTINGS } from "./lib/pdksHelpers";
++import { pdksFirstRecordDate } from "./lib/pdksAvailability";
++import { loadRuleReportDays } from "./lib/reportAttendance";
++import { trDateKey } from "./lib/trDate";
++const modules = import.meta.glob("./**/*.ts");
++const requirements: PdksDayPolicy = { punchMode: "requirements", checkpointMode: "all", targets: [], requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "review", noPunch: "absent" };
++beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-01T12:00:00.000Z")); });
++afterEach(() => vi.useRealTimers());
++
++async function fixture(role: "project_admin" | "project_user" | "super_admin" = "project_admin", effectiveFrom: string | null = "2026-10-23") {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async ctx => {
++    const projectId = await ctx.db.insert("projects", { name: "A" });
++    const foreignId = await ctx.db.insert("projects", { name: "B" });
++    const userId = await ctx.db.insert("users", { role });
++    const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 365 * 86400000 });
++    await ctx.db.insert("userProjects", { projectId, userId });
++    const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gündüz", startTime: "08:00", endTime: "17:00", earlyExitToleranceMinutes: 15, createdAt: "", updatedAt: "" });
++    const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "123", isActive: true, shiftId });
++    const deviceId = await ctx.db.insert("devices", { projectId, name: "IDE", brand: "ide_smart", createdAt: "", updatedAt: "" });
++    const versionId = effectiveFrom ? await ctx.db.insert("pdksRuleVersions", { projectId, effectiveFrom, punchMode: "requirements", checkpointMode: "all", requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "review", noPunch: "absent", createdAt: "", createdBy: userId }) : null;
++    await ctx.db.insert("employeeAuth", { employeeId, passwordHash: "fixture", passwordVersion: 1, createdAt: "", updatedAt: "" });
++    await ctx.db.insert("employeeSessions", { employeeId, token: "fix1-session", passwordVersion: 1, expiresAt: "2099-01-01T00:00:00.000Z", createdAt: "" });
++    return { projectId, foreignId, userId, sessionId, shiftId, employeeId, deviceId, versionId };
++  });
++  const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
++  const add = (accessTime: string, direction?: "entry" | "exit", extra: Partial<Doc<"cardReadings">> = {}) => t.run(ctx => ctx.db.insert("cardReadings", { projectId: ids.projectId, employeeId: ids.employeeId, deviceId: ids.deviceId, cardNo: "123", accessTime, accessStatus: "izin_verildi", direction, ...extra }));
++  const manual = (date: string, times: { entryTime?: string; exitTime?: string } = {}) => t.run(ctx => ctx.db.insert("pdksRecords", { projectId: ids.projectId, employeeId: ids.employeeId, employeeFirstName: "Ada", employeeLastName: "Test", date, manualEntry: true, status: "present", createdAt: "", updatedAt: "", ...times }));
++  const table = (date: string, endDate = date) => caller.query(api.cardReadings.getPdksTableData, { projectId: ids.projectId, startDate: date, endDate, viewMode: "matrix" });
++  const sgk = () => caller.query(api.sgkExport.buildAphbForMonth, { projectId: ids.projectId, year: 2026, month: 10 });
++  return { ...ids, t, caller, add, manual, table, sgk };
++}
++
++const base = { today: "2026-11-30", firstRecordDate: "2026-01-01", hasLeave: false, isLate: false, hasAttendance: false, dataAvailable: false };
++describe("W5-A fix1 denetçi probu", () => {
++  it.each([
++    ["weekend", "2026-11-07", "weekend", false],
++    ["holiday", "2026-11-10", "holiday", false],
++    ["leave", "2026-11-11", "workday", true],
++  ] as const)("ENGEL-1: %s veri yoktan önce döner", (expected, date, classification, hasLeave) => {
++    expect(classifyPdksDay({ ...base, date, classification, hasLeave, attendanceDecision: "absent" })).toBe(expected);
++  });
++  it.each(["absent", "incomplete"] as const)("ENGEL-2: gündüz eksik yön %s bitiş+toleransa kadar bekler", attendanceDecision => {
++    const input = { ...base, date: "2026-11-30", classification: "workday" as const, dataAvailable: true, attendanceDecision, shiftStart: "08:00", shiftEnd: "17:00", earlyExitTolerance: 15 };
++    expect(classifyPdksDay({ ...input, now: Date.parse("2026-11-30T09:00:00Z") })).toBe("future");
++    expect(classifyPdksDay({ ...input, now: Date.parse("2026-11-30T14:15:00Z") })).toBe("future");
++    expect(classifyPdksDay({ ...input, now: Date.parse("2026-11-30T14:15:01Z") })).toBe(attendanceDecision);
++  });
++  it("ENGEL-2: dün başlayan gece vardiyası sabah bitiş+toleransa kadar bekler", () => {
++    const input = { ...base, today: "2026-12-01", date: "2026-11-30", classification: "workday" as const, dataAvailable: true, attendanceDecision: "incomplete" as const, shiftStart: "22:00", shiftEnd: "06:00", earlyExitTolerance: 15 };
++    expect(classifyPdksDay({ ...input, now: Date.parse("2026-12-01T00:00:00Z") })).toBe("future");
++    expect(classifyPdksDay({ ...input, now: Date.parse("2026-12-01T03:16:00Z") })).toBe("incomplete");
++  });
++  it("ENGEL-1: noData yalnız absent adayıdır, noPunch review kararını örtmez", () => {
++    expect(classifyPdksDay({ ...base, firstRecordDate: null, date: "2026-11-30", classification: "workday", attendanceDecision: "incomplete" })).toBe("incomplete");
++    expect(classifyPdksDay({ ...base, firstRecordDate: null, date: "2026-11-30", classification: "workday", attendanceDecision: "absent" })).toBe("noData");
++  });
++  it("ENGEL-3: yönsüz ek okuma geçerli çifti veya manuel düzeltmeyi incelemeye çevirmez", () => {
++    const entry = { accessTime: "2026-11-30T05:00:00.000Z", direction: "entry" };
++    const exit = { accessTime: "2026-11-30T14:00:00.000Z", direction: "exit" };
++    const unknown = { accessTime: "2026-11-30T06:00:00.000Z" };
++    for (const [readings, manual] of [ [[entry, unknown, exit], undefined], [[unknown], { entryISO: entry.accessTime, exitISO: exit.accessTime }], [[entry, unknown], { exitISO: exit.accessTime }] ] as const) {
++      expect(resolveAttendanceEvidence(readings, manual, requirements)).toMatchObject({ decision: "present", durationMeasured: true, punchQuality: "undirected" });
++    }
++    expect(resolveAttendanceEvidence([entry, unknown], undefined, { ...requirements, requireCheckOut: false })).toMatchObject({ decision: "present", durationMeasured: false });
++    expect(resolveAttendanceEvidence([unknown], undefined, requirements).decision).toBe("incomplete");
++  });
++});
++
++it("D2/ENGEL-1: izin/tatil/hafta sonu reviewDays olmaz, gerçek inceleme XML üretimini engeller", async () => {
++  const f = await fixture("project_admin", "2026-10-01");
++  await f.t.run(async ctx => {
++    await ctx.db.insert("holidays", { projectId: f.projectId, name: "Tatil", date: "2026-10-26", type: "company", createdAt: "" });
++    await ctx.db.insert("leaves", { projectId: f.projectId, employeeId: f.employeeId, startDate: "2026-10-01", endDate: "2026-10-31", leaveType: "unpaid", status: "approved", createdAt: "", updatedAt: "" });
++  });
++  const allowed = await f.sgk();
++  expect(allowed).toMatchObject({ blockedByReview: false, filename: "aphb-2026-10.xml", employees: [{ employeeId: f.employeeId, reviewDays: [] }] });
++  expect(allowed.xml).toContain("<eksikGunNedeni>21</eksikGunNedeni>");
++  expect(allowed.xml).toContain("<eksikGunSayisi>21</eksikGunSayisi>");
++  expect((await f.table("2026-10-23", "2026-10-26"))[0]?.days.map(day => day.status)).toEqual(["leave", "weekend", "weekend", "holiday"]);
++  await f.t.run(async ctx => {
++    const leave = await ctx.db.query("leaves").withIndex("by_employee", q => q.eq("employeeId", f.employeeId)).first();
++    if (leave) await ctx.db.patch(leave._id, { endDate: "2026-10-22" });
++  });
++  await f.add("2026-10-23T05:00:00.000Z", "entry");
++  const blocked = await f.sgk();
++  expect(blocked).toMatchObject({ blockedByReview: true, xml: "", filename: allowed.filename });
++  expect(blocked.employees[0]?.reviewDays).toContain("2026-10-23");
++  expect(blocked.employees[0]?.reviewDays).not.toContain("2026-10-24");
++  expect(blocked.employees[0]?.reviewDays).not.toContain("2026-10-26");
++  expect(blocked.warnings.some(warning => warning.includes("XML üretimi engellendi"))).toBe(true);
++});
++
++it("D3: yeni sürümün ilk sabahındaki çıkış önceki legacy iş gününde rapor/SGK/tabloyla aynı oturumu oluşturur", async () => {
++  const f = await fixture();
++  await f.t.run(async ctx => {
++    await ctx.db.patch(f.shiftId, { startTime: "22:00", endTime: "06:00" });
++    await ctx.db.insert("leaves", { projectId: f.projectId, employeeId: f.employeeId, startDate: "2026-10-23", endDate: "2026-10-31", leaveType: "unpaid", status: "approved", createdAt: "", updatedAt: "" });
++  });
++  await f.add("2026-10-22T19:00:00.000Z", "entry");
++  await f.add("2026-10-23T03:00:00.000Z", "exit");
++  const table = await f.table("2026-10-22");
++  expect(table[0]?.days[0]).toMatchObject({ status: "present", firstEntry: "22:00", lastExit: "06:00", rawTotalMinutes: 480 });
++  const report = await f.caller.query(api.reports.getSgkMonthlyReport, { projectId: f.projectId, year: 2026, month: 10 });
++  expect(report.rows[0]).toMatchObject({ calismaGunu: 1, toplamSaat: 8 });
++  const workDates = await f.t.run(async ctx => {
++    const report = await loadRuleReportDays(ctx, [f.projectId], "2026-10-01", "2026-10-31");
++    return report.readings.map(reading => report.workDate(reading));
++  });
++  expect(workDates).toEqual(["2026-10-22", "2026-10-22"]);
++  const sgk = await f.sgk();
++  expect(sgk.blockedByReview).toBe(false);
++  expect(sgk.xml).toContain("<eksikGunSayisi>21</eksikGunSayisi>");
++});
++
++it("D4: saatsiz manuel kayıt legacy veri-yok sonucunu tablo/detay/bordroda korur", async () => {
++  const f = await fixture("project_admin", null);
++  await f.manual("2026-10-23");
++  expect((await f.table("2026-10-23"))[0]?.days[0]?.status).toBe("noData");
++  const detail = await f.caller.query(api.cardReadings.getEmployeeAttendanceDetail, { projectId: f.projectId, employeeId: f.employeeId, startDate: "2026-10-23", endDate: "2026-10-23" });
++  expect(detail?.days[0]?.status).toBe("noData");
++  const payroll = await f.caller.query(api.cardReadings.getMonthlyPayrollSheet, { projectId: f.projectId, year: 2026, month: 10 });
++  expect(payroll.rows[0]?.cells.find(day => day.date === "2026-10-23")?.status).toBe("noData");
++  const manual = await f.t.run(ctx => ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", f.employeeId)).first());
++  if (!manual) throw new Error("Fixture kaydı yok");
++  const input = { date: "2026-10-23", availableDateKeys: new Set<string>(), firstRecordDate: "2026-01-01", dayShift: null, dayReadings: [], manual, manualDay: manual, hasLeave: false, leaves: [], holiday: null, workingDays: ["Cuma"], workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: DEFAULT_OVERTIME_RATES, empHourlyRate: null };
++  expect(computePayrollCell({ ...input, policyFor: () => LEGACY_PDKS_POLICY }).status).toBe("noData");
++  expect(computeAttendanceDetailDay({ ...input, policyFor: () => LEGACY_PDKS_POLICY }).status).toBe("noData");
++  expect(computePayrollCell({ ...input, policyFor: () => requirements }).status).toBe("absent");
++  expect(computeAttendanceDetailDay({ ...input, policyFor: () => requirements }).status).toBe("absent");
++});
++
++it("D5: mobil requirements manuel ve gece günlerini tabloyla aynı sayar, ham hareketler takvim gününde kalır", async () => {
++  const f = await fixture();
++  await f.t.run(ctx => ctx.db.patch(f.shiftId, { startTime: "22:00", endTime: "06:00" }));
++  await f.add("2026-10-23T19:00:00.000Z", "entry");
++  await f.add("2026-10-24T03:00:00.000Z", "exit");
++  await f.manual("2026-10-26", { entryTime: "22:00", exitTime: "06:00" });
++  const table = await f.table("2026-10-23", "2026-10-26");
++  const summary = await f.t.query(api.mobileAttendance.summary, { sessionToken: "fix1-session", startDate: "2026-10-23", endDate: "2026-10-26" });
++  expect(summary.totals.presentDays).toBe(table[0]?.days.filter(day => day.status === "present" || day.status === "late").length);
++  expect(summary.totals.presentDays).toBe(2);
++  expect(summary.days.find(day => day.date === "2026-10-24")?.exitCount).toBe(1);
++  expect(summary.days.find(day => day.date === "2026-10-26")?.entryCount).toBe(0);
++});
++
++it("ENGEL-2: vardiyasız requirements çalışan çalışma ayarı bitişine kadar bekler; ham dashboard girişini sayar", async () => {
++  const f = await fixture();
++  await f.t.run(ctx => ctx.db.patch(f.employeeId, { shiftId: undefined }));
++  await f.add("2026-10-23T05:00:00.000Z", "entry");
++  vi.setSystemTime(new Date("2026-10-23T09:00:00.000Z"));
++  expect((await f.table("2026-10-23"))[0]?.days[0]?.status).toBe("future");
++  expect(await f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId })).toMatchObject({ presentToday: 1, insideBuilding: 1, averageFirstEntry: "08:00", incompleteDays: 0 });
++  vi.setSystemTime(new Date("2026-10-23T15:16:00.000Z"));
++  expect((await f.table("2026-10-23"))[0]?.days[0]?.status).toBe("incomplete");
++});
++
++it("D6: karma dashboard geç gelen kişiyi birden çok geç okumada yalnız bir kere sayar", async () => {
++  const f = await fixture("super_admin");
++  const legacyEmployee = await f.t.run(ctx => ctx.db.insert("employees", { projectId: f.foreignId, firstName: "Lin", lastName: "Test", email: "lin@test", cardNumber: "456", isActive: true }));
++  for (const time of ["10:00", "11:00", "12:00"]) await f.add(`2026-10-23T${time}:00.000Z`, "entry", { projectId: f.foreignId, employeeId: legacyEmployee, cardNo: "456" });
++  vi.setSystemTime(new Date("2026-10-23T17:00:00.000Z"));
++  expect(await f.caller.query(api.dashboard.getActivitySummary, {})).toMatchObject({ lateArrivals: 1, presentToday: 1 });
++});
++
++it("N-yetki: project_user kural/cihaz okuyamaz veya silemez; proje admin yabancı sürüm silemez", async () => {
++  const user = await fixture("project_user");
++  for (const query of [api.pdksRules.getRules, api.pdksRules.listCheckpointTargets]) await expect(user.caller.query(query, { projectId: user.projectId })).rejects.toThrow("yetkiniz");
++  if (!user.versionId) throw new Error("Fixture sürümü yok");
++  await expect(user.caller.mutation(api.pdksRules.deleteFutureRuleVersion, { ruleVersionId: user.versionId })).rejects.toThrow("yetkiniz");
++  const f = await fixture();
++  const foreignVersion = await f.t.run(ctx => ctx.db.insert("pdksRuleVersions", { projectId: f.foreignId, effectiveFrom: "2026-12-01", punchMode: "legacy", checkpointMode: "all", createdAt: "", createdBy: f.userId }));
++  await expect(f.caller.mutation(api.pdksRules.deleteFutureRuleVersion, { ruleVersionId: foreignVersion })).rejects.toThrow("erişim");
++});
++
++it("N-ilk kayıt: dönem öncesi adayın eski selected sürümü iç kapı okumasını ilk kayıt saymaz", async () => {
++  const f = await fixture("project_admin", "2026-10-01");
++  await f.t.run(async ctx => {
++    const oldVersion = await ctx.db.insert("pdksRuleVersions", { projectId: f.projectId, effectiveFrom: "2026-08-01", punchMode: "legacy", checkpointMode: "selected", createdAt: "", createdBy: f.userId });
++    await ctx.db.insert("pdksCheckpointSelections", { projectId: f.projectId, ruleVersionId: oldVersion, targetType: "door", deviceId: f.deviceId, ioId: 2 });
++  });
++  await f.add("2026-08-05T05:00:00.000Z", "entry", { ideIoId: 1 });
++  await f.add("2026-10-23T05:00:00.000Z", "entry");
++  const first = await f.t.run(async ctx => {
++    const employee = await ctx.db.get(f.employeeId);
++    if (!employee) throw new Error("Fixture çalışanı yok");
++    const policies = await loadPdksPolicies(ctx, [f.projectId], "2026-10-23", "2026-10-31");
++    return pdksFirstRecordDate(ctx, employee, [], [], reading => trDateKey(reading.accessTime), policies);
++  });
++  expect(first).toBe("2026-10-23");
++});
++
++it("N-perf: kontrol noktası Map sayımı çok kapılı Hik cihazını doğru reddeder", async () => {
++  const f = await fixture();
++  await f.t.run(async ctx => {
++    await ctx.db.patch(f.deviceId, { brand: "hikvision" });
++    for (let index = 0; index < 3; index++) await ctx.db.insert("doors", { projectId: f.projectId, deviceId: f.deviceId, name: `Kapı ${index}` });
++    await ctx.db.insert("doors", { projectId: f.projectId, name: "Bağsız" });
++  });
++  const targets = await f.caller.query(api.pdksRules.listCheckpointTargets, { projectId: f.projectId });
++  expect(targets.doors).toHaveLength(4);
++  expect(targets.doors.every(door => !door.selectable)).toBe(true);
++  expect(targets.doors.filter(door => door.deviceId === f.deviceId).every(door => door.reason?.includes("Çok kapılı"))).toBe(true);
++});
++
++it("D1: karma kapsamda ek personel/vardiya/okuma yalnız sürümlü proje içindir", async () => {
++  const f = await fixture();
++  const queriedProjects: { table: string; projectId: unknown }[] = [];
++  await f.t.run(async ctx => {
++    const db = new Proxy(ctx.db, { get(target, key) {
++      if (key !== "query") return Reflect.get(target, key);
++      return (table: string) => {
++        const query = Reflect.apply(target.query, target, [table]) as object;
++        return new Proxy(query, { get(queryTarget, queryKey) {
++          const method: unknown = Reflect.get(queryTarget, queryKey);
++          if (queryKey !== "withIndex" || typeof method !== "function") return method;
++          return (index: string, callback: (builder: object) => object) => Reflect.apply(method, queryTarget, [index, (builder: object) => callback(new Proxy(builder, { get(builderTarget, field) {
++            const operation: unknown = Reflect.get(builderTarget, field);
++            if (field !== "eq" || typeof operation !== "function") return operation;
++            return (name: string, value: unknown) => {
++              if (name === "projectId") queriedProjects.push({ table, projectId: value });
++              return Reflect.apply(operation, builderTarget, [name, value]);
++            };
++          } }))]);
++        } });
++      };
++    } });
++    const report = await loadRuleReportDays({ ...ctx, db }, [f.projectId, f.foreignId], "2026-10-23", "2026-10-23", { includeLegacyReadings: false });
++    expect(report.ruleEmployees.has(f.employeeId)).toBe(true);
++  });
++  expect(queriedProjects.some(query => query.table === "employees" && query.projectId === f.projectId)).toBe(true);
++  expect(queriedProjects.some(query => ["employees", "cardReadings"].includes(query.table) && query.projectId === f.foreignId)).toBe(false);
++});
++
++it("D1: yalnız selected legacy sürümü de iş günü check point filtresini yükler", async () => {
++  const f = await fixture();
++  await f.t.run(async ctx => {
++    if (!f.versionId) throw new Error("Fixture sürümü yok");
++    await ctx.db.patch(f.versionId, { punchMode: "legacy", checkpointMode: "selected" });
++    await ctx.db.insert("pdksCheckpointSelections", { projectId: f.projectId, ruleVersionId: f.versionId, targetType: "door", deviceId: f.deviceId, ioId: 2 });
++  });
++  await f.add("2026-10-23T05:00:00.000Z", "entry", { ideIoId: 1 });
++  await f.add("2026-10-23T14:00:00.000Z", "exit", { ideIoId: 2 });
++  const report = await f.t.run(async ctx => {
++    const result = await loadRuleReportDays(ctx, [f.projectId], "2026-10-23", "2026-10-23");
++    return { readings: result.readings.map(reading => reading.ideIoId), ruleCount: result.ruleRows.size };
++  });
++  expect(report).toEqual({ readings: [2], ruleCount: 0 });
++});
+diff --git a/convex/w5aLegacyEquivalence.test.ts b/convex/w5aLegacyEquivalence.test.ts
+new file mode 100644
+index 00000000..df278ad6
+--- /dev/null
++++ b/convex/w5aLegacyEquivalence.test.ts
+@@ -0,0 +1,87 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from "convex-test";
++import { afterEach, beforeEach, expect, it, vi } from "vitest";
++import type { QueryCtx } from "./_generated/server";
++import schema from "./schema";
++import { getPdksTableData } from "./cardReadings";
++import { getSgkMonthlyReport, getOvertimeSummaryReport, getDepartmentCostReport, getAttendanceSummaryReport } from "./reports";
++import { getActivitySummary, getAnnualOvertimeBalance } from "./dashboard";
++import { buildAphbForMonth } from "./sgkExport";
++const modules = import.meta.glob("./**/*.ts");
++beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-23T17:00:00.000Z")); });
++afterEach(() => vi.useRealTimers());
++
++// The snapshots were captured by running this same real-convex-test fixture against
++// 2b67349, before W5-A. No query/auth implementation is mocked. Only the new policy
++// metadata queries and additive DTO fields are excluded from the legacy comparison.
++it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır", async () => {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async ctx => {
++    const projectId = await ctx.db.insert("projects", { name: "Legacy" });
++    const userId = await ctx.db.insert("users", { role: "project_admin" });
++    const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 86400000 });
++    await ctx.db.insert("userProjects", { userId, projectId });
++    const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gündüz", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "" });
++    const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "123", isActive: true, shiftId });
++    for (const [accessTime, direction] of [["2026-10-23T05:00:00.000Z", "entry"], ["2026-10-23T14:00:00.000Z", "exit"], ["2026-09-30T05:00:00.000Z", "entry"], ["2026-11-01T05:00:00.000Z", "entry"]] as const) {
++      await ctx.db.insert("cardReadings", { projectId, employeeId, cardNo: "123", accessStatus: "izin_verildi", direction, accessTime });
++    }
++    return { projectId, userId, sessionId, shiftId, employeeId };
++  });
++  const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
++  const omit = new Set(["incompleteDays", "durationMeasured", "punchQuality", "blockedByReview"]);
++  function stable(value: unknown): unknown {
++    if (typeof value === "string") {
++      for (const [key, id] of Object.entries(ids)) value = String(value).split(id).join(key);
++      return value;
++    }
++    if (Array.isArray(value)) return value.map(stable);
++    if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).filter(([key]) => !omit.has(key)).map(([key, entry]) => [key, stable(entry)]));
++    return value;
++  }
++  const cases = [
++    ["table", getPdksTableData, { projectId: ids.projectId, startDate: "2026-10-23", endDate: "2026-10-23", viewMode: "matrix" }],
++    ["sgkReport", getSgkMonthlyReport, { projectId: ids.projectId, year: 2026, month: 10 }],
++    ["overtimeReport", getOvertimeSummaryReport, { projectId: ids.projectId, year: 2026, month: 10 }],
++    ["departmentReport", getDepartmentCostReport, { projectId: ids.projectId, year: 2026, month: 10 }],
++    ["attendanceReport", getAttendanceSummaryReport, { projectId: ids.projectId, year: 2026, month: 10 }],
++    ["dashboard", getActivitySummary, { projectId: ids.projectId }],
++    ["annual", getAnnualOvertimeBalance, { projectId: ids.projectId, year: 2026 }],
++    ["sgk", buildAphbForMonth, { projectId: ids.projectId, year: 2026, month: 10 }],
++  ] as const;
++  for (const [name, registered, args] of cases) {
++    const reads: unknown[][] = [];
++    await caller.run(async ctx => {
++      function trace(target: object, calls: unknown[]): object {
++        return new Proxy(target, { get(obj, key) {
++          const value: unknown = Reflect.get(obj, key);
++          if (typeof value !== "function") return value;
++          return (...values: unknown[]) => {
++            // Capture actual index bounds, not callback identity.
++            calls.push([String(key), ...values.filter(value => typeof value !== "function")]);
++            if (key === "withIndex" && typeof values[1] === "function") {
++              const callback = values[1];
++              values[1] = (query: object) => Reflect.apply(callback, undefined, [trace(query, calls)]);
++            }
++            const result: unknown = Reflect.apply(value, obj, values);
++            return result !== null && typeof result === "object" && ["withIndex", "eq", "gte", "lte", "gt", "lt", "order", "filter"].includes(String(key)) ? trace(result, calls) : result;
++          };
++        } });
++      }
++      const db = new Proxy(ctx.db, { get(target, key) {
++        if (key !== "query") return Reflect.get(target, key);
++        return (table: string) => {
++          const calls: unknown[] = [table];
++          if (table !== "pdksRuleVersions" && table !== "pdksCheckpointSelections") reads.push(calls);
++          return trace(Reflect.apply(target.query, target, [table]) as object, calls);
++        };
++      } });
++      const handler = registered as unknown as { _handler: (ctx: QueryCtx, args: object) => Promise<unknown> };
++      const result = await handler._handler({ ...ctx, db }, args);
++      if (name === "sgk" && result !== null && typeof result === "object" && "employees" in result) delete result.employees;
++      const normalizedReads = reads.map(read => JSON.stringify(stable(read))).sort();
++      expect({ reads: normalizedReads, result: stable(result) }, name).toMatchSnapshot(name);
++    });
++  }
++});
+diff --git a/src/components/pdks/lib/analysis.ts b/src/components/pdks/lib/analysis.ts
+index bb5983cc..f307dd4a 100644
+--- a/src/components/pdks/lib/analysis.ts
++++ b/src/components/pdks/lib/analysis.ts
+@@ -24,7 +24,7 @@ export function analyzePdksRows(rows: readonly PdksRow[]): AnalysisDay[] {
+           holiday: 0,
+           future: 0,
+           noData: 0,
+-          notEmployed: 0,
++          notEmployed: 0, incomplete: 0,
+         },
+         totalMinutes: 0,
+         lateMinutes: 0,
+diff --git a/src/components/pdks/statusMeta.ts b/src/components/pdks/statusMeta.ts
+index c70c4abb..95e93538 100644
+--- a/src/components/pdks/statusMeta.ts
++++ b/src/components/pdks/statusMeta.ts
+@@ -37,6 +37,7 @@ function meta(
+   };
+ }
+ export const STATUS_META: Record<DayStatus, StatusMeta> = {
++  incomplete: meta("İnceleme", "—"),
+   present: meta("Mevcut", "M", "success"),
+   late: meta("Geç", "G", "warning"),
+   absent: meta("Devamsız", "D", "danger"),

@@ -1,0 +1,534 @@
+diff --git a/convex/lib/auditLogQuery.test.ts b/convex/lib/auditLogQuery.test.ts
+index dea51413..7f713b92 100644
+--- a/convex/lib/auditLogQuery.test.ts
++++ b/convex/lib/auditLogQuery.test.ts
+@@ -82,6 +82,7 @@ describe("denetim sorgusu", () => {
+       "pdksRecords",
+       "pdksRuleVersions",
+       "projectPrivacySettings",
++      "shiftAssignments",
+       "users",
+     ]);
+   });
+diff --git a/convex/lib/auditLogQuery.ts b/convex/lib/auditLogQuery.ts
+index d7d44a66..d95f73f3 100644
+--- a/convex/lib/auditLogQuery.ts
++++ b/convex/lib/auditLogQuery.ts
+@@ -1,6 +1,7 @@
+ import { trDayRangeISO } from "./trDate";
+ 
+ export const AUDIT_TARGET_LABELS: Record<string, string> = {
++  shiftAssignments: "Vardiya atamaları",
+   pdksRuleVersions: "PDKS kuralları",
+   users: "Kullanıcılar",
+   projectPrivacySettings: "Proje gizlilik ayarları",
+diff --git a/convex/shifts.test.ts b/convex/shifts.test.ts
+new file mode 100644
+index 00000000..afa50b13
+--- /dev/null
++++ b/convex/shifts.test.ts
+@@ -0,0 +1,65 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from 'convex-test';
++import { describe, expect, it } from 'vitest';
++import schema from './schema';
++import { api } from './_generated/api';
++const modules = import.meta.glob('./**/*.ts');
++async function fixture(role: 'project_admin' | 'project_user' = 'project_admin') {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async ctx => {
++    const projectId = await ctx.db.insert('projects', { name: 'Test' });
++    const foreignId = await ctx.db.insert('projects', { name: 'Other' });
++    const userId = await ctx.db.insert('users', { role });
++    const sessionId = await ctx.db.insert('authSessions', { userId, expirationTime: Date.now() + 86400000 });
++    await ctx.db.insert('userProjects', { userId, projectId });
++    const employeeId = await ctx.db.insert('employees', { projectId, firstName: 'Ayşe', lastName: 'Test', email: 'test@example.test', cardNumber: 'test' });
++    const foreignEmployeeId = await ctx.db.insert('employees', { projectId: foreignId, firstName: 'Other', lastName: 'Test', email: 'other@example.test', cardNumber: 'other' });
++    const shiftId = await ctx.db.insert('shifts', { projectId, name: 'Gündüz', startTime: '09:00', endTime: '17:00', createdAt: 'original', updatedAt: 'original' });
++    return { projectId, userId, sessionId, employeeId, foreignEmployeeId, shiftId };
++  });
++  const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
++  const args = { projectId: ids.projectId, employeeIds: [ids.employeeId], startDate: '2025-03-10', endDate: '2025-03-20' };
++  const insert = (startDate: string, endDate: string, count = 1) => t.run(async ctx => {
++    for (let i = 0; i < count; i++) await ctx.db.insert('shiftAssignments', { employeeId: ids.employeeId, projectId: ids.projectId, shiftId: ids.shiftId, startDate, endDate, weekPattern: ['MON'], createdAt: 'original', updatedAt: 'original' });
++  });
++  return { t, caller, args, insert, ...ids };
++}
++describe('shift bulk clear', () => {
++  it('deletes, trims either edge, splits and preserves external rows; preview equals mutation and one audit', async () => {
++    const f = await fixture();
++    for (const [start, end] of [['12','18'], ['01','15'], ['15','28'], ['01','28'], ['01','05']]) await f.insert(`2025-03-${start}`, `2025-03-${end}`);
++    const preview = await f.caller.query(api.shifts.previewClearAssignments, f.args);
++    expect(preview).toEqual({ deleted: 1, trimmed: 2, split: 1, affectedEmployees: 1, affectsPast: true });
++    expect(await f.caller.mutation(api.shifts.clearAssignments, f.args)).toEqual(preview);
++    const rows = await f.t.run(ctx => ctx.db.query('shiftAssignments').take(20));
++    expect(rows.map(row => [row.startDate, row.endDate]).sort()).toEqual([
++      ['2025-03-01','2025-03-05'], ['2025-03-01','2025-03-09'], ['2025-03-01','2025-03-09'], ['2025-03-21','2025-03-28'], ['2025-03-21','2025-03-28'],
++    ]);
++    expect(rows.every(row => row.weekPattern?.[0] === 'MON' && row.createdAt === 'original')).toBe(true);
++    const logs = await f.t.run(ctx => ctx.db.query('auditLog').take(20));
++    expect(logs).toHaveLength(1);
++    expect(logs[0]).toMatchObject({ action: 'delete', targetTable: 'shiftAssignments', projectId: f.projectId, userId: f.userId, newValue: preview });
++  });
++  it('rejects project_user in both endpoints', async () => {
++    const f = await fixture('project_user');
++    await expect(f.caller.query(api.shifts.previewClearAssignments, f.args)).rejects.toThrow('yetkiniz yok');
++    await expect(f.caller.mutation(api.shifts.clearAssignments, f.args)).rejects.toThrow('yetkiniz yok');
++  });
++  it('rejects foreign employee and invalid, duplicate, excessive selections or date ranges', async () => {
++    const f = await fixture();
++    for (const patch of [{ employeeIds: [f.foreignEmployeeId] }, { employeeIds: [f.employeeId, f.employeeId] }, { employeeIds: Array.from({ length: 501 }, () => f.employeeId) }, { startDate: '2025-02-30' }, { endDate: '2026-03-11' }]) {
++      await expect(f.caller.query(api.shifts.previewClearAssignments, { ...f.args, ...patch })).rejects.toThrow();
++      await expect(f.caller.mutation(api.shifts.clearAssignments, { ...f.args, ...patch })).rejects.toThrow();
++    }
++  });
++  it('revalidates mutation after preview and rejects over 1000 without writes', async () => {
++    const f = await fixture();
++    expect((await f.caller.query(api.shifts.previewClearAssignments, f.args)).deleted).toBe(0);
++    await f.insert('2025-03-12', '2025-03-18', 1001);
++    await expect(f.caller.mutation(api.shifts.clearAssignments, f.args)).rejects.toThrow('aralığı daraltın');
++    await expect(f.caller.query(api.shifts.previewClearAssignments, f.args)).rejects.toThrow('aralığı daraltın');
++    expect(await f.t.run(ctx => ctx.db.query('shiftAssignments').take(1002))).toHaveLength(1001);
++    expect(await f.t.run(ctx => ctx.db.query('auditLog').take(1))).toHaveLength(0);
++  });
++});
+diff --git a/convex/shifts.ts b/convex/shifts.ts
+index aa1b37fc..e2cc514b 100644
+--- a/convex/shifts.ts
++++ b/convex/shifts.ts
+@@ -1,3 +1,4 @@
++import { writeAudit } from "./lib/audit";
+ import { assertPeopleProject } from "./lib/peopleScope";
+ import { resolveProjectScope } from "./lib/projectScope";
+ import { toPatch } from "./lib/nullablePatch";
+@@ -479,3 +480,70 @@ export const remove = authedMutation({
+     return { removedAssignments: eligible.length, skippedAssignments: linkedAssignments.length - eligible.length };
+   },
+ });
++
++const clearArgs = {
++  projectId: v.id("projects"), employeeIds: v.array(v.id("employees")),
++  startDate: v.string(), endDate: v.string(),
++};
++type ClearInput = { projectId: Id<"projects">; employeeIds: Id<"employees">[]; startDate: string; endDate: string };
++async function prepareClear(ctx: ReadCtx & { user: Doc<"users"> }, args: ClearInput) {
++  if (ctx.user.role !== "super_admin" && ctx.user.role !== "project_admin") throw new ConvexError("Bu işlem için yetkiniz yok");
++  validateAssignRange(args);
++  if (!args.employeeIds.length || args.employeeIds.length > 500) throw new ConvexError("1–500 çalışan seçin");
++  if (new Set(args.employeeIds).size !== args.employeeIds.length) throw new ConvexError("Aynı çalışan birden fazla seçilemez");
++  await resolveProjectScope(ctx, args.projectId);
++  const state = newReadState();
++  const rows: Doc<"shiftAssignments">[] = [];
++  for (const employeeId of args.employeeIds) {
++    const employee = await ctx.db.get(employeeId);
++    if (!employee || employee.projectId !== args.projectId) throw new ConvexError("Çalışan seçili projeye ait değil");
++    await requireEmployeeAccess(ctx, employeeId);
++    const found = consumeRows(await ctx.db.query("shiftAssignments").withIndex("by_employee_end", q =>
++      q.eq("employeeId", employeeId).gte("endDate", args.startDate),
++    ).take(state.remaining + 1), state);
++    for (const row of found) {
++      if (row.startDate > args.endDate) continue;
++      if (row.projectId !== args.projectId) throw new ConvexError("Atamanın proje bilgisi doğrulanamadı");
++      rows.push(row);
++      if (rows.length > 1000) throw new ConvexError("1000 üzeri atama tek işlemde temizlenemez; aralığı daraltın");
++    }
++  }
++  const summary = { deleted: 0, trimmed: 0, split: 0, affectedEmployees: new Set(rows.map(row => row.employeeId)).size,
++    affectsPast: rows.some(row => row.startDate < trDateKey(new Date().toISOString()) && args.startDate < trDateKey(new Date().toISOString())) };
++  for (const row of rows) {
++    if (row.startDate < args.startDate && row.endDate > args.endDate) summary.split++;
++    else if (row.startDate < args.startDate || row.endDate > args.endDate) summary.trimmed++;
++    else summary.deleted++;
++  }
++  return { rows, summary };
++}
++export const previewClearAssignments = authedQuery({
++  args: clearArgs,
++  handler: async (ctx, args) => (await prepareClear(ctx, args)).summary,
++});
++export const clearAssignments = authedMutation({
++  args: clearArgs,
++  handler: async (ctx, args) => {
++    const { rows, summary } = await prepareClear(ctx, args);
++    const updatedAt = new Date().toISOString();
++    for (const row of rows) {
++      if (row.startDate < args.startDate && row.endDate > args.endDate) {
++        await ctx.db.patch(row._id, { endDate: shiftDateOffset(args.startDate, -1), updatedAt });
++        await ctx.db.insert("shiftAssignments", {
++          employeeId: row.employeeId, shiftId: row.shiftId, projectId: row.projectId,
++          startDate: shiftDateOffset(args.endDate, 1), endDate: row.endDate,
++          weekPattern: row.weekPattern, createdAt: row.createdAt, updatedAt,
++        });
++      } else if (row.startDate < args.startDate) {
++        await ctx.db.patch(row._id, { endDate: shiftDateOffset(args.startDate, -1), updatedAt });
++      } else if (row.endDate > args.endDate) {
++        await ctx.db.patch(row._id, { startDate: shiftDateOffset(args.endDate, 1), updatedAt });
++      } else await ctx.db.delete(row._id);
++    }
++    if (rows.length) await writeAudit(ctx, { user: ctx.user, projectId: args.projectId, action: "delete",
++      targetTable: "shiftAssignments", targetId: args.projectId,
++      oldValue: { startDate: args.startDate, endDate: args.endDate, employeeIds: args.employeeIds },
++      newValue: summary, note: `Vardiya toplu temizle: ${summary.deleted} silindi, ${summary.trimmed} kırpıldı, ${summary.split} bölündü` });
++    return summary;
++  },
++});
+diff --git a/src/components/audit/AuditExportButton.tsx b/src/components/audit/AuditExportButton.tsx
+new file mode 100644
+index 00000000..1af9547a
+--- /dev/null
++++ b/src/components/audit/AuditExportButton.tsx
+@@ -0,0 +1,31 @@
++import { useEffect, useRef, useState } from 'react';
++import { useConvex } from 'convex/react';
++import { api } from '../../../convex/_generated/api';
++import type { AuditArgs } from './auditState';
++import { Button } from '@/components/ui/button';
++import { collectAuditExport, auditExportRows } from '@/lib/auditExport';
++import { downloadExport, exportFilenamePart, xlsxExport } from '@/lib/spreadsheetExport';
++import { notify } from '@/lib/notify';
++export function AuditExportButton({ args, projectName }: { args: AuditArgs; projectName: string }) {
++  const convex = useConvex();
++  const controller = useRef<AbortController | null>(null);
++  const [progress, setProgress] = useState<number | null>(null);
++  useEffect(() => () => controller.current?.abort(), []);
++  const run = async () => {
++    if (controller.current) return;
++    const active = new AbortController();
++    controller.current = active;
++    setProgress(0);
++    try {
++      const result = await collectAuditExport(cursor => convex.query(api.auditLog.list, { ...args, paginationOpts: { cursor, numItems: 500 } }), active.signal, setProgress);
++      if (result.truncated && !window.confirm('İlk 10.000 kayıt aktarılacak; tarih aralığını daraltın. Devam edilsin mi?')) return;
++      active.signal.throwIfAborted();
++      const blob = await xlsxExport(auditExportRows(result.rows), 'Denetim Kaydı');
++      active.signal.throwIfAborted();
++      downloadExport(blob, `denetim-kaydi-${exportFilenamePart(args.allProjects ? 'tum-projeler' : projectName)}-${args.startDate ?? 'ilk'}_${args.endDate ?? 'son'}.xlsx`);
++    } catch (error: unknown) {
++      if (!active.signal.aborted) notify.error('Denetim kaydı aktarılamadı', error);
++    } finally { controller.current = null; setProgress(null); }
++  };
++  return <div className="flex items-center gap-2">{progress === null ? <Button variant="outline" onClick={run}>Excel'e aktar</Button> : <><span role="status" className="text-sm">{progress.toLocaleString('tr-TR')} / ~? kayıt</span><Button variant="outline" onClick={() => controller.current?.abort()}>İptal</Button></>}</div>;
++}
+diff --git a/src/components/audit/auditLabels.ts b/src/components/audit/auditLabels.ts
+index e405bdbd..494813c5 100644
+--- a/src/components/audit/auditLabels.ts
++++ b/src/components/audit/auditLabels.ts
+@@ -39,6 +39,13 @@ const commonLabels: Record<string, string> = {
+   firstName: "Ad",
+   lastName: "Soyad",
+   employeeId: "Çalışan kimliği",
++  employeeIds: "Çalışan kimlikleri",
++  startDate: "Başlangıç tarihi",
++  endDate: "Bitiş tarihi",
++  trimmed: "Kırpılan atama sayısı",
++  split: "Bölünen atama sayısı",
++  affectedEmployees: "Etkilenen çalışan sayısı",
++  affectsPast: "Geçmiş günleri etkiler",
+   projectId: "Proje kimliği",
+   date: "Tarih",
+   status: "Durum",
+diff --git a/src/components/shifts/ClearAssignmentsDialog.tsx b/src/components/shifts/ClearAssignmentsDialog.tsx
+new file mode 100644
+index 00000000..2565ae52
+--- /dev/null
++++ b/src/components/shifts/ClearAssignmentsDialog.tsx
+@@ -0,0 +1,44 @@
++import { useRef, useState } from 'react';
++import { useConvex, useMutation } from 'convex/react';
++import type { FunctionReturnType } from 'convex/server';
++import { api } from '../../../convex/_generated/api';
++import type { Id } from '../../../convex/_generated/dataModel';
++import type { Employee } from './lib/planning';
++import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
++import { Button } from '@/components/ui/button';
++import { Input } from '@/components/ui/input';
++import { DateInput } from '@/components/ui/date-picker';
++import { errorMessage, notify } from '@/lib/notify';
++export function ClearAssignmentsDialog({ projectId, employees, initialIds, start, end, onClose }: {
++  projectId: Id<'projects'>; employees: Employee[]; initialIds: string[]; start: string; end: string; onClose: () => void;
++}) {
++  const convex = useConvex();
++  const apply = useMutation(api.shifts.clearAssignments);
++  const [selected, setSelected] = useState(new Set(initialIds));
++  const [search, setSearch] = useState('');
++  const [startDate, setStart] = useState(start);
++  const [endDate, setEnd] = useState(end);
++  const [preview, setPreview] = useState<FunctionReturnType<typeof api.shifts.previewClearAssignments> | null>(null);
++  const [pending, setPending] = useState(false);
++  const lock = useRef(false);
++  const [error, setError] = useState('');
++  const args = { projectId, employeeIds: employees.filter(e => selected.has(e._id)).map(e => e._id), startDate, endDate };
++  const run = async (confirm: boolean) => {
++    if (lock.current) return;
++    lock.current = true; setPending(true); setError('');
++    try {
++      if (confirm && preview) { const result = await apply(args); notify.success(`${result.affectedEmployees} çalışanın atamaları temizlendi`); onClose(); }
++      else setPreview(await convex.query(api.shifts.previewClearAssignments, args));
++    } catch (error: unknown) { setError(errorMessage(error)); setPreview(null); }
++    finally { lock.current = false; setPending(false); }
++  };
++  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose(); }}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Toplu temizle</DialogTitle><DialogDescription>Seçili çalışanların tarih aralığındaki atamalarını kaldırın. Aralığın dışındaki günler korunur.</DialogDescription></DialogHeader>
++    <label className="space-y-1 text-sm">Çalışan ara<Input value={search} onChange={event => setSearch(event.target.value)} /></label>
++    <div className="max-h-48 overflow-auto rounded border p-2">{employees.filter(e => `${e.firstName} ${e.lastName}`.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'))).map(e => <label key={e._id} className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" disabled={pending} checked={selected.has(e._id)} onChange={() => { setSelected(old => { const next = new Set(old); if (next.has(e._id)) next.delete(e._id); else next.add(e._id); return next; }); setPreview(null); }} />{e.firstName} {e.lastName}</label>)}</div>
++    <p className="text-sm">{selected.size} çalışan seçildi · En fazla 500</p>
++    <div className="flex flex-wrap gap-3"><label className="text-sm">Başlangıç<DateInput disabled={pending} value={startDate} onChange={value => { setStart(value); setPreview(null); }} /></label><label className="text-sm">Bitiş<DateInput disabled={pending} value={endDate} onChange={value => { setEnd(value); setPreview(null); }} /></label></div>
++    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
++    {preview && <div role="status" className="space-y-2 text-sm"><p>{preview.deleted} silinecek, {preview.trimmed} kırpılacak, {preview.split} bölünecek · {preview.affectedEmployees} çalışan.</p>{preview.affectsPast && <p className="text-destructive">Geçmiş günlerin PDKS hesabı değişir.</p>}</div>}
++    <div className="flex justify-end gap-2"><Button variant="outline" disabled={pending} onClick={onClose}>Vazgeç</Button><Button variant={preview ? 'destructive' : 'default'} disabled={pending || !selected.size || (preview !== null && !preview.affectedEmployees)} onClick={() => run(preview !== null)}>{pending ? 'İşleniyor…' : preview ? 'Onayla ve temizle' : 'Önizle'}</Button></div>
++  </DialogContent></Dialog>;
++}
+diff --git a/src/components/shifts/ShiftCalendarView.tsx b/src/components/shifts/ShiftCalendarView.tsx
+index 082c4e42..2748697e 100644
+--- a/src/components/shifts/ShiftCalendarView.tsx
++++ b/src/components/shifts/ShiftCalendarView.tsx
+@@ -1,3 +1,9 @@
++import { ClearAssignmentsDialog } from './ClearAssignmentsDialog';
++import { useAuth } from '@/components/auth/AuthProvider';
++import { capabilities } from '@/lib/capabilities';
++import { shiftExportRows } from '@/lib/shiftExport';
++import { csvExport, downloadExport, exportFilenamePart, xlsxExport } from '@/lib/spreadsheetExport';
++import { notify } from '@/lib/notify';
+ import { ShiftSelect } from "./ShiftSelect";
+ import { assignmentInitial, shiftTimeLabel } from "./lib/planning";
+ import { useEffect, useMemo, useState } from "react";
+@@ -102,6 +108,10 @@ function Plan({
+   shifts: Shift[];
+   openDefinitions: () => void;
+ }) {
++  const { profile } = useAuth();
++  const canManage = capabilities(profile?.role).admin;
++  const [clearOpen, setClearOpen] = useState(false);
++  const [exporting, setExporting] = useState(false);
+   const compact = useCompact();
+   const navigate = useNavigate();
+   const [day, setDay] = useState(istanbulToday);
+@@ -146,6 +156,16 @@ function Plan({
+     startDate: range.rangeStart,
+     endDate: range.rangeEnd,
+   });
++  const exportPlan = async (format: 'xlsx' | 'csv') => {
++    if (!assignments || exporting) return;
++    setExporting(true);
++    try {
++      const rows = shiftExportRows(visible, range.days, assignments, shifts);
++      const blob = format === 'xlsx' ? await xlsxExport(rows, 'Vardiyalar') : new Blob([csvExport(rows)], { type: 'text/csv;charset=utf-8' });
++      downloadExport(blob, `vardiyalar-${exportFilenamePart(projectName)}-${range.rangeStart}_${range.rangeEnd}.${format}`);
++    } catch (error: unknown) { notify.error('Vardiyalar aktarılamadı', error); }
++    finally { setExporting(false); }
++  };
+   const active = shifts.filter((s) => s.isActive !== false);
+   const loading =
+     assignments === undefined || leaves === undefined || holidays === undefined;
+@@ -207,6 +227,13 @@ function Plan({
+           </Button>
+         }
+       />
++      <div className="flex flex-wrap gap-2">
++        {canManage && <Button variant="outline" onClick={() => setClearOpen(true)}>Toplu temizle</Button>}
++        <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('xlsx')}>Excel'e aktar</Button>
++        <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('csv')}>CSV'ye aktar</Button>
++        <span className="self-center text-xs text-muted-foreground">Dışa aktarım: görünen sayfa ve dönem</span>
++      </div>
++      {clearOpen && <ClearAssignmentsDialog projectId={projectId} employees={employees} initialIds={[...selected]} start={range.rangeStart} end={range.rangeEnd} onClose={() => { setClearOpen(false); clearSelection(); }} />}
+       <StatInline
+         items={[
+           { label: "Görünen çalışan", value: filtered.length },
+diff --git a/src/components/shifts/lib/auditFixes.test.tsx b/src/components/shifts/lib/auditFixes.test.tsx
+index 13ff96b9..4b0e1a94 100644
+--- a/src/components/shifts/lib/auditFixes.test.tsx
++++ b/src/components/shifts/lib/auditFixes.test.tsx
+@@ -15,6 +15,7 @@ type PageHeaderProps = ComponentProps<typeof PageHeader>;
+ import type { Id } from "../../../../convex/_generated/dataModel";
+ 
+ const state = vi.hoisted(() => ({ shifts: [] as Shift[], calls: [] as string[], primary: null as PageHeaderProps["primaryAction"] | null }));
++vi.mock("@/components/auth/AuthProvider", () => ({ useAuth: () => ({ profile: { role: "project_admin" } }) }));
+ vi.mock("convex/react", () => ({
+   useMutation: () => vi.fn(),
+   useQuery: (reference: Parameters<typeof getFunctionName>[0]) => {
+diff --git a/src/lib/auditExport.test.ts b/src/lib/auditExport.test.ts
+new file mode 100644
+index 00000000..c59bcdab
+--- /dev/null
++++ b/src/lib/auditExport.test.ts
+@@ -0,0 +1,46 @@
++import { describe, expect, it, vi } from 'vitest';
++import { collectAuditExport, auditExportRows } from './auditExport';
++import { csvExport, safeRows, xlsxExport } from './spreadsheetExport';
++import type { AuditRow } from '@/components/audit/auditState';
++import type { Id } from '../../convex/_generated/dataModel';
++const row: AuditRow = { _id: 'audit' as Id<'auditLog'>, _creationTime: 0, timestamp: Date.parse('2025-01-01T22:01:02Z'), userName: '=Test', projectName: 'Test', targetTable: 'employees', action: 'update', targetId: '@id', note: 'Not\nmetni', oldValue: { firstName: 'Ali' }, newValue: { firstName: 'Veli' } };
++const page = (rows: AuditRow[], isDone: boolean, continueCursor: string) => ({ page: rows, isDone, continueCursor });
++describe('audit export', () => {
++  it('joins pages including empty filtered pages with cursors and progress', async () => {
++    const fetch = vi.fn().mockResolvedValueOnce(page([row], false, 'a')).mockResolvedValueOnce(page([], false, 'b')).mockResolvedValueOnce(page([row], true, 'c'));
++    const progress = vi.fn();
++    expect(await collectAuditExport(fetch, new AbortController().signal, progress)).toEqual({ rows: [row, row], truncated: false });
++    expect(fetch.mock.calls).toEqual([[null], ['a'], ['b']]);
++    expect(progress.mock.calls).toEqual([[1], [1], [2]]);
++  });
++  it('caps at 10000 and flags the confirmation only when extra matching rows exist', async () => {
++    const rows = Array.from({ length: 10000 }, () => row);
++    const fetch = vi.fn().mockResolvedValueOnce(page(rows, false, 'a')).mockResolvedValueOnce(page([], false, 'b')).mockResolvedValueOnce(page([row], true, 'c'));
++    const result = await collectAuditExport(fetch, new AbortController().signal, () => {});
++    expect(result.rows).toHaveLength(10000); expect(result.truncated).toBe(true);
++    expect((await collectAuditExport(async () => page(rows, true, 'a'), new AbortController().signal, () => {})).truncated).toBe(false);
++  });
++  it('cancels before requests and after an in-flight page', async () => {
++    const controller = new AbortController(); controller.abort();
++    const fetch = vi.fn();
++    await expect(collectAuditExport(fetch, controller.signal, () => {})).rejects.toThrow(); expect(fetch).not.toHaveBeenCalled();
++    const active = new AbortController();
++    await expect(collectAuditExport(async () => { active.abort(); return page([row], true, 'a'); }, active.signal, () => {})).rejects.toThrow();
++  });
++  it('formats Turkish labels, İstanbul seconds, masked detail and neutralizes formula cells', () => {
++    const rows = auditExportRows([row]);
++    expect(rows[0]).toEqual(['Zaman','Kullanıcı','Proje','Tablo','İşlem','Kayıt','Özet/Değişiklik']);
++    expect(rows[1]).toEqual(['02.01.2025 01:01:02','=Test','Test','Çalışan','Güncelleme','@id','Not metni; Ad: Ali → Veli']);
++    expect(safeRows(rows)[1]?.[1]).toBe("'=Test");
++    expect(csvExport([['=x','a;b','a"b','\tfoo']])).toBe('\uFEFF"\'=x";"a;b";"a""b";"\'\tfoo"');
++  });
++});
++
++it('writes actual XLSX cells as neutralized text', async () => {
++  const { default: ExcelJS } = await import('exceljs');
++  const blob = await xlsxExport([['Başlık'], ['=SUM(A1)'], ['@id']], 'Test');
++  const workbook = new ExcelJS.Workbook();
++  await workbook.xlsx.load(await blob.arrayBuffer());
++  expect(workbook.worksheets[0]?.getCell('A2').value).toBe("'=SUM(A1)");
++  expect(workbook.worksheets[0]?.getCell('A3').value).toBe("'@id");
++});
+diff --git a/src/lib/auditExport.ts b/src/lib/auditExport.ts
+new file mode 100644
+index 00000000..aa5b7652
+--- /dev/null
++++ b/src/lib/auditExport.ts
+@@ -0,0 +1,33 @@
++import type { FunctionReturnType } from 'convex/server';
++import type { api } from '../../convex/_generated/api';
++import type { AuditRow } from '@/components/audit/auditState';
++import { timestampFormat } from '@/components/audit/auditState';
++import { AUDIT_TARGET_LABELS } from '../../convex/lib/auditLogQuery';
++import { auditChanges, auditFieldLabel, auditFieldDisplayValue, maskAuditValue } from '@/components/audit/auditLabels';
++
++type AuditPage = FunctionReturnType<typeof api.auditLog.list>;
++export async function collectAuditExport(fetchPage: (cursor: string | null) => Promise<AuditPage>, signal: AbortSignal, progress: (count: number) => void) {
++  const rows: AuditRow[] = [];
++  let cursor: string | null = null;
++  for (;;) {
++    signal.throwIfAborted();
++    const page = await fetchPage(cursor);
++    signal.throwIfAborted();
++    const remaining = 10000 - rows.length;
++    rows.push(...page.page.slice(0, remaining));
++    progress(rows.length);
++    if (page.page.length > remaining) return { rows, truncated: true };
++    if (page.isDone) return { rows, truncated: false };
++    // Continue past empty filtered pages and probe beyond exactly 10,000 matches.
++    if (page.continueCursor === cursor) throw new Error('Denetim sayfalaması ilerleyemedi');
++    cursor = page.continueCursor;
++  }
++}
++export function auditExportRows(rows: AuditRow[]) {
++  const labels = { create: 'Oluşturma', update: 'Güncelleme', delete: 'Silme' };
++  return [['Zaman', 'Kullanıcı', 'Proje', 'Tablo', 'İşlem', 'Kayıt', 'Özet/Değişiklik'], ...rows.map(row => [
++    timestampFormat.format(row.timestamp), row.userName ?? 'Sistem', row.projectName,
++    AUDIT_TARGET_LABELS[row.targetTable] ?? row.targetTable, labels[row.action], row.targetId,
++    [row.note, ...auditChanges(row.oldValue, row.newValue).map(change => `${auditFieldLabel(row.targetTable, change.field)}: ${auditFieldDisplayValue(change.field, maskAuditValue(change.field, change.before))} → ${auditFieldDisplayValue(change.field, maskAuditValue(change.field, change.after))}`)].filter(value => value !== undefined && value !== '').join('; ').replace(/\s+/g, ' ').slice(0, 1000),
++  ])];
++}
+diff --git a/src/lib/shiftExport.test.ts b/src/lib/shiftExport.test.ts
+new file mode 100644
+index 00000000..504dd91f
+--- /dev/null
++++ b/src/lib/shiftExport.test.ts
+@@ -0,0 +1,22 @@
++import { describe, expect, it } from 'vitest';
++import { shiftExportRows } from './shiftExport';
++import { safeRows, csvExport } from './spreadsheetExport';
++import type { Employee, Shift, Assignment } from '@/components/shifts/lib/planning';
++const employee = { _id: 'e', firstName: '=Ayşe', lastName: 'Test', payrollCode: '+123' } as Employee;
++const fixed = { _id: 's', name: 'Gündüz', startTime: '09:00', endTime: '17:00' } as Shift;
++const flex = { _id: 'f', name: 'Serbest', startTime: '08:00', endTime: '10:00', scheduleType: 'flexible', flexible: { requiredNetMinutes: 480, checkInStart: '08:00', checkInEnd: '10:00', checkOutStart: '16:00', checkOutEnd: '20:00', checkOutEndDayOffset: 0, maxSpanMinutes: 720, breakMode: 'duration', breakMinutes: 0 } } as Shift;
++const assignment = (shiftId: string, day: string) => ({ _id: shiftId, employeeId: 'e', shiftId, startDate: day, endDate: day }) as Assignment;
++describe('shift export grid', () => {
++  it('exports fixed, flexible, empty cells, employee codes and Turkish day labels', () => {
++    const rows = shiftExportRows([employee], ['2026-10-19','2026-10-20','2026-10-21'], [assignment('s','2026-10-19'), assignment('f','2026-10-20')], [fixed, flex]);
++    expect(rows).toEqual([['Çalışan','Sicil','19.10 Pzt','20.10 Sal','21.10 Çar'],['=Ayşe Test','+123','Gündüz · 09:00–17:00','Serbest · Esnek · 8 sa','—']]);
++    expect(safeRows(rows)[1]?.slice(0,2)).toEqual(["'=Ayşe Test","'+123"]);
++    expect(csvExport(rows)).toContain('"Gündüz · 09:00–17:00";"Serbest · Esnek · 8 sa";"—"');
++  });
++  it('respects weekday patterns and shows night continuations like calendar', () => {
++    const night = { ...fixed, startTime: '22:00', endTime: '06:00' };
++    const a = { ...assignment('s','2026-10-19'), weekPattern: ['MON'] };
++    const rows = shiftExportRows([employee], ['2026-10-20','2026-10-21'], [a], [night]);
++    expect(rows[1]?.slice(2)).toEqual(['Gündüz · 22:00–06:00 (+1 gün) (devam)', '—']);
++  });
++});
+diff --git a/src/lib/shiftExport.ts b/src/lib/shiftExport.ts
+new file mode 100644
+index 00000000..19051124
+--- /dev/null
++++ b/src/lib/shiftExport.ts
+@@ -0,0 +1,8 @@
++import { cellData, shiftTimeLabel, type Employee, type Shift, type Assignment } from '@/components/shifts/lib/planning';
++export function shiftExportRows(employees: Employee[], days: string[], assignments: Assignment[], shifts: Shift[]) {
++  return [['Çalışan', 'Sicil', ...days.map(day => `${day.slice(8, 10)}.${day.slice(5, 7)} ${new Intl.DateTimeFormat('tr-TR', { weekday: 'short', timeZone: 'Europe/Istanbul' }).format(new Date(`${day}T12:00:00Z`))}`)],
++    ...employees.map(employee => [`${employee.firstName} ${employee.lastName}`, employee.payrollCode ?? '', ...days.map(day => {
++      const records = cellData(employee, day, assignments, shifts, [], []).records;
++      return records.map(record => `${record.shift.name} · ${shiftTimeLabel(record.shift)}${record.continuation ? ' (devam)' : ''}`).join('; ') || '—';
++    })])];
++}
+diff --git a/src/lib/spreadsheetExport.ts b/src/lib/spreadsheetExport.ts
+new file mode 100644
+index 00000000..8dad6343
+--- /dev/null
++++ b/src/lib/spreadsheetExport.ts
+@@ -0,0 +1,30 @@
++import { neutralizeSpreadsheetFormula } from './spreadsheetSafety';
++
++export function safeRows(rows: string[][]) {
++  return rows.map(row => row.map(neutralizeSpreadsheetFormula));
++}
++export function csvExport(rows: string[][]) {
++  return '\uFEFF' + safeRows(rows).map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(';')).join('\r\n');
++}
++export function downloadExport(blob: Blob, filename: string) {
++  const url = URL.createObjectURL(blob);
++  const link = document.createElement('a');
++  link.href = url;
++  link.download = filename;
++  link.click();
++  setTimeout(() => URL.revokeObjectURL(url), 1000);
++}
++export async function xlsxExport(rows: string[][], sheetName: string) {
++  const { default: ExcelJS } = await import('exceljs');
++  const workbook = new ExcelJS.Workbook();
++  const sheet = workbook.addWorksheet(sheetName);
++  sheet.addRows(safeRows(rows));
++  sheet.getRow(1).font = { bold: true };
++  sheet.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
++  sheet.columns.forEach((column, i) => { column.width = i === 0 ? 25 : 30; });
++  const buffer = await workbook.xlsx.writeBuffer();
++  return new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
++}
++export function exportFilenamePart(value: string) {
++  return Array.from(value, character => character.charCodeAt(0) < 32 || /[\\/:*?"<>|]/.test(character) ? '-' : character).join('');
++}
+diff --git a/src/pages/AuditLog.tsx b/src/pages/AuditLog.tsx
+index 63984639..94542b76 100644
+--- a/src/pages/AuditLog.tsx
++++ b/src/pages/AuditLog.tsx
+@@ -1,3 +1,4 @@
++import { AuditExportButton } from '@/components/audit/AuditExportButton';
+ import { useAuth } from '@/components/auth/AuthProvider';
+ import { capabilities } from '@/lib/capabilities';
+ import { useActiveProjectScope } from '@/hooks/useActiveProjectScope';
+@@ -26,6 +27,7 @@ function AuthorizedAuditLog() {
+     <PageHeader title="Denetim Kaydı" scope={<span>{allProjects ? 'Tüm projeler · Projesiz kayıtlar dahil' : activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)</span>}>
+       {profile?.role === 'super_admin' && <label className="flex min-h-10 items-center gap-2 text-sm"><Switch checked={allProjects} onCheckedChange={checked => state.update('allProjects', checked ? 'true' : '')} />Tüm projeler</label>}
+     </PageHeader>
++    {ready && !state.changingScope && !rangeError && <AuditExportButton key={JSON.stringify(args)} args={args} projectName={activeProject?.name ?? "proje"} />}
+     <AuditCoverage />
+     <AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError} />
+     {!allProjects && <p className="text-xs text-muted-foreground">Seçili projenin kayıtları gösteriliyor. Projeyi üst çubuktan değiştirebilirsiniz.</p>}

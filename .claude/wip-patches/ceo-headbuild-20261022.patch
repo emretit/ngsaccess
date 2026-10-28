@@ -1,0 +1,40 @@
+diff --git a/convex/_generated/api.d.ts b/convex/_generated/api.d.ts
+index e90f6397..27594fcc 100644
+--- a/convex/_generated/api.d.ts
++++ b/convex/_generated/api.d.ts
+@@ -50,8 +50,8 @@ import type * as employeeFingerprints from "../employeeFingerprints.js";
+ import type * as employeeImport from "../employeeImport.js";
+ import type * as employeeTermination from "../employeeTermination.js";
+ import type * as employees from "../employees.js";
+-import type * as fingerprintEnrollment from "../fingerprintEnrollment.js";
+ import type * as files from "../files.js";
++import type * as fingerprintEnrollment from "../fingerprintEnrollment.js";
+ import type * as hikBridge from "../hikBridge.js";
+ import type * as hikvisionSync from "../hikvisionSync.js";
+ import type * as holidays from "../holidays.js";
+@@ -111,6 +111,7 @@ import type * as lib_employeeCardChange from "../lib/employeeCardChange.js";
+ import type * as lib_employeeCascade from "../lib/employeeCascade.js";
+ import type * as lib_employeeImportValidation from "../lib/employeeImportValidation.js";
+ import type * as lib_employeeUx from "../lib/employeeUx.js";
++import type * as lib_employment from "../lib/employment.js";
+ import type * as lib_escapers from "../lib/escapers.js";
+ import type * as lib_gateway_biometrics from "../lib/gateway/biometrics.js";
+ import type * as lib_gateway_capabilities from "../lib/gateway/capabilities.js";
+@@ -256,8 +257,8 @@ declare const fullApi: ApiFromModules<{
+   employeeImport: typeof employeeImport;
+   employeeTermination: typeof employeeTermination;
+   employees: typeof employees;
+-  fingerprintEnrollment: typeof fingerprintEnrollment;
+   files: typeof files;
++  fingerprintEnrollment: typeof fingerprintEnrollment;
+   hikBridge: typeof hikBridge;
+   hikvisionSync: typeof hikvisionSync;
+   holidays: typeof holidays;
+@@ -317,6 +318,7 @@ declare const fullApi: ApiFromModules<{
+   "lib/employeeCascade": typeof lib_employeeCascade;
+   "lib/employeeImportValidation": typeof lib_employeeImportValidation;
+   "lib/employeeUx": typeof lib_employeeUx;
++  "lib/employment": typeof lib_employment;
+   "lib/escapers": typeof lib_escapers;
+   "lib/gateway/biometrics": typeof lib_gateway_biometrics;
+   "lib/gateway/capabilities": typeof lib_gateway_capabilities;

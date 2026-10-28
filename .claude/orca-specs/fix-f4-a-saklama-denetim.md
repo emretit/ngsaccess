@@ -1,0 +1,9 @@
+# DENETİM — Faz 4-A (R-04/B-07 saklama purge zinciri, Y-08 e-posta token temizliği, B-01 QR kullanılmış yanıtı)
+ÖNCE `/Users/emreaydin/ngsaccess/.claude/orca-specs/fix-denetim-ortak.md` OKU. Fix spec: `.claude/orca-specs/fix-f4-a-saklama.md`. Worker raporu: `/tmp/fix-f4-a-saklama-rapor.md`.
+Rapor: `/tmp/fix-f4-a-saklama-denetim.md`. Dosyalar (yalnız `git diff HEAD` / yeni dosya): convex/crons.ts convex/privacyRetention.ts convex/retention.test.ts convex/emailVerification.ts convex/emailVerification.test.ts convex/employeeCheckIn.ts convex/employeeCheckIn.test.ts convex/schema.ts src/pages/CheckIn.tsx src/pages/CheckIn.test.tsx.
+Koordinatör kararları (spec'ten sapma, ONAYLI): yeni fonksiyonlar `convex/privacyRetention.ts` içinde (retention.ts modülü YOK — codegen yasak); auditLog SİLİNMEZ (karar Emre'de); CheckIn.tsx dar izinli.
+DİKKAT: aynı ağaçta F4-C (http/openaiChat/alarms/biometricDestruction/fingerprintEnrollment/rateLimit/cardReaderParse) yazıyor, F4-B (employees/employeeCascade) bitti; başka oturum PDKS/rapor WIP'i var — onları DENETLEME, dokunma.
+Özel dikkat (SİLME = geri alınamaz): her purge aşaması YALNIZ terminal + yaşı dolmuş kaydı mı siliyor — pending/processing/sent operasyon, running run, geçerli QR/oturum, dismissedAt'siz başarısız delete* geri alma işi asla silinmemeli;
+index aralığı + filtre birleşiminde "sayfa doldu ama hepsi korunuyor" durumunda zincir ilerliyor mu yoksa aynı sayfada takılıp çağrı bütçesini mi yakıyor (kota); deviceSyncRunTargets parent'tan önce siliniyor mu, yarıda kalırsa yetim kalıyor mu;
+20 çağrı sınırı gerçekten uygulanıyor mu (sonsuz zincir yok); yeni index'ler schema'da doğru alan sırasıyla mı ve kullanılan withIndex ile birebir mi; cron saati TR 03:40 = UTC 00:40 doğru mu, mevcut cron'larla çakışma;
+Y-08 sayfalama sabit runAt ile doğru mu; B-01: kullanılmış QR yanıtında ad/saat/konum/kimlik sızıntısı kalmadı mı (başka dönüş dalı?), ilk başarılı check-in akışı ve UI bozulmadı mı.

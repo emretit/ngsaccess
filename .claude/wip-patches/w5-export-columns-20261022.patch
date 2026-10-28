@@ -1,0 +1,687 @@
+diff --git a/src/components/pdks/dashboard/PDKSEnhancedExportPanel.tsx b/src/components/pdks/dashboard/PDKSEnhancedExportPanel.tsx
+index 21e14e8e..18b0d1e3 100644
+--- a/src/components/pdks/dashboard/PDKSEnhancedExportPanel.tsx
++++ b/src/components/pdks/dashboard/PDKSEnhancedExportPanel.tsx
+@@ -1,3 +1,8 @@
++import { useAuth } from '@/components/auth/AuthProvider';
++import { capabilities } from '@/lib/capabilities';
++import { readPDKSPreferences, savePDKSPreferences, type PDKSExportPreferences } from '@/lib/pdksExportColumns';
++import type { ColumnScope } from '@/lib/reports/columns';
++import { PDKSExportColumns } from './export/PDKSExportColumns';
+ import { pdksToday } from "@/components/pdks/lib/calendar";
+ import { useRef, useState } from "react";
+ import { useConvex } from "convex/react";
+@@ -41,7 +46,14 @@ interface Props {
+   totalCount?: number;
+   disabled?: boolean;
+ }
+-export function PDKSEnhancedExportPanel({
++export function PDKSEnhancedExportPanel(props: Props) {
++  const { profile } = useAuth();
++  const { projectId } = useActiveProject();
++  const scope = projectId && profile?._id ? { projectId, userId: profile._id } : undefined;
++  const canSeePay = capabilities(profile?.role).admin;
++  return <ExportPanel key={`${scope?.projectId}:${scope?.userId}:${canSeePay}`} {...props} scope={scope} canSeePay={canSeePay} />;
++}
++function ExportPanel({
+   records = [],
+   dateRange = "",
+   selectedDate = pdksToday(),
+@@ -49,9 +61,16 @@ export function PDKSEnhancedExportPanel({
+   selectedCount = 0,
+   totalCount = records.length,
+   disabled,
+-}: Props) {
++  scope,
++  canSeePay,
++}: Props & { scope?: ColumnScope; canSeePay: boolean }) {
+   const { projectId, activeProject } = useActiveProject();
+   const convex = useConvex();
++  const [preferences, setPreferences] = useState(() => readPDKSPreferences(scope, canSeePay));
++  const updatePreferences = (next: PDKSExportPreferences) => {
++    setPreferences(next);
++    savePDKSPreferences(next, scope, canSeePay);
++  };
+   const [type, setType] = useState<ExportType | null>(null),
+     [pending, setPending] = useState(false),
+     [error, setError] = useState("");
+@@ -68,6 +87,9 @@ export function PDKSEnhancedExportPanel({
+   const choose = (next: ExportType) => {
+     setError("");
+     setAphb(null);
++    if (next === 'Excel' || next === 'CSV' || next === 'PDF') {
++      updatePreferences({ ...preferences, format: next });
++    }
+     setType(next);
+   };
+   const execute = async () => {
+@@ -105,9 +127,9 @@ export function PDKSEnhancedExportPanel({
+           },
+         );
+         await exportMonthlyPayrollSheet(data);
+-      } else if (type === "Excel") await exportToExcel(records, { dateRange });
+-      else if (type === "CSV") exportToCsv(records, { dateRange });
+-      else await exportToPdf(records, { dateRange });
++      } else if (type === "Excel") await exportToExcel(records, { dateRange, ...preferences, canSeePay });
++      else if (type === "CSV") exportToCsv(records, { dateRange, ...preferences, canSeePay });
++      else await exportToPdf(records, { dateRange, ...preferences, canSeePay });
+       notify.success("Rapor oluşturuldu");
+       setType(null);
+     } catch (e) {
+@@ -178,6 +200,8 @@ export function PDKSEnhancedExportPanel({
+               </dd>
+             </div>
+           </dl>
++          {!monthly && type && <PDKSExportColumns records={records} preferences={preferences} canSeePay={canSeePay} disabled={pending} onChange={updatePreferences} />}
++          {monthly && <p className="text-xs text-muted-foreground">Aylık bordro ve APHB sabit kolonlarla hazırlanır; kolon seçimi uygulanmaz.</p>}
+           {type === "aphb" && (
+             <p className="text-xs text-muted-foreground">
+               Önce bildirim hazırlanır. Uyarılar indirmeden önce aşağıda
+diff --git a/src/components/pdks/dashboard/export/PDKSExportColumns.test.tsx b/src/components/pdks/dashboard/export/PDKSExportColumns.test.tsx
+new file mode 100644
+index 00000000..747af409
+--- /dev/null
++++ b/src/components/pdks/dashboard/export/PDKSExportColumns.test.tsx
+@@ -0,0 +1,26 @@
++import { describe, expect, it } from 'vitest';
++import { renderToStaticMarkup } from 'react-dom/server';
++import { PDKSExportColumns } from './PDKSExportColumns';
++import { defaultPDKSPreferences } from '@/lib/pdksExportColumns';
++import type { PDKSExportRecord } from '@/utils/pdksExport';
++const record: PDKSExportRecord = { id: 'r', employeeId: 'e', name: 'Kişi', department: 'Üretim', firstEntry: '08:00', lastExit: '17:00', totalHours: '8 sa', overtime: '0 sa', leaveType: '—', status: 'present' };
++describe('PDKS export column controls', () => {
++  it('previews only five records in the actual selected order and offers keyboard buttons', () => {
++    const preferences = { ...defaultPDKSPreferences(), orderedColumnKeys: ['department', 'name'] };
++    const html = renderToStaticMarkup(<PDKSExportColumns canSeePay={false} records={Array.from({ length: 6 }, (_, i) => ({ ...record, id: String(i), name: `Kişi-${i}` }))} preferences={preferences} onChange={() => {}} />);
++    expect(html).toContain('Kişi-4'); expect(html).not.toContain('Kişi-5');
++    expect(html.indexOf('>Departman</th>')).toBeLessThan(html.indexOf('>Çalışan</th>'));
++    expect(html).not.toContain('>Kart no</th>');
++    expect(html).toContain('aria-label="Çalışan yukarı"'); expect(html).toContain('aria-label="Departman aşağı"');
++    expect(html).toContain('Varsayılana dön'); expect(html).toContain('En az bir kolon');
++  });
++  it('disables the last checkbox, and shows CSV delimiter options only for CSV', () => {
++    const preferences = { ...defaultPDKSPreferences(), orderedColumnKeys: ['name'] };
++    const props = { canSeePay: false, records: [record], preferences, onChange: () => {} };
++    const html = renderToStaticMarkup(<PDKSExportColumns {...props} />);
++    expect(html).toMatch(/<button[^>]*role="checkbox"[^>]*disabled=""/);
++    expect(html).not.toContain('CSV ayracı');
++    const csv = renderToStaticMarkup(<PDKSExportColumns {...props} preferences={{ ...preferences, format: 'CSV', delimiter: ';' }} />);
++    expect(csv).toContain('CSV ayracı'); expect(csv).toContain('TAB (sekme)'); expect(csv).toContain('value=";" selected=""');
++  });
++});
+diff --git a/src/components/pdks/dashboard/export/PDKSExportColumns.tsx b/src/components/pdks/dashboard/export/PDKSExportColumns.tsx
+new file mode 100644
+index 00000000..b7b94de4
+--- /dev/null
++++ b/src/components/pdks/dashboard/export/PDKSExportColumns.tsx
+@@ -0,0 +1,53 @@
++import { ArrowDown, ArrowUp } from 'lucide-react';
++import { Button } from '@/components/ui/button';
++import { Checkbox } from '@/components/ui/checkbox';
++import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
++import { availablePDKSColumns, defaultPDKSPreferences, movePDKSColumn, selectedPDKSColumns, togglePDKSColumn, type PDKSExportPreferences } from '@/lib/pdksExportColumns';
++import type { PDKSExportRecord } from '@/utils/pdksExport';
++
++export interface PDKSExportColumnsProps {
++  records: readonly PDKSExportRecord[];
++  preferences: PDKSExportPreferences;
++  canSeePay: boolean;
++  disabled?: boolean;
++  onChange: (next: PDKSExportPreferences) => void;
++}
++export function PDKSExportColumns({ records, preferences, canSeePay, disabled, onChange }: PDKSExportColumnsProps) {
++  const columns = availablePDKSColumns(canSeePay);
++  const selected = selectedPDKSColumns(preferences.orderedColumnKeys, canSeePay);
++  const changeKeys = (orderedColumnKeys: string[]) => onChange({ ...preferences, orderedColumnKeys });
++  return <section className="min-w-0 space-y-3" aria-label="Kolonlar">
++    <div className="flex items-center justify-between gap-2">
++      <h3 className="text-sm font-medium">Kolonlar</h3>
++      <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => onChange({ ...defaultPDKSPreferences(canSeePay), format: preferences.format })}>Varsayılana dön</Button>
++    </div>
++    <p className="text-xs text-muted-foreground">En az bir kolon seçin. Kart no ve bordro kodu tercihleri her açılışta varsayılana döner.</p>
++    <div className="space-y-1">
++      {[...selected, ...columns.filter(c => !selected.some(item => item.key === c.key))].map(c => {
++        const index = preferences.orderedColumnKeys.indexOf(c.key);
++        const checked = index >= 0;
++        return <div key={c.key} className="flex items-center gap-2 rounded-md border px-2 py-1">
++          <Checkbox id={`pdks-export-${c.key}`} checked={checked} disabled={disabled || (checked && selected.length === 1)} onCheckedChange={() => changeKeys(togglePDKSColumn(preferences.orderedColumnKeys, c.key))} />
++          <label className="flex-1 text-sm" htmlFor={`pdks-export-${c.key}`}>{c.label}</label>
++          {checked && <>
++            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={`${c.label} yukarı`} disabled={disabled || index === 0} onClick={() => changeKeys(movePDKSColumn(preferences.orderedColumnKeys, c.key, -1))}><ArrowUp className="h-4 w-4" aria-hidden="true" /></Button>
++            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label={`${c.label} aşağı`} disabled={disabled || index === selected.length - 1} onClick={() => changeKeys(movePDKSColumn(preferences.orderedColumnKeys, c.key, 1))}><ArrowDown className="h-4 w-4" aria-hidden="true" /></Button>
++          </>}
++        </div>;
++      })}
++    </div>
++    {preferences.format === 'CSV' && <label className="flex items-center gap-2 text-sm">CSV ayracı
++      <select className="h-9 rounded-md border border-input bg-background px-3" value={preferences.delimiter} disabled={disabled} onChange={event => {
++        const delimiter = event.target.value;
++        if (delimiter === ',' || delimiter === ';' || delimiter === '\t') onChange({ ...preferences, delimiter });
++      }}><option value=",">Virgül (,)</option><option value=";">Noktalı virgül (;)</option><option value={'\t'}>TAB (sekme)</option></select>
++    </label>}
++    <h3 className="text-sm font-medium">Önizleme (ilk 5 satır)</h3>
++    <div className="max-w-full overflow-x-auto rounded-md border">
++      <Table aria-label="Dışa aktarma önizlemesi">
++        <TableHeader><TableRow>{selected.map(c => <TableHead scope="col" key={c.key} className="whitespace-nowrap">{c.label}</TableHead>)}</TableRow></TableHeader>
++        <TableBody>{records.slice(0, 5).map((row, index) => <TableRow key={`${row.id}-${index}`}>{selected.map(c => <TableCell key={c.key} className="whitespace-nowrap">{c.value(row)}</TableCell>)}</TableRow>)}</TableBody>
++      </Table>
++    </div>
++  </section>;
++}
+diff --git a/src/lib/pdksExportColumns.test.ts b/src/lib/pdksExportColumns.test.ts
+new file mode 100644
+index 00000000..9416b17f
+--- /dev/null
++++ b/src/lib/pdksExportColumns.test.ts
+@@ -0,0 +1,114 @@
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { availablePDKSColumns, defaultPDKSPreferences, movePDKSColumn, PDKS_EXPORT_COLUMNS, readPDKSPreferences, savePDKSPreferences, selectedPDKSColumns, togglePDKSColumn } from './pdksExportColumns';
++import { columnStorageKey } from './reports/columns';
++import { buildPDKSCsv, buildPDKSExportTable, exportToCsv, exportToExcel, exportToPdf, type PDKSExportRecord } from '@/utils/pdksExport';
++const mocks = vi.hoisted(() => ({ excelRows: [] as unknown[][], pdfText: [] as string[], blob: null as Blob | null }));
++vi.mock('exceljs', () => ({ default: { Workbook: class {
++  addWorksheet() { return { addRow: (row: unknown[]) => mocks.excelRows.push(row), columns: [] }; }
++  xlsx = { writeBuffer: async () => new ArrayBuffer(0) };
++} } }));
++vi.mock('jspdf', () => ({ jsPDF: class {
++  internal = { pageSize: { getHeight: () => 210, getWidth: () => 297 } };
++  text(value: string | string[]) { mocks.pdfText.push(Array.isArray(value) ? value.join(' ') : value); }
++  splitTextToSize(value: string) { return [value]; }
++  setFontSize() {} setTextColor() {} setFont() {} rect() {} addPage() {} save() {}
++} }));
++export const record: PDKSExportRecord = { id: 'row', employeeId: 'employee', name: 'Ayşe', cardNumber: '123', payrollEmployeeCode: 'P01', department: 'Üretim', payrollCode: 'N', firstEntry: '08:00', lastExit: '17:00', totalMinutes: 480, totalHours: 'legacy', overtimeMinutes: 60, overtime: 'legacy', leaveType: '—', status: 'present' };
++const headers = ['Çalışan', 'Kart no', 'Bordro Kodu', 'Departman', 'Gün Kodu', 'İlk Giriş', 'Son Çıkış', 'Toplam Saat', 'Mesai', 'İzin', 'Durum'];
++const scope = { projectId: 'project-a', userId: 'user-a' };
++let storage: Map<string, string>;
++beforeEach(() => {
++  storage = new Map(); mocks.excelRows = []; mocks.pdfText = []; mocks.blob = null;
++  vi.stubGlobal('localStorage', { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
++  vi.stubGlobal('document', { createElement: () => ({ click: vi.fn() }) });
++  vi.stubGlobal('URL', { createObjectURL: (blob: Blob) => { mocks.blob = blob; return 'blob:test'; }, revokeObjectURL: vi.fn() });
++});
++afterEach(() => vi.unstubAllGlobals());
++describe('PDKS serializers', () => {
++  it('golden: no selection preserves legacy Excel, CSV and PDF headers and cell content', async () => {
++    const cells = ['Ayşe', '123', 'P01', 'Üretim', 'N', '08:00', '17:00', '08 sa 00 dk', '01 sa 00 dk', '—', 'Mevcut'];
++    expect(buildPDKSExportTable([record]).headers).toEqual(headers);
++    expect(buildPDKSExportTable([record]).rows).toEqual([cells]);
++    await exportToExcel([record]);
++    expect(mocks.excelRows).toEqual([headers, cells]);
++    exportToCsv([record]);
++    expect(await mocks.blob?.text()).toBe(headers.join(',') + '\n' + cells.join(','));
++    const csvBytes = new Uint8Array(await mocks.blob?.arrayBuffer() ?? new ArrayBuffer(0));
++    expect([...csvBytes.slice(0, 3)]).toEqual([239, 187, 191]);
++    await exportToPdf([record]);
++    expect(mocks.pdfText).toEqual(['PDKS Raporu', 'Çalışan', 'Kart no', 'Bordro', 'Departman', 'Gün', 'İlk Giriş', 'Son Çıkış', 'Toplam', 'Mesai', 'İzin', 'Durum', ...cells]);
++  });
++  it('keeps legacy PDF labels when explicit selection equals the default', async () => {
++    await exportToPdf([record], defaultPDKSPreferences());
++    expect(mocks.pdfText.slice(1, 12)).toEqual(['Çalışan', 'Kart no', 'Bordro', 'Departman', 'Gün', 'İlk Giriş', 'Son Çıkış', 'Toplam', 'Mesai', 'İzin', 'Durum']);
++  });
++  it('uses the same removed and reordered columns in Excel, CSV and PDF without extra minute columns', async () => {
++    const options = { orderedColumnKeys: ['overtime', 'name', 'department'] };
++    await exportToExcel([record], options);
++    expect(mocks.excelRows).toEqual([['Mesai', 'Çalışan', 'Departman'], ['01 sa 00 dk', 'Ayşe', 'Üretim']]);
++    expect(buildPDKSCsv([record], options)).toBe('\uFEFFMesai,Çalışan,Departman\n01 sa 00 dk,Ayşe,Üretim');
++    await exportToPdf([record], options);
++    expect(mocks.pdfText).toEqual(['PDKS Raporu', 'Mesai', 'Çalışan', 'Departman', '01 sa 00 dk', 'Ayşe', 'Üretim']);
++  });
++  it.each([',', ';', '\t'] as const)('escapes delimiter %j, quotes and newlines and neutralizes formulas', delimiter => {
++    const value = `=SUM(1${delimiter}2)"\nnext`;
++    expect(buildPDKSCsv([{ ...record, name: value }], { orderedColumnKeys: ['name'], delimiter })).toBe(`\uFEFFÇalışan\n"'=SUM(1${delimiter}2)""\nnext"`);
++  });
++  it.each(['=SUM(1)', '+1', '-1', '@test'])('neutralizes %s in spreadsheet formats, PDF keeps raw text', async name => {
++    const options = { orderedColumnKeys: ['name'] };
++    await exportToExcel([{ ...record, name }], options);
++    await exportToPdf([{ ...record, name }], options);
++    expect(mocks.excelRows[1]).toEqual([`'${name}`]);
++    expect(mocks.pdfText[mocks.pdfText.length - 1]).toBe(name);
++    expect(buildPDKSCsv([{ ...record, name }], options)).toContain(`'${name}`);
++  });
++  it('keeps the bare "-" placeholder unchanged in every format', async () => {
++    const options = { orderedColumnKeys: ['name'] };
++    await exportToExcel([{ ...record, name: '-' }], options);
++    expect(mocks.excelRows[1]).toEqual(['-']);
++    expect(buildPDKSCsv([{ ...record, name: '-' }], options)).toBe('\uFEFFÇalışan\n-');
++  });
++  it('retains legacy duration fallbacks and card fallback', () => {
++    const row = { ...record, cardNumber: undefined, totalMinutes: undefined, overtimeMinutes: undefined };
++    expect(buildPDKSExportTable([row]).rows[0]).toEqual(['Ayşe', 'employee', 'P01', 'Üretim', 'N', '08:00', '17:00', 'legacy', 'legacy', '—', 'Mevcut']);
++  });
++});
++describe('PDKS preferences and catalog', () => {
++  it('round trips normal selection, order, format and delimiter without storing sensitive choices or row values', () => {
++    savePDKSPreferences({ version: 1, orderedColumnKeys: ['department', 'name', 'cardNumber'], format: 'CSV', delimiter: ';' }, scope);
++    const saved = storage.get(columnStorageKey('pdks-export-v1', scope));
++    expect(saved).not.toContain('cardNumber'); expect(saved).not.toContain('Ayşe');
++    expect(readPDKSPreferences(scope)).toEqual({ version: 1, orderedColumnKeys: ['department', 'cardNumber', 'payrollEmployeeCode', 'name'], format: 'CSV', delimiter: ';' });
++    expect(readPDKSPreferences({ ...scope, projectId: 'b' })).toEqual(defaultPDKSPreferences());
++    expect(readPDKSPreferences({ ...scope, userId: 'b' })).toEqual(defaultPDKSPreferences());
++  });
++  it.each(['broken', '{"version":2,"orderedColumnKeys":[]}', 'null', '{}'])('falls back on malformed or incompatible preference %s', raw => {
++    storage.set(columnStorageKey('pdks-export-v1', scope), raw);
++    expect(readPDKSPreferences(scope)).toEqual(defaultPDKSPreferences());
++  });
++  it('removes unknown keys, duplicates and restored sensitive ordering while preserving sensitive defaults', () => {
++    storage.set(columnStorageKey('pdks-export-v1', scope), JSON.stringify({ version: 1, orderedColumnKeys: ['cardNumber', 'gone', 'name', 'name'], delimiter: 'bad', format: 'bad' }));
++    expect(readPDKSPreferences(scope)).toEqual({ ...defaultPDKSPreferences(), orderedColumnKeys: ['name', 'cardNumber', 'payrollEmployeeCode'] });
++  });
++  it('enforces a nonempty selection, moves columns and resets to legacy defaults', () => {
++    expect(togglePDKSColumn(['name'], 'name')).toEqual(['name']);
++    expect(togglePDKSColumn(['name'], 'department')).toEqual(['name', 'department']);
++    expect(togglePDKSColumn(['name', 'department'], 'name')).toEqual(['department']);
++    expect(movePDKSColumn(['name', 'department'], 'department', -1)).toEqual(['department', 'name']);
++    expect(movePDKSColumn(['name'], 'name', -1)).toEqual(['name']);
++    expect(selectedPDKSColumns([]).map(c => c.label)).toEqual(headers);
++    expect(selectedPDKSColumns(['unknown']).map(c => c.label)).toEqual(headers);
++  });
++  it('lists only existing row fields, and filters pay columns for non-admin users', () => {
++    expect(PDKS_EXPORT_COLUMNS.every(c => c.key in record)).toBe(true);
++    const pay = { ...PDKS_EXPORT_COLUMNS[0], key: 'pay', requiresPay: true };
++    expect(availablePDKSColumns(false, [pay])).toEqual([]);
++    expect(availablePDKSColumns(true, [pay])).toEqual([pay]);
++  });
++  it('keeps preferences usable if browser storage fails or scope is absent', () => {
++    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } });
++    expect(readPDKSPreferences(scope)).toEqual(defaultPDKSPreferences());
++    expect(() => savePDKSPreferences(defaultPDKSPreferences(), scope)).not.toThrow();
++    expect(readPDKSPreferences()).toEqual(defaultPDKSPreferences());
++  });
++});
+diff --git a/src/lib/pdksExportColumns.ts b/src/lib/pdksExportColumns.ts
+new file mode 100644
+index 00000000..b2de5494
+--- /dev/null
++++ b/src/lib/pdksExportColumns.ts
+@@ -0,0 +1,80 @@
++import type { PDKSExportRecord } from '@/utils/pdksExport';
++import { STATUS_FILTER_LABELS } from '@/components/pdks/statusMeta';
++import { formatDuration } from '@/components/pdks/lib/presentation';
++import { columnStorageKey, type ColumnScope } from '@/lib/reports/columns';
++
++export interface PDKSExportColumn {
++  key: string;
++  label: string;
++  value: (row: PDKSExportRecord) => string | number;
++  dataType: 'text' | 'number' | 'duration' | 'date';
++  sensitivity: 'normal' | 'sensitive';
++  requiresPay: boolean;
++  defaultExportVisible: boolean;
++  excelWidth: number;
++  pdfWidth: number;
++  pdfLabel?: string;
++}
++const column = (key: string, label: string, value: PDKSExportColumn['value'], excelWidth: number, pdfWidth: number, extra: Partial<PDKSExportColumn> = {}): PDKSExportColumn => ({
++  key, label, value, excelWidth, pdfWidth, dataType: 'text', sensitivity: 'normal', requiresPay: false, defaultExportVisible: true, ...extra,
++});
++export const PDKS_EXPORT_COLUMNS: readonly PDKSExportColumn[] = [
++  column('name', 'Çalışan', r => r.name, 25, 38),
++  column('cardNumber', 'Kart no', r => r.cardNumber ?? r.employeeId, 15, 22, { sensitivity: 'sensitive' }),
++  column('payrollEmployeeCode', 'Bordro Kodu', r => r.payrollEmployeeCode ?? '', 14, 22, { sensitivity: 'sensitive', pdfLabel: 'Bordro' }),
++  column('department', 'Departman', r => r.department, 18, 28),
++  column('payrollCode', 'Gün Kodu', r => r.payrollCode ?? '', 10, 16, { pdfLabel: 'Gün' }),
++  column('firstEntry', 'İlk Giriş', r => r.firstEntry, 10, 18),
++  column('lastExit', 'Son Çıkış', r => r.lastExit, 10, 18),
++  column('totalHours', 'Toplam Saat', r => r.totalMinutes === undefined ? r.totalHours : formatDuration(r.totalMinutes), 12, 22, { dataType: 'duration', pdfLabel: 'Toplam' }),
++  column('overtime', 'Mesai', r => r.overtimeMinutes === undefined ? r.overtime : formatDuration(r.overtimeMinutes), 10, 16, { dataType: 'duration' }),
++  column('leaveType', 'İzin', r => r.leaveType, 12, 18),
++  column('status', 'Durum', r => STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ?? r.status, 10, 18),
++];
++export type PDKSExportFormat = 'Excel' | 'CSV' | 'PDF';
++export type CsvDelimiter = ',' | ';' | '\t';
++export interface PDKSExportPreferences {
++  version: 1;
++  orderedColumnKeys: string[];
++  format: PDKSExportFormat;
++  delimiter: CsvDelimiter;
++}
++export function availablePDKSColumns(canSeePay: boolean, catalog = PDKS_EXPORT_COLUMNS): readonly PDKSExportColumn[] {
++  return catalog.filter(c => canSeePay || !c.requiresPay);
++}
++export function defaultPDKSPreferences(canSeePay = false): PDKSExportPreferences {
++  return { version: 1, orderedColumnKeys: availablePDKSColumns(canSeePay).filter(c => c.defaultExportVisible).map(c => c.key), format: 'Excel', delimiter: ',' };
++}
++export function selectedPDKSColumns(keys?: readonly string[], canSeePay = false): PDKSExportColumn[] {
++  const available = availablePDKSColumns(canSeePay);
++  const selected = keys?.map(key => available.find(c => c.key === key)).filter((c): c is PDKSExportColumn => c !== undefined);
++  return selected?.length ? [...new Set(selected)] : available.filter(c => c.defaultExportVisible);
++}
++export function togglePDKSColumn(keys: readonly string[], key: string): string[] {
++  return keys.includes(key) ? keys.length === 1 ? [...keys] : keys.filter(k => k !== key) : [...keys, key];
++}
++export function movePDKSColumn(keys: readonly string[], key: string, direction: -1 | 1): string[] {
++  const next = [...keys], index = next.indexOf(key), target = index + direction;
++  if (index >= 0 && target >= 0 && target < next.length) [next[index], next[target]] = [next[target], next[index]];
++  return next;
++}
++export function readPDKSPreferences(scope?: ColumnScope, canSeePay = false): PDKSExportPreferences {
++  const defaults = defaultPDKSPreferences(canSeePay);
++  try {
++    if (!scope || typeof localStorage === 'undefined') return defaults;
++    const saved: unknown = JSON.parse(localStorage.getItem(columnStorageKey('pdks-export-v1', scope)) ?? 'null');
++    if (!saved || typeof saved !== 'object' || !('version' in saved) || saved.version !== 1 || !('orderedColumnKeys' in saved) || !Array.isArray(saved.orderedColumnKeys)) return defaults;
++    const available = availablePDKSColumns(canSeePay);
++    const keys = [...new Set(saved.orderedColumnKeys.filter((key): key is string => typeof key === 'string' && available.some(c => c.key === key && c.sensitivity !== 'sensitive')))];
++    // Sensitive choices are never restored; legacy defaults are reinserted at their default positions.
++    available.forEach((c, index) => { if (c.sensitivity === 'sensitive' && c.defaultExportVisible) keys.splice(Math.min(index, keys.length), 0, c.key); });
++    return { version: 1, orderedColumnKeys: keys.length ? keys : defaults.orderedColumnKeys,
++      format: 'format' in saved && (saved.format === 'Excel' || saved.format === 'CSV' || saved.format === 'PDF') ? saved.format : defaults.format,
++      delimiter: 'delimiter' in saved && (saved.delimiter === ',' || saved.delimiter === ';' || saved.delimiter === '\t') ? saved.delimiter : defaults.delimiter };
++  } catch { return defaults; }
++}
++export function savePDKSPreferences(preferences: PDKSExportPreferences, scope?: ColumnScope, canSeePay = false): void {
++  if (!scope) return;
++  const orderedColumnKeys = selectedPDKSColumns(preferences.orderedColumnKeys, canSeePay).filter(c => c.sensitivity !== 'sensitive').map(c => c.key);
++  try { localStorage.setItem(columnStorageKey('pdks-export-v1', scope), JSON.stringify({ ...preferences, orderedColumnKeys })); } catch { /* Selection remains usable when browser storage is unavailable. */ }
++}
+diff --git a/src/lib/reports/export.ts b/src/lib/reports/export.ts
+index 28df9ba2..3fdfb8f8 100644
+--- a/src/lib/reports/export.ts
++++ b/src/lib/reports/export.ts
+@@ -21,11 +21,13 @@ function safeSpreadsheetValue(value: string | number | null): string | number {
+   if (typeof value === 'number') return value;
+   return neutralizeSpreadsheetFormula(value ?? '');
+ }
++/** Shared escaping for report and PDKS CSV exports. */
++export function escapeCsvCell(value: string | number | null, delimiter = ';'): string {
++  const text = String(safeSpreadsheetValue(value));
++  return text.includes(delimiter) || /["\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
++}
+ export function buildCsv(columns: readonly ReportColumn[], rows: readonly ReportRow[]): string {
+-  const escape = (value: string | number | null) => {
+-    const text = String(safeSpreadsheetValue(value));
+-    return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+-  };
++  const escape = (value: string | number | null) => escapeCsvCell(value);
+   return '\uFEFF' + [columns.map(column => escape(column.label)).join(';'), ...rows.map(row => columns.map(column => escape(column.value(row))).join(';'))].join('\r\n');
+ }
+ function download(blob: Blob, filename: string) {
+diff --git a/src/lib/spreadsheetSafety.test.ts b/src/lib/spreadsheetSafety.test.ts
+index 75ee3aa0..0610a622 100644
+--- a/src/lib/spreadsheetSafety.test.ts
++++ b/src/lib/spreadsheetSafety.test.ts
+@@ -3,12 +3,13 @@ import { neutralizeSpreadsheetFormula } from './spreadsheetSafety';
+ 
+ describe('neutralizeSpreadsheetFormula', () => {
+   it('formül başlatan karakterleri metne çevirir', () => {
+-    for (const text of ['=cmd|"/c calc"!A1', '+1', '-2+3', '@SUM(A1)', '  =A1']) {
++    for (const text of ['=cmd|"/c calc"!A1', '+1', '-2+3', '@SUM(A1)', '  =A1', '\tdüz metin', '\rdüz metin']) {
+       expect(neutralizeSpreadsheetFormula(text)).toBe(`'${text}`);
+     }
+   });
+   it('sıradan metne dokunmaz', () => {
+     expect(neutralizeSpreadsheetFormula('Ahmet Yılmaz')).toBe('Ahmet Yılmaz');
+     expect(neutralizeSpreadsheetFormula('')).toBe('');
++    expect(neutralizeSpreadsheetFormula('-')).toBe('-');
+   });
+ });
+diff --git a/src/lib/spreadsheetSafety.ts b/src/lib/spreadsheetSafety.ts
+index a50a3ee9..65157870 100644
+--- a/src/lib/spreadsheetSafety.ts
++++ b/src/lib/spreadsheetSafety.ts
+@@ -1,7 +1,9 @@
+ /**
+- * CSV/Excel formül enjeksiyonu koruması: `= + - @` (baştaki boşluk dahil) ile başlayan metnin
+- * başına `'` ekler; tablo programı hücreyi formül değil metin olarak açar.
++ * CSV/Excel formül enjeksiyonu koruması: `= + - @` (baştaki boşluk dahil) ya da TAB/CR ile başlayan
++ * metnin başına `'` ekler; tablo programı hücreyi formül değil metin olarak açar. Tek başına `-`
++ * (boş değer yer tutucusu) formül olamaz, olduğu gibi kalır.
+  */
+ export function neutralizeSpreadsheetFormula(text: string): string {
+-  return /^[\s]*[=+@-]/.test(text) ? `'${text}` : text;
++  if (text === '-') return text;
++  return /^[\t\r]|^\s*[=+@-]/.test(text) ? `'${text}` : text;
+ }
+diff --git a/src/utils/pdksExport.ts b/src/utils/pdksExport.ts
+index b3a68007..886ad0fb 100644
+--- a/src/utils/pdksExport.ts
++++ b/src/utils/pdksExport.ts
+@@ -1,8 +1,31 @@
+-import { STATUS_FILTER_LABELS } from "@/components/pdks/statusMeta";
+-import { formatDuration } from "@/components/pdks/lib/presentation";
+ import { toLocalDateString } from "@/lib/date";
+ import { neutralizeSpreadsheetFormula } from "@/lib/spreadsheetSafety";
+ 
++import { defaultPDKSPreferences, selectedPDKSColumns, type CsvDelimiter } from '@/lib/pdksExportColumns';
++import { escapeCsvCell } from '@/lib/reports/export';
++
++export interface PDKSExportOptions {
++  title?: string;
++  dateRange?: string;
++  orderedColumnKeys?: readonly string[];
++  delimiter?: CsvDelimiter;
++  canSeePay?: boolean;
++}
++/** The same ordered cells drive the preview and all three serializers. Formula neutralization
++ * applies only to spreadsheet output; PDF and preview show the raw text. */
++export function buildPDKSExportTable(records: readonly PDKSExportRecord[], options: PDKSExportOptions = {}, neutralize = false) {
++  const columns = selectedPDKSColumns(options.orderedColumnKeys, options.canSeePay);
++  return { columns, headers: columns.map(c => c.label), rows: records.map(r => columns.map(c => {
++    const value = c.value(r);
++    return neutralize && typeof value === 'string' ? neutralizeSpreadsheetFormula(value) : value;
++  })) };
++}
++export function buildPDKSCsv(records: readonly PDKSExportRecord[], options: PDKSExportOptions = {}): string {
++  const { columns } = buildPDKSExportTable([], options);
++  const delimiter = options.delimiter ?? ',';
++  return '\uFEFF' + [columns.map(c => escapeCsvCell(c.label, delimiter)).join(delimiter), ...records.map(r => columns.map(c => escapeCsvCell(c.value(r), delimiter)).join(delimiter))].join('\n');
++}
++
+ export interface PDKSExportRecord {
+   id: string;
+   name: string;
+@@ -56,42 +79,11 @@ export interface MonthlyPayrollSheet {
+  */
+ export async function exportToExcel(
+   records: PDKSExportRecord[],
+-  options: { title?: string; dateRange?: string } = {},
++  options: PDKSExportOptions = {},
+ ): Promise<void> {
+   const { dateRange = "" } = options;
+ 
+-  const headers = [
+-    "Çalışan",
+-    "Kart no",
+-    "Bordro Kodu",
+-    "Departman",
+-    "Gün Kodu",
+-    "İlk Giriş",
+-    "Son Çıkış",
+-    "Toplam Saat",
+-    "Mesai",
+-    "İzin",
+-    "Durum",
+-  ];
+-
+-  const rows = records.map((r) => [
+-    r.name,
+-    r.cardNumber ?? r.employeeId,
+-    r.payrollEmployeeCode ?? "",
+-    r.department,
+-    r.payrollCode ?? "",
+-    r.firstEntry,
+-    r.lastExit,
+-    r.totalMinutes === undefined
+-      ? r.totalHours
+-      : formatDuration(r.totalMinutes),
+-    r.overtimeMinutes === undefined
+-      ? r.overtime
+-      : formatDuration(r.overtimeMinutes),
+-    r.leaveType,
+-    STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
+-      r.status,
+-  ]);
++  const { columns, headers, rows } = buildPDKSExportTable(records, options, true);
+ 
+   const { default: ExcelJS } = await import("exceljs");
+   const workbook = new ExcelJS.Workbook();
+@@ -102,19 +94,7 @@ export async function exportToExcel(
+   worksheet.addRow(headers);
+   rows.forEach((row) => worksheet.addRow(row));
+ 
+-  worksheet.columns = [
+-    { width: 25 },
+-    { width: 15 },
+-    { width: 14 },
+-    { width: 18 },
+-    { width: 10 },
+-    { width: 10 },
+-    { width: 10 },
+-    { width: 12 },
+-    { width: 10 },
+-    { width: 12 },
+-    { width: 10 },
+-  ];
++  worksheet.columns = columns.map(c => ({ width: c.excelWidth }));
+ 
+   const fileName = `PDKS_Raporu_${dateRange || toLocalDateString()}.xlsx`;
+   const buffer = await workbook.xlsx.writeBuffer();
+@@ -134,54 +114,11 @@ export async function exportToExcel(
+  */
+ export function exportToCsv(
+   records: PDKSExportRecord[],
+-  options: { dateRange?: string } = {},
++  options: PDKSExportOptions = {},
+ ): void {
+   const { dateRange = "" } = options;
+ 
+-  const headers = [
+-    "Çalışan",
+-    "Kart no",
+-    "Bordro Kodu",
+-    "Departman",
+-    "Gün Kodu",
+-    "İlk Giriş",
+-    "Son Çıkış",
+-    "Toplam Saat",
+-    "Mesai",
+-    "İzin",
+-    "Durum",
+-  ];
+-
+-  const escapeCsv = (raw: string) => {
+-    const v = neutralizeSpreadsheetFormula(raw);
+-    return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+-  };
+-
+-  const rows = records.map((r) =>
+-    [
+-      r.name,
+-      r.cardNumber ?? r.employeeId,
+-      r.payrollEmployeeCode ?? "",
+-      r.department,
+-      r.payrollCode ?? "",
+-      r.firstEntry,
+-      r.lastExit,
+-      r.totalMinutes === undefined
+-        ? r.totalHours
+-        : formatDuration(r.totalMinutes),
+-      r.overtimeMinutes === undefined
+-        ? r.overtime
+-        : formatDuration(r.overtimeMinutes),
+-      r.leaveType,
+-      STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
+-        r.status,
+-    ]
+-      .map((c) => escapeCsv(String(c)))
+-      .join(","),
+-  );
+-
+-  const csvContent = [headers.join(","), ...rows].join("\n");
+-  const blob = new Blob(["\uFEFF" + csvContent], {
++  const blob = new Blob([buildPDKSCsv(records, options)], {
+     type: "text/csv;charset=utf-8",
+   });
+   const url = URL.createObjectURL(blob);
+@@ -197,7 +134,7 @@ export function exportToCsv(
+  */
+ export async function exportToPdf(
+   records: PDKSExportRecord[],
+-  options: { title?: string; dateRange?: string } = {},
++  options: PDKSExportOptions = {},
+ ): Promise<void> {
+   const { title = "PDKS Raporu", dateRange = "" } = options;
+ 
+@@ -205,9 +142,12 @@ export async function exportToPdf(
+   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+   const pageHeight = doc.internal.pageSize.getHeight();
+   const margin = 15;
+-  const colWidths = [38, 22, 22, 28, 16, 18, 18, 22, 16, 18, 18];
++  const { columns, rows } = buildPDKSExportTable(records, options);
++  const availableWidth = doc.internal.pageSize.getWidth() - margin * 2;
++  const totalWidth = columns.reduce((sum, c) => sum + c.pdfWidth, 0);
++  const colWidths = columns.map(c => c.pdfWidth * Math.min(1, availableWidth / totalWidth));
+   const rowHeight = 8;
+-  const headerHeight = 10;
++  let headerHeight = 10;
+ 
+   let y = margin;
+ 
+@@ -224,55 +164,34 @@ export async function exportToPdf(
+   }
+ 
+   doc.setFontSize(9);
+-  const headers = [
+-    "Çalışan",
+-    "Kart no",
+-    "Bordro",
+-    "Departman",
+-    "Gün",
+-    "İlk Giriş",
+-    "Son Çıkış",
+-    "Toplam",
+-    "Mesai",
+-    "İzin",
+-    "Durum",
+-  ];
++  const defaultKeys = defaultPDKSPreferences(options.canSeePay).orderedColumnKeys;
++  const customColumns = columns.length !== defaultKeys.length || columns.some((c, i) => c.key !== defaultKeys[i]);
++  const headers = columns.map(c => customColumns ? c.label : c.pdfLabel ?? c.label);
++  const headerLines = headers.map((h, i) => customColumns ? doc.splitTextToSize(h, colWidths[i] - 4) as string[] : [h]);
++  headerHeight = Math.max(10, ...headerLines.map(lines => lines.length * 4 + 4));
+   let x = margin;
+ 
+   headers.forEach((h, i) => {
+     doc.setFont("helvetica", "bold");
+     doc.rect(x, y, colWidths[i], headerHeight);
+-    doc.text(h, x + 2, y + 6);
++    doc.text(customColumns ? headerLines[i] : h, x + 2, y + 6);
+     x += colWidths[i];
+   });
+   y += headerHeight;
+ 
+   doc.setFont("helvetica", "normal");
+-  records.forEach((r, _idx) => {
++  rows.forEach((row) => {
+     if (y > pageHeight - 25) {
+       doc.addPage("a4", "landscape");
+       y = margin;
+     }
+ 
+     x = margin;
+-    const rowData = [
+-      r.name.substring(0, 22),
+-      r.cardNumber ?? r.employeeId,
+-      r.payrollEmployeeCode ?? "",
+-      r.department.substring(0, 16),
+-      r.payrollCode ?? "",
+-      r.firstEntry,
+-      r.lastExit,
+-      r.totalMinutes === undefined
+-        ? r.totalHours
+-        : formatDuration(r.totalMinutes),
+-      r.overtimeMinutes === undefined
+-        ? r.overtime
+-        : formatDuration(r.overtimeMinutes),
+-      r.leaveType,
+-      STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
+-        r.status,
+-    ];
++    const rowData = row.map((value, i) => {
++      const key = columns[i].key;
++      const text = String(value);
++      return key === 'name' ? text.substring(0, 22) : key === 'department' ? text.substring(0, 16) : text;
++    });
+ 
+     rowData.forEach((cell, i) => {
+       doc.rect(x, y, colWidths[i], rowHeight);

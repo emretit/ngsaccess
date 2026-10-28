@@ -1,0 +1,10 @@
+- Önemli-1 → convex/dashboard.ts:259,268,639; ortak convex/lib/pdksFixedRules.ts:18, entegrasyon convex/pdksFixedRules.integration.test.ts:32.
+- Önemli-2 → convex/mobileAttendance.ts:124,126,141,169; atama kontrolü convex/lib/pdksWorkDay.ts:152.
+- Önemli-3 → convex/cardReadings.ts:581; gece detay testi convex/pdksFixedRules.integration.test.ts:44.
+- Önemli-4 → convex/lib/pdksDay.ts:309; eksik çıkış review korunur, test convex/lib/pdksFixedRules.test.ts:181.
+- Önemli-5 → convex/lib/pdksDay.ts:312; legacy attendanceDecision undefined kalır, bugün sabah/öğlen/akşam eşdeğerlik testi convex/lib/pdksFixedRules.test.ts:181.
+- Düşük-1 → src/components/shifts/definitions/AddShiftDialog.tsx:477; tolerans sonrası eşik yardım metni.
+- Düşük-2 → convex/lib/pdksFixedRules.test.ts:196; yarım tatil eşikleri uygulanmaz, gerekçe .claude/review-vardiya-faz1.md:29.
+- Düşük-3 → .claude/review-vardiya-faz1.md:30; legacy yönsüz tek çıkış davranışı belgelendi.
+- Düşük-4 → convex/shifts.ts:474; kozmetik değişiklik doğrulamadan muaf, test convex/shifts.test.ts:140.
+- Kapılar: tsc app PASS; tsc convex PASS; eslint src convex PASS (0 hata, mevcut 1 warn); TAM vitest PASS (362 dosya / 3997 test); find-node-leak PASS; kalan iş yok.

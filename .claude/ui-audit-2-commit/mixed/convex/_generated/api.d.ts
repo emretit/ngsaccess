@@ -1,0 +1,401 @@
+/* eslint-disable */
+/**
+ * Generated `api` utility.
+ *
+ * THIS CODE IS AUTOMATICALLY GENERATED.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
+ */
+
+import type * as accessRules from "../accessRules.js";
+import type * as actions_biometricDestruction from "../actions/biometricDestruction.js";
+import type * as actions_getChatData from "../actions/getChatData.js";
+import type * as actions_hikBridgeWake from "../actions/hikBridgeWake.js";
+import type * as actions_hikDebug from "../actions/hikDebug.js";
+import type * as actions_hikGatewayDevice from "../actions/hikGatewayDevice.js";
+import type * as actions_hikQueueWorker from "../actions/hikQueueWorker.js";
+import type * as actions_hikvisionSync from "../actions/hikvisionSync.js";
+import type * as actions_ideGatewayDevice from "../actions/ideGatewayDevice.js";
+import type * as actions_openaiChat from "../actions/openaiChat.js";
+import type * as actions_pdksImport from "../actions/pdksImport.js";
+import type * as actions_sendEmail from "../actions/sendEmail.js";
+import type * as actions_sendScheduledReports from "../actions/sendScheduledReports.js";
+import type * as actions_setPassword from "../actions/setPassword.js";
+import type * as adminDevices from "../adminDevices.js";
+import type * as auditLog from "../auditLog.js";
+import type * as auth from "../auth.js";
+import type * as biometricDestruction from "../biometricDestruction.js";
+import type * as cardReadings from "../cardReadings.js";
+import type * as companies from "../companies.js";
+import type * as crons from "../crons.js";
+import type * as dashboard from "../dashboard.js";
+import type * as debugIde from "../debugIde.js";
+import type * as departments from "../departments.js";
+import type * as deviceCenter from "../deviceCenter.js";
+import type * as deviceEvents from "../deviceEvents.js";
+import type * as deviceSyncRuns from "../deviceSyncRuns.js";
+import type * as devices from "../devices.js";
+import type * as doors from "../doors.js";
+import type * as emailVerification from "../emailVerification.js";
+import type * as employeeAuth from "../employeeAuth.js";
+import type * as employeeCheckIn from "../employeeCheckIn.js";
+import type * as employeeConsents from "../employeeConsents.js";
+import type * as employeeFaces from "../employeeFaces.js";
+import type * as employeeFingerprints from "../employeeFingerprints.js";
+import type * as employees from "../employees.js";
+import type * as files from "../files.js";
+import type * as hikBridge from "../hikBridge.js";
+import type * as hikvisionSync from "../hikvisionSync.js";
+import type * as holidays from "../holidays.js";
+import type * as http from "../http.js";
+import type * as ideDefaults from "../ideDefaults.js";
+import type * as ideSync from "../ideSync.js";
+import type * as invites from "../invites.js";
+import type * as leaves from "../leaves.js";
+import type * as lib_accessDecision from "../lib/accessDecision.js";
+import type * as lib_accessGraph from "../lib/accessGraph.js";
+import type * as lib_accessGraphPure from "../lib/accessGraphPure.js";
+import type * as lib_accessRuleDiff from "../lib/accessRuleDiff.js";
+import type * as lib_accessRuleSummary from "../lib/accessRuleSummary.js";
+import type * as lib_accessRuleUx from "../lib/accessRuleUx.js";
+import type * as lib_accessScope from "../lib/accessScope.js";
+import type * as lib_accessScopeRelations from "../lib/accessScopeRelations.js";
+import type * as lib_adminGuards from "../lib/adminGuards.js";
+import type * as lib_adminLists from "../lib/adminLists.js";
+import type * as lib_audit from "../lib/audit.js";
+import type * as lib_auditActors from "../lib/auditActors.js";
+import type * as lib_auditLogQuery from "../lib/auditLogQuery.js";
+import type * as lib_auditSearch from "../lib/auditSearch.js";
+import type * as lib_auth from "../lib/auth.js";
+import type * as lib_authEmail from "../lib/authEmail.js";
+import type * as lib_biometricDestruction from "../lib/biometricDestruction.js";
+import type * as lib_biometricDestructionState from "../lib/biometricDestructionState.js";
+import type * as lib_biometricGate from "../lib/biometricGate.js";
+import type * as lib_breakDeduction from "../lib/breakDeduction.js";
+import type * as lib_cardReaderAuth from "../lib/cardReaderAuth.js";
+import type * as lib_cardReaderParse from "../lib/cardReaderParse.js";
+import type * as lib_cardReadingAudit from "../lib/cardReadingAudit.js";
+import type * as lib_cardReadingList from "../lib/cardReadingList.js";
+import type * as lib_cardReadingProcess from "../lib/cardReadingProcess.js";
+import type * as lib_cardReadingRetention from "../lib/cardReadingRetention.js";
+import type * as lib_chatMasking from "../lib/chatMasking.js";
+import type * as lib_checkInUx from "../lib/checkInUx.js";
+import type * as lib_customFunctions from "../lib/customFunctions.js";
+import type * as lib_dashboardActivity from "../lib/dashboardActivity.js";
+import type * as lib_dashboardCounts from "../lib/dashboardCounts.js";
+import type * as lib_dashboardTimeline from "../lib/dashboardTimeline.js";
+import type * as lib_departmentTree from "../lib/departmentTree.js";
+import type * as lib_deviceConnection from "../lib/deviceConnection.js";
+import type * as lib_deviceHelpers from "../lib/deviceHelpers.js";
+import type * as lib_deviceIdentity from "../lib/deviceIdentity.js";
+import type * as lib_deviceIdentityRegistration from "../lib/deviceIdentityRegistration.js";
+import type * as lib_devicePool from "../lib/devicePool.js";
+import type * as lib_deviceSync from "../lib/deviceSync.js";
+import type * as lib_deviceSyncRun from "../lib/deviceSyncRun.js";
+import type * as lib_deviceUx from "../lib/deviceUx.js";
+import type * as lib_digestAuth from "../lib/digestAuth.js";
+import type * as lib_doorZoneDelete from "../lib/doorZoneDelete.js";
+import type * as lib_emailVerification from "../lib/emailVerification.js";
+import type * as lib_employeeAuth from "../lib/employeeAuth.js";
+import type * as lib_employeeCascade from "../lib/employeeCascade.js";
+import type * as lib_employeeUx from "../lib/employeeUx.js";
+import type * as lib_escapers from "../lib/escapers.js";
+import type * as lib_gateway_biometrics from "../lib/gateway/biometrics.js";
+import type * as lib_gateway_capabilities from "../lib/gateway/capabilities.js";
+import type * as lib_gateway_capture from "../lib/gateway/capture.js";
+import type * as lib_gateway_cards from "../lib/gateway/cards.js";
+import type * as lib_gateway_core from "../lib/gateway/core.js";
+import type * as lib_gateway_devices from "../lib/gateway/devices.js";
+import type * as lib_gateway_events from "../lib/gateway/events.js";
+import type * as lib_gateway_persons from "../lib/gateway/persons.js";
+import type * as lib_gateway_plans from "../lib/gateway/plans.js";
+import type * as lib_gateway_readers from "../lib/gateway/readers.js";
+import type * as lib_gateway_scheduling from "../lib/gateway/scheduling.js";
+import type * as lib_hikEventCatalog from "../lib/hikEventCatalog.js";
+import type * as lib_hikEventCodes from "../lib/hikEventCodes.js";
+import type * as lib_hikGateway from "../lib/hikGateway.js";
+import type * as lib_hikModels from "../lib/hikModels.js";
+import type * as lib_hikReaderNumbers from "../lib/hikReaderNumbers.js";
+import type * as lib_hikSync from "../lib/hikSync.js";
+import type * as lib_hikWake from "../lib/hikWake.js";
+import type * as lib_leaveRules from "../lib/leaveRules.js";
+import type * as lib_leaveValidation from "../lib/leaveValidation.js";
+import type * as lib_liveReadings from "../lib/liveReadings.js";
+import type * as lib_nullablePatch from "../lib/nullablePatch.js";
+import type * as lib_overtimeCalc from "../lib/overtimeCalc.js";
+import type * as lib_payVisibility from "../lib/payVisibility.js";
+import type * as lib_pdksAvailability from "../lib/pdksAvailability.js";
+import type * as lib_pdksCalc from "../lib/pdksCalc.js";
+import type * as lib_pdksChart from "../lib/pdksChart.js";
+import type * as lib_pdksDay from "../lib/pdksDay.js";
+import type * as lib_pdksDetail from "../lib/pdksDetail.js";
+import type * as lib_pdksHelpers from "../lib/pdksHelpers.js";
+import type * as lib_pdksManual from "../lib/pdksManual.js";
+import type * as lib_pdksPayroll from "../lib/pdksPayroll.js";
+import type * as lib_pdksSource from "../lib/pdksSource.js";
+import type * as lib_pdksTable from "../lib/pdksTable.js";
+import type * as lib_pdksWorkDay from "../lib/pdksWorkDay.js";
+import type * as lib_peopleActivity from "../lib/peopleActivity.js";
+import type * as lib_peopleHikSnapshot from "../lib/peopleHikSnapshot.js";
+import type * as lib_peoplePhoto from "../lib/peoplePhoto.js";
+import type * as lib_peopleRelations from "../lib/peopleRelations.js";
+import type * as lib_peopleScope from "../lib/peopleScope.js";
+import type * as lib_privacySettings from "../lib/privacySettings.js";
+import type * as lib_projectScope from "../lib/projectScope.js";
+import type * as lib_publicUser from "../lib/publicUser.js";
+import type * as lib_rateLimit from "../lib/rateLimit.js";
+import type * as lib_reconcileMath from "../lib/reconcileMath.js";
+import type * as lib_reportAttendance from "../lib/reportAttendance.js";
+import type * as lib_reportScope from "../lib/reportScope.js";
+import type * as lib_settingsUx from "../lib/settingsUx.js";
+import type * as lib_sgkCodes from "../lib/sgkCodes.js";
+import type * as lib_sgkEksikGun from "../lib/sgkEksikGun.js";
+import type * as lib_shiftAssign from "../lib/shiftAssign.js";
+import type * as lib_shiftResolver from "../lib/shiftResolver.js";
+import type * as lib_shiftUx from "../lib/shiftUx.js";
+import type * as lib_syncErrors from "../lib/syncErrors.js";
+import type * as lib_syncStatusLogic from "../lib/syncStatusLogic.js";
+import type * as lib_syncStatusScope from "../lib/syncStatusScope.js";
+import type * as lib_trDate from "../lib/trDate.js";
+import type * as lib_turkishHolidays from "../lib/turkishHolidays.js";
+import type * as lib_visitorPresence from "../lib/visitorPresence.js";
+import type * as lib_visitorStatus from "../lib/visitorStatus.js";
+import type * as maintenance from "../maintenance.js";
+import type * as migrations from "../migrations.js";
+import type * as onboarding from "../onboarding.js";
+import type * as pdksRecords from "../pdksRecords.js";
+import type * as peopleActivity from "../peopleActivity.js";
+import type * as positions from "../positions.js";
+import type * as privacyBiometric from "../privacyBiometric.js";
+import type * as privacyRetention from "../privacyRetention.js";
+import type * as projects from "../projects.js";
+import type * as readers from "../readers.js";
+import type * as reports from "../reports.js";
+import type * as seedCardReaderTest from "../seedCardReaderTest.js";
+import type * as seedHikvisionLanDevice from "../seedHikvisionLanDevice.js";
+import type * as seedTestCardAccess from "../seedTestCardAccess.js";
+import type * as settings from "../settings.js";
+import type * as sgkExport from "../sgkExport.js";
+import type * as shifts from "../shifts.js";
+import type * as syncStatus from "../syncStatus.js";
+import type * as userPreferences from "../userPreferences.js";
+import type * as userProjects from "../userProjects.js";
+import type * as users from "../users.js";
+import type * as visitors from "../visitors.js";
+import type * as zones from "../zones.js";
+
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
+declare const fullApi: ApiFromModules<{
+  accessRules: typeof accessRules;
+  "actions/biometricDestruction": typeof actions_biometricDestruction;
+  "actions/getChatData": typeof actions_getChatData;
+  "actions/hikBridgeWake": typeof actions_hikBridgeWake;
+  "actions/hikDebug": typeof actions_hikDebug;
+  "actions/hikGatewayDevice": typeof actions_hikGatewayDevice;
+  "actions/hikQueueWorker": typeof actions_hikQueueWorker;
+  "actions/hikvisionSync": typeof actions_hikvisionSync;
+  "actions/ideGatewayDevice": typeof actions_ideGatewayDevice;
+  "actions/openaiChat": typeof actions_openaiChat;
+  "actions/pdksImport": typeof actions_pdksImport;
+  "actions/sendEmail": typeof actions_sendEmail;
+  "actions/sendScheduledReports": typeof actions_sendScheduledReports;
+  "actions/setPassword": typeof actions_setPassword;
+  adminDevices: typeof adminDevices;
+  auditLog: typeof auditLog;
+  auth: typeof auth;
+  biometricDestruction: typeof biometricDestruction;
+  cardReadings: typeof cardReadings;
+  companies: typeof companies;
+  crons: typeof crons;
+  dashboard: typeof dashboard;
+  debugIde: typeof debugIde;
+  departments: typeof departments;
+  deviceCenter: typeof deviceCenter;
+  deviceEvents: typeof deviceEvents;
+  deviceSyncRuns: typeof deviceSyncRuns;
+  devices: typeof devices;
+  doors: typeof doors;
+  emailVerification: typeof emailVerification;
+  employeeAuth: typeof employeeAuth;
+  employeeCheckIn: typeof employeeCheckIn;
+  employeeConsents: typeof employeeConsents;
+  employeeFaces: typeof employeeFaces;
+  employeeFingerprints: typeof employeeFingerprints;
+  employees: typeof employees;
+  files: typeof files;
+  hikBridge: typeof hikBridge;
+  hikvisionSync: typeof hikvisionSync;
+  holidays: typeof holidays;
+  http: typeof http;
+  ideDefaults: typeof ideDefaults;
+  ideSync: typeof ideSync;
+  invites: typeof invites;
+  leaves: typeof leaves;
+  "lib/accessDecision": typeof lib_accessDecision;
+  "lib/accessGraph": typeof lib_accessGraph;
+  "lib/accessGraphPure": typeof lib_accessGraphPure;
+  "lib/accessRuleDiff": typeof lib_accessRuleDiff;
+  "lib/accessRuleSummary": typeof lib_accessRuleSummary;
+  "lib/accessRuleUx": typeof lib_accessRuleUx;
+  "lib/accessScope": typeof lib_accessScope;
+  "lib/accessScopeRelations": typeof lib_accessScopeRelations;
+  "lib/adminGuards": typeof lib_adminGuards;
+  "lib/adminLists": typeof lib_adminLists;
+  "lib/audit": typeof lib_audit;
+  "lib/auditActors": typeof lib_auditActors;
+  "lib/auditLogQuery": typeof lib_auditLogQuery;
+  "lib/auditSearch": typeof lib_auditSearch;
+  "lib/auth": typeof lib_auth;
+  "lib/authEmail": typeof lib_authEmail;
+  "lib/biometricDestruction": typeof lib_biometricDestruction;
+  "lib/biometricDestructionState": typeof lib_biometricDestructionState;
+  "lib/biometricGate": typeof lib_biometricGate;
+  "lib/breakDeduction": typeof lib_breakDeduction;
+  "lib/cardReaderAuth": typeof lib_cardReaderAuth;
+  "lib/cardReaderParse": typeof lib_cardReaderParse;
+  "lib/cardReadingAudit": typeof lib_cardReadingAudit;
+  "lib/cardReadingList": typeof lib_cardReadingList;
+  "lib/cardReadingProcess": typeof lib_cardReadingProcess;
+  "lib/cardReadingRetention": typeof lib_cardReadingRetention;
+  "lib/chatMasking": typeof lib_chatMasking;
+  "lib/checkInUx": typeof lib_checkInUx;
+  "lib/customFunctions": typeof lib_customFunctions;
+  "lib/dashboardActivity": typeof lib_dashboardActivity;
+  "lib/dashboardCounts": typeof lib_dashboardCounts;
+  "lib/dashboardTimeline": typeof lib_dashboardTimeline;
+  "lib/departmentTree": typeof lib_departmentTree;
+  "lib/deviceConnection": typeof lib_deviceConnection;
+  "lib/deviceHelpers": typeof lib_deviceHelpers;
+  "lib/deviceIdentity": typeof lib_deviceIdentity;
+  "lib/deviceIdentityRegistration": typeof lib_deviceIdentityRegistration;
+  "lib/devicePool": typeof lib_devicePool;
+  "lib/deviceSync": typeof lib_deviceSync;
+  "lib/deviceSyncRun": typeof lib_deviceSyncRun;
+  "lib/deviceUx": typeof lib_deviceUx;
+  "lib/digestAuth": typeof lib_digestAuth;
+  "lib/doorZoneDelete": typeof lib_doorZoneDelete;
+  "lib/emailVerification": typeof lib_emailVerification;
+  "lib/employeeAuth": typeof lib_employeeAuth;
+  "lib/employeeCascade": typeof lib_employeeCascade;
+  "lib/employeeUx": typeof lib_employeeUx;
+  "lib/escapers": typeof lib_escapers;
+  "lib/gateway/biometrics": typeof lib_gateway_biometrics;
+  "lib/gateway/capabilities": typeof lib_gateway_capabilities;
+  "lib/gateway/capture": typeof lib_gateway_capture;
+  "lib/gateway/cards": typeof lib_gateway_cards;
+  "lib/gateway/core": typeof lib_gateway_core;
+  "lib/gateway/devices": typeof lib_gateway_devices;
+  "lib/gateway/events": typeof lib_gateway_events;
+  "lib/gateway/persons": typeof lib_gateway_persons;
+  "lib/gateway/plans": typeof lib_gateway_plans;
+  "lib/gateway/readers": typeof lib_gateway_readers;
+  "lib/gateway/scheduling": typeof lib_gateway_scheduling;
+  "lib/hikEventCatalog": typeof lib_hikEventCatalog;
+  "lib/hikEventCodes": typeof lib_hikEventCodes;
+  "lib/hikGateway": typeof lib_hikGateway;
+  "lib/hikModels": typeof lib_hikModels;
+  "lib/hikReaderNumbers": typeof lib_hikReaderNumbers;
+  "lib/hikSync": typeof lib_hikSync;
+  "lib/hikWake": typeof lib_hikWake;
+  "lib/leaveRules": typeof lib_leaveRules;
+  "lib/leaveValidation": typeof lib_leaveValidation;
+  "lib/liveReadings": typeof lib_liveReadings;
+  "lib/nullablePatch": typeof lib_nullablePatch;
+  "lib/overtimeCalc": typeof lib_overtimeCalc;
+  "lib/payVisibility": typeof lib_payVisibility;
+  "lib/pdksAvailability": typeof lib_pdksAvailability;
+  "lib/pdksCalc": typeof lib_pdksCalc;
+  "lib/pdksChart": typeof lib_pdksChart;
+  "lib/pdksDay": typeof lib_pdksDay;
+  "lib/pdksDetail": typeof lib_pdksDetail;
+  "lib/pdksHelpers": typeof lib_pdksHelpers;
+  "lib/pdksManual": typeof lib_pdksManual;
+  "lib/pdksPayroll": typeof lib_pdksPayroll;
+  "lib/pdksSource": typeof lib_pdksSource;
+  "lib/pdksTable": typeof lib_pdksTable;
+  "lib/pdksWorkDay": typeof lib_pdksWorkDay;
+  "lib/peopleActivity": typeof lib_peopleActivity;
+  "lib/peopleHikSnapshot": typeof lib_peopleHikSnapshot;
+  "lib/peoplePhoto": typeof lib_peoplePhoto;
+  "lib/peopleRelations": typeof lib_peopleRelations;
+  "lib/peopleScope": typeof lib_peopleScope;
+  "lib/privacySettings": typeof lib_privacySettings;
+  "lib/projectScope": typeof lib_projectScope;
+  "lib/publicUser": typeof lib_publicUser;
+  "lib/rateLimit": typeof lib_rateLimit;
+  "lib/reconcileMath": typeof lib_reconcileMath;
+  "lib/reportAttendance": typeof lib_reportAttendance;
+  "lib/reportScope": typeof lib_reportScope;
+  "lib/settingsUx": typeof lib_settingsUx;
+  "lib/sgkCodes": typeof lib_sgkCodes;
+  "lib/sgkEksikGun": typeof lib_sgkEksikGun;
+  "lib/shiftAssign": typeof lib_shiftAssign;
+  "lib/shiftResolver": typeof lib_shiftResolver;
+  "lib/shiftUx": typeof lib_shiftUx;
+  "lib/syncErrors": typeof lib_syncErrors;
+  "lib/syncStatusLogic": typeof lib_syncStatusLogic;
+  "lib/syncStatusScope": typeof lib_syncStatusScope;
+  "lib/trDate": typeof lib_trDate;
+  "lib/turkishHolidays": typeof lib_turkishHolidays;
+  "lib/visitorPresence": typeof lib_visitorPresence;
+  "lib/visitorStatus": typeof lib_visitorStatus;
+  maintenance: typeof maintenance;
+  migrations: typeof migrations;
+  onboarding: typeof onboarding;
+  pdksRecords: typeof pdksRecords;
+  peopleActivity: typeof peopleActivity;
+  positions: typeof positions;
+  privacyBiometric: typeof privacyBiometric;
+  privacyRetention: typeof privacyRetention;
+  projects: typeof projects;
+  readers: typeof readers;
+  reports: typeof reports;
+  seedCardReaderTest: typeof seedCardReaderTest;
+  seedHikvisionLanDevice: typeof seedHikvisionLanDevice;
+  seedTestCardAccess: typeof seedTestCardAccess;
+  settings: typeof settings;
+  sgkExport: typeof sgkExport;
+  shifts: typeof shifts;
+  syncStatus: typeof syncStatus;
+  userPreferences: typeof userPreferences;
+  userProjects: typeof userProjects;
+  users: typeof users;
+  visitors: typeof visitors;
+  zones: typeof zones;
+}>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
+export declare const api: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "public">
+>;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
+export declare const internal: FilterApi<
+  typeof fullApi,
+  FunctionReference<any, "internal">
+>;
+
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

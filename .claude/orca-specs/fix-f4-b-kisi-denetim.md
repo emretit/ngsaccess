@@ -1,0 +1,6 @@
+# DENETİM — Faz 4-B (K-05 eski fotoğraf silme, K-08 liste izinleri + sayfalı cascade, B-01 kişi silmede QR token)
+ÖNCE `/Users/emreaydin/ngsaccess/.claude/orca-specs/fix-denetim-ortak.md` OKU. Fix spec: `.claude/orca-specs/fix-f4-b-kisi.md`. Worker raporu: `/tmp/fix-f4-b-kisi-rapor.md`.
+Rapor: `/tmp/fix-f4-b-kisi-denetim.md`. Dosyalar (yalnız `git diff HEAD` / yeni dosya): convex/employees.ts convex/lib/employeeCascade.ts convex/fixF4People.test.ts.
+DİKKAT: aynı ağaçta F4-A (crons/privacyRetention/retention.test/employeeCheckIn/emailVerification/schema/CheckIn.tsx) ve F4-C (http/openaiChat/alarms/biometricDestruction/fingerprintEnrollment/rateLimit) yazıyor; başka oturum PDKS/rapor WIP'i var — onları DENETLEME, dokunma.
+Özel dikkat: storage.delete paylaşım kontrolü (aynı photoStorageId başka kayıtta/ziyaretçide/yüz kaydında kullanılıyorsa silinmemeli; silme patch'ten SONRA mı, hata olursa veri tutarlılığı); `employees.list` çıktı shape'i ve maskeleme birebir aynı mı (ücret/kişisel alan sızıntısı yok mu, izin proje başına doğru projeyle mi hesaplanıyor — çok projeli listede);
+sayfalı anonimleştirme zinciri: kişi silindikten sonra devam halkası doc'u bulamazsa çalışıyor mu, sonsuz zincir/kota, yarıda kalırsa kalan satırlar PII taşıyor mu; QR token silme.

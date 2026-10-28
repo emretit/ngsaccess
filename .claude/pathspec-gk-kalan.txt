@@ -1,0 +1,16 @@
+convex/_generated/api.d.ts
+convex/accessGrantStatus.test.ts
+convex/accessGrantStatus.ts
+convex/lib/deviceSyncRun.ts
+src/components/access-control/DoorStatusPlanEditor.tsx
+src/components/access-control/door-dialog/DoorVerifyPlanEditor.tsx
+src/components/access-control/unified/status/StatusCounters.tsx
+src/components/access-control/unified/status/StatusPage.tsx
+src/components/access-control/unified/status/StatusViews.tsx
+src/components/access-control/unified/status/model.ts
+src/components/access-control/unified/status/status.test.tsx
+src/lib/pastAttempt.test.ts
+src/lib/pastAttempt.ts
+convex/lib/syncReasons.ts
+src/components/access-control/door-dialog/weeklyPlan.tsx
+docs/ui-audit-gk/sadelestirme/review-kalan.md

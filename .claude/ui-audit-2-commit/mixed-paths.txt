@@ -1,0 +1,6 @@
+convex/schema.ts
+convex/_generated/api.d.ts
+src/lib/routeMeta.ts
+src/pages/Employees.tsx
+src/components/employees/EmployeeBulkActions.tsx
+src/components/employees/EmployeeTable.tsx

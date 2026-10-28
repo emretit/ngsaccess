@@ -5,7 +5,7 @@ Son güncelleme: 2026-10-27 21:00 · Canlı = da631a09 (Convex + web, push'lu). 
 ## Hemen (1-2 dk)
 
 - [ ] **"emre" projesinde 5 yetki cihaza hiç gönderilmemiş** — 2026-10-27
-  - Yetki Durumu → Bilinmiyor (5) → hepsini seç → yeniden gönder. Kişiler: Ersin Keskin, Enes Hasanoglu, Gökçe Şekem, İrem Peker, Emre Aydın · cihaz Deneme1.
+  - Yetki Durumu → Bilinmiyor (5) → hepsini seç → yeniden gönder. 5 kişi · cihaz Deneme1.
 
 ## Karar bekleyen (Emre)
 

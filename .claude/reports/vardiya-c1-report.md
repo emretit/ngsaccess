@@ -1,0 +1,9 @@
+C1 tamamlandı — kişi/departman hedefi, haftalık çoklu/gün döngüsü/hafta döngüsü, 14 gün önizleme, kaynaklı takvim ve departman CRUD arayüzü.
+Atama: src/components/shifts/AssignShiftDialog.tsx:49, AssignmentEditDialog.tsx:37, assignmentFormSchema.ts:9; yeni AssignmentPatternEditor.tsx:12, DayShiftsPicker.tsx:9, RotationEditor.tsx:14, DepartmentTargetPicker.tsx:17, PlanQueryBoundary.tsx:7, lib/planForm.ts:7 (kısa yolların kökü src/components/shifts/).
+Takvim: src/components/shifts/calendar/useShiftCalendarData.ts:26, calendar/shiftCalendarModel.ts:28, calendar/ShiftCalendarPlan.tsx:47, calendar/calendarActions.ts:5, ShiftCalendarCell.tsx:32, ShiftDayDetails.tsx:22, lib/planning.ts:183; planCells kararı kullanılır, includePlans=true, kişi gece devamı ve kaynaklı dışa aktarım korunur.
+Departman listesi: src/components/shifts/ShiftPlanSheet.tsx:37 ve yeni DepartmentAssignments.tsx:16; uyarı: src/components/employees/EmployeeFormFields.tsx:32.
+Testler: yeni src/components/shifts/assignmentPlans.test.tsx:1 (17 test), src/components/employees/EmployeeFormFields.test.tsx:89 (1 yeni test), src/components/shifts/ShiftPlanSheet.test.tsx:7 (yeni alt bölüm mocku).
+Son kapılar: app tsc PASS; convex tsc PASS; eslint src convex PASS (0 error, yalnız convex/attendanceCorrections.test.ts:8 mevcut unused warning); vitest run src PASS (188 dosya, 1215 test); git diff --check PASS.
+Tam vitest run önceki koşu: 4091 PASS / 5 FAIL, yalnız convex/attendanceCorrections.test.ts (2), convex/w53Integration.test.ts (2), convex/w5aLegacyEquivalence.test.ts (1); log /tmp/c1-full-tests.log, son frontend log /tmp/c1-src-tests-final.log.
+Koordinatör ask yanıtı: B dosyalarına dokunmadan src kapısı yeşilse tamamla; tam kapıyı B bittikten sonra koordinatör koşacak (20:23 civarı alınan yanıt).
+A API eksikliği ve açık soru yok; backend/PDKS/definitions/mobile değiştirilmedi; dev server, DB yazma, commit, yayın yapılmadı; Orca görsel turu ve B sonrası tam kapı koordinatörde.

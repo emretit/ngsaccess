@@ -1,0 +1,581 @@
+diff --git a/convex/deviceConnectivity.test.ts b/convex/deviceConnectivity.test.ts
+new file mode 100644
+index 00000000..9745c0b8
+--- /dev/null
++++ b/convex/deviceConnectivity.test.ts
+@@ -0,0 +1,183 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from "convex-test";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import schema from "./schema";
++import { api, internal } from "./_generated/api";
++import type { Doc } from "./_generated/dataModel";
++
++const modules = import.meta.glob("./**/*.ts");
++const now = Date.parse("2026-10-22T12:00:00Z");
++const day = 86400000;
++beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
++afterEach(() => vi.useRealTimers());
++
++async function fixture(fields: Partial<Doc<"devices">> = {}) {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async ctx => {
++    const projectId = await ctx.db.insert("projects", { name: "Proje" });
++    const otherProjectId = await ctx.db.insert("projects", { name: "Diğer" });
++    const userId = await ctx.db.insert("users", { role: "project_user" });
++    const adminId = await ctx.db.insert("users", { role: "project_admin" });
++    const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: now + day });
++    const adminSessionId = await ctx.db.insert("authSessions", { userId: adminId, expirationTime: now + day });
++    await ctx.db.insert("userProjects", { userId, projectId });
++    await ctx.db.insert("userProjects", { userId: adminId, projectId });
++    const deviceId = await ctx.db.insert("devices", {
++      name: "Panel", brand: "other", projectId, lastSeen: new Date(now - 600000).toISOString(),
++      createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), ...fields,
++    });
++    return { projectId, otherProjectId, userId, adminId, sessionId, adminSessionId, deviceId };
++  });
++  return {
++    t, ...ids,
++    caller: t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` }),
++    admin: t.withIdentity({ subject: `${ids.adminId}|${ids.adminSessionId}` }),
++  };
++}
++type Fixture = Awaited<ReturnType<typeof fixture>>;
++const events = (f: Fixture) => f.t.run(ctx => ctx.db.query("deviceEvents").take(600));
++const history = (f: Fixture) => f.caller.query(api.deviceEvents.getConnectivityHistory, { deviceId: f.deviceId });
++
++const paths = ["gateway", "localBridge", "ideMqtt", "ideCommand", "esp32", "httpOther", "settings"] as const;
++type Path = typeof paths[number];
++async function pathFixture(path: Path, signal: number | undefined) {
++  const fields: Partial<Doc<"devices">> = {
++    brand: path === "gateway" || path === "localBridge" ? "hikvision" : path === "ideMqtt" || path === "ideCommand" ? "ide_smart" : "other",
++    hikTransport: path === "localBridge" ? "localBridge" : undefined,
++    hikDevIndex: path === "gateway" ? "gateway" : undefined,
++    ideUuid: path === "ideMqtt" ? "mqtt-uuid" : undefined,
++    lastSeen: signal === undefined ? undefined : new Date(signal).toISOString(),
++    hikLastSeenAt: path === "gateway" ? signal : undefined,
++  };
++  return fixture(fields);
++}
++async function heartbeat(f: Fixture, path: Path) {
++  if (path === "gateway") return f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: true });
++  if (path === "ideCommand") return f.t.mutation(internal.devices.markIdeOnline, { deviceId: f.deviceId });
++  if (path === "ideMqtt") return f.t.mutation(internal.devices.updateLastSeen, { ideUuid: "mqtt-uuid" });
++  if (path === "settings") return f.admin.mutation(api.devices.update, { deviceId: f.deviceId, lastSeen: new Date(Date.now()).toISOString() });
++  return f.t.mutation(internal.devices.updateLastSeen, { deviceId: f.deviceId });
++}
++
++describe("connectivity writers", () => {
++  it.each(paths)("%s records one long gap, then no repeated event", async path => {
++    const f = await pathFixture(path, now - 600000);
++    await heartbeat(f, path);
++    await heartbeat(f, path);
++    const rows = await events(f);
++    expect(rows).toHaveLength(1);
++    expect(rows[0]).toMatchObject({ category: "status", severity: "warning", label: "Çevrimdışı dönemi", eventTime: new Date(now).toISOString(), source: path === "gateway" || path === "localBridge" ? "hikvision" : path === "ideMqtt" || path === "ideCommand" ? "ide_smart" : "system" });
++    expect(JSON.parse(rows[0].rawData ?? "null")).toEqual({ offlineFrom: now - 600000, offlineTo: now, durationMs: 600000 });
++  });
++  it.each(paths)("%s ignores short gaps, never and future signals", async path => {
++    for (const signal of [now - 60000, undefined, now + 60000]) {
++      const f = await pathFixture(path, signal);
++      await heartbeat(f, path);
++      expect(await events(f)).toHaveLength(0);
++    }
++  });
++  it("gateway hint transition records once before throttle and offline probes retain successful signal", async () => {
++    const f = await pathFixture("gateway", now - 1000);
++    await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: false });
++    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.hikLastSeenAt).toBe(now - 1000);
++    expect(await events(f)).toHaveLength(0);
++    await heartbeat(f, "gateway");
++    const after = await f.t.run(ctx => ctx.db.get(f.deviceId));
++    vi.setSystemTime(now + 1);
++    await heartbeat(f, "gateway");
++    expect(await f.t.run(ctx => ctx.db.get(f.deviceId))).toEqual(after);
++    expect(await events(f)).toHaveLength(1);
++    expect(JSON.parse((await events(f))[0].rawData ?? "null").durationMs).toBe(1000);
++  });
++  it("keeps offline gateway probes throttled without overwriting the last successful signal", async () => {
++    const f = await pathFixture("gateway", now - 600000);
++    await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: false });
++    const after = await f.t.run(ctx => ctx.db.get(f.deviceId));
++    vi.setSystemTime(now + 1);
++    await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: false });
++    expect(await f.t.run(ctx => ctx.db.get(f.deviceId))).toEqual(after);
++    expect(after?.hikLastSeenAt).toBe(now - 600000);
++    expect(await events(f)).toHaveLength(0);
++  });
++  it("writes a reconnect signal even if another transport timestamp would throttle the heartbeat", async () => {
++    const f = await fixture({ brand: "hikvision", hikTransport: "localBridge", hikDevIndex: "gateway", hikLastSeenAt: now - 1 });
++    await heartbeat(f, "gateway"); await heartbeat(f, "gateway");
++    expect(await events(f)).toHaveLength(1);
++    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.lastSeen).toBe(new Date(now).toISOString());
++  });
++  it("rejected gateway scope cannot create a period", async () => {
++    const f = await pathFixture("gateway", now - 600000);
++    expect(await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: true, allowedProjectIds: [] })).toBe(false);
++    expect(await events(f)).toHaveLength(0);
++  });
++  it("HTTP clears an offline hint along with the signal to prevent duplicate periods", async () => {
++    const f = await fixture({ brand: "hikvision", hikOfflineHint: "Çevrimdışı", hikLastSeenAt: now - 1000 });
++    await heartbeat(f, "httpOther"); await heartbeat(f, "httpOther");
++    expect(await events(f)).toHaveLength(1);
++    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.hikOfflineHint).toBeUndefined();
++  });
++});
++
++async function insertPeriod(f: Fixture, from: number, to: number) {
++  await f.t.run(ctx => ctx.db.insert("deviceEvents", {
++    deviceId: f.deviceId, projectId: f.projectId, source: "system", category: "status", severity: "warning", label: "Çevrimdışı dönemi",
++    eventTime: new Date(to).toISOString(), createdAt: new Date(to).toISOString(), updatedAt: new Date(to).toISOString(),
++    rawData: JSON.stringify({ offlineFrom: from, offlineTo: to, durationMs: to - from }),
++  }));
++}
++
++describe("connectivity history", () => {
++  it("permits project_user and rejects another project's device", async () => {
++    const f = await fixture();
++    expect((await history(f)).ongoing).toEqual({ since: now - 600000 });
++    await f.t.run(ctx => ctx.db.patch(f.deviceId, { projectId: f.otherProjectId }));
++    await expect(history(f)).rejects.toThrow("erişim yetkiniz yok");
++  });
++  it("applies the 30-day window, clips crossing periods, and calculates totals and longest", async () => {
++    const f = await fixture({ lastSeen: new Date(now).toISOString() });
++    await insertPeriod(f, now - 32 * day, now - 31 * day);
++    await insertPeriod(f, now - 31 * day, now - 29 * day);
++    await insertPeriod(f, now - 3600000, now - 600000);
++    const result = await history(f);
++    expect(result).toMatchObject({ count: 2, totalMs: day + 3000000, longestMs: day, truncated: false });
++    expect(result.periods[0].durationMs).toBe(3000000);
++    expect(result.periods[1].offlineFrom).toBe(now - 31 * day);
++    expect(result.ongoing).toBeUndefined();
++  });
++  it("includes the open period without writing and clips its aggregate to the window", async () => {
++    const f = await fixture({ lastSeen: new Date(now - 31 * day).toISOString() });
++    expect(await history(f)).toMatchObject({ count: 1, totalMs: 30 * day, longestMs: 30 * day, periods: [], ongoing: { since: now - 31 * day } });
++    expect(await events(f)).toEqual([]);
++  });
++  it.each([undefined, "invalid", new Date(now + 1).toISOString()])("does not invent ongoing periods for %s", async lastSeen => {
++    const f = await fixture({ lastSeen });
++    expect(await history(f)).toEqual({ asOf: now, count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false });
++  });
++  it("takes at most 501 periods and returns the last 20; exactly 500 is not truncated", async () => {
++    const f = await fixture({ lastSeen: new Date(now).toISOString() });
++    for (let i = 0; i < 500; i++) await insertPeriod(f, now - (i + 1) * 600000, now - i * 600000);
++    expect(await history(f)).toMatchObject({ count: 500, totalMs: 300000000, truncated: false });
++    await insertPeriod(f, now - 501 * 600000, now - 500 * 600000);
++    const result = await history(f);
++    expect(result).toMatchObject({ count: 500, totalMs: 300000000, longestMs: 600000, truncated: true });
++    expect(result.periods).toHaveLength(20);
++    expect(result.periods[0].offlineTo).toBe(now);
++    expect(result.periods[19].offlineTo).toBe(now - 19 * 600000);
++  });
++  it("ignores other events, malformed raw data, and future periods", async () => {
++    const f = await fixture({ lastSeen: new Date(now).toISOString() });
++    await insertPeriod(f, now - 600000, now + 1);
++    await f.t.run(async ctx => {
++      const base = { deviceId: f.deviceId, source: "system" as const, category: "status" as const, severity: "warning" as const, label: "Çevrimdışı dönemi", eventTime: new Date(now).toISOString(), createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() };
++      for (const rawData of ["{", "null", "{}", JSON.stringify({ offlineFrom: now - 10, offlineTo: now, durationMs: 20 })]) await ctx.db.insert("deviceEvents", { ...base, rawData });
++      await ctx.db.insert("deviceEvents", { ...base, label: "Başka durum" });
++      await ctx.db.insert("deviceEvents", { ...base, category: "operation" });
++    });
++    expect((await history(f)).count).toBe(0);
++  });
++  it("validates the requested window", async () => {
++    const f = await fixture();
++    for (const days of [0, -1, 31, 1.5]) await expect(f.caller.query(api.deviceEvents.getConnectivityHistory, { deviceId: f.deviceId, days })).rejects.toThrow("Gün sayısı");
++  });
++});
+diff --git a/convex/deviceEvents.ts b/convex/deviceEvents.ts
+index 3f9c544d..182510b7 100644
+--- a/convex/deviceEvents.ts
++++ b/convex/deviceEvents.ts
+@@ -1,3 +1,6 @@
++import { authedQuery } from "./lib/customFunctions";
++import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
++import { deviceConnection, deviceLastSignal } from "./lib/deviceConnection";
+ import { v } from "convex/values";
+ import { internalMutation } from "./_generated/server";
+ import { classifyHikEvent } from "./lib/hikEventCatalog";
+@@ -156,3 +159,57 @@ export const recordHikDeviceEvent = internalMutation({
+     return { inserted: true };
+   },
+ });
++
++
++type ConnectivityPeriod = { offlineFrom: number; offlineTo: number; durationMs: number };
++
++function parseConnectivityPeriod(rawData: string | undefined): ConnectivityPeriod | undefined {
++  if (!rawData) return;
++  try {
++    const value: unknown = JSON.parse(rawData);
++    if (typeof value !== "object" || value === null ||
++      !("offlineFrom" in value) || !("offlineTo" in value) || !("durationMs" in value)) return;
++    const { offlineFrom, offlineTo, durationMs } = value;
++    if (typeof offlineFrom !== "number" || typeof offlineTo !== "number" || typeof durationMs !== "number" ||
++      !Number.isFinite(offlineFrom) || !Number.isFinite(offlineTo) || !Number.isFinite(durationMs) ||
++      offlineTo <= offlineFrom || durationMs !== offlineTo - offlineFrom) return;
++    return { offlineFrom, offlineTo, durationMs };
++  } catch { return; }
++}
++
++export const getConnectivityHistory = authedQuery({
++  args: { deviceId: v.id("devices"), days: v.optional(v.number()) },
++  handler: async (ctx, args) => {
++    const device = await ctx.db.get(args.deviceId);
++    if (!device) throw new Error("Cihaz bulunamadı");
++    const allowed = await getProjectIdsForUser(ctx);
++    if (!isProjectAllowed(allowed, device.projectId)) throw new Error("Bu cihaza erişim yetkiniz yok");
++    const days = args.days ?? 30;
++    if (!Number.isInteger(days) || days < 1 || days > 30) throw new Error("Gün sayısı 1–30 arasında olmalı");
++    const now = Date.now();
++    const cutoff = now - days * 86400000;
++    const rows = await ctx.db.query("deviceEvents")
++      .withIndex("by_device_and_event_time", q => q.eq("deviceId", args.deviceId).gte("eventTime", new Date(cutoff).toISOString()))
++      .order("desc")
++      .filter(q => q.and(q.eq(q.field("category"), "status"), q.eq(q.field("label"), "Çevrimdışı dönemi")))
++      .take(501);
++    const periods: ConnectivityPeriod[] = [];
++    for (const row of rows.slice(0, 500)) {
++      const period = parseConnectivityPeriod(row.rawData);
++      if (period && period.offlineTo <= now && period.offlineTo >= cutoff) {
++        periods.push(period);
++      }
++    }
++    const signal = deviceLastSignal(device);
++    const ongoing = deviceConnection(device, now) === "offline" && signal !== undefined && signal < now
++      ? { since: signal } : undefined;
++    const ongoingMs = ongoing ? now - Math.max(cutoff, ongoing.since) : 0;
++    return {
++      asOf: now,
++      count: periods.length + (ongoing ? 1 : 0),
++      totalMs: periods.reduce((sum, p) => sum + p.offlineTo - Math.max(cutoff, p.offlineFrom), ongoingMs),
++      longestMs: periods.reduce((longest, p) => Math.max(longest, p.offlineTo - Math.max(cutoff, p.offlineFrom)), ongoingMs),
++      periods: periods.slice(0, 20), ...(ongoing ? { ongoing } : {}), truncated: rows.length > 500,
++    };
++  },
++});
+diff --git a/convex/devices.ts b/convex/devices.ts
+index 424e284a..c45585ee 100644
+--- a/convex/devices.ts
++++ b/convex/devices.ts
+@@ -1,3 +1,4 @@
++import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
+ import { listMobileTargets } from "./lib/mobileAccess";
+ import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
+ import { ConvexError, v } from "convex/values";
+@@ -286,6 +287,13 @@ export const update = adminMutation({
+       clean.isActive = active;
+       clean.status = active ? "active" : "inactive";
+     }
++    if (args.lastSeen !== undefined) {
++      const signal = deviceLastSignal({ ...device, lastSeen: args.lastSeen });
++      const nowMs = Date.now();
++      if (signal !== undefined && signal <= nowMs && signal > nowMs - DEVICE_ONLINE_WINDOW_MS && signal !== deviceLastSignal(device)) {
++        await recordConnectivityTransition(ctx, device, signal);
++      }
++    }
+     await ctx.db.patch(deviceId, toPatch(clean));
+ 
+     // Panel başka bölgeye taşınırsa (zoneId değişti), o panele bağlı tüm kapıların
+@@ -405,9 +413,11 @@ export const updateLastSeen = internalMutation({
+       // ETMİYORUZ — /card-reader unauth olduğu için saldırgan forged ipAddress
+       // veya devIndex yollayarak cihaz lookup index'lerini bozabilir. Bu alanlar
+       // sadece trusted yoldan (gateway register / refreshGatewayDeviceStatus) yazılır.
++      await recordConnectivityTransition(ctx, device, Date.parse(now));
+       await ctx.db.patch(device._id, {
+         lastSeen: now,
+-        hikLastSeenAt: Date.now(),
++        hikLastSeenAt: Date.parse(now),
++        hikOfflineHint: undefined,
+       });
+     } else if (!deviceId && ideUuid) {
+       // Cihaz henüz projeye atanmamış (adminDevices'ta) olabilir — orada da lastSeen güncelle.
+@@ -518,6 +528,9 @@ export const markIdeOnline = internalMutation({
+   args: { deviceId: v.id("devices") },
+   handler: async (ctx, args) => {
+     const now = new Date().toISOString();
++    const device = await ctx.db.get(args.deviceId);
++    if (!device) throw new Error("Cihaz bulunamadı");
++    await recordConnectivityTransition(ctx, device, Date.parse(now));
+     await ctx.db.patch(args.deviceId, {
+       lastSeen: now,
+       status: "active",
+@@ -1240,17 +1253,21 @@ export const applyGatewayHeartbeat = internalMutation({
+       }
+     }
+     const now = Date.now();
++    // Throttle erken dönüşünden önce eski sinyalle karşılaştır.
++    const reconnected = args.online ? await recordConnectivityTransition(ctx, device, now) : false;
+     const offlineHint = args.online ? undefined : "Gateway çevrimdışı";
+     const deviceIp = device.deviceIp || args.deviceIp || undefined;
+     const model = device.hikModel || args.model || undefined;
+     const changed = device.hikOfflineHint !== offlineHint ||
+       device.deviceIp !== deviceIp || device.hikModel !== model;
+-    if (!changed && device.hikLastSeenAt !== undefined && now - device.hikLastSeenAt < 60_000) {
++    const lastHeartbeat = args.online ? device.hikLastSeenAt : Date.parse(device.updatedAt);
++    if (!reconnected && !changed && lastHeartbeat !== undefined && now - lastHeartbeat < 60_000) {
+       return true;
+     }
+     const nowIso = new Date(now).toISOString();
+     await ctx.db.patch(device._id, {
+-      hikLastSeenAt: now,
++      // Offline durum sorgusu başarılı cihaz sinyali değildir.
++      ...(args.online ? { hikLastSeenAt: now } : {}),
+       updatedAt: nowIso,
+       hikOfflineHint: offlineHint,
+       deviceIp,
+diff --git a/convex/lib/deviceConnection.ts b/convex/lib/deviceConnection.ts
+index a5189a86..b16a3d6e 100644
+--- a/convex/lib/deviceConnection.ts
++++ b/convex/lib/deviceConnection.ts
+@@ -1,13 +1,41 @@
++import type { Doc } from "../_generated/dataModel";
++import type { MutationCtx } from "../_generated/server";
++
+ export const DEVICE_ONLINE_WINDOW_MS = 5 * 60 * 1000;
+ 
+-export function deviceConnection(device: {
++type ConnectionSignal = {
+   brand?: string; hikTransport?: string; hikLastSeenAt?: number;
+   lastSeen?: string | null; hikOfflineHint?: string;
+-}, now: number): "online" | "offline" | "never" {
++};
++
++export function deviceLastSignal(device: ConnectionSignal): number | undefined {
+   const signal = device.brand === "hikvision" && device.hikTransport !== "localBridge"
+     ? device.hikLastSeenAt ?? (device.lastSeen ? Date.parse(device.lastSeen) : undefined)
+     : device.lastSeen ? Date.parse(device.lastSeen) : undefined;
++  return signal !== undefined && Number.isFinite(signal) ? signal : undefined;
++}
++
++export function deviceConnection(device: ConnectionSignal, now: number): "online" | "offline" | "never" {
++  const signal = deviceLastSignal(device);
+   if (device.hikOfflineHint) return "offline";
+-  if (signal === undefined || !Number.isFinite(signal)) return "never";
++  if (signal === undefined) return "never";
+   return signal <= now && signal > now - DEVICE_ONLINE_WINDOW_MS ? "online" : "offline";
+ }
++
++/** Yalnız başarılı yeni sinyalden önce, mevcut cihaz yazımıyla aynı işlemde çağrılır. */
++export async function recordConnectivityTransition(
++  ctx: MutationCtx, device: Doc<"devices">, nowMs: number,
++): Promise<boolean> {
++  const offlineFrom = deviceLastSignal(device);
++  if (offlineFrom === undefined || offlineFrom >= nowMs ||
++    deviceConnection(device, nowMs) !== "offline") return false;
++  const now = new Date(nowMs).toISOString();
++  await ctx.db.insert("deviceEvents", {
++    deviceId: device._id, projectId: device.projectId,
++    source: device.brand === "hikvision" ? "hikvision" : device.brand === "ide_smart" ? "ide_smart" : "system",
++    category: "status", severity: "warning", label: "Çevrimdışı dönemi",
++    eventTime: now, createdAt: now, updatedAt: now,
++    rawData: JSON.stringify({ offlineFrom, offlineTo: nowMs, durationMs: nowMs - offlineFrom }),
++  });
++  return true;
++}
+diff --git a/src/components/devices/DeviceAudit.test.tsx b/src/components/devices/DeviceAudit.test.tsx
+index 0005cad2..0b43811c 100644
+--- a/src/components/devices/DeviceAudit.test.tsx
++++ b/src/components/devices/DeviceAudit.test.tsx
+@@ -2,6 +2,7 @@ vi.mock("@/hooks/useProjectAccess", () => ({
+   useProjectAccess: () => ({ isAdmin: true }),
+ }));
+ import type { MouseEvent, ReactNode } from "react";
++import { getFunctionName, type FunctionReference } from "convex/server";
+ import { renderToStaticMarkup } from "react-dom/server";
+ import { beforeEach, describe, expect, it, vi } from "vitest";
+ import type { Id } from "../../../convex/_generated/dataModel";
+@@ -36,7 +37,9 @@ vi.mock("@/components/ui/table", async (original) => {
+   };
+ });
+ vi.mock("convex/react", () => ({
+-  useQuery: mocks.query,
++  useQuery: (query: FunctionReference<"query">, args: unknown) => getFunctionName(query) === "deviceEvents:getConnectivityHistory"
++    ? { asOf: 0, count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false }
++    : mocks.query(query, args),
+   useMutation: () => vi.fn(),
+   useAction: () => vi.fn(),
+ }));
+diff --git a/src/components/devices/DeviceCommandCenter.audit.test.tsx b/src/components/devices/DeviceCommandCenter.audit.test.tsx
+index 91db5920..3d98bc0d 100644
+--- a/src/components/devices/DeviceCommandCenter.audit.test.tsx
++++ b/src/components/devices/DeviceCommandCenter.audit.test.tsx
+@@ -1,6 +1,7 @@
+ vi.mock("@/hooks/useProjectAccess", () => ({
+   useProjectAccess: () => ({ isAdmin: mocks.admin }),
+ }));
++import { getFunctionName, type FunctionReference } from "convex/server";
+ import { renderToStaticMarkup } from "react-dom/server";
+ import { expect, it, vi } from "vitest";
+ import type { Device } from "@/types/device";
+@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
+   device: {} as Device,
+ }));
+ vi.mock("convex/react", () => ({
+-  useQuery: () => ({
++  useQuery: (query: FunctionReference<"query">) => getFunctionName(query) === "deviceEvents:getConnectivityHistory" ? { asOf: 0, count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false } : ({
+     device: mocks.device,
+     limits: { doorsCapped: mocks.limited, readersCapped: false },
+     doors: [{ _id: "door", name: "Kapı", hikDoorNo: 1, ioId: 0 }],
+diff --git a/src/components/devices/DeviceCommandCenter.tsx b/src/components/devices/DeviceCommandCenter.tsx
+index 5834cf2c..753ea6ec 100644
+--- a/src/components/devices/DeviceCommandCenter.tsx
++++ b/src/components/devices/DeviceCommandCenter.tsx
+@@ -134,7 +134,7 @@ function DeviceCenter({
+           {offlineMessage}
+         </p>
+       )}
+-      <DeviceConnectionSection {...view} />
++      <DeviceConnectionSection {...view} now={clock} />
+ 
+       <DeviceQueueSection {...view} />
+ 
+diff --git a/src/components/devices/DeviceConnectionSection.tsx b/src/components/devices/DeviceConnectionSection.tsx
+index a3c068b0..87e9328d 100644
+--- a/src/components/devices/DeviceConnectionSection.tsx
++++ b/src/components/devices/DeviceConnectionSection.tsx
+@@ -1,3 +1,5 @@
++import { deviceLastSignal } from "../../../convex/lib/deviceConnection";
++import { DeviceConnectivityHistory } from "./DeviceConnectivityHistory";
+ import { Copy } from "lucide-react";
+ import { Badge } from "@/components/ui/badge";
+ import { Button } from "@/components/ui/button";
+@@ -11,10 +13,13 @@ export function DeviceConnectionSection({
+   adapter,
+   connected,
+   connection,
++  now,
+ }: Pick<
+   DeviceCenterView,
+   "overview" | "adapter" | "connected" | "connection"
+->) {
++> & { now: number }) {
++  const signal = deviceLastSignal(overview.device);
++  const since = connection === "offline" && signal !== undefined && signal < now ? signal : undefined;
+   const lastSignal = deviceDateTime(
+     overview.device.brand === "hikvision" &&
+       overview.device.hikTransport !== "localBridge"
+@@ -99,6 +104,7 @@ export function DeviceConnectionSection({
+           </Button>
+         </div>
+       </div>
++      <DeviceConnectivityHistory deviceId={overview.device._id} current={{ now, since }} />
+     </section>
+   );
+ }
+diff --git a/src/components/devices/DeviceConnectivityHistory.test.tsx b/src/components/devices/DeviceConnectivityHistory.test.tsx
+new file mode 100644
+index 00000000..e6416739
+--- /dev/null
++++ b/src/components/devices/DeviceConnectivityHistory.test.tsx
+@@ -0,0 +1,42 @@
++import { renderToStaticMarkup } from "react-dom/server";
++import { describe, expect, it, vi } from "vitest";
++import type { FunctionReturnType } from "convex/server";
++import type { api } from "../../../convex/_generated/api";
++import type { Id } from "../../../convex/_generated/dataModel";
++import { DeviceConnectivityHistory, connectivityDuration, connectivityTime } from "./DeviceConnectivityHistory";
++const mocks = vi.hoisted(() => ({ query: vi.fn() }));
++vi.mock("convex/react", () => ({ useQuery: mocks.query }));
++type History = FunctionReturnType<typeof api.deviceEvents.getConnectivityHistory>;
++const empty: History = { asOf: Date.parse("2026-10-22T12:00:00Z"), count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false };
++const render = (history: History | undefined) => {
++  mocks.query.mockReturnValue(history);
++  return renderToStaticMarkup(<DeviceConnectivityHistory deviceId={"device" as Id<"devices">} />);
++};
++describe("connection history section", () => {
++  it("shows the loading and empty states", () => {
++    expect(render(undefined)).toContain("Bağlantı geçmişi yükleniyor");
++    expect(render(empty)).toContain("Son 30 günde çevrimdışı dönem yok");
++    expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), { deviceId: "device" });
++  });
++  it("shows completed periods, ongoing status, limits and Istanbul times", () => {
++    const start = Date.parse("2026-10-22T09:00:00Z");
++    const html = render({ asOf: start + 8100000, count: 2, totalMs: 8100000, longestMs: 8100000, periods: [{ offlineFrom: start, offlineTo: start + 8100000, durationMs: 8100000 }], ongoing: { since: start }, truncated: true });
++    for (const text of ["Bağlantı geçmişi", "2 sa 15 dk", "22.10.2026 12:00:00", "22.10.2026 14:15:00", "devam ediyor", "son 500 dönem", "UTC+3"]) expect(html).toContain(text);
++  });
++  it("shows a newly expired signal using the existing device clock without another query", () => {
++    const now = empty.asOf;
++    mocks.query.mockReturnValue(empty);
++    const html = renderToStaticMarkup(<DeviceConnectivityHistory deviceId={"device" as Id<"devices">} current={{ now, since: now - 360000 }} />);
++    expect(html).toContain("devam ediyor");
++    expect(html).toContain("6 dk");
++    expect(html).not.toContain("Son 30 günde çevrimdışı dönem yok");
++  });
++  it("formats duration boundaries and UTC+3 across date rollover", () => {
++    expect(connectivityDuration(0)).toBe("1 dk'dan az");
++    expect(connectivityDuration(59999)).toBe("1 dk'dan az");
++    expect(connectivityDuration(60000)).toBe("1 dk");
++    expect(connectivityDuration(3600000)).toBe("1 sa");
++    expect(connectivityDuration(8100000)).toBe("2 sa 15 dk");
++    expect(connectivityTime(Date.parse("2026-10-21T22:00:00Z"))).toBe("22.10.2026 01:00:00");
++  });
++});
+diff --git a/src/components/devices/DeviceConnectivityHistory.tsx b/src/components/devices/DeviceConnectivityHistory.tsx
+new file mode 100644
+index 00000000..c999aaa7
+--- /dev/null
++++ b/src/components/devices/DeviceConnectivityHistory.tsx
+@@ -0,0 +1,60 @@
++import { useQuery } from "convex/react";
++import { api } from "../../../convex/_generated/api";
++import type { Id } from "../../../convex/_generated/dataModel";
++import { Metric } from "./DeviceCenterMetric";
++
++export function connectivityDuration(ms: number): string {
++  const minutes = Math.floor(Math.max(0, ms) / 60000);
++  if (minutes === 0) return "1 dk'dan az";
++  const hours = Math.floor(minutes / 60);
++  return hours > 0 ? `${hours} sa${minutes % 60 ? ` ${minutes % 60} dk` : ""}` : `${minutes} dk`;
++}
++
++export function connectivityTime(ms: number): string {
++  return new Intl.DateTimeFormat("tr-TR", {
++    timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric",
++    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
++  }).format(ms);
++}
++
++export function DeviceConnectivityHistory({ deviceId, current }: {
++  deviceId: Id<"devices">;
++  current?: { now: number; since: number | undefined };
++}) {
++  const history = useQuery(api.deviceEvents.getConnectivityHistory, { deviceId });
++  // Mevcut cihaz merkezi saatini kullanır; ek timer veya sunucu polling'i yok.
++  const since = current ? current.since : history?.ongoing?.since;
++  const now = current?.now ?? history?.asOf ?? 0;
++  const ongoingMs = since === undefined ? 0 : Math.max(0, now - Math.max(since, now - 30 * 86400000));
++  const snapshotOngoingMs = history?.ongoing
++    ? Math.max(0, history.asOf - Math.max(history.ongoing.since, history.asOf - 30 * 86400000)) : 0;
++  const count = history ? history.count - (history.ongoing ? 1 : 0) + (since === undefined ? 0 : 1) : 0;
++  const totalMs = history ? Math.max(0, history.totalMs - snapshotOngoingMs + ongoingMs) : 0;
++  const longestMs = Math.max(history?.longestMs ?? 0, ongoingMs);
++  return (
++    <section aria-label="Bağlantı geçmişi" className="mt-5 space-y-3 border-t border-line pt-5">
++      <div>
++        <h3 className="text-base font-semibold">Bağlantı geçmişi</h3>
++        <p className="text-xs text-muted-foreground">Son 30 gün · İstanbul saati (UTC+3)</p>
++      </div>
++      {history === undefined ? <p role="status" className="text-sm">Bağlantı geçmişi yükleniyor…</p> : <>
++        <div className="grid grid-cols-3 gap-3">
++          <Metric label="Çevrimdışı sayısı" value={String(count)} />
++          <Metric label="Toplam süre" value={totalMs ? connectivityDuration(totalMs) : "0 dk"} />
++          <Metric label="En uzun süre" value={longestMs ? connectivityDuration(longestMs) : "0 dk"} />
++        </div>
++        {count === 0 && <p className="text-sm text-muted-foreground">Son 30 günde çevrimdışı dönem yok</p>}
++        {since !== undefined && <p className="text-sm text-warning">
++          {connectivityTime(since)} — devam ediyor
++        </p>}
++        {history.periods.length > 0 && <ol aria-label="Son çevrimdışı dönemler" className="space-y-2 text-sm">
++          {history.periods.map((period, index) => <li key={`${period.offlineTo}-${index}`} className="flex flex-wrap justify-between gap-x-3 gap-y-1">
++            <span>{connectivityTime(period.offlineFrom)} — {connectivityTime(period.offlineTo)}</span>
++            <span className="text-muted-foreground">{connectivityDuration(period.durationMs)}</span>
++          </li>)}
++        </ol>}
++        {history.truncated && <p className="text-xs text-muted-foreground">Hesaplama son 500 dönem ile sınırlı; listede son 20 tamamlanan dönem gösterilir.</p>}
++      </>}
++    </section>
++  );
++}

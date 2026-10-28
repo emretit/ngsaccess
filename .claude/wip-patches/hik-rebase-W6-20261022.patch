@@ -1,0 +1,2486 @@
+diff --git a/convex/actions/hikGatewayDevice.ts b/convex/actions/hikGatewayDevice.ts
+index 3cb7504c..0d2e3a88 100644
+--- a/convex/actions/hikGatewayDevice.ts
++++ b/convex/actions/hikGatewayDevice.ts
+@@ -1,5 +1,6 @@
+ "use node";
+ 
++import { buildDoorStatusSegments } from "../lib/doorStatusPlan";
+ import { internal } from "../_generated/api";
+ import { v } from "convex/values";
+ import { internalAction, type ActionCtx } from "../_generated/server";
+@@ -1163,18 +1164,7 @@ export const applyDoorStatusPlan = authedAction({
+         return await linkDoorStatusPlan(devIndex, doorNo, 0);
+       }
+ 
+-      // Her gün aynı segment (basit tek-aralık plan)
+-      const ALL_WEEKDAYS: Weekday[] = [
+-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+-      ];
+-      const segments = ALL_WEEKDAYS.map((week, idx) => ({
+-        week,
+-        id: idx + 1,
+-        enable: true,
+-        doorStatus: plan.mode as "remainOpen" | "normal",
+-        beginTime: plan.beginTime,
+-        endTime: plan.endTime,
+-      }));
++      const segments = buildDoorStatusSegments(plan);
+ 
+       const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
+       if (!r1.ok) return r1;
+diff --git a/convex/actions/hikQueueWorker.ts b/convex/actions/hikQueueWorker.ts
+index 0a65533f..90812523 100644
+--- a/convex/actions/hikQueueWorker.ts
++++ b/convex/actions/hikQueueWorker.ts
+@@ -1,6 +1,7 @@
+ "use node";
+ 
+ import { internalAction, type ActionCtx } from "../_generated/server";
++import { buildDoorStatusSegments } from "../lib/doorStatusPlan";
+ import { internal } from "../_generated/api";
+ import type { FunctionReturnType } from "convex/server";
+ import type { Id } from "../_generated/dataModel";
+@@ -228,17 +229,7 @@ async function executeOperation(
+         return await linkDoorStatusPlan(devIndex, doorNo, 0);
+       }
+ 
+-      const ALL_WEEKDAYS: Weekday[] = [
+-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+-      ];
+-      const segments = ALL_WEEKDAYS.map((week, idx) => ({
+-        week,
+-        id: idx + 1,
+-        enable: true,
+-        doorStatus: plan.mode as "remainOpen" | "normal",
+-        beginTime: plan.beginTime,
+-        endTime: plan.endTime,
+-      }));
++      const segments = buildDoorStatusSegments(plan);
+ 
+       const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
+       if (!r1.ok) return r1;
+diff --git a/convex/deviceConnectivity.test.ts b/convex/deviceConnectivity.test.ts
+new file mode 100644
+index 00000000..db2eaa4b
+--- /dev/null
++++ b/convex/deviceConnectivity.test.ts
+@@ -0,0 +1,195 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from "convex-test";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import schema from "./schema";
++import { api, internal } from "./_generated/api";
++import type { Doc } from "./_generated/dataModel";
++
++const modules = import.meta.glob("./**/*.ts");
++const now = Date.parse("2026-10-22T12:00:00Z");
++const day = 86400000;
++beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
++afterEach(() => vi.useRealTimers());
++
++async function fixture(fields: Partial<Doc<"devices">> = {}) {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async ctx => {
++    const projectId = await ctx.db.insert("projects", { name: "Proje" });
++    const otherProjectId = await ctx.db.insert("projects", { name: "Diğer" });
++    const userId = await ctx.db.insert("users", { role: "project_user" });
++    const adminId = await ctx.db.insert("users", { role: "project_admin" });
++    const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: now + day });
++    const adminSessionId = await ctx.db.insert("authSessions", { userId: adminId, expirationTime: now + day });
++    await ctx.db.insert("userProjects", { userId, projectId });
++    await ctx.db.insert("userProjects", { userId: adminId, projectId });
++    const deviceId = await ctx.db.insert("devices", {
++      name: "Panel", brand: "other", projectId, lastSeen: new Date(now - 600000).toISOString(),
++      createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString(), ...fields,
++    });
++    return { projectId, otherProjectId, userId, adminId, sessionId, adminSessionId, deviceId };
++  });
++  return {
++    t, ...ids,
++    caller: t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` }),
++    admin: t.withIdentity({ subject: `${ids.adminId}|${ids.adminSessionId}` }),
++  };
++}
++type Fixture = Awaited<ReturnType<typeof fixture>>;
++const events = (f: Fixture) => f.t.run(ctx => ctx.db.query("deviceEvents").take(600));
++const history = (f: Fixture) => f.caller.query(api.deviceEvents.getConnectivityHistory, { deviceId: f.deviceId });
++
++const paths = ["gateway", "localBridge", "ideMqtt", "ideCommand", "esp32", "httpOther", "settings"] as const;
++type Path = typeof paths[number];
++async function pathFixture(path: Path, signal: number | undefined) {
++  const fields: Partial<Doc<"devices">> = {
++    brand: path === "gateway" || path === "localBridge" ? "hikvision" : path === "ideMqtt" || path === "ideCommand" ? "ide_smart" : "other",
++    hikTransport: path === "localBridge" ? "localBridge" : undefined,
++    hikDevIndex: path === "gateway" ? "gateway" : undefined,
++    ideUuid: path === "ideMqtt" ? "mqtt-uuid" : undefined,
++    lastSeen: signal === undefined ? undefined : new Date(signal).toISOString(),
++    hikLastSeenAt: path === "gateway" ? signal : undefined,
++  };
++  return fixture(fields);
++}
++async function heartbeat(f: Fixture, path: Path) {
++  if (path === "gateway") return f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: true });
++  if (path === "ideCommand") return f.t.mutation(internal.devices.markIdeOnline, { deviceId: f.deviceId });
++  if (path === "ideMqtt") return f.t.mutation(internal.devices.updateLastSeen, { ideUuid: "mqtt-uuid" });
++  if (path === "settings") return f.admin.mutation(api.devices.update, { deviceId: f.deviceId, lastSeen: new Date(Date.now()).toISOString() });
++  return f.t.mutation(internal.devices.updateLastSeen, { deviceId: f.deviceId });
++}
++
++describe("connectivity writers", () => {
++  it("gateway quiet gap without an offline hint is not an outage (card-event-only signal)", async () => {
++    const f = await pathFixture("gateway", now - 6 * 60000);
++    await heartbeat(f, "gateway");
++    expect(await events(f)).toEqual([]);
++  });
++  it.each(paths.filter(path => path !== "gateway"))("%s records one long gap, then no repeated event", async path => {
++    const f = await pathFixture(path, now - 600000);
++    await heartbeat(f, path);
++    await heartbeat(f, path);
++    const rows = await events(f);
++    expect(rows).toHaveLength(1);
++    expect(rows[0]).toMatchObject({ category: "status", severity: "warning", label: "Çevrimdışı dönemi", eventTime: new Date(now).toISOString(), source: path === "localBridge" ? "hikvision" : path === "ideMqtt" || path === "ideCommand" ? "ide_smart" : "system" });
++    expect(JSON.parse(rows[0].rawData ?? "null")).toEqual({ offlineFrom: now - 600000, offlineTo: now, durationMs: 600000 });
++  });
++  it.each(paths)("%s ignores short gaps, never and future signals", async path => {
++    for (const signal of [now - 60000, undefined, now + 60000]) {
++      const f = await pathFixture(path, signal);
++      await heartbeat(f, path);
++      expect(await events(f)).toHaveLength(0);
++    }
++  });
++  it("gateway hint transition records once before throttle and offline probes retain successful signal", async () => {
++    const f = await pathFixture("gateway", now - 1000);
++    await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: false });
++    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.hikLastSeenAt).toBe(now - 1000);
++    expect(await events(f)).toHaveLength(0);
++    await heartbeat(f, "gateway");
++    const after = await f.t.run(ctx => ctx.db.get(f.deviceId));
++    vi.setSystemTime(now + 1);
++    await heartbeat(f, "gateway");
++    expect(await f.t.run(ctx => ctx.db.get(f.deviceId))).toEqual(after);
++    expect(await events(f)).toHaveLength(1);
++    expect(JSON.parse((await events(f))[0].rawData ?? "null").durationMs).toBe(1000);
++  });
++  it("keeps offline gateway probes throttled without overwriting the last successful signal", async () => {
++    const f = await pathFixture("gateway", now - 600000);
++    await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: false });
++    const after = await f.t.run(ctx => ctx.db.get(f.deviceId));
++    vi.setSystemTime(now + 1);
++    await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: false });
++    expect(await f.t.run(ctx => ctx.db.get(f.deviceId))).toEqual(after);
++    expect(after?.hikLastSeenAt).toBe(now - 600000);
++    expect(await events(f)).toHaveLength(0);
++  });
++  it("writes a reconnect signal even if another transport timestamp would throttle the heartbeat", async () => {
++    const f = await fixture({ brand: "hikvision", hikTransport: "localBridge", hikDevIndex: "gateway", hikLastSeenAt: now - 1 });
++    await heartbeat(f, "gateway"); await heartbeat(f, "gateway");
++    expect(await events(f)).toHaveLength(1);
++    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.lastSeen).toBe(new Date(now).toISOString());
++  });
++  it("rejected gateway scope cannot create a period", async () => {
++    const f = await pathFixture("gateway", now - 600000);
++    expect(await f.t.mutation(internal.devices.applyGatewayHeartbeat, { hikDevIndex: "gateway", online: true, allowedProjectIds: [] })).toBe(false);
++    expect(await events(f)).toHaveLength(0);
++  });
++  it("HTTP clears an offline hint along with the signal to prevent duplicate periods", async () => {
++    const f = await fixture({ brand: "hikvision", hikOfflineHint: "Çevrimdışı", hikLastSeenAt: now - 1000 });
++    await heartbeat(f, "httpOther"); await heartbeat(f, "httpOther");
++    expect(await events(f)).toHaveLength(1);
++    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.hikOfflineHint).toBeUndefined();
++  });
++});
++
++async function insertPeriod(f: Fixture, from: number, to: number) {
++  await f.t.run(ctx => ctx.db.insert("deviceEvents", {
++    deviceId: f.deviceId, projectId: f.projectId, source: "system", category: "status", severity: "warning", label: "Çevrimdışı dönemi",
++    eventTime: new Date(to).toISOString(), createdAt: new Date(to).toISOString(), updatedAt: new Date(to).toISOString(),
++    rawData: JSON.stringify({ offlineFrom: from, offlineTo: to, durationMs: to - from }),
++  }));
++}
++
++describe("connectivity history", () => {
++  it("permits project_user and rejects another project's device", async () => {
++    const f = await fixture();
++    expect((await history(f)).ongoing).toEqual({ since: now - 600000 });
++    await f.t.run(ctx => ctx.db.patch(f.deviceId, { projectId: f.otherProjectId }));
++    await expect(history(f)).rejects.toThrow("erişim yetkiniz yok");
++  });
++  it("applies the 30-day window, clips crossing periods, and calculates totals and longest", async () => {
++    const f = await fixture({ lastSeen: new Date(now).toISOString() });
++    await insertPeriod(f, now - 32 * day, now - 31 * day);
++    await insertPeriod(f, now - 31 * day, now - 29 * day);
++    await insertPeriod(f, now - 3600000, now - 600000);
++    const result = await history(f);
++    expect(result).toMatchObject({ count: 2, totalMs: day + 3000000, longestMs: day, truncated: false });
++    expect(result.periods[0].durationMs).toBe(3000000);
++    expect(result.periods[1].offlineFrom).toBe(now - 31 * day);
++    expect(result.ongoing).toBeUndefined();
++  });
++  it("includes the open period without writing and clips its aggregate to the window", async () => {
++    const f = await fixture({ lastSeen: new Date(now - 31 * day).toISOString() });
++    expect(await history(f)).toMatchObject({ count: 1, totalMs: 30 * day, longestMs: 30 * day, periods: [], ongoing: { since: now - 31 * day } });
++    expect(await events(f)).toEqual([]);
++  });
++  it("gateway history shows an ongoing outage only after an explicit offline hint", async () => {
++    const quiet = await fixture({ brand: "hikvision", hikTransport: "gateway", hikLastSeenAt: now - 3600000 });
++    expect(await history(quiet)).toMatchObject({ count: 0, periodicHeartbeat: false });
++    expect(await history(quiet)).not.toHaveProperty("ongoing");
++    const hinted = await fixture({ brand: "hikvision", hikTransport: "gateway", hikLastSeenAt: now - 3600000, hikOfflineHint: "Gateway çevrimdışı" });
++    expect(await history(hinted)).toMatchObject({ count: 1, ongoing: { since: now - 3600000 }, periodicHeartbeat: false });
++  });
++  it.each([undefined, "invalid", new Date(now + 1).toISOString()])("does not invent ongoing periods for %s", async lastSeen => {
++    const f = await fixture({ lastSeen });
++    expect(await history(f)).toEqual({ asOf: now, count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false, periodicHeartbeat: true });
++  });
++  it("takes at most 501 periods and returns the last 20; exactly 500 is not truncated", async () => {
++    const f = await fixture({ lastSeen: new Date(now).toISOString() });
++    for (let i = 0; i < 500; i++) await insertPeriod(f, now - (i + 1) * 600000, now - i * 600000);
++    expect(await history(f)).toMatchObject({ count: 500, totalMs: 300000000, truncated: false });
++    await insertPeriod(f, now - 501 * 600000, now - 500 * 600000);
++    const result = await history(f);
++    expect(result).toMatchObject({ count: 500, totalMs: 300000000, longestMs: 600000, truncated: true });
++    expect(result.periods).toHaveLength(20);
++    expect(result.periods[0].offlineTo).toBe(now);
++    expect(result.periods[19].offlineTo).toBe(now - 19 * 600000);
++  });
++  it("ignores other events, malformed raw data, and future periods", async () => {
++    const f = await fixture({ lastSeen: new Date(now).toISOString() });
++    await insertPeriod(f, now - 600000, now + 1);
++    await f.t.run(async ctx => {
++      const base = { deviceId: f.deviceId, source: "system" as const, category: "status" as const, severity: "warning" as const, label: "Çevrimdışı dönemi", eventTime: new Date(now).toISOString(), createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() };
++      for (const rawData of ["{", "null", "{}", JSON.stringify({ offlineFrom: now - 10, offlineTo: now, durationMs: 20 })]) await ctx.db.insert("deviceEvents", { ...base, rawData });
++      await ctx.db.insert("deviceEvents", { ...base, label: "Başka durum" });
++      await ctx.db.insert("deviceEvents", { ...base, category: "operation" });
++    });
++    expect((await history(f)).count).toBe(0);
++  });
++  it("validates the requested window", async () => {
++    const f = await fixture();
++    for (const days of [0, -1, 31, 1.5]) await expect(f.caller.query(api.deviceEvents.getConnectivityHistory, { deviceId: f.deviceId, days })).rejects.toThrow("Gün sayısı");
++  });
++});
+diff --git a/convex/deviceEvents.ts b/convex/deviceEvents.ts
+index 3f9c544d..e13cf3ff 100644
+--- a/convex/deviceEvents.ts
++++ b/convex/deviceEvents.ts
+@@ -1,3 +1,6 @@
++import { authedQuery } from "./lib/customFunctions";
++import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
++import { deviceConnection, deviceLastSignal, hasPeriodicHeartbeat } from "./lib/deviceConnection";
+ import { v } from "convex/values";
+ import { internalMutation } from "./_generated/server";
+ import { classifyHikEvent } from "./lib/hikEventCatalog";
+@@ -156,3 +159,58 @@ export const recordHikDeviceEvent = internalMutation({
+     return { inserted: true };
+   },
+ });
++
++
++type ConnectivityPeriod = { offlineFrom: number; offlineTo: number; durationMs: number };
++
++function parseConnectivityPeriod(rawData: string | undefined): ConnectivityPeriod | undefined {
++  if (!rawData) return;
++  try {
++    const value: unknown = JSON.parse(rawData);
++    if (typeof value !== "object" || value === null ||
++      !("offlineFrom" in value) || !("offlineTo" in value) || !("durationMs" in value)) return;
++    const { offlineFrom, offlineTo, durationMs } = value;
++    if (typeof offlineFrom !== "number" || typeof offlineTo !== "number" || typeof durationMs !== "number" ||
++      !Number.isFinite(offlineFrom) || !Number.isFinite(offlineTo) || !Number.isFinite(durationMs) ||
++      offlineTo <= offlineFrom || durationMs !== offlineTo - offlineFrom) return;
++    return { offlineFrom, offlineTo, durationMs };
++  } catch { return; }
++}
++
++export const getConnectivityHistory = authedQuery({
++  args: { deviceId: v.id("devices"), days: v.optional(v.number()) },
++  handler: async (ctx, args) => {
++    const device = await ctx.db.get(args.deviceId);
++    if (!device) throw new Error("Cihaz bulunamadı");
++    const allowed = await getProjectIdsForUser(ctx);
++    if (!isProjectAllowed(allowed, device.projectId)) throw new Error("Bu cihaza erişim yetkiniz yok");
++    const days = args.days ?? 30;
++    if (!Number.isInteger(days) || days < 1 || days > 30) throw new Error("Gün sayısı 1–30 arasında olmalı");
++    const now = Date.now();
++    const cutoff = now - days * 86400000;
++    // Category + label in the index keep other events (access/alarm/other status) out of the scan and the subscription.
++    const rows = await ctx.db.query("deviceEvents")
++      .withIndex("by_device_category_label_event_time", q => q.eq("deviceId", args.deviceId).eq("category", "status").eq("label", "Çevrimdışı dönemi").gte("eventTime", new Date(cutoff).toISOString()))
++      .order("desc")
++      .take(501);
++    const periods: ConnectivityPeriod[] = [];
++    for (const row of rows.slice(0, 500)) {
++      const period = parseConnectivityPeriod(row.rawData);
++      if (period && period.offlineTo <= now && period.offlineTo >= cutoff) {
++        periods.push(period);
++      }
++    }
++    const signal = deviceLastSignal(device);
++    const periodicHeartbeat = hasPeriodicHeartbeat(device);
++    const ongoing = (periodicHeartbeat || device.hikOfflineHint) && deviceConnection(device, now) === "offline" && signal !== undefined && signal < now
++      ? { since: signal } : undefined;
++    const ongoingMs = ongoing ? now - Math.max(cutoff, ongoing.since) : 0;
++    return {
++      asOf: now,
++      count: periods.length + (ongoing ? 1 : 0),
++      totalMs: periods.reduce((sum, p) => sum + p.offlineTo - Math.max(cutoff, p.offlineFrom), ongoingMs),
++      longestMs: periods.reduce((longest, p) => Math.max(longest, p.offlineTo - Math.max(cutoff, p.offlineFrom)), ongoingMs),
++      periods: periods.slice(0, 20), ...(ongoing ? { ongoing } : {}), truncated: rows.length > 500, periodicHeartbeat,
++    };
++  },
++});
+diff --git a/convex/devices.ts b/convex/devices.ts
+index 424e284a..c45585ee 100644
+--- a/convex/devices.ts
++++ b/convex/devices.ts
+@@ -1,3 +1,4 @@
++import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
+ import { listMobileTargets } from "./lib/mobileAccess";
+ import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
+ import { ConvexError, v } from "convex/values";
+@@ -286,6 +287,13 @@ export const update = adminMutation({
+       clean.isActive = active;
+       clean.status = active ? "active" : "inactive";
+     }
++    if (args.lastSeen !== undefined) {
++      const signal = deviceLastSignal({ ...device, lastSeen: args.lastSeen });
++      const nowMs = Date.now();
++      if (signal !== undefined && signal <= nowMs && signal > nowMs - DEVICE_ONLINE_WINDOW_MS && signal !== deviceLastSignal(device)) {
++        await recordConnectivityTransition(ctx, device, signal);
++      }
++    }
+     await ctx.db.patch(deviceId, toPatch(clean));
+ 
+     // Panel başka bölgeye taşınırsa (zoneId değişti), o panele bağlı tüm kapıların
+@@ -405,9 +413,11 @@ export const updateLastSeen = internalMutation({
+       // ETMİYORUZ — /card-reader unauth olduğu için saldırgan forged ipAddress
+       // veya devIndex yollayarak cihaz lookup index'lerini bozabilir. Bu alanlar
+       // sadece trusted yoldan (gateway register / refreshGatewayDeviceStatus) yazılır.
++      await recordConnectivityTransition(ctx, device, Date.parse(now));
+       await ctx.db.patch(device._id, {
+         lastSeen: now,
+-        hikLastSeenAt: Date.now(),
++        hikLastSeenAt: Date.parse(now),
++        hikOfflineHint: undefined,
+       });
+     } else if (!deviceId && ideUuid) {
+       // Cihaz henüz projeye atanmamış (adminDevices'ta) olabilir — orada da lastSeen güncelle.
+@@ -518,6 +528,9 @@ export const markIdeOnline = internalMutation({
+   args: { deviceId: v.id("devices") },
+   handler: async (ctx, args) => {
+     const now = new Date().toISOString();
++    const device = await ctx.db.get(args.deviceId);
++    if (!device) throw new Error("Cihaz bulunamadı");
++    await recordConnectivityTransition(ctx, device, Date.parse(now));
+     await ctx.db.patch(args.deviceId, {
+       lastSeen: now,
+       status: "active",
+@@ -1240,17 +1253,21 @@ export const applyGatewayHeartbeat = internalMutation({
+       }
+     }
+     const now = Date.now();
++    // Throttle erken dönüşünden önce eski sinyalle karşılaştır.
++    const reconnected = args.online ? await recordConnectivityTransition(ctx, device, now) : false;
+     const offlineHint = args.online ? undefined : "Gateway çevrimdışı";
+     const deviceIp = device.deviceIp || args.deviceIp || undefined;
+     const model = device.hikModel || args.model || undefined;
+     const changed = device.hikOfflineHint !== offlineHint ||
+       device.deviceIp !== deviceIp || device.hikModel !== model;
+-    if (!changed && device.hikLastSeenAt !== undefined && now - device.hikLastSeenAt < 60_000) {
++    const lastHeartbeat = args.online ? device.hikLastSeenAt : Date.parse(device.updatedAt);
++    if (!reconnected && !changed && lastHeartbeat !== undefined && now - lastHeartbeat < 60_000) {
+       return true;
+     }
+     const nowIso = new Date(now).toISOString();
+     await ctx.db.patch(device._id, {
+-      hikLastSeenAt: now,
++      // Offline durum sorgusu başarılı cihaz sinyali değildir.
++      ...(args.online ? { hikLastSeenAt: now } : {}),
+       updatedAt: nowIso,
+       hikOfflineHint: offlineHint,
+       deviceIp,
+diff --git a/convex/doorStatusPlan.integration.test.ts b/convex/doorStatusPlan.integration.test.ts
+new file mode 100644
+index 00000000..8bf4ba82
+--- /dev/null
++++ b/convex/doorStatusPlan.integration.test.ts
+@@ -0,0 +1,224 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from "convex-test";
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { api, internal } from "./_generated/api";
++import schema from "./schema";
++import type { DoorStatusPlan } from "./lib/doorStatusPlan";
++const wire = vi.hoisted(() => ({ send: vi.fn() }));
++vi.mock("./lib/gateway/core", () => ({ gatewayApiCallChecked: wire.send }));
++const modules = import.meta.glob("./**/*.ts");
++const legacy: DoorStatusPlan = {
++  enabled: true,
++  beginTime: "08:00:00",
++  endTime: "18:00:00",
++  mode: "remainOpen",
++};
++const weekly: DoorStatusPlan = {
++  ...legacy,
++  weekly: [
++    {
++      day: "Monday",
++      segments: [
++        { beginTime: "09:00", endTime: "12:00", mode: "remainClosed" },
++        { beginTime: "13:00", endTime: "17:00", mode: "normal" },
++      ],
++    },
++    { day: "Sunday", segments: [] },
++  ],
++};
++async function fixture(plan: DoorStatusPlan) {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async (ctx) => {
++    const userId = await ctx.db.insert("users", {
++      role: "super_admin",
++      verified: true,
++    });
++    const sessionId = await ctx.db.insert("authSessions", {
++      userId,
++      expirationTime: Date.now() + 100000,
++    });
++    const projectId = await ctx.db.insert("projects", { name: "Test" });
++    const deviceId = await ctx.db.insert("devices", {
++      projectId,
++      name: "Panel",
++      brand: "hikvision",
++      hikTransport: "gateway",
++      hikDevIndex: "test-index",
++      hikLastSeenAt: Date.now(),
++      isActive: true,
++      createdAt: new Date().toISOString(),
++      updatedAt: new Date().toISOString(),
++    });
++    const doorId = await ctx.db.insert("doors", {
++      projectId,
++      deviceId,
++      name: "Kapı",
++      createdAt: new Date().toISOString(),
++      updatedAt: new Date().toISOString(),
++      hikDoorNo: 2,
++      hikDoorStatusPlan: plan,
++    });
++    return { userId, sessionId, projectId, deviceId, doorId };
++  });
++  return {
++    t,
++    caller: t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` }),
++    ...ids,
++  };
++}
++beforeEach(() => wire.send.mockReset().mockResolvedValue({ ok: true }));
++describe("kapı durum planı gateway zinciri", () => {
++  it.each(["direct", "queue"] as const)(
++    "%s: eski, haftalık ve kapalı planı mock gateway'e gönderir",
++    async (route) => {
++      for (const plan of [legacy, weekly, { ...weekly, enabled: false }]) {
++        wire.send.mockClear();
++        const { t, caller, doorId, deviceId } = await fixture(plan);
++        if (route === "direct")
++          expect(
++            await caller.action(
++              api.actions.hikGatewayDevice.applyDoorStatusPlan,
++              { doorId },
++            ),
++          ).toEqual({ ok: true });
++        else {
++          await t.run((ctx) =>
++            ctx.db.insert("hikPendingOperations", {
++              deviceId,
++              operation: "syncDoorStatusPlan",
++              payload: { doorId },
++              status: "failed",
++              attemptCount: 0,
++              createdAt: Date.now(),
++            }),
++          );
++          expect(
++            await t.action(internal.actions.hikQueueWorker.processHikQueue, {}),
++          ).toEqual({ retried: 1, ok: 1, failed: 0 });
++        }
++        const link = [
++          "/ISAPI/AccessControl/DoorStatusPlan/2",
++          "PUT",
++          { DoorStatusPlan: { templateNo: plan.enabled ? 102 : 0 } },
++          "test-index",
++        ];
++        expect(wire.send).toHaveBeenLastCalledWith(...link);
++        expect(wire.send).toHaveBeenCalledTimes(plan.enabled ? 3 : 1);
++        if (plan.enabled) {
++          const cfg = wire.send.mock.calls[0]?.[2] as {
++            DoorStatusWeekPlanCfg: {
++              enable: boolean;
++              WeekPlanCfg: Array<{
++                week: string;
++                id: number;
++                enable: boolean;
++                doorStatus: string;
++                TimeSegment: { beginTime: string; endTime: string };
++              }>;
++            };
++          };
++          const active = cfg.DoorStatusWeekPlanCfg.WeekPlanCfg.filter(
++            (item) => item.enable,
++          );
++          expect(cfg.DoorStatusWeekPlanCfg.WeekPlanCfg).toHaveLength(56);
++          if (plan.weekly)
++            expect(active).toEqual([
++              {
++                week: "Monday",
++                id: 1,
++                enable: true,
++                doorStatus: "remainClosed",
++                TimeSegment: { beginTime: "09:00:00", endTime: "12:00:00" },
++              },
++              {
++                week: "Monday",
++                id: 2,
++                enable: true,
++                doorStatus: "normal",
++                TimeSegment: { beginTime: "13:00:00", endTime: "17:00:00" },
++              },
++            ]);
++          else
++            expect(active).toEqual(
++              [
++                "Monday",
++                "Tuesday",
++                "Wednesday",
++                "Thursday",
++                "Friday",
++                "Saturday",
++                "Sunday",
++              ].map((week) => ({
++                week,
++                id: 1,
++                enable: true,
++                doorStatus: "remainOpen",
++                TimeSegment: { beginTime: "08:00:00", endTime: "18:00:00" },
++              })),
++            );
++          expect(wire.send.mock.calls[1]).toEqual([
++            "/ISAPI/AccessControl/DoorStatusPlanTemplate/102",
++            "PUT",
++            {
++              DoorStatusPlanTemplate: {
++                enable: true,
++                templateNo: 102,
++                weekPlanNo: 2,
++                holidayGroupNo: "",
++              },
++            },
++            "test-index",
++          ]);
++        }
++      }
++    },
++  );
++  it("doors.update geçersiz weekly reddeder ve kayıt değişmez", async () => {
++    const { t, caller, doorId } = await fixture(legacy);
++    const bad = {
++      ...legacy,
++      weekly: [
++        {
++          day: "Monday" as const,
++          segments: [
++            { beginTime: "12:00", endTime: "09:00", mode: "normal" as const },
++          ],
++        },
++      ],
++    };
++    await expect(
++      caller.mutation(api.doors.update, { doorId, hikDoorStatusPlan: bad }),
++    ).rejects.toThrow("Başlangıç");
++    expect(
++      (await t.run((ctx) => ctx.db.get(doorId)))?.hikDoorStatusPlan,
++    ).toEqual(legacy);
++  });
++  it("create ve update ilk segmenti normalize eder, create geçersiz planı reddeder", async () => {
++    const { t, caller, doorId, projectId } = await fixture(legacy);
++    const created = await caller.mutation(api.doors.create, {
++      name: "Yeni",
++      projectId,
++      hikDoorStatusPlan: weekly,
++    });
++    await caller.mutation(api.doors.update, {
++      doorId,
++      hikDoorStatusPlan: weekly,
++    });
++    for (const id of [created, doorId])
++      expect(
++        (await t.run((ctx) => ctx.db.get(id)))?.hikDoorStatusPlan,
++      ).toMatchObject({
++        beginTime: "09:00:00",
++        endTime: "12:00:00",
++        mode: "remainClosed",
++      });
++    await expect(
++      caller.mutation(api.doors.create, {
++        name: "Hatalı",
++        projectId,
++        hikDoorStatusPlan: { ...legacy, beginTime: "bad" },
++      }),
++    ).rejects.toThrow("Saat");
++  });
++});
+diff --git a/convex/doors.ts b/convex/doors.ts
+index 828e47bd..445d1de4 100644
+--- a/convex/doors.ts
++++ b/convex/doors.ts
+@@ -1,3 +1,4 @@
++import { doorStatusPlanValidator, normalizeDoorStatusPlan } from "./lib/doorStatusPlan";
+ 
+ import { ConvexError, v } from "convex/values";
+ import { internalMutation, internalQuery } from "./_generated/server";
+@@ -170,14 +171,7 @@ export const create = authedMutation({
+       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
+     ),
+     hikDoorNo: v.optional(v.number()),
+-    hikDoorStatusPlan: v.optional(
+-      v.object({
+-        enabled: v.boolean(),
+-        beginTime: v.string(),
+-        endTime: v.string(),
+-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+-      })
+-    ),
++    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
+     hikVerifyPlan: v.optional(
+       v.object({
+         enabled: v.boolean(),
+@@ -216,9 +210,11 @@ export const create = authedMutation({
+         throw new ConvexError("Seçilen cihaz bu kapının projesinde değil");
+       }
+     }
++    const hikDoorStatusPlan = args.hikDoorStatusPlan ? normalizeDoorStatusPlan(args.hikDoorStatusPlan) : undefined;
+     const now = new Date().toISOString();
+     const doorId = await ctx.db.insert("doors", {
+       ...args,
++      hikDoorStatusPlan,
+       projectId,
+       status: args.status ?? "active",
+       createdAt: now,
+@@ -264,14 +260,7 @@ export const update = authedMutation({
+       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
+     ),
+     hikDoorNo: v.optional(v.number()),
+-    hikDoorStatusPlan: v.optional(
+-      v.object({
+-        enabled: v.boolean(),
+-        beginTime: v.string(),
+-        endTime: v.string(),
+-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+-      })
+-    ),
++    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
+     hikVerifyPlan: v.optional(
+       v.object({
+         enabled: v.boolean(),
+@@ -301,6 +290,7 @@ export const update = authedMutation({
+       }
+     }
+     const { doorId, ...updates } = args;
++    if (updates.hikDoorStatusPlan) updates.hikDoorStatusPlan = normalizeDoorStatusPlan(updates.hikDoorStatusPlan);
+     const now = new Date().toISOString();
+     await ctx.db.patch(doorId, { ...updates, updatedAt: now });
+     if (args.hikDoorNo !== undefined) {
+diff --git a/convex/lib/auditLogQuery.test.ts b/convex/lib/auditLogQuery.test.ts
+index dea51413..7f713b92 100644
+--- a/convex/lib/auditLogQuery.test.ts
++++ b/convex/lib/auditLogQuery.test.ts
+@@ -82,6 +82,7 @@ describe("denetim sorgusu", () => {
+       "pdksRecords",
+       "pdksRuleVersions",
+       "projectPrivacySettings",
++      "shiftAssignments",
+       "users",
+     ]);
+   });
+diff --git a/convex/lib/auditLogQuery.ts b/convex/lib/auditLogQuery.ts
+index d7d44a66..d95f73f3 100644
+--- a/convex/lib/auditLogQuery.ts
++++ b/convex/lib/auditLogQuery.ts
+@@ -1,6 +1,7 @@
+ import { trDayRangeISO } from "./trDate";
+ 
+ export const AUDIT_TARGET_LABELS: Record<string, string> = {
++  shiftAssignments: "Vardiya atamaları",
+   pdksRuleVersions: "PDKS kuralları",
+   users: "Kullanıcılar",
+   projectPrivacySettings: "Proje gizlilik ayarları",
+diff --git a/convex/lib/deviceConnection.ts b/convex/lib/deviceConnection.ts
+index a5189a86..726bf485 100644
+--- a/convex/lib/deviceConnection.ts
++++ b/convex/lib/deviceConnection.ts
+@@ -1,13 +1,49 @@
++import type { Doc } from "../_generated/dataModel";
++import type { MutationCtx } from "../_generated/server";
++
+ export const DEVICE_ONLINE_WINDOW_MS = 5 * 60 * 1000;
+ 
+-export function deviceConnection(device: {
++type ConnectionSignal = {
+   brand?: string; hikTransport?: string; hikLastSeenAt?: number;
+   lastSeen?: string | null; hikOfflineHint?: string;
+-}, now: number): "online" | "offline" | "never" {
+-  const signal = device.brand === "hikvision" && device.hikTransport !== "localBridge"
++};
++
++const isHikGateway = (device: ConnectionSignal) => device.brand === "hikvision" && device.hikTransport !== "localBridge";
++
++export function deviceLastSignal(device: ConnectionSignal): number | undefined {
++  const signal = isHikGateway(device)
+     ? device.hikLastSeenAt ?? (device.lastSeen ? Date.parse(device.lastSeen) : undefined)
+     : device.lastSeen ? Date.parse(device.lastSeen) : undefined;
++  return signal !== undefined && Number.isFinite(signal) ? signal : undefined;
++}
++
++/** Hik gateway/ISAPI devices only signal on card events, so a quiet night is not an outage. */
++export function hasPeriodicHeartbeat(device: ConnectionSignal): boolean {
++  return !isHikGateway(device);
++}
++
++export function deviceConnection(device: ConnectionSignal, now: number): "online" | "offline" | "never" {
++  const signal = deviceLastSignal(device);
+   if (device.hikOfflineHint) return "offline";
+-  if (signal === undefined || !Number.isFinite(signal)) return "never";
++  if (signal === undefined) return "never";
+   return signal <= now && signal > now - DEVICE_ONLINE_WINDOW_MS ? "online" : "offline";
+ }
++
++/** Yalnız başarılı yeni sinyalden önce, mevcut cihaz yazımıyla aynı işlemde çağrılır. */
++export async function recordConnectivityTransition(
++  ctx: MutationCtx, device: Doc<"devices">, nowMs: number,
++): Promise<boolean> {
++  const offlineFrom = deviceLastSignal(device);
++  if (offlineFrom === undefined || offlineFrom >= nowMs ||
++    deviceConnection(device, nowMs) !== "offline") return false;
++  if (!device.hikOfflineHint && !hasPeriodicHeartbeat(device)) return false;
++  const now = new Date(nowMs).toISOString();
++  await ctx.db.insert("deviceEvents", {
++    deviceId: device._id, projectId: device.projectId,
++    source: device.brand === "hikvision" ? "hikvision" : device.brand === "ide_smart" ? "ide_smart" : "system",
++    category: "status", severity: "warning", label: "Çevrimdışı dönemi",
++    eventTime: now, createdAt: now, updatedAt: now,
++    rawData: JSON.stringify({ offlineFrom, offlineTo: nowMs, durationMs: nowMs - offlineFrom }),
++  });
++  return true;
++}
+diff --git a/convex/lib/doorStatusPlan.test.ts b/convex/lib/doorStatusPlan.test.ts
+new file mode 100644
+index 00000000..4ef12cb7
+--- /dev/null
++++ b/convex/lib/doorStatusPlan.test.ts
+@@ -0,0 +1,158 @@
++import { describe, expect, it } from "vitest";
++import {
++  buildDoorStatusSegments,
++  DOOR_STATUS_DAYS,
++  normalizeDoorStatusPlan,
++  type DoorStatusPlan,
++} from "./doorStatusPlan";
++const legacy: DoorStatusPlan = {
++  enabled: true,
++  beginTime: "08:00:00",
++  endTime: "18:00:00",
++  mode: "remainOpen",
++};
++const segment = {
++  beginTime: "09:00",
++  endTime: "12:00",
++  mode: "normal" as const,
++};
++describe("buildDoorStatusSegments", () => {
++  it("eski tek aralık koduyla birebir aynı yedi segmenti üretir", () => {
++    expect(buildDoorStatusSegments(legacy)).toEqual(
++      DOOR_STATUS_DAYS.map((week, index) => ({
++        week,
++        id: index + 1,
++        enable: true,
++        doorStatus: legacy.mode,
++        beginTime: legacy.beginTime,
++        endTime: legacy.endTime,
++      })),
++    );
++  });
++  it("haftalık günleri, sıraları, modları ve boş günleri korur", () => {
++    expect(
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          {
++            day: "Monday",
++            segments: [
++              segment,
++              {
++                ...segment,
++                beginTime: "13:00:01",
++                endTime: "18:00:02",
++                mode: "remainClosed",
++              },
++            ],
++          },
++          { day: "Sunday", segments: [] },
++        ],
++      }),
++    ).toEqual([
++      {
++        week: "Monday",
++        id: 1,
++        enable: true,
++        doorStatus: "normal",
++        beginTime: "09:00:00",
++        endTime: "12:00:00",
++      },
++      {
++        week: "Monday",
++        id: 2,
++        enable: true,
++        doorStatus: "remainClosed",
++        beginTime: "13:00:01",
++        endTime: "18:00:02",
++      },
++    ]);
++    expect(buildDoorStatusSegments({ ...legacy, weekly: [] })).toEqual([]);
++  });
++  it("eski okuyucular için ilk segmenti veya varsayılanları doldurur", () => {
++    expect(
++      normalizeDoorStatusPlan({
++        ...legacy,
++        weekly: [{ day: "Tuesday", segments: [segment] }],
++      }),
++    ).toMatchObject({
++      beginTime: "09:00:00",
++      endTime: "12:00:00",
++      mode: "normal",
++    });
++    expect(normalizeDoorStatusPlan({ ...legacy, weekly: [] })).toMatchObject({
++      beginTime: "08:00:00",
++      endTime: "18:00:00",
++      mode: "remainOpen",
++    });
++  });
++  it.each(["24:00", "08:60", "8:00", "08:00:60", ""])(
++    "geçersiz saati reddeder: %s",
++    (beginTime) => {
++      expect(() =>
++        buildDoorStatusSegments({
++          ...legacy,
++          weekly: [{ day: "Monday", segments: [{ ...segment, beginTime }] }],
++        }),
++      ).toThrow("Saat");
++    },
++  );
++  it.each(["12:00", "13:00"])("begin>=end reddeder: %s", (beginTime) => {
++    expect(() =>
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [{ day: "Monday", segments: [{ ...segment, beginTime }] }],
++      }),
++    ).toThrow("Başlangıç");
++  });
++  it("sırasız çakışmayı, dokuz segmenti ve tekrar eden günü reddeder", () => {
++    expect(() =>
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          {
++            day: "Monday",
++            segments: [{ ...segment, beginTime: "10:00" }, segment],
++          },
++        ],
++      }),
++    ).toThrow("çakışamaz");
++    expect(() =>
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          { day: "Monday", segments: Array.from({ length: 9 }, () => segment) },
++        ],
++      }),
++    ).toThrow("en fazla 8");
++    expect(() =>
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          { day: "Monday", segments: [] },
++          { day: "Monday", segments: [] },
++        ],
++      }),
++    ).toThrow("en fazla bir kez");
++  });
++  it("bitişik sekiz aralığı kabul eder ve legacy saatleri doğrular", () => {
++    expect(
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          {
++            day: "Monday",
++            segments: Array.from({ length: 8 }, (_, i) => ({
++              ...segment,
++              beginTime: `${String(i).padStart(2, "0")}:00`,
++              endTime: `${String(i + 1).padStart(2, "0")}:00`,
++            })),
++          },
++        ],
++      }),
++    ).toHaveLength(8);
++    expect(() =>
++      buildDoorStatusSegments({ ...legacy, beginTime: "18:00:00" }),
++    ).toThrow("Başlangıç");
++  });
++});
+diff --git a/convex/lib/doorStatusPlan.ts b/convex/lib/doorStatusPlan.ts
+new file mode 100644
+index 00000000..239ad9b2
+--- /dev/null
++++ b/convex/lib/doorStatusPlan.ts
+@@ -0,0 +1,134 @@
++import { ConvexError, v } from "convex/values";
++import type { Infer } from "convex/values";
++import type { DoorStatusSegment } from "./gateway/plans";
++
++export const DOOR_STATUS_DAYS = [
++  "Monday",
++  "Tuesday",
++  "Wednesday",
++  "Thursday",
++  "Friday",
++  "Saturday",
++  "Sunday",
++] as const;
++// gateway/scheduling.ts MAX_SEGMENTS_PER_DAY (Node runtime) ile aynı Hik sınırı.
++export const DOOR_STATUS_MAX_SEGMENTS = 8;
++const modeValidator = v.union(
++  v.literal("remainOpen"),
++  v.literal("normal"),
++  v.literal("remainClosed"),
++);
++export const doorStatusPlanValidator = v.object({
++  enabled: v.boolean(),
++  beginTime: v.string(),
++  endTime: v.string(),
++  mode: modeValidator,
++  weekly: v.optional(
++    v.array(
++      v.object({
++        day: v.union(
++          v.literal("Monday"),
++          v.literal("Tuesday"),
++          v.literal("Wednesday"),
++          v.literal("Thursday"),
++          v.literal("Friday"),
++          v.literal("Saturday"),
++          v.literal("Sunday"),
++        ),
++        segments: v.array(
++          v.object({
++            beginTime: v.string(),
++            endTime: v.string(),
++            mode: modeValidator,
++          }),
++        ),
++      }),
++    ),
++  ),
++});
++export type DoorStatusPlan = Infer<typeof doorStatusPlanValidator>;
++export type DoorStatusInterval = Pick<
++  DoorStatusPlan,
++  "beginTime" | "endTime" | "mode"
++>;
++
++export function normalizeDoorStatusTime(time: string): string {
++  if (!/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) {
++    throw new ConvexError("Saat HH:MM veya HH:MM:SS biçiminde olmalıdır.");
++  }
++  return time.length === 5 ? `${time}:00` : time;
++}
++
++/** Doğrulama ve eski okuyucular için zorunlu tek-aralık alanları. */
++export function normalizeDoorStatusPlan(plan: DoorStatusPlan): DoorStatusPlan {
++  const interval = (segment: DoorStatusInterval): DoorStatusInterval => {
++    const beginTime = normalizeDoorStatusTime(segment.beginTime);
++    const endTime = normalizeDoorStatusTime(segment.endTime);
++    if (beginTime >= endTime)
++      throw new ConvexError(
++        "Başlangıç bitişten önce olmalıdır; gece yarısını geçen aralığı iki güne bölün.",
++      );
++    return { beginTime, endTime, mode: segment.mode };
++  };
++  if (plan.weekly === undefined)
++    return { enabled: plan.enabled, ...interval(plan) };
++  const seen = new Set<string>();
++  const weekly = plan.weekly.map(({ day, segments }) => {
++    if (!DOOR_STATUS_DAYS.some((value) => value === day) || seen.has(day))
++      throw new ConvexError(
++        "Haftanın her günü en fazla bir kez tanımlanabilir.",
++      );
++    seen.add(day);
++    if (segments.length > DOOR_STATUS_MAX_SEGMENTS)
++      throw new ConvexError(
++        "Bir günde en fazla 8 zaman aralığı tanımlanabilir.",
++      );
++    const normalized = segments.map(interval);
++    const sorted = [...normalized].sort((a, b) =>
++      a.beginTime.localeCompare(b.beginTime),
++    );
++    for (let i = 1; i < sorted.length; i++) {
++      const previous = sorted[i - 1];
++      const current = sorted[i];
++      if (previous && current && previous.endTime > current.beginTime)
++        throw new ConvexError("Aynı gündeki zaman aralıkları çakışamaz.");
++    }
++    return { day, segments: normalized };
++  });
++  const first = weekly.flatMap((day) => day.segments)[0];
++  return {
++    enabled: plan.enabled,
++    ...(first ?? {
++      beginTime: "08:00:00",
++      endTime: "18:00:00",
++      mode: "remainOpen",
++    }),
++    weekly,
++  };
++}
++
++export function buildDoorStatusSegments(
++  plan: DoorStatusPlan,
++): DoorStatusSegment[] {
++  const normalized = normalizeDoorStatusPlan(plan);
++  if (normalized.weekly === undefined) {
++    return DOOR_STATUS_DAYS.map((week, index) => ({
++      week,
++      id: index + 1,
++      enable: true,
++      doorStatus: normalized.mode,
++      beginTime: normalized.beginTime,
++      endTime: normalized.endTime,
++    }));
++  }
++  return normalized.weekly.flatMap(({ day, segments }) =>
++    segments.map((segment, index) => ({
++      week: day,
++      id: index + 1,
++      enable: true,
++      doorStatus: segment.mode,
++      beginTime: segment.beginTime,
++      endTime: segment.endTime,
++    })),
++  );
++}
+diff --git a/convex/schema.ts b/convex/schema.ts
+index 5dfb264e..d7ff67c4 100644
+--- a/convex/schema.ts
++++ b/convex/schema.ts
+@@ -1,3 +1,4 @@
++import { doorStatusPlanValidator } from "./lib/doorStatusPlan";
+ import { defineSchema, defineTable } from "convex/server";
+ import { v } from "convex/values";
+ import { authTables } from "@convex-dev/auth/server";
+@@ -286,14 +287,7 @@ export default defineSchema({
+     // openDoor/setDoorParam ile tutarlı; boşsa 1 default.
+     hikDoorNo: v.optional(v.number()),
+     // Kapı durum planı (DoorStatusPlan) — mesai saatinde kapıyı otomatik açık/kapalı tutar.
+-    hikDoorStatusPlan: v.optional(
+-      v.object({
+-        enabled: v.boolean(),
+-        beginTime: v.string(), // "HH:MM:SS"
+-        endTime: v.string(),   // "HH:MM:SS"
+-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+-      })
+-    ),
++    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
+     // Doğrulama planı (VerifyWeekPlan) — saate göre doğrulama modunu değiştirir.
+     hikVerifyPlan: v.optional(
+       v.object({
+@@ -657,6 +651,7 @@ export default defineSchema({
+     .index("by_project_and_event_time", ["projectId", "eventTime"])
+     .index("by_project_category_event_time", ["projectId", "category", "eventTime"])
+     .index("by_device_and_event_time", ["deviceId", "eventTime"])
++    .index("by_device_category_label_event_time", ["deviceId", "category", "label", "eventTime"])
+     .index("by_device_and_hik_serial", ["deviceId", "hikSerialNo"]),
+ 
+   // Alarm e-posta bildirimi ayarı (proje başına tek satır; P1).
+diff --git a/convex/shifts.test.ts b/convex/shifts.test.ts
+new file mode 100644
+index 00000000..afa50b13
+--- /dev/null
++++ b/convex/shifts.test.ts
+@@ -0,0 +1,65 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from 'convex-test';
++import { describe, expect, it } from 'vitest';
++import schema from './schema';
++import { api } from './_generated/api';
++const modules = import.meta.glob('./**/*.ts');
++async function fixture(role: 'project_admin' | 'project_user' = 'project_admin') {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async ctx => {
++    const projectId = await ctx.db.insert('projects', { name: 'Test' });
++    const foreignId = await ctx.db.insert('projects', { name: 'Other' });
++    const userId = await ctx.db.insert('users', { role });
++    const sessionId = await ctx.db.insert('authSessions', { userId, expirationTime: Date.now() + 86400000 });
++    await ctx.db.insert('userProjects', { userId, projectId });
++    const employeeId = await ctx.db.insert('employees', { projectId, firstName: 'Ayşe', lastName: 'Test', email: 'test@example.test', cardNumber: 'test' });
++    const foreignEmployeeId = await ctx.db.insert('employees', { projectId: foreignId, firstName: 'Other', lastName: 'Test', email: 'other@example.test', cardNumber: 'other' });
++    const shiftId = await ctx.db.insert('shifts', { projectId, name: 'Gündüz', startTime: '09:00', endTime: '17:00', createdAt: 'original', updatedAt: 'original' });
++    return { projectId, userId, sessionId, employeeId, foreignEmployeeId, shiftId };
++  });
++  const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
++  const args = { projectId: ids.projectId, employeeIds: [ids.employeeId], startDate: '2025-03-10', endDate: '2025-03-20' };
++  const insert = (startDate: string, endDate: string, count = 1) => t.run(async ctx => {
++    for (let i = 0; i < count; i++) await ctx.db.insert('shiftAssignments', { employeeId: ids.employeeId, projectId: ids.projectId, shiftId: ids.shiftId, startDate, endDate, weekPattern: ['MON'], createdAt: 'original', updatedAt: 'original' });
++  });
++  return { t, caller, args, insert, ...ids };
++}
++describe('shift bulk clear', () => {
++  it('deletes, trims either edge, splits and preserves external rows; preview equals mutation and one audit', async () => {
++    const f = await fixture();
++    for (const [start, end] of [['12','18'], ['01','15'], ['15','28'], ['01','28'], ['01','05']]) await f.insert(`2025-03-${start}`, `2025-03-${end}`);
++    const preview = await f.caller.query(api.shifts.previewClearAssignments, f.args);
++    expect(preview).toEqual({ deleted: 1, trimmed: 2, split: 1, affectedEmployees: 1, affectsPast: true });
++    expect(await f.caller.mutation(api.shifts.clearAssignments, f.args)).toEqual(preview);
++    const rows = await f.t.run(ctx => ctx.db.query('shiftAssignments').take(20));
++    expect(rows.map(row => [row.startDate, row.endDate]).sort()).toEqual([
++      ['2025-03-01','2025-03-05'], ['2025-03-01','2025-03-09'], ['2025-03-01','2025-03-09'], ['2025-03-21','2025-03-28'], ['2025-03-21','2025-03-28'],
++    ]);
++    expect(rows.every(row => row.weekPattern?.[0] === 'MON' && row.createdAt === 'original')).toBe(true);
++    const logs = await f.t.run(ctx => ctx.db.query('auditLog').take(20));
++    expect(logs).toHaveLength(1);
++    expect(logs[0]).toMatchObject({ action: 'delete', targetTable: 'shiftAssignments', projectId: f.projectId, userId: f.userId, newValue: preview });
++  });
++  it('rejects project_user in both endpoints', async () => {
++    const f = await fixture('project_user');
++    await expect(f.caller.query(api.shifts.previewClearAssignments, f.args)).rejects.toThrow('yetkiniz yok');
++    await expect(f.caller.mutation(api.shifts.clearAssignments, f.args)).rejects.toThrow('yetkiniz yok');
++  });
++  it('rejects foreign employee and invalid, duplicate, excessive selections or date ranges', async () => {
++    const f = await fixture();
++    for (const patch of [{ employeeIds: [f.foreignEmployeeId] }, { employeeIds: [f.employeeId, f.employeeId] }, { employeeIds: Array.from({ length: 501 }, () => f.employeeId) }, { startDate: '2025-02-30' }, { endDate: '2026-03-11' }]) {
++      await expect(f.caller.query(api.shifts.previewClearAssignments, { ...f.args, ...patch })).rejects.toThrow();
++      await expect(f.caller.mutation(api.shifts.clearAssignments, { ...f.args, ...patch })).rejects.toThrow();
++    }
++  });
++  it('revalidates mutation after preview and rejects over 1000 without writes', async () => {
++    const f = await fixture();
++    expect((await f.caller.query(api.shifts.previewClearAssignments, f.args)).deleted).toBe(0);
++    await f.insert('2025-03-12', '2025-03-18', 1001);
++    await expect(f.caller.mutation(api.shifts.clearAssignments, f.args)).rejects.toThrow('aralığı daraltın');
++    await expect(f.caller.query(api.shifts.previewClearAssignments, f.args)).rejects.toThrow('aralığı daraltın');
++    expect(await f.t.run(ctx => ctx.db.query('shiftAssignments').take(1002))).toHaveLength(1001);
++    expect(await f.t.run(ctx => ctx.db.query('auditLog').take(1))).toHaveLength(0);
++  });
++});
+diff --git a/convex/shifts.ts b/convex/shifts.ts
+index aa1b37fc..e2cc514b 100644
+--- a/convex/shifts.ts
++++ b/convex/shifts.ts
+@@ -1,3 +1,4 @@
++import { writeAudit } from "./lib/audit";
+ import { assertPeopleProject } from "./lib/peopleScope";
+ import { resolveProjectScope } from "./lib/projectScope";
+ import { toPatch } from "./lib/nullablePatch";
+@@ -479,3 +480,70 @@ export const remove = authedMutation({
+     return { removedAssignments: eligible.length, skippedAssignments: linkedAssignments.length - eligible.length };
+   },
+ });
++
++const clearArgs = {
++  projectId: v.id("projects"), employeeIds: v.array(v.id("employees")),
++  startDate: v.string(), endDate: v.string(),
++};
++type ClearInput = { projectId: Id<"projects">; employeeIds: Id<"employees">[]; startDate: string; endDate: string };
++async function prepareClear(ctx: ReadCtx & { user: Doc<"users"> }, args: ClearInput) {
++  if (ctx.user.role !== "super_admin" && ctx.user.role !== "project_admin") throw new ConvexError("Bu işlem için yetkiniz yok");
++  validateAssignRange(args);
++  if (!args.employeeIds.length || args.employeeIds.length > 500) throw new ConvexError("1–500 çalışan seçin");
++  if (new Set(args.employeeIds).size !== args.employeeIds.length) throw new ConvexError("Aynı çalışan birden fazla seçilemez");
++  await resolveProjectScope(ctx, args.projectId);
++  const state = newReadState();
++  const rows: Doc<"shiftAssignments">[] = [];
++  for (const employeeId of args.employeeIds) {
++    const employee = await ctx.db.get(employeeId);
++    if (!employee || employee.projectId !== args.projectId) throw new ConvexError("Çalışan seçili projeye ait değil");
++    await requireEmployeeAccess(ctx, employeeId);
++    const found = consumeRows(await ctx.db.query("shiftAssignments").withIndex("by_employee_end", q =>
++      q.eq("employeeId", employeeId).gte("endDate", args.startDate),
++    ).take(state.remaining + 1), state);
++    for (const row of found) {
++      if (row.startDate > args.endDate) continue;
++      if (row.projectId !== args.projectId) throw new ConvexError("Atamanın proje bilgisi doğrulanamadı");
++      rows.push(row);
++      if (rows.length > 1000) throw new ConvexError("1000 üzeri atama tek işlemde temizlenemez; aralığı daraltın");
++    }
++  }
++  const summary = { deleted: 0, trimmed: 0, split: 0, affectedEmployees: new Set(rows.map(row => row.employeeId)).size,
++    affectsPast: rows.some(row => row.startDate < trDateKey(new Date().toISOString()) && args.startDate < trDateKey(new Date().toISOString())) };
++  for (const row of rows) {
++    if (row.startDate < args.startDate && row.endDate > args.endDate) summary.split++;
++    else if (row.startDate < args.startDate || row.endDate > args.endDate) summary.trimmed++;
++    else summary.deleted++;
++  }
++  return { rows, summary };
++}
++export const previewClearAssignments = authedQuery({
++  args: clearArgs,
++  handler: async (ctx, args) => (await prepareClear(ctx, args)).summary,
++});
++export const clearAssignments = authedMutation({
++  args: clearArgs,
++  handler: async (ctx, args) => {
++    const { rows, summary } = await prepareClear(ctx, args);
++    const updatedAt = new Date().toISOString();
++    for (const row of rows) {
++      if (row.startDate < args.startDate && row.endDate > args.endDate) {
++        await ctx.db.patch(row._id, { endDate: shiftDateOffset(args.startDate, -1), updatedAt });
++        await ctx.db.insert("shiftAssignments", {
++          employeeId: row.employeeId, shiftId: row.shiftId, projectId: row.projectId,
++          startDate: shiftDateOffset(args.endDate, 1), endDate: row.endDate,
++          weekPattern: row.weekPattern, createdAt: row.createdAt, updatedAt,
++        });
++      } else if (row.startDate < args.startDate) {
++        await ctx.db.patch(row._id, { endDate: shiftDateOffset(args.startDate, -1), updatedAt });
++      } else if (row.endDate > args.endDate) {
++        await ctx.db.patch(row._id, { startDate: shiftDateOffset(args.endDate, 1), updatedAt });
++      } else await ctx.db.delete(row._id);
++    }
++    if (rows.length) await writeAudit(ctx, { user: ctx.user, projectId: args.projectId, action: "delete",
++      targetTable: "shiftAssignments", targetId: args.projectId,
++      oldValue: { startDate: args.startDate, endDate: args.endDate, employeeIds: args.employeeIds },
++      newValue: summary, note: `Vardiya toplu temizle: ${summary.deleted} silindi, ${summary.trimmed} kırpıldı, ${summary.split} bölündü` });
++    return summary;
++  },
++});
+diff --git a/src/components/access-control/DoorStatusPlanEditor.test.tsx b/src/components/access-control/DoorStatusPlanEditor.test.tsx
+new file mode 100644
+index 00000000..4d5bfc4f
+--- /dev/null
++++ b/src/components/access-control/DoorStatusPlanEditor.test.tsx
+@@ -0,0 +1,257 @@
++import { isValidElement, type ReactNode, type ReactElement } from "react";
++import { renderToStaticMarkup } from "react-dom/server";
++import { describe, expect, it, vi, beforeEach } from "vitest";
++import { DoorStatusPlanEditor } from "./DoorStatusPlanEditor";
++import { EditDoorDialog } from "./EditDoorDialog";
++import type { DoorStatusPlan } from "../../../convex/lib/doorStatusPlan";
++import type { Id } from "../../../convex/_generated/dataModel";
++
++const state = vi.hoisted(() => ({
++  slots: [] as unknown[],
++  cursor: 0,
++  save: vi.fn(),
++  apply: vi.fn(),
++  dirty: false,
++}));
++vi.mock("react", async (importOriginal) => ({
++  ...(await importOriginal<typeof import("react")>()),
++  useState: (initial: unknown) => {
++    const index = state.cursor++;
++    if (state.slots.length <= index)
++      state.slots[index] =
++        typeof initial === "function" ? (initial as () => unknown)() : initial;
++    return [
++      state.slots[index],
++      (next: unknown) => {
++        state.slots[index] =
++          typeof next === "function"
++            ? (next as (previous: unknown) => unknown)(state.slots[index])
++            : next;
++      },
++    ];
++  },
++}));
++vi.mock("convex/react", () => ({
++  useMutation: () => state.save,
++  useAction: () => state.apply,
++}));
++vi.mock("@/hooks/useProjectAccess", () => ({
++  useProjectAccess: () => ({ isAdmin: true }),
++}));
++vi.mock("@/hooks/useAsyncAction", () => ({
++  useAsyncAction: (run: (...args: unknown[]) => Promise<unknown>) => ({
++    run,
++    pending: false,
++  }),
++}));
++vi.mock("@/components/shared/UnsavedChangesDialog", () => ({
++  useUnsavedChangesGuard: (dirty: boolean) => {
++    state.dirty = dirty;
++    return { requestClose: vi.fn(), dialog: null };
++  },
++}));
++vi.mock("@/lib/notify", () => ({
++  errorMessage: String,
++  notify: { success: vi.fn() },
++}));
++const legacy: DoorStatusPlan = {
++  enabled: true,
++  beginTime: "08:00:00",
++  endTime: "18:00:00",
++  mode: "remainOpen",
++};
++type Props = Record<string, unknown> & { children?: ReactNode };
++function nodes(node: ReactNode): ReactElement<Props>[] {
++  if (Array.isArray(node)) return node.flatMap((child) => nodes(child));
++  if (!isValidElement<Props>(node)) return [];
++  return [node, ...nodes(node.props.children)];
++}
++function find(
++  node: ReactNode,
++  predicate: (element: ReactElement<Props>) => boolean,
++) {
++  const found = nodes(node).find(predicate);
++  if (!found) throw new Error("Element bulunamadı");
++  return found;
++}
++function edit(initial = legacy) {
++  let value = initial;
++  const onChange = (next: DoorStatusPlan) => {
++    value = next;
++  };
++  return {
++    tree: () => DoorStatusPlanEditor({ value, onChange }),
++    value: () => value,
++  };
++}
++function click(tree: ReactNode, label: string) {
++  const button = find(
++    tree,
++    (element) =>
++      element.props["aria-label"] === label || element.props.children === label,
++  );
++  (button.props.onClick as () => void)();
++}
++beforeEach(() => {
++  state.slots = [];
++  state.cursor = 0;
++  state.dirty = false;
++  state.save.mockReset().mockResolvedValue(undefined);
++  state.apply.mockReset().mockResolvedValue({ ok: true });
++});
++describe("DoorStatusPlanEditor", () => {
++  it("Her gün aynı ile Gün bazında arasında geçer ve yedi günü doldurur", () => {
++    const editor = edit();
++    const change = (value: string) =>
++      (
++        find(
++          editor.tree(),
++          (element) =>
++            element.props["aria-label"] === "Kapı durum planı düzeni",
++        ).props.onChange as (event: { target: { value: string } }) => void
++      )({ target: { value } });
++    change("weekly");
++    expect(editor.value().weekly).toHaveLength(7);
++    expect(
++      editor
++        .value()
++        .weekly?.every((day) => day.segments[0]?.beginTime === "08:00:00"),
++    ).toBe(true);
++    change("daily");
++    expect(editor.value().weekly).toBeUndefined();
++    expect(editor.value().beginTime).toBe("08:00:00");
++  });
++  it("boş gün, ekle/sil, sekiz aralık sınırı ve pazartesi kopyası", () => {
++    const editor = edit({
++      ...legacy,
++      weekly: [
++        {
++          day: "Monday",
++          segments: [
++            { beginTime: "09:00", endTime: "12:00", mode: "remainClosed" },
++          ],
++        },
++      ],
++    });
++    click(editor.tree(), "Salı aralık ekle");
++    expect(
++      editor.value().weekly?.find((day) => day.day === "Tuesday")?.segments,
++    ).toHaveLength(1);
++    click(editor.tree(), "Salı 1. aralığı sil");
++    expect(
++      editor.value().weekly?.find((day) => day.day === "Tuesday")?.segments,
++    ).toEqual([]);
++    click(editor.tree(), "Pazartesiyi hafta içine (Salı–Cuma) kopyala");
++    const weekend = new Set(["Saturday", "Sunday"]);
++    expect(
++      editor
++        .value()
++        .weekly?.filter((day) => !weekend.has(day.day))
++        .every((day) => day.segments[0]?.mode === "remainClosed"),
++    ).toBe(true);
++    expect(
++      editor
++        .value()
++        .weekly?.filter((day) => weekend.has(day.day))
++        .every((day) => day.segments.length === 0),
++    ).toBe(true);
++    for (let i = 1; i < 8; i++) click(editor.tree(), "Salı aralık ekle");
++    expect(
++      find(
++        editor.tree(),
++        (element) => element.props["aria-label"] === "Salı aralık ekle",
++      ).props.disabled,
++    ).toBe(true);
++    const html = renderToStaticMarkup(editor.tree());
++    expect(html).toContain('aria-label="Pazartesi 1. aralık başlangıç"');
++    expect(html).toContain('aria-label="Cuma 1. aralık mod"');
++    expect(html).not.toContain('aria-label="Pazar 1. aralık mod"');
++  });
++  it("boş pazartesiyi Salı–Cuma'ya kopyalar, hafta sonunu korur", () => {
++    const editor = edit({
++      ...legacy,
++      weekly: [{ day: "Tuesday", segments: [legacy] }, { day: "Saturday", segments: [legacy] }],
++    });
++    click(editor.tree(), "Pazartesiyi hafta içine (Salı–Cuma) kopyala");
++    const weekly = editor.value().weekly ?? [];
++    expect(weekly.filter((day) => day.day !== "Saturday").every((day) => day.segments.length === 0)).toBe(true);
++    expect(weekly.find((day) => day.day === "Saturday")?.segments).toHaveLength(1);
++  });
++});
++describe("EditDoorDialog haftalık kayıt", () => {
++  const door = {
++    _id: "door" as Id<"doors">,
++    name: "Kapı",
++    hikDoorNo: 2,
++    hikDoorStatusPlan: legacy,
++  };
++  function dialog() {
++    state.cursor = 0;
++    return EditDoorDialog({
++      open: true,
++      onOpenChange: vi.fn(),
++      onSuccess: vi.fn(),
++      door,
++      device: {
++        _id: "device" as Id<"devices">,
++        brand: "hikvision",
++        hikTransport: "gateway",
++      },
++    });
++  }
++  it("weekly değişikliğini guard'a dahil eder, saniyeleri ve modları kaydet payload'unda korur", async () => {
++    const initial = dialog();
++    expect(state.dirty).toBe(false);
++    const onChange = find(
++      initial,
++      (element) => element.type === DoorStatusPlanEditor,
++    ).props.onChange as (plan: DoorStatusPlan) => void;
++    onChange({
++      ...legacy,
++      weekly: [
++        {
++          day: "Monday",
++          segments: [
++            {
++              beginTime: "09:00:01",
++              endTime: "12:00:02",
++              mode: "remainClosed",
++            },
++          ],
++        },
++        { day: "Sunday", segments: [] },
++      ],
++    });
++    const updated = dialog();
++    expect(state.dirty).toBe(true);
++    await (
++      find(updated, (element) => element.type === "form").props
++        .onSubmit as (event: { preventDefault: () => void }) => Promise<void>
++    )({ preventDefault: vi.fn() });
++    expect(state.save).toHaveBeenCalledWith(
++      expect.objectContaining({
++        doorId: door._id,
++        hikDoorStatusPlan: {
++          enabled: true,
++          beginTime: "09:00:01",
++          endTime: "12:00:02",
++          mode: "remainClosed",
++          weekly: [
++            {
++              day: "Monday",
++              segments: [
++                {
++                  beginTime: "09:00:01",
++                  endTime: "12:00:02",
++                  mode: "remainClosed",
++                },
++              ],
++            },
++            { day: "Sunday", segments: [] },
++          ],
++        },
++      }),
++    );
++    expect(state.apply).toHaveBeenCalledTimes(2);
++  });
++});
+diff --git a/src/components/access-control/DoorStatusPlanEditor.tsx b/src/components/access-control/DoorStatusPlanEditor.tsx
+new file mode 100644
+index 00000000..453e7412
+--- /dev/null
++++ b/src/components/access-control/DoorStatusPlanEditor.tsx
+@@ -0,0 +1,236 @@
++import { Button } from "@/components/ui/button";
++import { Input } from "@/components/ui/input";
++import { Label } from "@/components/ui/label";
++import {
++  DOOR_STATUS_DAYS,
++  DOOR_STATUS_MAX_SEGMENTS,
++  type DoorStatusInterval,
++  type DoorStatusPlan,
++} from "../../../convex/lib/doorStatusPlan";
++
++const DAY_LABELS = [
++  "Pazartesi",
++  "Salı",
++  "Çarşamba",
++  "Perşembe",
++  "Cuma",
++  "Cumartesi",
++  "Pazar",
++];
++function IntervalEditor({
++  value,
++  onChange,
++  label,
++}: {
++  value: DoorStatusInterval;
++  onChange: (value: DoorStatusInterval) => void;
++  label: string;
++}) {
++  return (
++    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
++      <Label className="space-y-1">
++        Başlangıç (TR saati)
++        <Input
++          aria-label={`${label} başlangıç`}
++          type="time"
++          step={1}
++          value={value.beginTime}
++          onChange={(e) => onChange({ ...value, beginTime: e.target.value })}
++        />
++      </Label>
++      <Label className="space-y-1">
++        Bitiş (TR saati)
++        <Input
++          aria-label={`${label} bitiş`}
++          type="time"
++          step={1}
++          value={value.endTime}
++          onChange={(e) => onChange({ ...value, endTime: e.target.value })}
++        />
++      </Label>
++      <Label className="space-y-1">
++        Mod
++        <select
++          className="h-10 w-full rounded-md border bg-background px-2 text-sm"
++          aria-label={`${label} mod`}
++          value={value.mode}
++          onChange={(e) => {
++            const mode = e.target.value;
++            if (
++              mode === "remainOpen" ||
++              mode === "remainClosed" ||
++              mode === "normal"
++            )
++              onChange({ ...value, mode });
++          }}
++        >
++          <option value="remainOpen">Sürekli Açık</option>
++          <option value="normal">Normal</option>
++          <option value="remainClosed">Sürekli Kapalı</option>
++        </select>
++      </Label>
++    </div>
++  );
++}
++
++export function DoorStatusPlanEditor({
++  value,
++  onChange,
++}: {
++  value: DoorStatusPlan;
++  onChange: (value: DoorStatusPlan) => void;
++}) {
++  const setDay = (
++    day: (typeof DOOR_STATUS_DAYS)[number],
++    segments: DoorStatusInterval[],
++  ) =>
++    onChange({
++      ...value,
++      weekly: DOOR_STATUS_DAYS.map((dayName) => ({
++        day: dayName,
++        segments:
++          dayName === day
++            ? segments
++            : (value.weekly?.find((entry) => entry.day === dayName)?.segments ??
++              []),
++      })),
++    });
++  return (
++    <div className="space-y-3">
++      <Label className="block space-y-1">
++        Plan düzeni
++        <select
++          aria-label="Kapı durum planı düzeni"
++          className="h-10 w-full rounded-md border bg-background px-2"
++          value={value.weekly === undefined ? "daily" : "weekly"}
++          onChange={(e) => {
++            const { weekly, ...daily } = value;
++            onChange(
++              e.target.value === "weekly"
++                ? {
++                    ...daily,
++                    weekly: DOOR_STATUS_DAYS.map((day) => ({
++                      day,
++                      segments: [
++                        {
++                          beginTime: daily.beginTime,
++                          endTime: daily.endTime,
++                          mode: daily.mode,
++                        },
++                      ],
++                    })),
++                  }
++                : {
++                    ...daily,
++                    ...weekly?.flatMap((entry) => entry.segments)[0],
++                  },
++            );
++          }}
++        >
++          <option value="daily">Her gün aynı</option>
++          <option value="weekly">Gün bazında</option>
++        </select>
++      </Label>
++      {value.weekly === undefined ? (
++        <IntervalEditor
++          value={value}
++          label="Her gün"
++          onChange={(segment) => onChange({ ...value, ...segment })}
++        />
++      ) : (
++        <>
++          <Button
++            type="button"
++            variant="outline"
++            className="h-auto whitespace-normal"
++            onClick={() => {
++              const monday =
++                value.weekly?.find((entry) => entry.day === "Monday")
++                  ?.segments ?? [];
++              // Hafta sonu korunur: kapı Cumartesi/Pazar istemeden açık kalmasın.
++              const weekdays = new Set(["Tuesday", "Wednesday", "Thursday", "Friday"]);
++              onChange({
++                ...value,
++                weekly: DOOR_STATUS_DAYS.map((day) => ({
++                  day,
++                  segments: (weekdays.has(day)
++                    ? monday
++                    : value.weekly?.find((entry) => entry.day === day)?.segments ?? []
++                  ).map((segment) => ({ ...segment })),
++                })),
++              });
++            }}
++          >
++            Pazartesiyi hafta içine (Salı–Cuma) kopyala
++          </Button>
++          {DOOR_STATUS_DAYS.map((day, dayIndex) => {
++            const segments =
++              value.weekly?.find((entry) => entry.day === day)?.segments ?? [];
++            const label = DAY_LABELS[dayIndex] ?? day;
++            return (
++              <fieldset key={day} className="space-y-2 rounded-md border p-2">
++                <legend className="px-1 text-sm font-medium">{label}</legend>
++                {segments.length === 0 && (
++                  <p className="text-xs text-muted-foreground">
++                    Zaman aralığı yok
++                  </p>
++                )}
++                {segments.map((segment, index) => (
++                  <div key={index} className="space-y-2">
++                    <IntervalEditor
++                      value={segment}
++                      label={`${label} ${index + 1}. aralık`}
++                      onChange={(next) =>
++                        setDay(
++                          day,
++                          segments.map((item, i) =>
++                            i === index ? next : item,
++                          ),
++                        )
++                      }
++                    />
++                    <Button
++                      type="button"
++                      variant="ghost"
++                      aria-label={`${label} ${index + 1}. aralığı sil`}
++                      onClick={() =>
++                        setDay(
++                          day,
++                          segments.filter((_, i) => i !== index),
++                        )
++                      }
++                    >
++                      Aralığı sil
++                    </Button>
++                  </div>
++                ))}
++                <Button
++                  type="button"
++                  variant="outline"
++                  disabled={segments.length >= DOOR_STATUS_MAX_SEGMENTS}
++                  aria-label={`${label} aralık ekle`}
++                  onClick={() =>
++                    setDay(day, [
++                      ...segments,
++                      {
++                        beginTime: "08:00:00",
++                        endTime: "18:00:00",
++                        mode: "remainOpen",
++                      },
++                    ])
++                  }
++                >
++                  Aralık ekle
++                </Button>
++              </fieldset>
++            );
++          })}
++        </>
++      )}
++      <p className="text-xs text-muted-foreground">
++        Gün başına en fazla 8 aralık. Gece yarısını geçen aralıkları iki güne
++        bölün.
++      </p>
++    </div>
++  );
++}
+diff --git a/src/components/access-control/EditDoorDialog.tsx b/src/components/access-control/EditDoorDialog.tsx
+index 5c35aaa5..4d610f05 100644
+--- a/src/components/access-control/EditDoorDialog.tsx
++++ b/src/components/access-control/EditDoorDialog.tsx
+@@ -1,3 +1,5 @@
++import { DoorStatusPlanEditor } from "./DoorStatusPlanEditor";
++import { normalizeDoorStatusPlan, type DoorStatusPlan } from "../../../convex/lib/doorStatusPlan";
+ import { useProjectAccess } from "@/hooks/useProjectAccess";
+ import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+ import { useState } from "react";
+@@ -43,12 +45,7 @@ export type DoorForEdit = {
+   name: string;
+   doorCode?: string;
+   hikDoorNo?: number;
+-  hikDoorStatusPlan?: {
+-    enabled: boolean;
+-    beginTime: string;
+-    endTime: string;
+-    mode: "remainOpen" | "normal";
+-  };
++  hikDoorStatusPlan?: DoorStatusPlan;
+   hikVerifyPlan?: {
+     enabled: boolean;
+     beginTime: string;
+@@ -66,12 +63,7 @@ interface EditDoorDialogProps {
+ }
+ 
+ // hikDoorStatusPlan form state tipi — schema shape ile birebir
+-type DoorStatusPlanState = {
+-  enabled: boolean;
+-  beginTime: string;
+-  endTime: string;
+-  mode: "remainOpen" | "normal";
+-};
++type DoorStatusPlanState = DoorStatusPlan;
+ 
+ // hikVerifyPlan form state tipi — schema shape ile birebir
+ type VerifyPlanState = {
+@@ -127,14 +119,7 @@ export function EditDoorDialog({
+   );
+ 
+   const [statusPlan, setStatusPlan] = useState<DoorStatusPlanState>(
+-    door.hikDoorStatusPlan
+-      ? {
+-          enabled: door.hikDoorStatusPlan.enabled,
+-          beginTime: door.hikDoorStatusPlan.beginTime.slice(0, 5),
+-          endTime: door.hikDoorStatusPlan.endTime.slice(0, 5),
+-          mode: door.hikDoorStatusPlan.mode,
+-        }
+-      : DEFAULT_STATUS_PLAN
++    door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN
+   );
+ 
+   const [verifyPlan, setVerifyPlan] = useState<VerifyPlanState>(
+@@ -177,11 +162,7 @@ export function EditDoorDialog({
+       name: name.trim(),
+       doorCode: doorCode.trim() || undefined,
+       hikDoorNo: parsedDoorNo,
+-      hikDoorStatusPlan: showHikSection ? {
+-        ...statusPlan,
+-        beginTime: `${statusPlan.beginTime}:00`,
+-        endTime: `${statusPlan.endTime}:00`,
+-      } : undefined,
++      hikDoorStatusPlan: showHikSection ? normalizeDoorStatusPlan(statusPlan) : undefined,
+       hikVerifyPlan: showHikSection ? {
+         ...verifyPlan,
+         beginTime: `${verifyPlan.beginTime}:00`,
+@@ -206,7 +187,7 @@ export function EditDoorDialog({
+   }, { error: "Planlar gönderilemedi" });
+   const isSubmitting = saveAction.pending || retryAction.pending;
+ 
+-  const guard = useUnsavedChangesGuard(open && (!saved && (name !== door.name || doorCode !== (door.doorCode ?? "") || hikDoorNo !== (door.hikDoorNo !== undefined ? String(door.hikDoorNo) : "") || JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ? { ...door.hikDoorStatusPlan, beginTime: door.hikDoorStatusPlan.beginTime.slice(0, 5), endTime: door.hikDoorStatusPlan.endTime.slice(0, 5) } : DEFAULT_STATUS_PLAN) || JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ? { ...door.hikVerifyPlan, beginTime: door.hikVerifyPlan.beginTime.slice(0, 5), endTime: door.hikVerifyPlan.endTime.slice(0, 5) } : DEFAULT_VERIFY_PLAN))));
++  const guard = useUnsavedChangesGuard(open && (!saved && (name !== door.name || doorCode !== (door.doorCode ?? "") || hikDoorNo !== (door.hikDoorNo !== undefined ? String(door.hikDoorNo) : "") || JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN) || JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ? { ...door.hikVerifyPlan, beginTime: door.hikVerifyPlan.beginTime.slice(0, 5), endTime: door.hikVerifyPlan.endTime.slice(0, 5) } : DEFAULT_VERIFY_PLAN))));
+   const close = () => { if (!isSubmitting) guard.requestClose(() => onOpenChange(false)); };
+   const handleSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+@@ -224,7 +205,8 @@ export function EditDoorDialog({
+     }
+     const errors: Record<string, string> = {};
+     if (showHikSection) {
+-      for (const [key, plan] of [["status", statusPlan], ["verify", verifyPlan]] as const) {
++      try { normalizeDoorStatusPlan(statusPlan); } catch (error: unknown) { errors["status-plan"] = errorMessage(error); }
++      for (const [key, plan] of [["verify", verifyPlan]] as const) {
+         const result = doorPlanTimeSchema.safeParse({
+           beginTime: plan.beginTime,
+           endTime: plan.endTime,
+@@ -327,56 +309,9 @@ export function EditDoorDialog({
+                         }
+                       />
+                     </div>
+-                    <div className="grid grid-cols-2 gap-3">
+-                      <FormFieldWrapper htmlFor="status-beginTime" label="Başlangıç (TR saati)" error={timeErrors["status-beginTime"]}>
+-                        <Input
+-                          id="status-beginTime"
+-                          type="time"
+-                          step={60}
+-                          value={statusPlan.beginTime.slice(0, 5)}
+-                          onChange={(e) =>
+-                            setStatusPlan((p) => ({
+-                              ...p,
+-                              beginTime: e.target.value,
+-                            }))
+-                          }
+-                        />
+-                      </FormFieldWrapper>
+-                      <FormFieldWrapper htmlFor="status-endTime" label="Bitiş (TR saati)" error={timeErrors["status-endTime"]}>
+-                        <Input
+-                          id="status-endTime"
+-                          type="time"
+-                          step={60}
+-                          value={statusPlan.endTime.slice(0, 5)}
+-                          onChange={(e) =>
+-                            setStatusPlan((p) => ({
+-                              ...p,
+-                              endTime: e.target.value,
+-                            }))
+-                          }
+-                        />
+-                      </FormFieldWrapper>
+-                    </div>
+-                    <div className="space-y-1">
+-                      <Label htmlFor="status-mode" className="text-xs">Mod</Label>
+-                      <Select
+-                        disabled={isSubmitting || saved}
+-                        value={statusPlan.mode}
+-                        onValueChange={(v) =>
+-                          setStatusPlan((p) => ({
+-                            ...p,
+-                            mode: v as "remainOpen" | "normal",
+-                          }))
+-                        }
+-                      >
+-                        <SelectTrigger id="status-mode">
+-                          <SelectValue />
+-                        </SelectTrigger>
+-                        <SelectContent>
+-                          <SelectItem value="remainOpen">Sürekli Açık</SelectItem>
+-                          <SelectItem value="normal">Normal</SelectItem>
+-                        </SelectContent>
+-                      </Select>
++                    <div id="status-plan" tabIndex={-1} role="group" aria-label="Kapı durum planı aralıkları" aria-invalid={!!timeErrors["status-plan"]} aria-describedby={timeErrors["status-plan"] ? "status-plan-error" : undefined}>
++                      <DoorStatusPlanEditor value={statusPlan} onChange={setStatusPlan} />
++                      {timeErrors["status-plan"] && <p id="status-plan-error" className="mt-2 text-xs text-destructive">{timeErrors["status-plan"]}</p>}
+                     </div>
+                   </div>
+ 
+diff --git a/src/components/audit/AuditExportButton.tsx b/src/components/audit/AuditExportButton.tsx
+new file mode 100644
+index 00000000..1af9547a
+--- /dev/null
++++ b/src/components/audit/AuditExportButton.tsx
+@@ -0,0 +1,31 @@
++import { useEffect, useRef, useState } from 'react';
++import { useConvex } from 'convex/react';
++import { api } from '../../../convex/_generated/api';
++import type { AuditArgs } from './auditState';
++import { Button } from '@/components/ui/button';
++import { collectAuditExport, auditExportRows } from '@/lib/auditExport';
++import { downloadExport, exportFilenamePart, xlsxExport } from '@/lib/spreadsheetExport';
++import { notify } from '@/lib/notify';
++export function AuditExportButton({ args, projectName }: { args: AuditArgs; projectName: string }) {
++  const convex = useConvex();
++  const controller = useRef<AbortController | null>(null);
++  const [progress, setProgress] = useState<number | null>(null);
++  useEffect(() => () => controller.current?.abort(), []);
++  const run = async () => {
++    if (controller.current) return;
++    const active = new AbortController();
++    controller.current = active;
++    setProgress(0);
++    try {
++      const result = await collectAuditExport(cursor => convex.query(api.auditLog.list, { ...args, paginationOpts: { cursor, numItems: 500 } }), active.signal, setProgress);
++      if (result.truncated && !window.confirm('İlk 10.000 kayıt aktarılacak; tarih aralığını daraltın. Devam edilsin mi?')) return;
++      active.signal.throwIfAborted();
++      const blob = await xlsxExport(auditExportRows(result.rows), 'Denetim Kaydı');
++      active.signal.throwIfAborted();
++      downloadExport(blob, `denetim-kaydi-${exportFilenamePart(args.allProjects ? 'tum-projeler' : projectName)}-${args.startDate ?? 'ilk'}_${args.endDate ?? 'son'}.xlsx`);
++    } catch (error: unknown) {
++      if (!active.signal.aborted) notify.error('Denetim kaydı aktarılamadı', error);
++    } finally { controller.current = null; setProgress(null); }
++  };
++  return <div className="flex items-center gap-2">{progress === null ? <Button variant="outline" onClick={run}>Excel'e aktar</Button> : <><span role="status" className="text-sm">{progress.toLocaleString('tr-TR')} / ~? kayıt</span><Button variant="outline" onClick={() => controller.current?.abort()}>İptal</Button></>}</div>;
++}
+diff --git a/src/components/audit/auditLabels.ts b/src/components/audit/auditLabels.ts
+index e405bdbd..494813c5 100644
+--- a/src/components/audit/auditLabels.ts
++++ b/src/components/audit/auditLabels.ts
+@@ -39,6 +39,13 @@ const commonLabels: Record<string, string> = {
+   firstName: "Ad",
+   lastName: "Soyad",
+   employeeId: "Çalışan kimliği",
++  employeeIds: "Çalışan kimlikleri",
++  startDate: "Başlangıç tarihi",
++  endDate: "Bitiş tarihi",
++  trimmed: "Kırpılan atama sayısı",
++  split: "Bölünen atama sayısı",
++  affectedEmployees: "Etkilenen çalışan sayısı",
++  affectsPast: "Geçmiş günleri etkiler",
+   projectId: "Proje kimliği",
+   date: "Tarih",
+   status: "Durum",
+diff --git a/src/components/devices/DeviceAudit.test.tsx b/src/components/devices/DeviceAudit.test.tsx
+index 0005cad2..0b43811c 100644
+--- a/src/components/devices/DeviceAudit.test.tsx
++++ b/src/components/devices/DeviceAudit.test.tsx
+@@ -2,6 +2,7 @@ vi.mock("@/hooks/useProjectAccess", () => ({
+   useProjectAccess: () => ({ isAdmin: true }),
+ }));
+ import type { MouseEvent, ReactNode } from "react";
++import { getFunctionName, type FunctionReference } from "convex/server";
+ import { renderToStaticMarkup } from "react-dom/server";
+ import { beforeEach, describe, expect, it, vi } from "vitest";
+ import type { Id } from "../../../convex/_generated/dataModel";
+@@ -36,7 +37,9 @@ vi.mock("@/components/ui/table", async (original) => {
+   };
+ });
+ vi.mock("convex/react", () => ({
+-  useQuery: mocks.query,
++  useQuery: (query: FunctionReference<"query">, args: unknown) => getFunctionName(query) === "deviceEvents:getConnectivityHistory"
++    ? { asOf: 0, count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false }
++    : mocks.query(query, args),
+   useMutation: () => vi.fn(),
+   useAction: () => vi.fn(),
+ }));
+diff --git a/src/components/devices/DeviceCommandCenter.audit.test.tsx b/src/components/devices/DeviceCommandCenter.audit.test.tsx
+index 91db5920..3d98bc0d 100644
+--- a/src/components/devices/DeviceCommandCenter.audit.test.tsx
++++ b/src/components/devices/DeviceCommandCenter.audit.test.tsx
+@@ -1,6 +1,7 @@
+ vi.mock("@/hooks/useProjectAccess", () => ({
+   useProjectAccess: () => ({ isAdmin: mocks.admin }),
+ }));
++import { getFunctionName, type FunctionReference } from "convex/server";
+ import { renderToStaticMarkup } from "react-dom/server";
+ import { expect, it, vi } from "vitest";
+ import type { Device } from "@/types/device";
+@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
+   device: {} as Device,
+ }));
+ vi.mock("convex/react", () => ({
+-  useQuery: () => ({
++  useQuery: (query: FunctionReference<"query">) => getFunctionName(query) === "deviceEvents:getConnectivityHistory" ? { asOf: 0, count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false } : ({
+     device: mocks.device,
+     limits: { doorsCapped: mocks.limited, readersCapped: false },
+     doors: [{ _id: "door", name: "Kapı", hikDoorNo: 1, ioId: 0 }],
+diff --git a/src/components/devices/DeviceCommandCenter.tsx b/src/components/devices/DeviceCommandCenter.tsx
+index 5834cf2c..753ea6ec 100644
+--- a/src/components/devices/DeviceCommandCenter.tsx
++++ b/src/components/devices/DeviceCommandCenter.tsx
+@@ -134,7 +134,7 @@ function DeviceCenter({
+           {offlineMessage}
+         </p>
+       )}
+-      <DeviceConnectionSection {...view} />
++      <DeviceConnectionSection {...view} now={clock} />
+ 
+       <DeviceQueueSection {...view} />
+ 
+diff --git a/src/components/devices/DeviceConnectionSection.tsx b/src/components/devices/DeviceConnectionSection.tsx
+index a3c068b0..87e9328d 100644
+--- a/src/components/devices/DeviceConnectionSection.tsx
++++ b/src/components/devices/DeviceConnectionSection.tsx
+@@ -1,3 +1,5 @@
++import { deviceLastSignal } from "../../../convex/lib/deviceConnection";
++import { DeviceConnectivityHistory } from "./DeviceConnectivityHistory";
+ import { Copy } from "lucide-react";
+ import { Badge } from "@/components/ui/badge";
+ import { Button } from "@/components/ui/button";
+@@ -11,10 +13,13 @@ export function DeviceConnectionSection({
+   adapter,
+   connected,
+   connection,
++  now,
+ }: Pick<
+   DeviceCenterView,
+   "overview" | "adapter" | "connected" | "connection"
+->) {
++> & { now: number }) {
++  const signal = deviceLastSignal(overview.device);
++  const since = connection === "offline" && signal !== undefined && signal < now ? signal : undefined;
+   const lastSignal = deviceDateTime(
+     overview.device.brand === "hikvision" &&
+       overview.device.hikTransport !== "localBridge"
+@@ -99,6 +104,7 @@ export function DeviceConnectionSection({
+           </Button>
+         </div>
+       </div>
++      <DeviceConnectivityHistory deviceId={overview.device._id} current={{ now, since }} />
+     </section>
+   );
+ }
+diff --git a/src/components/devices/DeviceConnectivityHistory.test.tsx b/src/components/devices/DeviceConnectivityHistory.test.tsx
+new file mode 100644
+index 00000000..a51bf432
+--- /dev/null
++++ b/src/components/devices/DeviceConnectivityHistory.test.tsx
+@@ -0,0 +1,48 @@
++import { renderToStaticMarkup } from "react-dom/server";
++import { describe, expect, it, vi } from "vitest";
++import type { FunctionReturnType } from "convex/server";
++import type { api } from "../../../convex/_generated/api";
++import type { Id } from "../../../convex/_generated/dataModel";
++import { DeviceConnectivityHistory, connectivityDuration, connectivityTime } from "./DeviceConnectivityHistory";
++const mocks = vi.hoisted(() => ({ query: vi.fn() }));
++vi.mock("convex/react", () => ({ useQuery: mocks.query }));
++type History = FunctionReturnType<typeof api.deviceEvents.getConnectivityHistory>;
++const empty: History = { asOf: Date.parse("2026-10-22T12:00:00Z"), count: 0, totalMs: 0, longestMs: 0, periods: [], truncated: false, periodicHeartbeat: true };
++const render = (history: History | undefined) => {
++  mocks.query.mockReturnValue(history);
++  return renderToStaticMarkup(<DeviceConnectivityHistory deviceId={"device" as Id<"devices">} />);
++};
++describe("connection history section", () => {
++  it("does not show a client-side ongoing outage for card-event-only devices", () => {
++    mocks.query.mockReturnValue({ ...empty, periodicHeartbeat: false });
++    const html = renderToStaticMarkup(<DeviceConnectivityHistory deviceId={"device" as Id<"devices">} current={{ now: empty.asOf, since: empty.asOf - 3600000 }} />);
++    expect(html).not.toContain("devam ediyor");
++    expect(html).toContain("yalnız kart okutulunca sinyal gönderir");
++  });
++  it("shows the loading and empty states", () => {
++    expect(render(undefined)).toContain("Bağlantı geçmişi yükleniyor");
++    expect(render(empty)).toContain("Son 30 günde çevrimdışı dönem yok");
++    expect(mocks.query).toHaveBeenLastCalledWith(expect.anything(), { deviceId: "device" });
++  });
++  it("shows completed periods, ongoing status, limits and Istanbul times", () => {
++    const start = Date.parse("2026-10-22T09:00:00Z");
++    const html = render({ asOf: start + 8100000, count: 2, totalMs: 8100000, longestMs: 8100000, periods: [{ offlineFrom: start, offlineTo: start + 8100000, durationMs: 8100000 }], ongoing: { since: start }, truncated: true, periodicHeartbeat: true });
++    for (const text of ["Bağlantı geçmişi", "2 sa 15 dk", "22.10.2026 12:00:00", "22.10.2026 14:15:00", "devam ediyor", "son 500 dönem", "UTC+3"]) expect(html).toContain(text);
++  });
++  it("shows a newly expired signal using the existing device clock without another query", () => {
++    const now = empty.asOf;
++    mocks.query.mockReturnValue(empty);
++    const html = renderToStaticMarkup(<DeviceConnectivityHistory deviceId={"device" as Id<"devices">} current={{ now, since: now - 360000 }} />);
++    expect(html).toContain("devam ediyor");
++    expect(html).toContain("6 dk");
++    expect(html).not.toContain("Son 30 günde çevrimdışı dönem yok");
++  });
++  it("formats duration boundaries and UTC+3 across date rollover", () => {
++    expect(connectivityDuration(0)).toBe("1 dk'dan az");
++    expect(connectivityDuration(59999)).toBe("1 dk'dan az");
++    expect(connectivityDuration(60000)).toBe("1 dk");
++    expect(connectivityDuration(3600000)).toBe("1 sa");
++    expect(connectivityDuration(8100000)).toBe("2 sa 15 dk");
++    expect(connectivityTime(Date.parse("2026-10-21T22:00:00Z"))).toBe("22.10.2026 01:00:00");
++  });
++});
+diff --git a/src/components/devices/DeviceConnectivityHistory.tsx b/src/components/devices/DeviceConnectivityHistory.tsx
+new file mode 100644
+index 00000000..6c1b2672
+--- /dev/null
++++ b/src/components/devices/DeviceConnectivityHistory.tsx
+@@ -0,0 +1,62 @@
++import { useQuery } from "convex/react";
++import { api } from "../../../convex/_generated/api";
++import type { Id } from "../../../convex/_generated/dataModel";
++import { Metric } from "./DeviceCenterMetric";
++
++export function connectivityDuration(ms: number): string {
++  const minutes = Math.floor(Math.max(0, ms) / 60000);
++  if (minutes === 0) return "1 dk'dan az";
++  const hours = Math.floor(minutes / 60);
++  return hours > 0 ? `${hours} sa${minutes % 60 ? ` ${minutes % 60} dk` : ""}` : `${minutes} dk`;
++}
++
++export function connectivityTime(ms: number): string {
++  return new Intl.DateTimeFormat("tr-TR", {
++    timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric",
++    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
++  }).format(ms);
++}
++
++export function DeviceConnectivityHistory({ deviceId, current }: {
++  deviceId: Id<"devices">;
++  current?: { now: number; since: number | undefined };
++}) {
++  const history = useQuery(api.deviceEvents.getConnectivityHistory, { deviceId });
++  // Mevcut cihaz merkezi saatini kullanır; ek timer veya sunucu polling'i yok.
++  // Kart okutunca sinyal veren cihazda (Hik gateway) sessizlik kesinti değildir: yalnız sunucunun açık dönemi.
++  const since = history?.periodicHeartbeat === false || !current ? history?.ongoing?.since : current.since;
++  const now = current?.now ?? history?.asOf ?? 0;
++  const ongoingMs = since === undefined ? 0 : Math.max(0, now - Math.max(since, now - 30 * 86400000));
++  const snapshotOngoingMs = history?.ongoing
++    ? Math.max(0, history.asOf - Math.max(history.ongoing.since, history.asOf - 30 * 86400000)) : 0;
++  const count = history ? history.count - (history.ongoing ? 1 : 0) + (since === undefined ? 0 : 1) : 0;
++  const totalMs = history ? Math.max(0, history.totalMs - snapshotOngoingMs + ongoingMs) : 0;
++  const longestMs = Math.max(history?.longestMs ?? 0, ongoingMs);
++  return (
++    <section aria-label="Bağlantı geçmişi" className="mt-5 space-y-3 border-t border-line pt-5">
++      <div>
++        <h3 className="text-base font-semibold">Bağlantı geçmişi</h3>
++        <p className="text-xs text-muted-foreground">Son 30 gün · İstanbul saati (UTC+3)</p>
++      </div>
++      {history === undefined ? <p role="status" className="text-sm">Bağlantı geçmişi yükleniyor…</p> : <>
++        <div className="grid grid-cols-3 gap-3">
++          <Metric label="Çevrimdışı sayısı" value={String(count)} />
++          <Metric label="Toplam süre" value={totalMs ? connectivityDuration(totalMs) : "0 dk"} />
++          <Metric label="En uzun süre" value={longestMs ? connectivityDuration(longestMs) : "0 dk"} />
++        </div>
++        {count === 0 && <p className="text-sm text-muted-foreground">Son 30 günde çevrimdışı dönem yok</p>}
++        {!history.periodicHeartbeat && <p className="text-xs text-muted-foreground">Bu cihaz yalnız kart okutulunca sinyal gönderir; kesinti yalnız gateway cihazı çevrimdışı bildirdiğinde kaydedilir.</p>}
++        {since !== undefined && <p className="text-sm text-warning">
++          {connectivityTime(since)} — devam ediyor
++        </p>}
++        {history.periods.length > 0 && <ol aria-label="Son çevrimdışı dönemler" className="space-y-2 text-sm">
++          {history.periods.map((period, index) => <li key={`${period.offlineTo}-${index}`} className="flex flex-wrap justify-between gap-x-3 gap-y-1">
++            <span>{connectivityTime(period.offlineFrom)} — {connectivityTime(period.offlineTo)}</span>
++            <span className="text-muted-foreground">{connectivityDuration(period.durationMs)}</span>
++          </li>)}
++        </ol>}
++        {history.truncated && <p className="text-xs text-muted-foreground">Hesaplama son 500 dönem ile sınırlı; listede son 20 tamamlanan dönem gösterilir.</p>}
++      </>}
++    </section>
++  );
++}
+diff --git a/src/components/shifts/ClearAssignmentsDialog.tsx b/src/components/shifts/ClearAssignmentsDialog.tsx
+new file mode 100644
+index 00000000..2565ae52
+--- /dev/null
++++ b/src/components/shifts/ClearAssignmentsDialog.tsx
+@@ -0,0 +1,44 @@
++import { useRef, useState } from 'react';
++import { useConvex, useMutation } from 'convex/react';
++import type { FunctionReturnType } from 'convex/server';
++import { api } from '../../../convex/_generated/api';
++import type { Id } from '../../../convex/_generated/dataModel';
++import type { Employee } from './lib/planning';
++import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
++import { Button } from '@/components/ui/button';
++import { Input } from '@/components/ui/input';
++import { DateInput } from '@/components/ui/date-picker';
++import { errorMessage, notify } from '@/lib/notify';
++export function ClearAssignmentsDialog({ projectId, employees, initialIds, start, end, onClose }: {
++  projectId: Id<'projects'>; employees: Employee[]; initialIds: string[]; start: string; end: string; onClose: () => void;
++}) {
++  const convex = useConvex();
++  const apply = useMutation(api.shifts.clearAssignments);
++  const [selected, setSelected] = useState(new Set(initialIds));
++  const [search, setSearch] = useState('');
++  const [startDate, setStart] = useState(start);
++  const [endDate, setEnd] = useState(end);
++  const [preview, setPreview] = useState<FunctionReturnType<typeof api.shifts.previewClearAssignments> | null>(null);
++  const [pending, setPending] = useState(false);
++  const lock = useRef(false);
++  const [error, setError] = useState('');
++  const args = { projectId, employeeIds: employees.filter(e => selected.has(e._id)).map(e => e._id), startDate, endDate };
++  const run = async (confirm: boolean) => {
++    if (lock.current) return;
++    lock.current = true; setPending(true); setError('');
++    try {
++      if (confirm && preview) { const result = await apply(args); notify.success(`${result.affectedEmployees} çalışanın atamaları temizlendi`); onClose(); }
++      else setPreview(await convex.query(api.shifts.previewClearAssignments, args));
++    } catch (error: unknown) { setError(errorMessage(error)); setPreview(null); }
++    finally { lock.current = false; setPending(false); }
++  };
++  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose(); }}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Toplu temizle</DialogTitle><DialogDescription>Seçili çalışanların tarih aralığındaki atamalarını kaldırın. Aralığın dışındaki günler korunur.</DialogDescription></DialogHeader>
++    <label className="space-y-1 text-sm">Çalışan ara<Input value={search} onChange={event => setSearch(event.target.value)} /></label>
++    <div className="max-h-48 overflow-auto rounded border p-2">{employees.filter(e => `${e.firstName} ${e.lastName}`.toLocaleLowerCase('tr-TR').includes(search.toLocaleLowerCase('tr-TR'))).map(e => <label key={e._id} className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" disabled={pending} checked={selected.has(e._id)} onChange={() => { setSelected(old => { const next = new Set(old); if (next.has(e._id)) next.delete(e._id); else next.add(e._id); return next; }); setPreview(null); }} />{e.firstName} {e.lastName}</label>)}</div>
++    <p className="text-sm">{selected.size} çalışan seçildi · En fazla 500</p>
++    <div className="flex flex-wrap gap-3"><label className="text-sm">Başlangıç<DateInput disabled={pending} value={startDate} onChange={value => { setStart(value); setPreview(null); }} /></label><label className="text-sm">Bitiş<DateInput disabled={pending} value={endDate} onChange={value => { setEnd(value); setPreview(null); }} /></label></div>
++    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
++    {preview && <div role="status" className="space-y-2 text-sm"><p>{preview.deleted} silinecek, {preview.trimmed} kırpılacak, {preview.split} bölünecek · {preview.affectedEmployees} çalışan.</p>{preview.affectsPast && <p className="text-destructive">Geçmiş günlerin PDKS hesabı değişir.</p>}</div>}
++    <div className="flex justify-end gap-2"><Button variant="outline" disabled={pending} onClick={onClose}>Vazgeç</Button><Button variant={preview ? 'destructive' : 'default'} disabled={pending || !selected.size || (preview !== null && !preview.affectedEmployees)} onClick={() => run(preview !== null)}>{pending ? 'İşleniyor…' : preview ? 'Onayla ve temizle' : 'Önizle'}</Button></div>
++  </DialogContent></Dialog>;
++}
+diff --git a/src/components/shifts/ShiftCalendarView.tsx b/src/components/shifts/ShiftCalendarView.tsx
+index 082c4e42..2748697e 100644
+--- a/src/components/shifts/ShiftCalendarView.tsx
++++ b/src/components/shifts/ShiftCalendarView.tsx
+@@ -1,3 +1,9 @@
++import { ClearAssignmentsDialog } from './ClearAssignmentsDialog';
++import { useAuth } from '@/components/auth/AuthProvider';
++import { capabilities } from '@/lib/capabilities';
++import { shiftExportRows } from '@/lib/shiftExport';
++import { csvExport, downloadExport, exportFilenamePart, xlsxExport } from '@/lib/spreadsheetExport';
++import { notify } from '@/lib/notify';
+ import { ShiftSelect } from "./ShiftSelect";
+ import { assignmentInitial, shiftTimeLabel } from "./lib/planning";
+ import { useEffect, useMemo, useState } from "react";
+@@ -102,6 +108,10 @@ function Plan({
+   shifts: Shift[];
+   openDefinitions: () => void;
+ }) {
++  const { profile } = useAuth();
++  const canManage = capabilities(profile?.role).admin;
++  const [clearOpen, setClearOpen] = useState(false);
++  const [exporting, setExporting] = useState(false);
+   const compact = useCompact();
+   const navigate = useNavigate();
+   const [day, setDay] = useState(istanbulToday);
+@@ -146,6 +156,16 @@ function Plan({
+     startDate: range.rangeStart,
+     endDate: range.rangeEnd,
+   });
++  const exportPlan = async (format: 'xlsx' | 'csv') => {
++    if (!assignments || exporting) return;
++    setExporting(true);
++    try {
++      const rows = shiftExportRows(visible, range.days, assignments, shifts);
++      const blob = format === 'xlsx' ? await xlsxExport(rows, 'Vardiyalar') : new Blob([csvExport(rows)], { type: 'text/csv;charset=utf-8' });
++      downloadExport(blob, `vardiyalar-${exportFilenamePart(projectName)}-${range.rangeStart}_${range.rangeEnd}.${format}`);
++    } catch (error: unknown) { notify.error('Vardiyalar aktarılamadı', error); }
++    finally { setExporting(false); }
++  };
+   const active = shifts.filter((s) => s.isActive !== false);
+   const loading =
+     assignments === undefined || leaves === undefined || holidays === undefined;
+@@ -207,6 +227,13 @@ function Plan({
+           </Button>
+         }
+       />
++      <div className="flex flex-wrap gap-2">
++        {canManage && <Button variant="outline" onClick={() => setClearOpen(true)}>Toplu temizle</Button>}
++        <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('xlsx')}>Excel'e aktar</Button>
++        <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('csv')}>CSV'ye aktar</Button>
++        <span className="self-center text-xs text-muted-foreground">Dışa aktarım: görünen sayfa ve dönem</span>
++      </div>
++      {clearOpen && <ClearAssignmentsDialog projectId={projectId} employees={employees} initialIds={[...selected]} start={range.rangeStart} end={range.rangeEnd} onClose={() => { setClearOpen(false); clearSelection(); }} />}
+       <StatInline
+         items={[
+           { label: "Görünen çalışan", value: filtered.length },
+diff --git a/src/components/shifts/lib/auditFixes.test.tsx b/src/components/shifts/lib/auditFixes.test.tsx
+index 13ff96b9..4b0e1a94 100644
+--- a/src/components/shifts/lib/auditFixes.test.tsx
++++ b/src/components/shifts/lib/auditFixes.test.tsx
+@@ -15,6 +15,7 @@ type PageHeaderProps = ComponentProps<typeof PageHeader>;
+ import type { Id } from "../../../../convex/_generated/dataModel";
+ 
+ const state = vi.hoisted(() => ({ shifts: [] as Shift[], calls: [] as string[], primary: null as PageHeaderProps["primaryAction"] | null }));
++vi.mock("@/components/auth/AuthProvider", () => ({ useAuth: () => ({ profile: { role: "project_admin" } }) }));
+ vi.mock("convex/react", () => ({
+   useMutation: () => vi.fn(),
+   useQuery: (reference: Parameters<typeof getFunctionName>[0]) => {
+diff --git a/src/lib/auditExport.test.ts b/src/lib/auditExport.test.ts
+new file mode 100644
+index 00000000..c59bcdab
+--- /dev/null
++++ b/src/lib/auditExport.test.ts
+@@ -0,0 +1,46 @@
++import { describe, expect, it, vi } from 'vitest';
++import { collectAuditExport, auditExportRows } from './auditExport';
++import { csvExport, safeRows, xlsxExport } from './spreadsheetExport';
++import type { AuditRow } from '@/components/audit/auditState';
++import type { Id } from '../../convex/_generated/dataModel';
++const row: AuditRow = { _id: 'audit' as Id<'auditLog'>, _creationTime: 0, timestamp: Date.parse('2025-01-01T22:01:02Z'), userName: '=Test', projectName: 'Test', targetTable: 'employees', action: 'update', targetId: '@id', note: 'Not\nmetni', oldValue: { firstName: 'Ali' }, newValue: { firstName: 'Veli' } };
++const page = (rows: AuditRow[], isDone: boolean, continueCursor: string) => ({ page: rows, isDone, continueCursor });
++describe('audit export', () => {
++  it('joins pages including empty filtered pages with cursors and progress', async () => {
++    const fetch = vi.fn().mockResolvedValueOnce(page([row], false, 'a')).mockResolvedValueOnce(page([], false, 'b')).mockResolvedValueOnce(page([row], true, 'c'));
++    const progress = vi.fn();
++    expect(await collectAuditExport(fetch, new AbortController().signal, progress)).toEqual({ rows: [row, row], truncated: false });
++    expect(fetch.mock.calls).toEqual([[null], ['a'], ['b']]);
++    expect(progress.mock.calls).toEqual([[1], [1], [2]]);
++  });
++  it('caps at 10000 and flags the confirmation only when extra matching rows exist', async () => {
++    const rows = Array.from({ length: 10000 }, () => row);
++    const fetch = vi.fn().mockResolvedValueOnce(page(rows, false, 'a')).mockResolvedValueOnce(page([], false, 'b')).mockResolvedValueOnce(page([row], true, 'c'));
++    const result = await collectAuditExport(fetch, new AbortController().signal, () => {});
++    expect(result.rows).toHaveLength(10000); expect(result.truncated).toBe(true);
++    expect((await collectAuditExport(async () => page(rows, true, 'a'), new AbortController().signal, () => {})).truncated).toBe(false);
++  });
++  it('cancels before requests and after an in-flight page', async () => {
++    const controller = new AbortController(); controller.abort();
++    const fetch = vi.fn();
++    await expect(collectAuditExport(fetch, controller.signal, () => {})).rejects.toThrow(); expect(fetch).not.toHaveBeenCalled();
++    const active = new AbortController();
++    await expect(collectAuditExport(async () => { active.abort(); return page([row], true, 'a'); }, active.signal, () => {})).rejects.toThrow();
++  });
++  it('formats Turkish labels, İstanbul seconds, masked detail and neutralizes formula cells', () => {
++    const rows = auditExportRows([row]);
++    expect(rows[0]).toEqual(['Zaman','Kullanıcı','Proje','Tablo','İşlem','Kayıt','Özet/Değişiklik']);
++    expect(rows[1]).toEqual(['02.01.2025 01:01:02','=Test','Test','Çalışan','Güncelleme','@id','Not metni; Ad: Ali → Veli']);
++    expect(safeRows(rows)[1]?.[1]).toBe("'=Test");
++    expect(csvExport([['=x','a;b','a"b','\tfoo']])).toBe('\uFEFF"\'=x";"a;b";"a""b";"\'\tfoo"');
++  });
++});
++
++it('writes actual XLSX cells as neutralized text', async () => {
++  const { default: ExcelJS } = await import('exceljs');
++  const blob = await xlsxExport([['Başlık'], ['=SUM(A1)'], ['@id']], 'Test');
++  const workbook = new ExcelJS.Workbook();
++  await workbook.xlsx.load(await blob.arrayBuffer());
++  expect(workbook.worksheets[0]?.getCell('A2').value).toBe("'=SUM(A1)");
++  expect(workbook.worksheets[0]?.getCell('A3').value).toBe("'@id");
++});
+diff --git a/src/lib/auditExport.ts b/src/lib/auditExport.ts
+new file mode 100644
+index 00000000..aa5b7652
+--- /dev/null
++++ b/src/lib/auditExport.ts
+@@ -0,0 +1,33 @@
++import type { FunctionReturnType } from 'convex/server';
++import type { api } from '../../convex/_generated/api';
++import type { AuditRow } from '@/components/audit/auditState';
++import { timestampFormat } from '@/components/audit/auditState';
++import { AUDIT_TARGET_LABELS } from '../../convex/lib/auditLogQuery';
++import { auditChanges, auditFieldLabel, auditFieldDisplayValue, maskAuditValue } from '@/components/audit/auditLabels';
++
++type AuditPage = FunctionReturnType<typeof api.auditLog.list>;
++export async function collectAuditExport(fetchPage: (cursor: string | null) => Promise<AuditPage>, signal: AbortSignal, progress: (count: number) => void) {
++  const rows: AuditRow[] = [];
++  let cursor: string | null = null;
++  for (;;) {
++    signal.throwIfAborted();
++    const page = await fetchPage(cursor);
++    signal.throwIfAborted();
++    const remaining = 10000 - rows.length;
++    rows.push(...page.page.slice(0, remaining));
++    progress(rows.length);
++    if (page.page.length > remaining) return { rows, truncated: true };
++    if (page.isDone) return { rows, truncated: false };
++    // Continue past empty filtered pages and probe beyond exactly 10,000 matches.
++    if (page.continueCursor === cursor) throw new Error('Denetim sayfalaması ilerleyemedi');
++    cursor = page.continueCursor;
++  }
++}
++export function auditExportRows(rows: AuditRow[]) {
++  const labels = { create: 'Oluşturma', update: 'Güncelleme', delete: 'Silme' };
++  return [['Zaman', 'Kullanıcı', 'Proje', 'Tablo', 'İşlem', 'Kayıt', 'Özet/Değişiklik'], ...rows.map(row => [
++    timestampFormat.format(row.timestamp), row.userName ?? 'Sistem', row.projectName,
++    AUDIT_TARGET_LABELS[row.targetTable] ?? row.targetTable, labels[row.action], row.targetId,
++    [row.note, ...auditChanges(row.oldValue, row.newValue).map(change => `${auditFieldLabel(row.targetTable, change.field)}: ${auditFieldDisplayValue(change.field, maskAuditValue(change.field, change.before))} → ${auditFieldDisplayValue(change.field, maskAuditValue(change.field, change.after))}`)].filter(value => value !== undefined && value !== '').join('; ').replace(/\s+/g, ' ').slice(0, 1000),
++  ])];
++}
+diff --git a/src/lib/shiftExport.test.ts b/src/lib/shiftExport.test.ts
+new file mode 100644
+index 00000000..504dd91f
+--- /dev/null
++++ b/src/lib/shiftExport.test.ts
+@@ -0,0 +1,22 @@
++import { describe, expect, it } from 'vitest';
++import { shiftExportRows } from './shiftExport';
++import { safeRows, csvExport } from './spreadsheetExport';
++import type { Employee, Shift, Assignment } from '@/components/shifts/lib/planning';
++const employee = { _id: 'e', firstName: '=Ayşe', lastName: 'Test', payrollCode: '+123' } as Employee;
++const fixed = { _id: 's', name: 'Gündüz', startTime: '09:00', endTime: '17:00' } as Shift;
++const flex = { _id: 'f', name: 'Serbest', startTime: '08:00', endTime: '10:00', scheduleType: 'flexible', flexible: { requiredNetMinutes: 480, checkInStart: '08:00', checkInEnd: '10:00', checkOutStart: '16:00', checkOutEnd: '20:00', checkOutEndDayOffset: 0, maxSpanMinutes: 720, breakMode: 'duration', breakMinutes: 0 } } as Shift;
++const assignment = (shiftId: string, day: string) => ({ _id: shiftId, employeeId: 'e', shiftId, startDate: day, endDate: day }) as Assignment;
++describe('shift export grid', () => {
++  it('exports fixed, flexible, empty cells, employee codes and Turkish day labels', () => {
++    const rows = shiftExportRows([employee], ['2026-10-19','2026-10-20','2026-10-21'], [assignment('s','2026-10-19'), assignment('f','2026-10-20')], [fixed, flex]);
++    expect(rows).toEqual([['Çalışan','Sicil','19.10 Pzt','20.10 Sal','21.10 Çar'],['=Ayşe Test','+123','Gündüz · 09:00–17:00','Serbest · Esnek · 8 sa','—']]);
++    expect(safeRows(rows)[1]?.slice(0,2)).toEqual(["'=Ayşe Test","'+123"]);
++    expect(csvExport(rows)).toContain('"Gündüz · 09:00–17:00";"Serbest · Esnek · 8 sa";"—"');
++  });
++  it('respects weekday patterns and shows night continuations like calendar', () => {
++    const night = { ...fixed, startTime: '22:00', endTime: '06:00' };
++    const a = { ...assignment('s','2026-10-19'), weekPattern: ['MON'] };
++    const rows = shiftExportRows([employee], ['2026-10-20','2026-10-21'], [a], [night]);
++    expect(rows[1]?.slice(2)).toEqual(['Gündüz · 22:00–06:00 (+1 gün) (devam)', '—']);
++  });
++});
+diff --git a/src/lib/shiftExport.ts b/src/lib/shiftExport.ts
+new file mode 100644
+index 00000000..19051124
+--- /dev/null
++++ b/src/lib/shiftExport.ts
+@@ -0,0 +1,8 @@
++import { cellData, shiftTimeLabel, type Employee, type Shift, type Assignment } from '@/components/shifts/lib/planning';
++export function shiftExportRows(employees: Employee[], days: string[], assignments: Assignment[], shifts: Shift[]) {
++  return [['Çalışan', 'Sicil', ...days.map(day => `${day.slice(8, 10)}.${day.slice(5, 7)} ${new Intl.DateTimeFormat('tr-TR', { weekday: 'short', timeZone: 'Europe/Istanbul' }).format(new Date(`${day}T12:00:00Z`))}`)],
++    ...employees.map(employee => [`${employee.firstName} ${employee.lastName}`, employee.payrollCode ?? '', ...days.map(day => {
++      const records = cellData(employee, day, assignments, shifts, [], []).records;
++      return records.map(record => `${record.shift.name} · ${shiftTimeLabel(record.shift)}${record.continuation ? ' (devam)' : ''}`).join('; ') || '—';
++    })])];
++}
+diff --git a/src/lib/spreadsheetExport.ts b/src/lib/spreadsheetExport.ts
+new file mode 100644
+index 00000000..8dad6343
+--- /dev/null
++++ b/src/lib/spreadsheetExport.ts
+@@ -0,0 +1,30 @@
++import { neutralizeSpreadsheetFormula } from './spreadsheetSafety';
++
++export function safeRows(rows: string[][]) {
++  return rows.map(row => row.map(neutralizeSpreadsheetFormula));
++}
++export function csvExport(rows: string[][]) {
++  return '\uFEFF' + safeRows(rows).map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(';')).join('\r\n');
++}
++export function downloadExport(blob: Blob, filename: string) {
++  const url = URL.createObjectURL(blob);
++  const link = document.createElement('a');
++  link.href = url;
++  link.download = filename;
++  link.click();
++  setTimeout(() => URL.revokeObjectURL(url), 1000);
++}
++export async function xlsxExport(rows: string[][], sheetName: string) {
++  const { default: ExcelJS } = await import('exceljs');
++  const workbook = new ExcelJS.Workbook();
++  const sheet = workbook.addWorksheet(sheetName);
++  sheet.addRows(safeRows(rows));
++  sheet.getRow(1).font = { bold: true };
++  sheet.views = [{ state: 'frozen', xSplit: 1, ySplit: 1 }];
++  sheet.columns.forEach((column, i) => { column.width = i === 0 ? 25 : 30; });
++  const buffer = await workbook.xlsx.writeBuffer();
++  return new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
++}
++export function exportFilenamePart(value: string) {
++  return Array.from(value, character => character.charCodeAt(0) < 32 || /[\\/:*?"<>|]/.test(character) ? '-' : character).join('');
++}
+diff --git a/src/pages/AuditLog.tsx b/src/pages/AuditLog.tsx
+index 63984639..94542b76 100644
+--- a/src/pages/AuditLog.tsx
++++ b/src/pages/AuditLog.tsx
+@@ -1,3 +1,4 @@
++import { AuditExportButton } from '@/components/audit/AuditExportButton';
+ import { useAuth } from '@/components/auth/AuthProvider';
+ import { capabilities } from '@/lib/capabilities';
+ import { useActiveProjectScope } from '@/hooks/useActiveProjectScope';
+@@ -26,6 +27,7 @@ function AuthorizedAuditLog() {
+     <PageHeader title="Denetim Kaydı" scope={<span>{allProjects ? 'Tüm projeler · Projesiz kayıtlar dahil' : activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)</span>}>
+       {profile?.role === 'super_admin' && <label className="flex min-h-10 items-center gap-2 text-sm"><Switch checked={allProjects} onCheckedChange={checked => state.update('allProjects', checked ? 'true' : '')} />Tüm projeler</label>}
+     </PageHeader>
++    {ready && !state.changingScope && !rangeError && <AuditExportButton key={JSON.stringify(args)} args={args} projectName={activeProject?.name ?? "proje"} />}
+     <AuditCoverage />
+     <AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError} />
+     {!allProjects && <p className="text-xs text-muted-foreground">Seçili projenin kayıtları gösteriliyor. Projeyi üst çubuktan değiştirebilirsiniz.</p>}

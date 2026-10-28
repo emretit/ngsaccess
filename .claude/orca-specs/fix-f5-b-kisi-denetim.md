@@ -1,0 +1,11 @@
+# DENETİM — Faz 5-B (R-02 e-posta normalizasyonu + backfill, K-07 kayıp ev sahibi, Y-10 silmede ziyaretçi iletişim temizliği, B-06 kurulum/check-in yönlendirmesi)
+ÖNCE `/Users/emreaydin/ngsaccess/.claude/orca-specs/fix-denetim-ortak.md` OKU. Fix spec: `.claude/orca-specs/fix-f5-b-kisi.md`. Worker raporu: `/tmp/fix-f5-b-kisi-rapor.md`.
+Rapor: `/tmp/fix-f5-b-kisi-denetim.md`. Dosyalar (yalnız `git diff HEAD` / yeni dosya): convex/employees.ts convex/employeeAuth.ts convex/employeeAuth.test.ts convex/lib/employeeCascade.ts convex/visitors.ts convex/migrations.ts convex/fixF5People.test.ts src/pages/EmployeeSetup.tsx src/pages/EmployeeSetup.test.tsx src/pages/CheckIn.tsx src/pages/CheckIn.test.tsx.
+Koordinatör kararı: convex/employeeImport.ts'teki normalizasyonu koordinatör ayrıca ekleyecek (F5-C o dosyada) — eksikliğini bulgu sayma, yalnız helper imzasının oraya uygun olduğunu teyit et.
+DİKKAT: aynı ağaçta F5-A (invites/UserSetup/Login/SecurityCard) denetimde, F5-C (grantStatus/accessGrantStatus/adminGuards/projects/employees UI/devices UI/employeeImport) yazıyor; başka oturum mail/PDKS/rapor WIP'i var — DENETLEME, dokunma.
+Özel dikkat:
+1. KOTA/DoS (Convex Free plan limiti zaten aşılmış): employeeAuth giriş yolundaki "legacy geçiş taraması" ve employees tekillik kontrolündeki legacy okuma, bilinmeyen/yanlış e-postada TÜM employees tablosunu mu okuyor? Oturumsuz mobil giriş ucundan tetiklenebiliyorsa bu ENGEL adayıdır: sınır, index ya da "backfill sonrası kaldır" planı öner (rate limit var mı bak).
+2. Hesap güvenliği: normalizasyon sonrası iki farklı kişinin (farklı proje, aynı e-posta farklı harf) mobil girişte yanlış kayda eşlenmesi; kurulum token'ının yanlış kişiye bağlanması; legacy yolda proje/aktiflik kontrolleri atlanıyor mu.
+3. Backfill (migrations.ts): çakışma ön kontrolü doğru mu, 20 parti sınırı + devam, yarıda kalırsa tutarsız durum, `console.warn`'da PII (e-posta) yazılıyor mu (yalnız id olmalı).
+4. Y-10/K-07 cascade: yalnız public metnin vaat ettiği alanlar mı temizleniyor, ziyaretçi kaydı/geçiş geçmişi korunuyor mu, sayfalama zinciri sonsuz değil mi; ev sahibi silinmiş ziyaretçi düzenlenebiliyor ama yabancı projeden ev sahibi atanamıyor mu.
+5. B-06: CheckIn.tsx'te konum hiç istenmiyor mu; F4-A'nın "Bu QR kod daha önce kullanıldı." davranışı korunmuş mu.

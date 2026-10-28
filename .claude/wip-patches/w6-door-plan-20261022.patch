@@ -1,0 +1,1319 @@
+diff --git a/convex/actions/hikGatewayDevice.ts b/convex/actions/hikGatewayDevice.ts
+index 3cb7504c..0d2e3a88 100644
+--- a/convex/actions/hikGatewayDevice.ts
++++ b/convex/actions/hikGatewayDevice.ts
+@@ -1,5 +1,6 @@
+ "use node";
+ 
++import { buildDoorStatusSegments } from "../lib/doorStatusPlan";
+ import { internal } from "../_generated/api";
+ import { v } from "convex/values";
+ import { internalAction, type ActionCtx } from "../_generated/server";
+@@ -1163,18 +1164,7 @@ export const applyDoorStatusPlan = authedAction({
+         return await linkDoorStatusPlan(devIndex, doorNo, 0);
+       }
+ 
+-      // Her gün aynı segment (basit tek-aralık plan)
+-      const ALL_WEEKDAYS: Weekday[] = [
+-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+-      ];
+-      const segments = ALL_WEEKDAYS.map((week, idx) => ({
+-        week,
+-        id: idx + 1,
+-        enable: true,
+-        doorStatus: plan.mode as "remainOpen" | "normal",
+-        beginTime: plan.beginTime,
+-        endTime: plan.endTime,
+-      }));
++      const segments = buildDoorStatusSegments(plan);
+ 
+       const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
+       if (!r1.ok) return r1;
+diff --git a/convex/actions/hikQueueWorker.ts b/convex/actions/hikQueueWorker.ts
+index 0a65533f..90812523 100644
+--- a/convex/actions/hikQueueWorker.ts
++++ b/convex/actions/hikQueueWorker.ts
+@@ -1,6 +1,7 @@
+ "use node";
+ 
+ import { internalAction, type ActionCtx } from "../_generated/server";
++import { buildDoorStatusSegments } from "../lib/doorStatusPlan";
+ import { internal } from "../_generated/api";
+ import type { FunctionReturnType } from "convex/server";
+ import type { Id } from "../_generated/dataModel";
+@@ -228,17 +229,7 @@ async function executeOperation(
+         return await linkDoorStatusPlan(devIndex, doorNo, 0);
+       }
+ 
+-      const ALL_WEEKDAYS: Weekday[] = [
+-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+-      ];
+-      const segments = ALL_WEEKDAYS.map((week, idx) => ({
+-        week,
+-        id: idx + 1,
+-        enable: true,
+-        doorStatus: plan.mode as "remainOpen" | "normal",
+-        beginTime: plan.beginTime,
+-        endTime: plan.endTime,
+-      }));
++      const segments = buildDoorStatusSegments(plan);
+ 
+       const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
+       if (!r1.ok) return r1;
+diff --git a/convex/doorStatusPlan.integration.test.ts b/convex/doorStatusPlan.integration.test.ts
+new file mode 100644
+index 00000000..8bf4ba82
+--- /dev/null
++++ b/convex/doorStatusPlan.integration.test.ts
+@@ -0,0 +1,224 @@
++// @vitest-environment edge-runtime
++/// <reference types="vite/client" />
++import { convexTest } from "convex-test";
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { api, internal } from "./_generated/api";
++import schema from "./schema";
++import type { DoorStatusPlan } from "./lib/doorStatusPlan";
++const wire = vi.hoisted(() => ({ send: vi.fn() }));
++vi.mock("./lib/gateway/core", () => ({ gatewayApiCallChecked: wire.send }));
++const modules = import.meta.glob("./**/*.ts");
++const legacy: DoorStatusPlan = {
++  enabled: true,
++  beginTime: "08:00:00",
++  endTime: "18:00:00",
++  mode: "remainOpen",
++};
++const weekly: DoorStatusPlan = {
++  ...legacy,
++  weekly: [
++    {
++      day: "Monday",
++      segments: [
++        { beginTime: "09:00", endTime: "12:00", mode: "remainClosed" },
++        { beginTime: "13:00", endTime: "17:00", mode: "normal" },
++      ],
++    },
++    { day: "Sunday", segments: [] },
++  ],
++};
++async function fixture(plan: DoorStatusPlan) {
++  const t = convexTest(schema, modules);
++  const ids = await t.run(async (ctx) => {
++    const userId = await ctx.db.insert("users", {
++      role: "super_admin",
++      verified: true,
++    });
++    const sessionId = await ctx.db.insert("authSessions", {
++      userId,
++      expirationTime: Date.now() + 100000,
++    });
++    const projectId = await ctx.db.insert("projects", { name: "Test" });
++    const deviceId = await ctx.db.insert("devices", {
++      projectId,
++      name: "Panel",
++      brand: "hikvision",
++      hikTransport: "gateway",
++      hikDevIndex: "test-index",
++      hikLastSeenAt: Date.now(),
++      isActive: true,
++      createdAt: new Date().toISOString(),
++      updatedAt: new Date().toISOString(),
++    });
++    const doorId = await ctx.db.insert("doors", {
++      projectId,
++      deviceId,
++      name: "Kapı",
++      createdAt: new Date().toISOString(),
++      updatedAt: new Date().toISOString(),
++      hikDoorNo: 2,
++      hikDoorStatusPlan: plan,
++    });
++    return { userId, sessionId, projectId, deviceId, doorId };
++  });
++  return {
++    t,
++    caller: t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` }),
++    ...ids,
++  };
++}
++beforeEach(() => wire.send.mockReset().mockResolvedValue({ ok: true }));
++describe("kapı durum planı gateway zinciri", () => {
++  it.each(["direct", "queue"] as const)(
++    "%s: eski, haftalık ve kapalı planı mock gateway'e gönderir",
++    async (route) => {
++      for (const plan of [legacy, weekly, { ...weekly, enabled: false }]) {
++        wire.send.mockClear();
++        const { t, caller, doorId, deviceId } = await fixture(plan);
++        if (route === "direct")
++          expect(
++            await caller.action(
++              api.actions.hikGatewayDevice.applyDoorStatusPlan,
++              { doorId },
++            ),
++          ).toEqual({ ok: true });
++        else {
++          await t.run((ctx) =>
++            ctx.db.insert("hikPendingOperations", {
++              deviceId,
++              operation: "syncDoorStatusPlan",
++              payload: { doorId },
++              status: "failed",
++              attemptCount: 0,
++              createdAt: Date.now(),
++            }),
++          );
++          expect(
++            await t.action(internal.actions.hikQueueWorker.processHikQueue, {}),
++          ).toEqual({ retried: 1, ok: 1, failed: 0 });
++        }
++        const link = [
++          "/ISAPI/AccessControl/DoorStatusPlan/2",
++          "PUT",
++          { DoorStatusPlan: { templateNo: plan.enabled ? 102 : 0 } },
++          "test-index",
++        ];
++        expect(wire.send).toHaveBeenLastCalledWith(...link);
++        expect(wire.send).toHaveBeenCalledTimes(plan.enabled ? 3 : 1);
++        if (plan.enabled) {
++          const cfg = wire.send.mock.calls[0]?.[2] as {
++            DoorStatusWeekPlanCfg: {
++              enable: boolean;
++              WeekPlanCfg: Array<{
++                week: string;
++                id: number;
++                enable: boolean;
++                doorStatus: string;
++                TimeSegment: { beginTime: string; endTime: string };
++              }>;
++            };
++          };
++          const active = cfg.DoorStatusWeekPlanCfg.WeekPlanCfg.filter(
++            (item) => item.enable,
++          );
++          expect(cfg.DoorStatusWeekPlanCfg.WeekPlanCfg).toHaveLength(56);
++          if (plan.weekly)
++            expect(active).toEqual([
++              {
++                week: "Monday",
++                id: 1,
++                enable: true,
++                doorStatus: "remainClosed",
++                TimeSegment: { beginTime: "09:00:00", endTime: "12:00:00" },
++              },
++              {
++                week: "Monday",
++                id: 2,
++                enable: true,
++                doorStatus: "normal",
++                TimeSegment: { beginTime: "13:00:00", endTime: "17:00:00" },
++              },
++            ]);
++          else
++            expect(active).toEqual(
++              [
++                "Monday",
++                "Tuesday",
++                "Wednesday",
++                "Thursday",
++                "Friday",
++                "Saturday",
++                "Sunday",
++              ].map((week) => ({
++                week,
++                id: 1,
++                enable: true,
++                doorStatus: "remainOpen",
++                TimeSegment: { beginTime: "08:00:00", endTime: "18:00:00" },
++              })),
++            );
++          expect(wire.send.mock.calls[1]).toEqual([
++            "/ISAPI/AccessControl/DoorStatusPlanTemplate/102",
++            "PUT",
++            {
++              DoorStatusPlanTemplate: {
++                enable: true,
++                templateNo: 102,
++                weekPlanNo: 2,
++                holidayGroupNo: "",
++              },
++            },
++            "test-index",
++          ]);
++        }
++      }
++    },
++  );
++  it("doors.update geçersiz weekly reddeder ve kayıt değişmez", async () => {
++    const { t, caller, doorId } = await fixture(legacy);
++    const bad = {
++      ...legacy,
++      weekly: [
++        {
++          day: "Monday" as const,
++          segments: [
++            { beginTime: "12:00", endTime: "09:00", mode: "normal" as const },
++          ],
++        },
++      ],
++    };
++    await expect(
++      caller.mutation(api.doors.update, { doorId, hikDoorStatusPlan: bad }),
++    ).rejects.toThrow("Başlangıç");
++    expect(
++      (await t.run((ctx) => ctx.db.get(doorId)))?.hikDoorStatusPlan,
++    ).toEqual(legacy);
++  });
++  it("create ve update ilk segmenti normalize eder, create geçersiz planı reddeder", async () => {
++    const { t, caller, doorId, projectId } = await fixture(legacy);
++    const created = await caller.mutation(api.doors.create, {
++      name: "Yeni",
++      projectId,
++      hikDoorStatusPlan: weekly,
++    });
++    await caller.mutation(api.doors.update, {
++      doorId,
++      hikDoorStatusPlan: weekly,
++    });
++    for (const id of [created, doorId])
++      expect(
++        (await t.run((ctx) => ctx.db.get(id)))?.hikDoorStatusPlan,
++      ).toMatchObject({
++        beginTime: "09:00:00",
++        endTime: "12:00:00",
++        mode: "remainClosed",
++      });
++    await expect(
++      caller.mutation(api.doors.create, {
++        name: "Hatalı",
++        projectId,
++        hikDoorStatusPlan: { ...legacy, beginTime: "bad" },
++      }),
++    ).rejects.toThrow("Saat");
++  });
++});
+diff --git a/convex/doors.ts b/convex/doors.ts
+index 828e47bd..445d1de4 100644
+--- a/convex/doors.ts
++++ b/convex/doors.ts
+@@ -1,3 +1,4 @@
++import { doorStatusPlanValidator, normalizeDoorStatusPlan } from "./lib/doorStatusPlan";
+ 
+ import { ConvexError, v } from "convex/values";
+ import { internalMutation, internalQuery } from "./_generated/server";
+@@ -170,14 +171,7 @@ export const create = authedMutation({
+       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
+     ),
+     hikDoorNo: v.optional(v.number()),
+-    hikDoorStatusPlan: v.optional(
+-      v.object({
+-        enabled: v.boolean(),
+-        beginTime: v.string(),
+-        endTime: v.string(),
+-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+-      })
+-    ),
++    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
+     hikVerifyPlan: v.optional(
+       v.object({
+         enabled: v.boolean(),
+@@ -216,9 +210,11 @@ export const create = authedMutation({
+         throw new ConvexError("Seçilen cihaz bu kapının projesinde değil");
+       }
+     }
++    const hikDoorStatusPlan = args.hikDoorStatusPlan ? normalizeDoorStatusPlan(args.hikDoorStatusPlan) : undefined;
+     const now = new Date().toISOString();
+     const doorId = await ctx.db.insert("doors", {
+       ...args,
++      hikDoorStatusPlan,
+       projectId,
+       status: args.status ?? "active",
+       createdAt: now,
+@@ -264,14 +260,7 @@ export const update = authedMutation({
+       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
+     ),
+     hikDoorNo: v.optional(v.number()),
+-    hikDoorStatusPlan: v.optional(
+-      v.object({
+-        enabled: v.boolean(),
+-        beginTime: v.string(),
+-        endTime: v.string(),
+-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+-      })
+-    ),
++    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
+     hikVerifyPlan: v.optional(
+       v.object({
+         enabled: v.boolean(),
+@@ -301,6 +290,7 @@ export const update = authedMutation({
+       }
+     }
+     const { doorId, ...updates } = args;
++    if (updates.hikDoorStatusPlan) updates.hikDoorStatusPlan = normalizeDoorStatusPlan(updates.hikDoorStatusPlan);
+     const now = new Date().toISOString();
+     await ctx.db.patch(doorId, { ...updates, updatedAt: now });
+     if (args.hikDoorNo !== undefined) {
+diff --git a/convex/lib/doorStatusPlan.test.ts b/convex/lib/doorStatusPlan.test.ts
+new file mode 100644
+index 00000000..4ef12cb7
+--- /dev/null
++++ b/convex/lib/doorStatusPlan.test.ts
+@@ -0,0 +1,158 @@
++import { describe, expect, it } from "vitest";
++import {
++  buildDoorStatusSegments,
++  DOOR_STATUS_DAYS,
++  normalizeDoorStatusPlan,
++  type DoorStatusPlan,
++} from "./doorStatusPlan";
++const legacy: DoorStatusPlan = {
++  enabled: true,
++  beginTime: "08:00:00",
++  endTime: "18:00:00",
++  mode: "remainOpen",
++};
++const segment = {
++  beginTime: "09:00",
++  endTime: "12:00",
++  mode: "normal" as const,
++};
++describe("buildDoorStatusSegments", () => {
++  it("eski tek aralık koduyla birebir aynı yedi segmenti üretir", () => {
++    expect(buildDoorStatusSegments(legacy)).toEqual(
++      DOOR_STATUS_DAYS.map((week, index) => ({
++        week,
++        id: index + 1,
++        enable: true,
++        doorStatus: legacy.mode,
++        beginTime: legacy.beginTime,
++        endTime: legacy.endTime,
++      })),
++    );
++  });
++  it("haftalık günleri, sıraları, modları ve boş günleri korur", () => {
++    expect(
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          {
++            day: "Monday",
++            segments: [
++              segment,
++              {
++                ...segment,
++                beginTime: "13:00:01",
++                endTime: "18:00:02",
++                mode: "remainClosed",
++              },
++            ],
++          },
++          { day: "Sunday", segments: [] },
++        ],
++      }),
++    ).toEqual([
++      {
++        week: "Monday",
++        id: 1,
++        enable: true,
++        doorStatus: "normal",
++        beginTime: "09:00:00",
++        endTime: "12:00:00",
++      },
++      {
++        week: "Monday",
++        id: 2,
++        enable: true,
++        doorStatus: "remainClosed",
++        beginTime: "13:00:01",
++        endTime: "18:00:02",
++      },
++    ]);
++    expect(buildDoorStatusSegments({ ...legacy, weekly: [] })).toEqual([]);
++  });
++  it("eski okuyucular için ilk segmenti veya varsayılanları doldurur", () => {
++    expect(
++      normalizeDoorStatusPlan({
++        ...legacy,
++        weekly: [{ day: "Tuesday", segments: [segment] }],
++      }),
++    ).toMatchObject({
++      beginTime: "09:00:00",
++      endTime: "12:00:00",
++      mode: "normal",
++    });
++    expect(normalizeDoorStatusPlan({ ...legacy, weekly: [] })).toMatchObject({
++      beginTime: "08:00:00",
++      endTime: "18:00:00",
++      mode: "remainOpen",
++    });
++  });
++  it.each(["24:00", "08:60", "8:00", "08:00:60", ""])(
++    "geçersiz saati reddeder: %s",
++    (beginTime) => {
++      expect(() =>
++        buildDoorStatusSegments({
++          ...legacy,
++          weekly: [{ day: "Monday", segments: [{ ...segment, beginTime }] }],
++        }),
++      ).toThrow("Saat");
++    },
++  );
++  it.each(["12:00", "13:00"])("begin>=end reddeder: %s", (beginTime) => {
++    expect(() =>
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [{ day: "Monday", segments: [{ ...segment, beginTime }] }],
++      }),
++    ).toThrow("Başlangıç");
++  });
++  it("sırasız çakışmayı, dokuz segmenti ve tekrar eden günü reddeder", () => {
++    expect(() =>
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          {
++            day: "Monday",
++            segments: [{ ...segment, beginTime: "10:00" }, segment],
++          },
++        ],
++      }),
++    ).toThrow("çakışamaz");
++    expect(() =>
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          { day: "Monday", segments: Array.from({ length: 9 }, () => segment) },
++        ],
++      }),
++    ).toThrow("en fazla 8");
++    expect(() =>
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          { day: "Monday", segments: [] },
++          { day: "Monday", segments: [] },
++        ],
++      }),
++    ).toThrow("en fazla bir kez");
++  });
++  it("bitişik sekiz aralığı kabul eder ve legacy saatleri doğrular", () => {
++    expect(
++      buildDoorStatusSegments({
++        ...legacy,
++        weekly: [
++          {
++            day: "Monday",
++            segments: Array.from({ length: 8 }, (_, i) => ({
++              ...segment,
++              beginTime: `${String(i).padStart(2, "0")}:00`,
++              endTime: `${String(i + 1).padStart(2, "0")}:00`,
++            })),
++          },
++        ],
++      }),
++    ).toHaveLength(8);
++    expect(() =>
++      buildDoorStatusSegments({ ...legacy, beginTime: "18:00:00" }),
++    ).toThrow("Başlangıç");
++  });
++});
+diff --git a/convex/lib/doorStatusPlan.ts b/convex/lib/doorStatusPlan.ts
+new file mode 100644
+index 00000000..239ad9b2
+--- /dev/null
++++ b/convex/lib/doorStatusPlan.ts
+@@ -0,0 +1,134 @@
++import { ConvexError, v } from "convex/values";
++import type { Infer } from "convex/values";
++import type { DoorStatusSegment } from "./gateway/plans";
++
++export const DOOR_STATUS_DAYS = [
++  "Monday",
++  "Tuesday",
++  "Wednesday",
++  "Thursday",
++  "Friday",
++  "Saturday",
++  "Sunday",
++] as const;
++// gateway/scheduling.ts MAX_SEGMENTS_PER_DAY (Node runtime) ile aynı Hik sınırı.
++export const DOOR_STATUS_MAX_SEGMENTS = 8;
++const modeValidator = v.union(
++  v.literal("remainOpen"),
++  v.literal("normal"),
++  v.literal("remainClosed"),
++);
++export const doorStatusPlanValidator = v.object({
++  enabled: v.boolean(),
++  beginTime: v.string(),
++  endTime: v.string(),
++  mode: modeValidator,
++  weekly: v.optional(
++    v.array(
++      v.object({
++        day: v.union(
++          v.literal("Monday"),
++          v.literal("Tuesday"),
++          v.literal("Wednesday"),
++          v.literal("Thursday"),
++          v.literal("Friday"),
++          v.literal("Saturday"),
++          v.literal("Sunday"),
++        ),
++        segments: v.array(
++          v.object({
++            beginTime: v.string(),
++            endTime: v.string(),
++            mode: modeValidator,
++          }),
++        ),
++      }),
++    ),
++  ),
++});
++export type DoorStatusPlan = Infer<typeof doorStatusPlanValidator>;
++export type DoorStatusInterval = Pick<
++  DoorStatusPlan,
++  "beginTime" | "endTime" | "mode"
++>;
++
++export function normalizeDoorStatusTime(time: string): string {
++  if (!/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(time)) {
++    throw new ConvexError("Saat HH:MM veya HH:MM:SS biçiminde olmalıdır.");
++  }
++  return time.length === 5 ? `${time}:00` : time;
++}
++
++/** Doğrulama ve eski okuyucular için zorunlu tek-aralık alanları. */
++export function normalizeDoorStatusPlan(plan: DoorStatusPlan): DoorStatusPlan {
++  const interval = (segment: DoorStatusInterval): DoorStatusInterval => {
++    const beginTime = normalizeDoorStatusTime(segment.beginTime);
++    const endTime = normalizeDoorStatusTime(segment.endTime);
++    if (beginTime >= endTime)
++      throw new ConvexError(
++        "Başlangıç bitişten önce olmalıdır; gece yarısını geçen aralığı iki güne bölün.",
++      );
++    return { beginTime, endTime, mode: segment.mode };
++  };
++  if (plan.weekly === undefined)
++    return { enabled: plan.enabled, ...interval(plan) };
++  const seen = new Set<string>();
++  const weekly = plan.weekly.map(({ day, segments }) => {
++    if (!DOOR_STATUS_DAYS.some((value) => value === day) || seen.has(day))
++      throw new ConvexError(
++        "Haftanın her günü en fazla bir kez tanımlanabilir.",
++      );
++    seen.add(day);
++    if (segments.length > DOOR_STATUS_MAX_SEGMENTS)
++      throw new ConvexError(
++        "Bir günde en fazla 8 zaman aralığı tanımlanabilir.",
++      );
++    const normalized = segments.map(interval);
++    const sorted = [...normalized].sort((a, b) =>
++      a.beginTime.localeCompare(b.beginTime),
++    );
++    for (let i = 1; i < sorted.length; i++) {
++      const previous = sorted[i - 1];
++      const current = sorted[i];
++      if (previous && current && previous.endTime > current.beginTime)
++        throw new ConvexError("Aynı gündeki zaman aralıkları çakışamaz.");
++    }
++    return { day, segments: normalized };
++  });
++  const first = weekly.flatMap((day) => day.segments)[0];
++  return {
++    enabled: plan.enabled,
++    ...(first ?? {
++      beginTime: "08:00:00",
++      endTime: "18:00:00",
++      mode: "remainOpen",
++    }),
++    weekly,
++  };
++}
++
++export function buildDoorStatusSegments(
++  plan: DoorStatusPlan,
++): DoorStatusSegment[] {
++  const normalized = normalizeDoorStatusPlan(plan);
++  if (normalized.weekly === undefined) {
++    return DOOR_STATUS_DAYS.map((week, index) => ({
++      week,
++      id: index + 1,
++      enable: true,
++      doorStatus: normalized.mode,
++      beginTime: normalized.beginTime,
++      endTime: normalized.endTime,
++    }));
++  }
++  return normalized.weekly.flatMap(({ day, segments }) =>
++    segments.map((segment, index) => ({
++      week: day,
++      id: index + 1,
++      enable: true,
++      doorStatus: segment.mode,
++      beginTime: segment.beginTime,
++      endTime: segment.endTime,
++    })),
++  );
++}
+diff --git a/convex/schema.ts b/convex/schema.ts
+index 5dfb264e..39c3b3df 100644
+--- a/convex/schema.ts
++++ b/convex/schema.ts
+@@ -1,3 +1,4 @@
++import { doorStatusPlanValidator } from "./lib/doorStatusPlan";
+ import { defineSchema, defineTable } from "convex/server";
+ import { v } from "convex/values";
+ import { authTables } from "@convex-dev/auth/server";
+@@ -286,14 +287,7 @@ export default defineSchema({
+     // openDoor/setDoorParam ile tutarlı; boşsa 1 default.
+     hikDoorNo: v.optional(v.number()),
+     // Kapı durum planı (DoorStatusPlan) — mesai saatinde kapıyı otomatik açık/kapalı tutar.
+-    hikDoorStatusPlan: v.optional(
+-      v.object({
+-        enabled: v.boolean(),
+-        beginTime: v.string(), // "HH:MM:SS"
+-        endTime: v.string(),   // "HH:MM:SS"
+-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+-      })
+-    ),
++    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
+     // Doğrulama planı (VerifyWeekPlan) — saate göre doğrulama modunu değiştirir.
+     hikVerifyPlan: v.optional(
+       v.object({
+diff --git a/src/components/access-control/DoorStatusPlanEditor.test.tsx b/src/components/access-control/DoorStatusPlanEditor.test.tsx
+new file mode 100644
+index 00000000..fc904765
+--- /dev/null
++++ b/src/components/access-control/DoorStatusPlanEditor.test.tsx
+@@ -0,0 +1,248 @@
++import { isValidElement, type ReactNode, type ReactElement } from "react";
++import { renderToStaticMarkup } from "react-dom/server";
++import { describe, expect, it, vi, beforeEach } from "vitest";
++import { DoorStatusPlanEditor } from "./DoorStatusPlanEditor";
++import { EditDoorDialog } from "./EditDoorDialog";
++import type { DoorStatusPlan } from "../../../convex/lib/doorStatusPlan";
++import type { Id } from "../../../convex/_generated/dataModel";
++
++const state = vi.hoisted(() => ({
++  slots: [] as unknown[],
++  cursor: 0,
++  save: vi.fn(),
++  apply: vi.fn(),
++  dirty: false,
++}));
++vi.mock("react", async (importOriginal) => ({
++  ...(await importOriginal<typeof import("react")>()),
++  useState: (initial: unknown) => {
++    const index = state.cursor++;
++    if (state.slots.length <= index)
++      state.slots[index] =
++        typeof initial === "function" ? (initial as () => unknown)() : initial;
++    return [
++      state.slots[index],
++      (next: unknown) => {
++        state.slots[index] =
++          typeof next === "function"
++            ? (next as (previous: unknown) => unknown)(state.slots[index])
++            : next;
++      },
++    ];
++  },
++}));
++vi.mock("convex/react", () => ({
++  useMutation: () => state.save,
++  useAction: () => state.apply,
++}));
++vi.mock("@/hooks/useProjectAccess", () => ({
++  useProjectAccess: () => ({ isAdmin: true }),
++}));
++vi.mock("@/hooks/useAsyncAction", () => ({
++  useAsyncAction: (run: (...args: unknown[]) => Promise<unknown>) => ({
++    run,
++    pending: false,
++  }),
++}));
++vi.mock("@/components/shared/UnsavedChangesDialog", () => ({
++  useUnsavedChangesGuard: (dirty: boolean) => {
++    state.dirty = dirty;
++    return { requestClose: vi.fn(), dialog: null };
++  },
++}));
++vi.mock("@/lib/notify", () => ({
++  errorMessage: String,
++  notify: { success: vi.fn() },
++}));
++const legacy: DoorStatusPlan = {
++  enabled: true,
++  beginTime: "08:00:00",
++  endTime: "18:00:00",
++  mode: "remainOpen",
++};
++type Props = Record<string, unknown> & { children?: ReactNode };
++function nodes(node: ReactNode): ReactElement<Props>[] {
++  if (Array.isArray(node)) return node.flatMap((child) => nodes(child));
++  if (!isValidElement<Props>(node)) return [];
++  return [node, ...nodes(node.props.children)];
++}
++function find(
++  node: ReactNode,
++  predicate: (element: ReactElement<Props>) => boolean,
++) {
++  const found = nodes(node).find(predicate);
++  if (!found) throw new Error("Element bulunamadı");
++  return found;
++}
++function edit(initial = legacy) {
++  let value = initial;
++  const onChange = (next: DoorStatusPlan) => {
++    value = next;
++  };
++  return {
++    tree: () => DoorStatusPlanEditor({ value, onChange }),
++    value: () => value,
++  };
++}
++function click(tree: ReactNode, label: string) {
++  const button = find(
++    tree,
++    (element) =>
++      element.props["aria-label"] === label || element.props.children === label,
++  );
++  (button.props.onClick as () => void)();
++}
++beforeEach(() => {
++  state.slots = [];
++  state.cursor = 0;
++  state.dirty = false;
++  state.save.mockReset().mockResolvedValue(undefined);
++  state.apply.mockReset().mockResolvedValue({ ok: true });
++});
++describe("DoorStatusPlanEditor", () => {
++  it("Her gün aynı ile Gün bazında arasında geçer ve yedi günü doldurur", () => {
++    const editor = edit();
++    const change = (value: string) =>
++      (
++        find(
++          editor.tree(),
++          (element) =>
++            element.props["aria-label"] === "Kapı durum planı düzeni",
++        ).props.onChange as (event: { target: { value: string } }) => void
++      )({ target: { value } });
++    change("weekly");
++    expect(editor.value().weekly).toHaveLength(7);
++    expect(
++      editor
++        .value()
++        .weekly?.every((day) => day.segments[0]?.beginTime === "08:00:00"),
++    ).toBe(true);
++    change("daily");
++    expect(editor.value().weekly).toBeUndefined();
++    expect(editor.value().beginTime).toBe("08:00:00");
++  });
++  it("boş gün, ekle/sil, sekiz aralık sınırı ve pazartesi kopyası", () => {
++    const editor = edit({
++      ...legacy,
++      weekly: [
++        {
++          day: "Monday",
++          segments: [
++            { beginTime: "09:00", endTime: "12:00", mode: "remainClosed" },
++          ],
++        },
++      ],
++    });
++    click(editor.tree(), "Salı aralık ekle");
++    expect(
++      editor.value().weekly?.find((day) => day.day === "Tuesday")?.segments,
++    ).toHaveLength(1);
++    click(editor.tree(), "Salı 1. aralığı sil");
++    expect(
++      editor.value().weekly?.find((day) => day.day === "Tuesday")?.segments,
++    ).toEqual([]);
++    click(editor.tree(), "Pazartesiyi tüm hafta içine kopyala");
++    expect(
++      editor
++        .value()
++        .weekly?.every((day) => day.segments[0]?.mode === "remainClosed"),
++    ).toBe(true);
++    for (let i = 1; i < 8; i++) click(editor.tree(), "Salı aralık ekle");
++    expect(
++      find(
++        editor.tree(),
++        (element) => element.props["aria-label"] === "Salı aralık ekle",
++      ).props.disabled,
++    ).toBe(true);
++    const html = renderToStaticMarkup(editor.tree());
++    expect(html).toContain('aria-label="Pazartesi 1. aralık başlangıç"');
++    expect(html).toContain('aria-label="Pazar 1. aralık mod"');
++  });
++  it("boş pazartesiyi tüm haftaya kopyalar", () => {
++    const editor = edit({
++      ...legacy,
++      weekly: [{ day: "Tuesday", segments: [legacy] }],
++    });
++    click(editor.tree(), "Pazartesiyi tüm hafta içine kopyala");
++    expect(
++      editor.value().weekly?.every((day) => day.segments.length === 0),
++    ).toBe(true);
++  });
++});
++describe("EditDoorDialog haftalık kayıt", () => {
++  const door = {
++    _id: "door" as Id<"doors">,
++    name: "Kapı",
++    hikDoorNo: 2,
++    hikDoorStatusPlan: legacy,
++  };
++  function dialog() {
++    state.cursor = 0;
++    return EditDoorDialog({
++      open: true,
++      onOpenChange: vi.fn(),
++      onSuccess: vi.fn(),
++      door,
++      device: {
++        _id: "device" as Id<"devices">,
++        brand: "hikvision",
++        hikTransport: "gateway",
++      },
++    });
++  }
++  it("weekly değişikliğini guard'a dahil eder, saniyeleri ve modları kaydet payload'unda korur", async () => {
++    const initial = dialog();
++    expect(state.dirty).toBe(false);
++    const onChange = find(
++      initial,
++      (element) => element.type === DoorStatusPlanEditor,
++    ).props.onChange as (plan: DoorStatusPlan) => void;
++    onChange({
++      ...legacy,
++      weekly: [
++        {
++          day: "Monday",
++          segments: [
++            {
++              beginTime: "09:00:01",
++              endTime: "12:00:02",
++              mode: "remainClosed",
++            },
++          ],
++        },
++        { day: "Sunday", segments: [] },
++      ],
++    });
++    const updated = dialog();
++    expect(state.dirty).toBe(true);
++    await (
++      find(updated, (element) => element.type === "form").props
++        .onSubmit as (event: { preventDefault: () => void }) => Promise<void>
++    )({ preventDefault: vi.fn() });
++    expect(state.save).toHaveBeenCalledWith(
++      expect.objectContaining({
++        doorId: door._id,
++        hikDoorStatusPlan: {
++          enabled: true,
++          beginTime: "09:00:01",
++          endTime: "12:00:02",
++          mode: "remainClosed",
++          weekly: [
++            {
++              day: "Monday",
++              segments: [
++                {
++                  beginTime: "09:00:01",
++                  endTime: "12:00:02",
++                  mode: "remainClosed",
++                },
++              ],
++            },
++            { day: "Sunday", segments: [] },
++          ],
++        },
++      }),
++    );
++    expect(state.apply).toHaveBeenCalledTimes(2);
++  });
++});
+diff --git a/src/components/access-control/DoorStatusPlanEditor.tsx b/src/components/access-control/DoorStatusPlanEditor.tsx
+new file mode 100644
+index 00000000..d6bcc025
+--- /dev/null
++++ b/src/components/access-control/DoorStatusPlanEditor.tsx
+@@ -0,0 +1,231 @@
++import { Button } from "@/components/ui/button";
++import { Input } from "@/components/ui/input";
++import { Label } from "@/components/ui/label";
++import {
++  DOOR_STATUS_DAYS,
++  DOOR_STATUS_MAX_SEGMENTS,
++  type DoorStatusInterval,
++  type DoorStatusPlan,
++} from "../../../convex/lib/doorStatusPlan";
++
++const DAY_LABELS = [
++  "Pazartesi",
++  "Salı",
++  "Çarşamba",
++  "Perşembe",
++  "Cuma",
++  "Cumartesi",
++  "Pazar",
++];
++function IntervalEditor({
++  value,
++  onChange,
++  label,
++}: {
++  value: DoorStatusInterval;
++  onChange: (value: DoorStatusInterval) => void;
++  label: string;
++}) {
++  return (
++    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
++      <Label className="space-y-1">
++        Başlangıç (TR saati)
++        <Input
++          aria-label={`${label} başlangıç`}
++          type="time"
++          step={1}
++          value={value.beginTime}
++          onChange={(e) => onChange({ ...value, beginTime: e.target.value })}
++        />
++      </Label>
++      <Label className="space-y-1">
++        Bitiş (TR saati)
++        <Input
++          aria-label={`${label} bitiş`}
++          type="time"
++          step={1}
++          value={value.endTime}
++          onChange={(e) => onChange({ ...value, endTime: e.target.value })}
++        />
++      </Label>
++      <Label className="space-y-1">
++        Mod
++        <select
++          className="h-10 w-full rounded-md border bg-background px-2 text-sm"
++          aria-label={`${label} mod`}
++          value={value.mode}
++          onChange={(e) => {
++            const mode = e.target.value;
++            if (
++              mode === "remainOpen" ||
++              mode === "remainClosed" ||
++              mode === "normal"
++            )
++              onChange({ ...value, mode });
++          }}
++        >
++          <option value="remainOpen">Sürekli Açık</option>
++          <option value="normal">Normal</option>
++          <option value="remainClosed">Sürekli Kapalı</option>
++        </select>
++      </Label>
++    </div>
++  );
++}
++
++export function DoorStatusPlanEditor({
++  value,
++  onChange,
++}: {
++  value: DoorStatusPlan;
++  onChange: (value: DoorStatusPlan) => void;
++}) {
++  const setDay = (
++    day: (typeof DOOR_STATUS_DAYS)[number],
++    segments: DoorStatusInterval[],
++  ) =>
++    onChange({
++      ...value,
++      weekly: DOOR_STATUS_DAYS.map((dayName) => ({
++        day: dayName,
++        segments:
++          dayName === day
++            ? segments
++            : (value.weekly?.find((entry) => entry.day === dayName)?.segments ??
++              []),
++      })),
++    });
++  return (
++    <div className="space-y-3">
++      <Label className="block space-y-1">
++        Plan düzeni
++        <select
++          aria-label="Kapı durum planı düzeni"
++          className="h-10 w-full rounded-md border bg-background px-2"
++          value={value.weekly === undefined ? "daily" : "weekly"}
++          onChange={(e) => {
++            const { weekly, ...daily } = value;
++            onChange(
++              e.target.value === "weekly"
++                ? {
++                    ...daily,
++                    weekly: DOOR_STATUS_DAYS.map((day) => ({
++                      day,
++                      segments: [
++                        {
++                          beginTime: daily.beginTime,
++                          endTime: daily.endTime,
++                          mode: daily.mode,
++                        },
++                      ],
++                    })),
++                  }
++                : {
++                    ...daily,
++                    ...weekly?.flatMap((entry) => entry.segments)[0],
++                  },
++            );
++          }}
++        >
++          <option value="daily">Her gün aynı</option>
++          <option value="weekly">Gün bazında</option>
++        </select>
++      </Label>
++      {value.weekly === undefined ? (
++        <IntervalEditor
++          value={value}
++          label="Her gün"
++          onChange={(segment) => onChange({ ...value, ...segment })}
++        />
++      ) : (
++        <>
++          <Button
++            type="button"
++            variant="outline"
++            className="h-auto whitespace-normal"
++            onClick={() => {
++              const monday =
++                value.weekly?.find((entry) => entry.day === "Monday")
++                  ?.segments ?? [];
++              onChange({
++                ...value,
++                weekly: DOOR_STATUS_DAYS.map((day) => ({
++                  day,
++                  segments: monday.map((segment) => ({ ...segment })),
++                })),
++              });
++            }}
++          >
++            Pazartesiyi tüm hafta içine kopyala
++          </Button>
++          {DOOR_STATUS_DAYS.map((day, dayIndex) => {
++            const segments =
++              value.weekly?.find((entry) => entry.day === day)?.segments ?? [];
++            const label = DAY_LABELS[dayIndex] ?? day;
++            return (
++              <fieldset key={day} className="space-y-2 rounded-md border p-2">
++                <legend className="px-1 text-sm font-medium">{label}</legend>
++                {segments.length === 0 && (
++                  <p className="text-xs text-muted-foreground">
++                    Zaman aralığı yok
++                  </p>
++                )}
++                {segments.map((segment, index) => (
++                  <div key={index} className="space-y-2">
++                    <IntervalEditor
++                      value={segment}
++                      label={`${label} ${index + 1}. aralık`}
++                      onChange={(next) =>
++                        setDay(
++                          day,
++                          segments.map((item, i) =>
++                            i === index ? next : item,
++                          ),
++                        )
++                      }
++                    />
++                    <Button
++                      type="button"
++                      variant="ghost"
++                      aria-label={`${label} ${index + 1}. aralığı sil`}
++                      onClick={() =>
++                        setDay(
++                          day,
++                          segments.filter((_, i) => i !== index),
++                        )
++                      }
++                    >
++                      Aralığı sil
++                    </Button>
++                  </div>
++                ))}
++                <Button
++                  type="button"
++                  variant="outline"
++                  disabled={segments.length >= DOOR_STATUS_MAX_SEGMENTS}
++                  aria-label={`${label} aralık ekle`}
++                  onClick={() =>
++                    setDay(day, [
++                      ...segments,
++                      {
++                        beginTime: "08:00:00",
++                        endTime: "18:00:00",
++                        mode: "remainOpen",
++                      },
++                    ])
++                  }
++                >
++                  Aralık ekle
++                </Button>
++              </fieldset>
++            );
++          })}
++        </>
++      )}
++      <p className="text-xs text-muted-foreground">
++        Gün başına en fazla 8 aralık. Gece yarısını geçen aralıkları iki güne
++        bölün.
++      </p>
++    </div>
++  );
++}
+diff --git a/src/components/access-control/EditDoorDialog.tsx b/src/components/access-control/EditDoorDialog.tsx
+index 5c35aaa5..4d610f05 100644
+--- a/src/components/access-control/EditDoorDialog.tsx
++++ b/src/components/access-control/EditDoorDialog.tsx
+@@ -1,3 +1,5 @@
++import { DoorStatusPlanEditor } from "./DoorStatusPlanEditor";
++import { normalizeDoorStatusPlan, type DoorStatusPlan } from "../../../convex/lib/doorStatusPlan";
+ import { useProjectAccess } from "@/hooks/useProjectAccess";
+ import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+ import { useState } from "react";
+@@ -43,12 +45,7 @@ export type DoorForEdit = {
+   name: string;
+   doorCode?: string;
+   hikDoorNo?: number;
+-  hikDoorStatusPlan?: {
+-    enabled: boolean;
+-    beginTime: string;
+-    endTime: string;
+-    mode: "remainOpen" | "normal";
+-  };
++  hikDoorStatusPlan?: DoorStatusPlan;
+   hikVerifyPlan?: {
+     enabled: boolean;
+     beginTime: string;
+@@ -66,12 +63,7 @@ interface EditDoorDialogProps {
+ }
+ 
+ // hikDoorStatusPlan form state tipi — schema shape ile birebir
+-type DoorStatusPlanState = {
+-  enabled: boolean;
+-  beginTime: string;
+-  endTime: string;
+-  mode: "remainOpen" | "normal";
+-};
++type DoorStatusPlanState = DoorStatusPlan;
+ 
+ // hikVerifyPlan form state tipi — schema shape ile birebir
+ type VerifyPlanState = {
+@@ -127,14 +119,7 @@ export function EditDoorDialog({
+   );
+ 
+   const [statusPlan, setStatusPlan] = useState<DoorStatusPlanState>(
+-    door.hikDoorStatusPlan
+-      ? {
+-          enabled: door.hikDoorStatusPlan.enabled,
+-          beginTime: door.hikDoorStatusPlan.beginTime.slice(0, 5),
+-          endTime: door.hikDoorStatusPlan.endTime.slice(0, 5),
+-          mode: door.hikDoorStatusPlan.mode,
+-        }
+-      : DEFAULT_STATUS_PLAN
++    door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN
+   );
+ 
+   const [verifyPlan, setVerifyPlan] = useState<VerifyPlanState>(
+@@ -177,11 +162,7 @@ export function EditDoorDialog({
+       name: name.trim(),
+       doorCode: doorCode.trim() || undefined,
+       hikDoorNo: parsedDoorNo,
+-      hikDoorStatusPlan: showHikSection ? {
+-        ...statusPlan,
+-        beginTime: `${statusPlan.beginTime}:00`,
+-        endTime: `${statusPlan.endTime}:00`,
+-      } : undefined,
++      hikDoorStatusPlan: showHikSection ? normalizeDoorStatusPlan(statusPlan) : undefined,
+       hikVerifyPlan: showHikSection ? {
+         ...verifyPlan,
+         beginTime: `${verifyPlan.beginTime}:00`,
+@@ -206,7 +187,7 @@ export function EditDoorDialog({
+   }, { error: "Planlar gönderilemedi" });
+   const isSubmitting = saveAction.pending || retryAction.pending;
+ 
+-  const guard = useUnsavedChangesGuard(open && (!saved && (name !== door.name || doorCode !== (door.doorCode ?? "") || hikDoorNo !== (door.hikDoorNo !== undefined ? String(door.hikDoorNo) : "") || JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ? { ...door.hikDoorStatusPlan, beginTime: door.hikDoorStatusPlan.beginTime.slice(0, 5), endTime: door.hikDoorStatusPlan.endTime.slice(0, 5) } : DEFAULT_STATUS_PLAN) || JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ? { ...door.hikVerifyPlan, beginTime: door.hikVerifyPlan.beginTime.slice(0, 5), endTime: door.hikVerifyPlan.endTime.slice(0, 5) } : DEFAULT_VERIFY_PLAN))));
++  const guard = useUnsavedChangesGuard(open && (!saved && (name !== door.name || doorCode !== (door.doorCode ?? "") || hikDoorNo !== (door.hikDoorNo !== undefined ? String(door.hikDoorNo) : "") || JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN) || JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ? { ...door.hikVerifyPlan, beginTime: door.hikVerifyPlan.beginTime.slice(0, 5), endTime: door.hikVerifyPlan.endTime.slice(0, 5) } : DEFAULT_VERIFY_PLAN))));
+   const close = () => { if (!isSubmitting) guard.requestClose(() => onOpenChange(false)); };
+   const handleSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+@@ -224,7 +205,8 @@ export function EditDoorDialog({
+     }
+     const errors: Record<string, string> = {};
+     if (showHikSection) {
+-      for (const [key, plan] of [["status", statusPlan], ["verify", verifyPlan]] as const) {
++      try { normalizeDoorStatusPlan(statusPlan); } catch (error: unknown) { errors["status-plan"] = errorMessage(error); }
++      for (const [key, plan] of [["verify", verifyPlan]] as const) {
+         const result = doorPlanTimeSchema.safeParse({
+           beginTime: plan.beginTime,
+           endTime: plan.endTime,
+@@ -327,56 +309,9 @@ export function EditDoorDialog({
+                         }
+                       />
+                     </div>
+-                    <div className="grid grid-cols-2 gap-3">
+-                      <FormFieldWrapper htmlFor="status-beginTime" label="Başlangıç (TR saati)" error={timeErrors["status-beginTime"]}>
+-                        <Input
+-                          id="status-beginTime"
+-                          type="time"
+-                          step={60}
+-                          value={statusPlan.beginTime.slice(0, 5)}
+-                          onChange={(e) =>
+-                            setStatusPlan((p) => ({
+-                              ...p,
+-                              beginTime: e.target.value,
+-                            }))
+-                          }
+-                        />
+-                      </FormFieldWrapper>
+-                      <FormFieldWrapper htmlFor="status-endTime" label="Bitiş (TR saati)" error={timeErrors["status-endTime"]}>
+-                        <Input
+-                          id="status-endTime"
+-                          type="time"
+-                          step={60}
+-                          value={statusPlan.endTime.slice(0, 5)}
+-                          onChange={(e) =>
+-                            setStatusPlan((p) => ({
+-                              ...p,
+-                              endTime: e.target.value,
+-                            }))
+-                          }
+-                        />
+-                      </FormFieldWrapper>
+-                    </div>
+-                    <div className="space-y-1">
+-                      <Label htmlFor="status-mode" className="text-xs">Mod</Label>
+-                      <Select
+-                        disabled={isSubmitting || saved}
+-                        value={statusPlan.mode}
+-                        onValueChange={(v) =>
+-                          setStatusPlan((p) => ({
+-                            ...p,
+-                            mode: v as "remainOpen" | "normal",
+-                          }))
+-                        }
+-                      >
+-                        <SelectTrigger id="status-mode">
+-                          <SelectValue />
+-                        </SelectTrigger>
+-                        <SelectContent>
+-                          <SelectItem value="remainOpen">Sürekli Açık</SelectItem>
+-                          <SelectItem value="normal">Normal</SelectItem>
+-                        </SelectContent>
+-                      </Select>
++                    <div id="status-plan" tabIndex={-1} role="group" aria-label="Kapı durum planı aralıkları" aria-invalid={!!timeErrors["status-plan"]} aria-describedby={timeErrors["status-plan"] ? "status-plan-error" : undefined}>
++                      <DoorStatusPlanEditor value={statusPlan} onChange={setStatusPlan} />
++                      {timeErrors["status-plan"] && <p id="status-plan-error" className="mt-2 text-xs text-destructive">{timeErrors["status-plan"]}</p>}
+                     </div>
+                   </div>
+ 
