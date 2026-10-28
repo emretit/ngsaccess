@@ -425,7 +425,7 @@ export default defineSchema({
     hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
     hikLastSeenAt: v.optional(v.number()),
     hikOfflineHint: v.optional(v.string()),
-    // Exhausted registration cleanup retries; resume on the next ISUP online event.
+    // Eski kayıt-sonrası temizlik bayrağı; temizlik kaldırıldı (2026-10-28), artık okunmuyor.
     hikRosterReconcilePending: v.optional(v.boolean()),
     hikIsupOnline: v.optional(v.boolean()),
     hikIsupStatusAt: v.optional(v.number()),

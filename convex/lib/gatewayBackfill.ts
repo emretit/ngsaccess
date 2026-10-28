@@ -193,11 +193,8 @@ export async function runBackfillDeviceFromGroups(
     ),
   );
 
-  await ctx.scheduler.runAfter(0, internal.actions.hikRosterReconcile.reconcileHikDeviceRoster, {
-    deviceId: args.deviceId,
-    dryRun: false,
-    reason: "register",
-  });
+  // Kayıt sonrası cihazdaki ngsplus dışı kişiler ASLA silinmez (Emre 2026-10-28):
+  // sahada çalışan cihazın yerel kişileri korunur.
   return { employees: empIds.length, rules: ruleIds.length };
 }
 

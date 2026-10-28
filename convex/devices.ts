@@ -1021,12 +1021,6 @@ export const applyIsupStatus = internalMutation({
     // Equal-time retries also cannot undo a newer transition with the same timestamp.
     if (device.hikIsupStatusAt !== undefined && args.at <= device.hikIsupStatusAt) return true;
     const online = args.status === "online";
-    if (online && device.hikRosterReconcilePending === true) {
-      await ctx.db.patch(device._id, { hikRosterReconcilePending: undefined });
-      await ctx.scheduler.runAfter(0, internal.actions.hikRosterReconcile.reconcileHikDeviceRoster, {
-        deviceId: device._id, dryRun: false, reason: "register", attempt: 0,
-      });
-    }
     const offlineFrom = device.hikIsupOfflineSince;
     if (online === device.hikIsupOnline) {
       await ctx.db.patch(device._id, { hikIsupStatusAt: args.at });
