@@ -43,11 +43,12 @@ export const FINGERPRINT_CAPTURE_TIMEOUT_MS = 35_000;
 export const MAX_FINGERPRINTS_PER_PERSON = 10;
 
 /**
- * Hik ISAPI arama oturumu kimliği. Cihazlar en fazla 32 karakter kabul eder
- * (DS-K1T804AMF 33+ karakterde `badParameters` döner); tiresiz UUID tam 32 karakterdir.
+ * Hik ISAPI arama oturumu kimliği. DS-K1T804AMF `AcsEvent` aramasında 21+ karakteri,
+ * kişi/kart/parmak izi aramalarında 33+ karakteri `badParameters` ile reddeder;
+ * ortak sınır 20 karakter (80 bit rastgele).
  */
 export function newHikSearchId(): string {
-  return crypto.randomUUID().replace(/-/g, "");
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 20);
 }
 
 /**
