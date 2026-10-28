@@ -37,6 +37,8 @@ import { useNow } from "@/hooks/useNow";
 import { deviceConnection } from "@/lib/deviceStatus";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export function DevicePersonImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { can } = usePermissions();
@@ -67,7 +69,13 @@ export function DevicePersonImportDialog({ open, onOpenChange }: { open: boolean
               {eligible.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
             </NativeSelect>
           </label>
-          {open && device && <PersonImport key={device._id} device={device} connected={deviceConnection(device, now) === "online"} canBiometrics={can("biometrics.manage")} onPendingChange={(value) => { pending.current = value; setIsPending(value); }} />}
+          {open && device && <PersonImport key={device._id} device={device} connected={deviceConnection(device, now) === "online"} canBiometrics={can("biometrics.manage")} onPendingChange={(value) => { pending.current = value; setIsPending(value); }}
+            onImported={(result) => {
+              // Aktarım bitti: ilerleme penceresi ve bu diyalog birlikte kapanır, sonuç bildirimde görünür.
+              pending.current = false; setIsPending(false); setSelectedId("");
+              onOpenChange(false);
+              notify.success("Aktarım tamamlandı", importResultText(result, device.name ?? "Cihaz"));
+            }} />}
         </>}
     </DialogContent>
   </Dialog>;
@@ -82,8 +90,9 @@ const statuses = {
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Beklenmeyen bir hata oluştu.";
 
-function PersonImport({ device, connected, canBiometrics, onPendingChange }: {
+function PersonImport({ device, connected, canBiometrics, onPendingChange, onImported }: {
 device: ServerDevice; connected: boolean; canBiometrics: boolean; onPendingChange: (pending: boolean) => void;
+onImported: (result: DeviceImportResult) => void;
 }) {
   const previewPersons = useAction(
     api.actions.hikDeviceImport.previewDeviceImport,
@@ -99,9 +108,6 @@ device: ServerDevice; connected: boolean; canBiometrics: boolean; onPendingChang
   );
   const running = useRef(false);
   const [confirmation, setConfirmation] = useState<"import" | null>(
-    null,
-  );
-  const [importResult, setImportResult] = useState<DeviceImportResult | null>(
     null,
   );
   const disabled = !connected || busy !== null;
@@ -130,7 +136,6 @@ device: ServerDevice; connected: boolean; canBiometrics: boolean; onPendingChang
     running.current = true;
     onPendingChange(true);
     setBusy("preview");
-    setImportResult(null);
     try {
       await readPreview();
     } catch (error) {
@@ -152,13 +157,8 @@ device: ServerDevice; connected: boolean; canBiometrics: boolean; onPendingChang
         deviceId: device._id,
         ...importSelection,
       });
-      setImportResult(result);
       setConfirmation(null);
-      try {
-        await readPreview();
-      } catch (error) {
-        notify.error("Önizleme yenilenemedi", errorMessage(error));
-      }
+      onImported(result);
       return true;
     } catch (error) {
       notify.error("Aktarım tamamlanamadı", errorMessage(error));
@@ -322,16 +322,18 @@ device: ServerDevice; connected: boolean; canBiometrics: boolean; onPendingChang
               </Button>
             </>
           )}
-          {importResult && (
-            <p
-              role="status"
-              className="rounded-md bg-muted p-3 text-sm break-words"
-            >
-              {importResultText(importResult, device.name ?? "Cihaz")}
-            </p>
-          )}
         </div>
-{busy === "import" && <p role="status" className="text-sm">Kişiler aktarılıyor…</p>}
+      <AlertDialog open={busy === "import"}>
+        <AlertDialogContent aria-busy onEscapeKeyDown={(event) => event.preventDefault()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kişiler aktarılıyor</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedNos.length} kişi ngsplus'a ekleniyor{importSelection.biometricConsentConfirmed ? " ve parmak izleri cihazdan okunuyor" : ""}. Birkaç dakika sürebilir; pencereyi kapatmayın.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <LoadingSpinner size="sm" text="" inline className="py-2" />
+        </AlertDialogContent>
+      </AlertDialog>
       <ConfirmAction
         open={confirmation === "import"}
         onOpenChange={(open) => {
@@ -340,7 +342,11 @@ device: ServerDevice; connected: boolean; canBiometrics: boolean; onPendingChang
         title="Kişiler aktarılsın mı?"
         description={`${selectedNos.length} kişi ngsplus'a eklenecek ve '${device.name ?? "Cihaz"} mevcut kişiler' erişim kuralına bağlanacak. Cihazdaki kişiler silinmez.`}
         confirmLabel="Aktar"
-        onConfirm={doImport}
+        onConfirm={() => {
+          // Onay penceresi hemen kapanır; ilerleme ayrı pencerede görünür.
+          setConfirmation(null);
+          return doImport();
+        }}
       />
 </section>;
 }

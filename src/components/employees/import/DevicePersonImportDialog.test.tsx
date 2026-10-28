@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   importPersons: vi.fn(),
   backfill: vi.fn(),
   error: vi.fn(),
+  success: vi.fn(),
   states: [] as unknown[],
   cursor: 0,
   effects: [] as (() => void | (() => void))[],
@@ -54,7 +55,14 @@ vi.mock("@/hooks/usePermissions", () => ({
     can: (permission: string) => mocks.permissions.includes(permission),
   }),
 }));
-vi.mock("@/lib/notify", () => ({ notify: { error: mocks.error } }));
+vi.mock("@/lib/notify", () => ({ notify: { error: mocks.error, success: mocks.success } }));
+vi.mock("@/components/ui/alert-dialog", () => ({
+  AlertDialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div role="alertdialog">{children}</div> : null),
+  AlertDialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
+  AlertDialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+}));
 vi.mock("@/components/shared/ConfirmAction", () => ({
   ConfirmAction: (props: ConfirmActionProps) => {
     mocks.confirmations.push(props);
@@ -309,27 +317,36 @@ it("önizlemeyi okur, dört yeni kişiyi seçer; kayıtlı/çakışan kutuları 
     );
   expect(html).toContain("Başka projede kayıtlı");
 });
-it("rıza ile aktarır, sonucu gösterir ve önizlemeyi yeniler", async () => {
-  render();
+it("aktarım sürerken ilerleme penceresi görünür", () => {
+  seedPreview(["1", "2", "3", "4"], true);
+  mocks.states[5] = "import";
+  const html = render();
+  expect(html).toContain("Kişiler aktarılıyor");
+  expect(html).toContain("4 kişi ngsplus");
+  expect(html).toContain("ekleniyor ve parmak izleri cihazdan okunuyor");
+  seedPreview();
+  expect(render()).not.toContain("Kişiler aktarılıyor");
+});
+it("rıza ile aktarır; bitince diyalog kapanır ve sonuç bildirimde görünür", async () => {
+  const close = vi.fn();
+  render({ onOpenChange: close });
   await mocks.buttons.get("Cihazdaki kişileri göster")?.();
-  render();
+  render({ onOpenChange: close });
   mocks.checks.get("consent")?.(true);
-  mocks.preview.mockResolvedValue({
-    ...preview,
-    rows: preview.rows.map((row) => ({ ...row, status: "matched" })),
-  });
-  render();
+  render({ onOpenChange: close });
   mocks.buttons.get("Seçilenleri aktar (4)")?.();
   expect(mocks.importPersons).not.toHaveBeenCalled();
-  expect(render()).toContain("Kişiler aktarılsın mı?");
+  expect(render({ onOpenChange: close })).toContain("Kişiler aktarılsın mı?");
   await confirm("import");
   expect(mocks.importPersons).toHaveBeenCalledExactlyOnceWith({
     deviceId: "device",
     employeeNos: ["1", "2", "3", "4"],
     biometricConsentConfirmed: true,
   });
-  expect(mocks.preview).toHaveBeenCalledTimes(2);
-  const html = render();
-  expect(html).toContain("4 kişi eklendi · 4 parmak izi kaydedildi");
-  expect(html).toContain("Aktarılacak yeni kişi yok.");
+  expect(mocks.preview).toHaveBeenCalledTimes(1);
+  expect(close).toHaveBeenCalledWith(false);
+  expect(mocks.success).toHaveBeenCalledWith(
+    "Aktarım tamamlandı",
+    "4 kişi eklendi · 4 parmak izi kaydedildi · 4 rıza kaydı · Erişim kuralı: ANKA mevcut kişiler",
+  );
 });
