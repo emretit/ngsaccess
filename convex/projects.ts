@@ -74,9 +74,9 @@ export const create = superAdminMutation({
       updatedAt: now,
     });
     await ctx.db.insert("userProjects", { userId: ctx.user._id, projectId: id, role: "admin", createdAt: now });
-    await upsertPrivacySettings(ctx, id, { biometricEnabled: false });
+    await upsertPrivacySettings(ctx, id, { biometricEnabled: true });
     await writeAudit(ctx, { user: ctx.user, projectId: id, action: "create",
-      targetTable: "projectPrivacySettings", targetId: id, newValue: { biometricEnabled: false } });
+      targetTable: "projectPrivacySettings", targetId: id, newValue: { biometricEnabled: true } });
     return id;
   },
 });

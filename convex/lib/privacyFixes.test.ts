@@ -32,15 +32,15 @@ function handler<C>(fn: unknown) {
 beforeEach(() => vi.clearAllMocks());
 
 describe("KVKK inceleme düzeltmeleri", () => {
-  it.each(["signup", "assignment"])("%s yeni projeyi biyometri kapalı ve audit ile oluşturur", async mode => {
+  it.each(["signup", "assignment"])("%s yeni projeyi biyometri açık ve audit ile oluşturur", async mode => {
     const user = { _id: "user-a", role: "member", name: "Test", email: "test@example.com" };
     const insert = vi.fn(async (table: string) => table === "projects" ? "project-a" : "new-row");
     const ctx = { user, db: { insert, patch: vi.fn(), query: () => ({
       collect: async () => [user], withIndex: () => ({ first: async () => null }),
     }) } } as unknown as MutationCtx;
     await handler<MutationCtx>(mode === "signup" ? ensureProjectForNewUser : assignProjectsToExistingUsers)(ctx, mode === "signup" ? {} : { secret: "test" });
-    expect(insert).toHaveBeenCalledWith("projectPrivacySettings", expect.objectContaining({ projectId: "project-a", biometricEnabled: false }));
-    expect(insert).toHaveBeenCalledWith("auditLog", expect.objectContaining({ projectId: "project-a", action: "create", newValue: { biometricEnabled: false } }));
+    expect(insert).toHaveBeenCalledWith("projectPrivacySettings", expect.objectContaining({ projectId: "project-a", biometricEnabled: true }));
+    expect(insert).toHaveBeenCalledWith("auditLog", expect.objectContaining({ projectId: "project-a", action: "create", newValue: { biometricEnabled: true } }));
   });
   it("yüz yakalamadan önce cihaz projesinin biyometri kapısını çağırır", async () => {
     const error = new ConvexError({ code: "BIOMETRIC_DISABLED", message: "Biyometri modülü kapalı." });

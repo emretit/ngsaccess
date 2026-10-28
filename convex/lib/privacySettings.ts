@@ -10,8 +10,8 @@ export type PrivacySettings = {
   aiMaskNames: boolean;
 };
 
-// Satır yokken geçerli değerler. Canlı sistemi bozmamak için biyometri AÇIK
-// (grandfather); yeni projeler satırı açıkça `biometricEnabled: false` ile oluşturur.
+// Biyometri varsayılan AÇIK; yeni projeler de açık oluşturulur.
+// Firmalar Ayarlar → Gizlilik üzerinden modülü kapatabilir.
 export const DEFAULT_PRIVACY: PrivacySettings = {
   biometricEnabled: true,
   biometricReason: null,

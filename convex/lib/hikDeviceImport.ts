@@ -3,7 +3,7 @@ import { cardNumericKey } from "./cardIdentity";
 import { MAX_FINGERPRINTS_PER_EMPLOYEE } from "./fingerprintSlots";
 
 export type ImportPerson = { employeeNo: string; name: string; cards: string[]; fingerCount: number };
-export type ImportRow = ImportPerson & { status: "new" | "matched" | "conflict" | "manual"; matchedEmployeeId?: Id<"employees">; reason?: string };
+export type ImportRow = ImportPerson & { status: "new" | "matched" | "conflict" | "manual"; matchedEmployeeId?: Id<"employees">; storedFingerCount?: number; reason?: string };
 export function classifyImportPerson(person: ImportPerson, projectId: Id<"projects">, duplicates: readonly Pick<Doc<"employees">, "_id" | "cardNumber" | "projectId">[]): ImportRow {
   const identities = [person.employeeNo, ...person.cards];
   const equivalent = (left: string, right: string) => left === right || (cardNumericKey(left) !== null && cardNumericKey(left) === cardNumericKey(right));

@@ -17,7 +17,7 @@ type ImportCtx = ActionCtx & { user: Doc<"users"> };
 const MAX_IMPORT_PERSONS = 1000;
 const MAX_CARD_PAGES = 1000;
 
-export async function authorizeImportDevice(ctx: ImportCtx, deviceId: Id<"devices">, importing: boolean) {
+export async function authorizeImportDevice(ctx: ImportCtx, deviceId: Id<"devices">, importing: boolean): Promise<{ device: Doc<"devices">; projectId: Id<"projects">; devIndex: string }> {
   const projectIds: Id<"projects">[] = await ctx.runQuery(internal.users.listProjectIdsForCurrentUser, {});
   const device: Doc<"devices"> | null = await ctx.runQuery(internal.devices.getByIdInternal, { id: deviceId });
   if (!device?.projectId || !isProjectAllowed(projectIds, device.projectId)) throw new Error("Bu cihaza erişim yetkiniz yok");
@@ -87,11 +87,12 @@ export async function readDevicePersons(devIndex: string, selected?: readonly st
   return { persons, totals: { persons: Math.max(total, seen.size), cards: cardTotal }, truncated };
 }
 
-export async function runPreviewDeviceImport(ctx: ImportCtx, args: { deviceId: Id<"devices"> }) {
+export async function runPreviewDeviceImport(ctx: ImportCtx, args: { deviceId: Id<"devices"> }): Promise<{ rows: ImportRow[]; biometricEnabled: boolean; totals: { persons: number; cards: number }; truncated?: boolean }> {
   const target = await authorizeImportDevice(ctx, args.deviceId, false);
   const data = await readDevicePersons(target.devIndex);
   const rows: ImportRow[] = await ctx.runQuery(internal.hikDeviceImport.classifyPersons, { projectId: target.projectId, persons: data.persons });
-  return { rows, totals: data.totals, ...(data.truncated ? { truncated: true } : {}) };
+  const biometricEnabled: boolean = await ctx.runQuery(internal.hikDeviceImport.biometricEnabled, { projectId: target.projectId });
+  return { rows, biometricEnabled, totals: data.totals, ...(data.truncated ? { truncated: true } : {}) };
 }
 export const previewDeviceImport = authedAction({ args: { deviceId: v.id("devices") }, handler: runPreviewDeviceImport });
 
@@ -104,37 +105,47 @@ export async function runImportDevicePersons(ctx: ImportCtx, args: { deviceId: I
   const transferFingers = args.biometricConsentConfirmed && biometricPermission && biometricEnabled;
   const data = await readDevicePersons(target.devIndex, [...new Set(args.employeeNos.map(value => value.trim()))]);
   const classified: ImportRow[] = await ctx.runQuery(internal.hikDeviceImport.classifyPersons, { projectId: target.projectId, persons: data.persons });
-  if (transferFingers && classified.some(row => row.status === "new" && row.fingerCount > 0)) await assertTemplateKey();
+  if (transferFingers && classified.some(row => (row.status === "new" || row.status === "matched") && row.fingerCount > 0)) await assertTemplateKey();
   const result: ImportResult = { created: 0, matched: 0, conflicts: 0, manual: 0, consentsRecorded: 0, fingerprintsStored: 0, fingerprintsSkipped: 0, ruleId: null };
   for (const person of data.persons) {
     const created: { row: ImportRow; employeeId?: Id<"employees">; ruleId?: Id<"accessRules">; consentRecorded: boolean } = await ctx.runMutation(internal.hikDeviceImport.createPerson, { deviceId: args.deviceId, userId: ctx.user._id, person, consent: transferFingers });
-    if (!created.employeeId || !created.ruleId) {
-      if (created.row.status === "matched") result.matched++;
-      else if (created.row.status === "conflict") result.conflicts++;
+    const matchedEmployeeId = created.row.status === "matched" ? created.row.matchedEmployeeId : undefined;
+    if (created.row.status === "matched") result.matched++;
+    const employeeId = created.employeeId ?? matchedEmployeeId;
+    if (!employeeId || (!created.employeeId && !transferFingers)) {
+      if (created.row.status === "conflict") result.conflicts++;
       else if (created.row.status === "manual") result.manual++;
+      if (matchedEmployeeId) result.fingerprintsSkipped += person.fingerCount;
       continue;
     }
-    result.created++; result.ruleId = created.ruleId;
+    if (created.employeeId) { result.created++; result.ruleId = created.ruleId ?? null; }
     if (created.consentRecorded) result.consentsRecorded++;
     let stored = 0;
     try {
-      if (transferFingers && created.consentRecorded) {
+      if (transferFingers && person.fingerCount > 0) {
+        if (matchedEmployeeId) {
+          const recorded: boolean = await ctx.runMutation(internal.hikDeviceImport.recordImportConsent, { employeeId, deviceId: args.deviceId, userId: ctx.user._id, expectedCardNumber: person.employeeNo });
+          if (recorded) result.consentsRecorded++;
+        }
+        const existing: Doc<"employeeFingerprints">[] = await ctx.runQuery(internal.employeeFingerprints.listInternal, { employeeId });
+        const storedSlots = new Set(existing.map(template => template.fingerPrintID));
         const templates = await readFingerprintTemplates(target.devIndex, person.employeeNo);
         const selection = selectImportFingerprints(templates);
         for (const template of selection.accepted) {
-          const encrypted = await encryptTemplate(template.fingerData, `${created.employeeId}:${template.fingerPrintID}`);
-          await ctx.runMutation(internal.hikDeviceImport.recordSource, { employeeId: created.employeeId, deviceId: args.deviceId, fingerNo: template.fingerPrintID, userId: ctx.user._id, expectedCardNumber: person.employeeNo });
-          await ctx.runMutation(internal.employeeFingerprints.upsertEncrypted, { employeeId: created.employeeId, fingerNo: template.fingerPrintID, sourceDeviceId: args.deviceId, enrolledBy: ctx.user._id, expectedCardNumber: person.employeeNo, ...encrypted });
+          if (storedSlots.has(template.fingerPrintID)) continue;
+          const encrypted = await encryptTemplate(template.fingerData, `${employeeId}:${template.fingerPrintID}`);
+          await ctx.runMutation(internal.hikDeviceImport.recordSource, { employeeId, deviceId: args.deviceId, fingerNo: template.fingerPrintID, userId: ctx.user._id, expectedCardNumber: person.employeeNo });
+          await ctx.runMutation(internal.employeeFingerprints.upsertEncrypted, { employeeId, fingerNo: template.fingerPrintID, sourceDeviceId: args.deviceId, enrolledBy: ctx.user._id, expectedCardNumber: person.employeeNo, ...encrypted });
           stored++; result.fingerprintsStored++;
         }
         result.fingerprintsSkipped += selection.skipped;
       } else result.fingerprintsSkipped += person.fingerCount;
-    } catch (error) {
-      // Kişi zaten oluştu; bir kişinin şablon hatası diğerlerinin aktarımını durdurmaz. Şablon loglanmaz.
+    } catch {
+      // Kişi kayıtlı; bir kişinin şablon hatası diğerlerinin aktarımını durdurmaz. Şablon loglanmaz.
       result.fingerprintsSkipped += Math.max(person.fingerCount - stored, 0);
-      console.warn(`[hik-import] parmak izi aktarılamadı, employeeNo=${person.employeeNo}: ${error instanceof Error ? error.message : "bilinmeyen hata"}`);
+      console.warn(`[hik-import] parmak izi aktarılamadı, employeeNo=${person.employeeNo}`);
     } finally {
-      await ctx.runMutation(internal.hikDeviceImport.scheduleSync, { employeeId: created.employeeId, ruleId: created.ruleId });
+      if (created.employeeId || stored > 0) await ctx.runMutation(internal.hikDeviceImport.scheduleSync, { employeeId, ...(created.ruleId ? { ruleId: created.ruleId } : {}) });
     }
   }
   return result;

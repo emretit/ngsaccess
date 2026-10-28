@@ -10,6 +10,7 @@ import { enrollmentTarget, validateFingerNo } from "./fingerprintEnrollment";
 import { MAX_FINGERPRINTS_PER_EMPLOYEE } from "./lib/fingerprintSlots";
 import { requirePermission } from "./lib/permissions";
 import { isProjectAllowed, getProjectIdsForUser } from "./lib/auth";
+import { assertBiometricAllowed } from "./lib/biometricGate";
 import { isBiometricEnabled } from "./lib/privacySettings";
 
 const personValidator = v.object({ employeeNo: v.string(), name: v.string(), cards: v.array(v.string()), fingerCount: v.number() });
@@ -23,7 +24,13 @@ async function classify(ctx: QueryCtx, person: ImportPerson, projectId: Id<"proj
       if (second) duplicates.push(second);
     }
   }
-  return classifyImportPerson(person, projectId, duplicates);
+  const row = classifyImportPerson(person, projectId, duplicates);
+  if (row.status === "matched" && row.matchedEmployeeId) {
+    const employeeId = row.matchedEmployeeId;
+    const stored = await ctx.db.query("employeeFingerprints").withIndex("by_employee", q => q.eq("employeeId", employeeId)).take(11);
+    row.storedFingerCount = stored.length;
+  }
+  return row;
 }
 export const classifyPersons = internalQuery({
   args: { projectId: v.id("projects"), persons: v.array(personValidator) },
@@ -80,6 +87,25 @@ export const createPerson = internalMutation({
 
 export const biometricEnabled = internalQuery({ args: { projectId: v.id("projects") }, handler: (ctx, args) => isBiometricEnabled(ctx, args.projectId) });
 
+/** Recheck the import identity and record consent only when no active consent exists. */
+export const recordImportConsent = internalMutation({
+  args: { employeeId: v.id("employees"), deviceId: v.id("devices"), userId: v.id("users"), expectedCardNumber: v.string() },
+  handler: async (ctx, args): Promise<boolean> => {
+    const employee = await ctx.db.get(args.employeeId);
+    const device = await ctx.db.get(args.deviceId);
+    const user = await ctx.db.get(args.userId);
+    if (!employee || !device?.projectId || !user || employee.projectId !== device.projectId || employee.cardNumber !== args.expectedCardNumber) throw new Error("Kişi bilgileri değişti");
+    if (!isProjectAllowed(await getProjectIdsForUser({ ...ctx, user }), device.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
+    for (const permission of ["devices.manage", "employees.manage", "biometrics.manage"] as const) await requirePermission(ctx, user, device.projectId, permission);
+    await assertBiometricAllowed(ctx, device.projectId);
+    const consents = await ctx.db.query("employeeConsents").withIndex("by_employee_type", q => q.eq("employeeId", args.employeeId).eq("consentType", "biometric_fingerprint")).take(201);
+    if (consents.length > 200) throw new Error("Rıza kaydı sınırı aşıldı");
+    if (consents.some(consent => !consent.revokedAt)) return false;
+    await ctx.db.insert("employeeConsents", { employeeId: args.employeeId, consentType: "biometric_fingerprint", grantedAt: new Date().toISOString(), grantedBy: user._id, notes: `Cihazdan aktarım: ${device.name}` });
+    return true;
+  },
+});
+
 /** Record a device-resident source delivery before upsertEncrypted's consent/scope checks. */
 export const recordSource = internalMutation({
   args: { employeeId: v.id("employees"), deviceId: v.id("devices"), fingerNo: v.number(), userId: v.id("users"), expectedCardNumber: v.string() },
@@ -100,9 +126,9 @@ export const recordSource = internalMutation({
 });
 
 export const scheduleSync = internalMutation({
-  args: { employeeId: v.id("employees"), ruleId: v.id("accessRules") },
+  args: { employeeId: v.id("employees"), ruleId: v.optional(v.id("accessRules")) },
   handler: async (ctx, args) => {
-    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: args.ruleId });
+    if (args.ruleId) await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: args.ruleId });
     await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: args.employeeId });
     await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId: args.employeeId });
   },

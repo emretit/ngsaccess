@@ -21,6 +21,7 @@ import {
 
 import {
   defaultPersonSelection,
+  isSelectablePerson,
   importResultText,
   personImportSelection,
   personSelectionState,
@@ -209,7 +210,7 @@ onImported: (result: DeviceImportResult) => void;
                     <TableRow>
                       <TableHead className="w-10">
                         <ListSelectAll
-                          label="Tüm yeni kişileri seç"
+                          label="Tüm aktarılabilir kişileri seç"
                           disabled={disabled || newRows.length === 0}
                           checked={personSelectionState(preview, selected)}
                           onChange={(checked) => {
@@ -236,12 +237,12 @@ onImported: (result: DeviceImportResult) => void;
                       <TableRow
                         key={row.employeeNo}
                         className={
-                          row.status === "new" && !disabled
+                          isSelectablePerson(row) && !disabled
                             ? "cursor-pointer"
                             : undefined
                         }
                         onClick={() => {
-                          if (row.status === "new")
+                          if (isSelectablePerson(row))
                             togglePerson(row.employeeNo);
                         }}
                       >
@@ -249,7 +250,7 @@ onImported: (result: DeviceImportResult) => void;
                           <Checkbox
                             aria-label={`${row.name} seç`}
                             checked={selected.includes(row.employeeNo)}
-                            disabled={disabled || row.status !== "new"}
+                            disabled={disabled || !isSelectablePerson(row)}
                             onClick={(event) => event.stopPropagation()}
                             onCheckedChange={() => togglePerson(row.employeeNo)}
                           />
@@ -273,6 +274,9 @@ onImported: (result: DeviceImportResult) => void;
                           >
                             {statuses[row.status].label}
                           </StatusBadge>
+                          {row.status === "matched" && isSelectablePerson(row) && (
+                            <p className="mt-1 text-xs text-muted-foreground">Parmak izi ngsplus'a aktarılacak</p>
+                          )}
                           {row.reason && (
                             <p className="mt-1 text-xs text-muted-foreground">
                               {row.reason}
@@ -286,13 +290,16 @@ onImported: (result: DeviceImportResult) => void;
               </div>
               {newRows.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  Aktarılacak yeni kişi yok.
+                  Aktarılacak kişi veya yeni parmak izi yok.
                 </p>
               )}
               {!canBiometrics && (
                 <p className="text-sm text-muted-foreground">
                   Parmak izi yetkiniz yok; kişiler parmak izi olmadan aktarılır.
                 </p>
+              )}
+              {preview.biometricEnabled === false && (
+                <p role="status" className="text-sm text-warning">Bu projede biyometri modülü kapalı; parmak izleri aktarılmaz (Ayarlar → Gizlilik)</p>
               )}
               {canBiometrics && hasFingerprints && (
                 <div className="space-y-1">
@@ -328,7 +335,7 @@ onImported: (result: DeviceImportResult) => void;
           <AlertDialogHeader>
             <AlertDialogTitle>Kişiler aktarılıyor</AlertDialogTitle>
             <AlertDialogDescription>
-              {selectedNos.length} kişi ngsplus'a ekleniyor{importSelection.biometricConsentConfirmed ? " ve parmak izleri cihazdan okunuyor" : ""}. Birkaç dakika sürebilir; pencereyi kapatmayın.
+              {selectedNos.length} kişi için aktarım yapılıyor{importSelection.biometricConsentConfirmed ? " ve parmak izleri cihazdan okunuyor" : ""}. Birkaç dakika sürebilir; pencereyi kapatmayın.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <LoadingSpinner size="sm" text="" inline className="py-2" />
@@ -340,7 +347,7 @@ onImported: (result: DeviceImportResult) => void;
           if (!open && !busy) setConfirmation(null);
         }}
         title="Kişiler aktarılsın mı?"
-        description={`${selectedNos.length} kişi ngsplus'a eklenecek ve '${device.name ?? "Cihaz"} mevcut kişiler' erişim kuralına bağlanacak. Cihazdaki kişiler silinmez.`}
+        description={`${selectedNos.length} kişi için aktarım yapılacak; yeni kişiler '${device.name ?? "Cihaz"} mevcut kişiler' erişim kuralına bağlanacak. Cihazdaki kişiler silinmez.`}
         confirmLabel="Aktar"
         onConfirm={() => {
           // Onay penceresi hemen kapanır; ilerleme ayrı pencerede görünür.

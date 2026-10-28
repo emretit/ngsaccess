@@ -35,7 +35,7 @@ describe("Hik device import", () => {
   it("previews metadata only, with no database writes or template reads", async () => {
     const f = await fixture();
     const preview = await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId });
-    expect(preview).toEqual({ rows: [{ employeeNo: "1", name: "Okan ISMAN", cards: [], fingerCount: 1, status: "new" }], totals: { persons: 1, cards: 0 } });
+    expect(preview).toEqual({ biometricEnabled: true, rows: [{ employeeNo: "1", name: "Okan ISMAN", cards: [], fingerCount: 1, status: "new" }], totals: { persons: 1, cards: 0 } });
     expect(JSON.stringify(preview)).not.toContain("sensitive-template");
     expect(wire.templates).not.toHaveBeenCalled();
     expect(await f.t.run(ctx => ctx.db.query("employees").collect())).toEqual([]);
@@ -125,4 +125,57 @@ it("drains person and card pages of 30 and truncates only after the first 1000 p
   expect(wire.persons).toHaveBeenCalledTimes(34);
   expect(wire.cards).toHaveBeenCalledTimes(2);
   expect(wire.persons.mock.calls.every(call => call[1].maxResults === 30)).toBe(true);
+});
+
+it("transfers matched person's missing encrypted template with consent and preserves rows on retry", async () => {
+  const f = await fixture();
+  const args = { deviceId: f.deviceId, employeeNos: ["1"], biometricConsentConfirmed: false };
+  await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, args);
+  const preview = await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId });
+  expect(preview.rows[0]).toMatchObject({ status: "matched", storedFingerCount: 0 });
+  const first = await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, { ...args, biometricConsentConfirmed: true });
+  expect(first).toMatchObject({ created: 0, matched: 1, fingerprintsStored: 1, consentsRecorded: 1, ruleId: null });
+  const before = await f.t.run(async ctx => ({ templates: await ctx.db.query("employeeFingerprints").collect(), consents: await ctx.db.query("employeeConsents").collect() }));
+  expect(before.templates).toHaveLength(1);
+  expect(before.consents).toHaveLength(1);
+  const template = before.templates[0];
+  expect(await decryptTemplate(template, `${template.employeeId}:6`)).toBe("sensitive-template");
+  expect(JSON.stringify(first)).not.toContain("sensitive-template");
+  expect(await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, { ...args, biometricConsentConfirmed: true })).toMatchObject({ created: 0, matched: 1, fingerprintsStored: 0, consentsRecorded: 0 });
+  expect(await f.t.run(async ctx => ({ templates: await ctx.db.query("employeeFingerprints").collect(), consents: await ctx.db.query("employeeConsents").collect() }))).toEqual(before);
+  expect((await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId })).rows[0].storedFingerCount).toBe(1);
+  const jobs = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(jobs.some(job => job.name.includes("syncEmployeeToDevicesInternal"))).toBe(true);
+});
+it.each(["noConsent", "moduleDisabled", "noPermission"])("matched person cannot transfer fingerprints when %s", async condition => {
+  const f = await fixture();
+  const args = { deviceId: f.deviceId, employeeNos: ["1"], biometricConsentConfirmed: false };
+  await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, args);
+  if (condition === "moduleDisabled") await f.t.run(async ctx => {
+    const settings = await ctx.db.query("projectPrivacySettings").first();
+    if (settings) await ctx.db.patch(settings._id, { biometricEnabled: false });
+  });
+  if (condition === "noPermission") await f.t.run(async ctx => {
+    const membership = await ctx.db.query("userProjects").first();
+    if (membership) await ctx.db.patch(membership._id, { role: "technician" });
+    await ctx.db.insert("projectRolePermissions", { projectId: f.projectId, role: "technician", permissions: ["devices.manage", "employees.manage"], updatedAt: Date.now(), updatedBy: f.userId });
+  });
+  expect(await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, { ...args, biometricConsentConfirmed: condition !== "noConsent" })).toMatchObject({ created: 0, matched: 1, fingerprintsStored: 0, consentsRecorded: 0 });
+  expect(wire.templates).not.toHaveBeenCalled();
+  expect(await f.t.run(ctx => ctx.db.query("employeeConsents").collect())).toHaveLength(0);
+  if (condition === "moduleDisabled") expect((await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId })).biometricEnabled).toBe(false);
+});
+it("matched consent rechecks project and exact card identity and replaces revoked consent once", async () => {
+  const f = await fixture();
+  await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, { deviceId: f.deviceId, employeeNos: ["1"], biometricConsentConfirmed: false });
+  const employee = await f.t.run(ctx => ctx.db.query("employees").first());
+  if (!employee) throw new Error("Employee missing");
+  const args = { employeeId: employee._id, deviceId: f.deviceId, userId: f.userId, expectedCardNumber: "1" };
+  await expect(f.t.mutation(internal.hikDeviceImport.recordImportConsent, { ...args, expectedCardNumber: "01" })).rejects.toThrow("değişti");
+  await f.t.run(ctx => ctx.db.insert("employeeConsents", { employeeId: employee._id, consentType: "biometric_fingerprint", grantedAt: "old", revokedAt: "revoked", grantedBy: f.userId }));
+  expect(await f.t.mutation(internal.hikDeviceImport.recordImportConsent, args)).toBe(true);
+  expect(await f.t.mutation(internal.hikDeviceImport.recordImportConsent, args)).toBe(false);
+  const otherProject = await f.t.run(ctx => ctx.db.insert("projects", { name: "Other" }));
+  await f.t.run(ctx => ctx.db.patch(employee._id, { projectId: otherProject }));
+  await expect(f.t.mutation(internal.hikDeviceImport.recordImportConsent, args)).rejects.toThrow("değişti");
 });

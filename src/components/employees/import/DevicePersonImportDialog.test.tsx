@@ -143,6 +143,7 @@ const device: ServerDevice = {
   hikLastSeenAt: 1800000000000,
 };
 const preview: DeviceImportPreview = {
+  biometricEnabled: true,
   rows: ["Okan ISMAN", "Cinar ZONGUR", "Bengu AYDIN", "Mustafa Bingeloglu"]
     .map((name, index) => ({
       employeeNo: String(index + 1),
@@ -271,7 +272,7 @@ it("yeni kişi yokken tablo ve açıklama kalır; elle eşleştir ve kısaltma u
   };
   const html = render();
   expect(html).toContain("Cihazdaki kişiler");
-  expect(html).toContain("Aktarılacak yeni kişi yok.");
+  expect(html).toContain("Aktarılacak kişi veya yeni parmak izi yok.");
   expect(html).toContain("Elle eşleştir");
   expect(html).toContain("İlk 1000 kişi gösteriliyor.");
   expect(html).not.toContain(
@@ -322,8 +323,8 @@ it("aktarım sürerken ilerleme penceresi görünür", () => {
   mocks.states[5] = "import";
   const html = render();
   expect(html).toContain("Kişiler aktarılıyor");
-  expect(html).toContain("4 kişi ngsplus");
-  expect(html).toContain("ekleniyor ve parmak izleri cihazdan okunuyor");
+  expect(html).toContain("4 kişi için aktarım");
+  expect(html).toContain("aktarım yapılıyor ve parmak izleri cihazdan okunuyor");
   seedPreview();
   expect(render()).not.toContain("Kişiler aktarılıyor");
 });
@@ -349,4 +350,26 @@ it("rıza ile aktarır; bitince diyalog kapanır ve sonuç bildirimde görünür
     "Aktarım tamamlandı",
     "4 kişi eklendi · 4 parmak izi kaydedildi · 4 rıza kaydı · Erişim kuralı: ANKA mevcut kişiler",
   );
+});
+
+it("eksik parmak izi olan kayıtlı kişiyi seçer ve rıza ile aktarır", async () => {
+  seedPreview(["5"], true);
+  mocks.states[2] = { ...preview, rows: [{ ...preview.rows[4], fingerCount: 1, storedFingerCount: 0 }] };
+  mocks.importPersons.mockResolvedValue({ ...imported, created: 0, matched: 1, fingerprintsStored: 1, consentsRecorded: 1, ruleId: null });
+  const html = render();
+  expect(html).toContain("Zaten kayıtlı");
+  expect(html).toContain("Parmak izi ngsplus&#x27;a aktarılacak");
+  expect(html).not.toMatch(/aria-label="Mevcut Kişi seç"[^>]*disabled=""/);
+  await confirm("import");
+  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["5"], biometricConsentConfirmed: true });
+  expect(mocks.success).toHaveBeenCalledWith("Aktarım tamamlandı", "1 parmak izi kaydedildi · 1 rıza kaydı");
+});
+it("biyometri kapalıysa uyarı gösterir ve rıza göndermez", async () => {
+  seedPreview(["1"], true);
+  mocks.states[2] = { ...preview, biometricEnabled: false };
+  const html = render();
+  expect(html).toContain("Bu projede biyometri modülü kapalı; parmak izleri aktarılmaz (Ayarlar → Gizlilik)");
+  expect(html).not.toContain("Seçilen kişilerin parmak izi açık rızası alınmıştır");
+  await confirm("import");
+  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["1"], biometricConsentConfirmed: false });
 });

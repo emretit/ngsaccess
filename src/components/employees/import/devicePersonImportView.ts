@@ -7,8 +7,11 @@ export type DeviceImportPreview = FunctionReturnType<
 export type DeviceImportResult = FunctionReturnType<
   typeof api.actions.hikDeviceImport.importDevicePersons
 >;
+export function isSelectablePerson(row: DeviceImportPreview["rows"][number]) {
+  return row.status === "new" || (row.status === "matched" && row.fingerCount > (row.storedFingerCount ?? 0));
+}
 export function selectablePersons(preview: DeviceImportPreview | null) {
-  return preview?.rows.filter((row) => row.status === "new") ?? [];
+  return preview?.rows.filter(isSelectablePerson) ?? [];
 }
 export function defaultPersonSelection(preview: DeviceImportPreview) {
   return selectablePersons(preview).map((row) => row.employeeNo);
@@ -43,6 +46,7 @@ export function showFingerprintConsent(
   canBiometrics: boolean,
 ) {
   return (
+    preview?.biometricEnabled === true &&
     canBiometrics &&
     selectedPersons(preview, selected).some((row) => row.fingerCount > 0)
   );
@@ -67,7 +71,9 @@ export function importResultText(
 ) {
   const summary =
     result.created === 0
-      ? "Yeni kişi eklenmedi (hepsi zaten kayıtlı)."
+      ? result.fingerprintsStored > 0
+        ? `${result.fingerprintsStored} parmak izi kaydedildi`
+        : "Yeni kişi eklenmedi (hepsi zaten kayıtlı)."
       : `${result.created} kişi eklendi · ${result.fingerprintsStored} parmak izi kaydedildi`;
   return (
     summary +

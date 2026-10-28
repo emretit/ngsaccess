@@ -53,9 +53,9 @@ export const ensureProjectForNewUser = authedMutation({
       updatedAt: now,
     });
 
-    await upsertPrivacySettings(ctx, projectId, { biometricEnabled: false });
+    await upsertPrivacySettings(ctx, projectId, { biometricEnabled: true });
     await writeAudit(ctx, { user, projectId, action: "create", targetTable: "projectPrivacySettings",
-      targetId: projectId, newValue: { biometricEnabled: false } });
+      targetId: projectId, newValue: { biometricEnabled: true } });
 
     // 3. Kullanıcıyı projeye ekle
     await ctx.db.insert("userProjects", {
@@ -138,9 +138,9 @@ export const assignProjectsToExistingUsers = mutation({
           updatedAt: now,
         });
 
-        await upsertPrivacySettings(ctx, projectId, { biometricEnabled: false });
+        await upsertPrivacySettings(ctx, projectId, { biometricEnabled: true });
         await writeAudit(ctx, { user: null, projectId, action: "create", targetTable: "projectPrivacySettings",
-          targetId: projectId, newValue: { biometricEnabled: false } });
+          targetId: projectId, newValue: { biometricEnabled: true } });
 
         await ctx.db.insert("userProjects", {
           userId: user._id,

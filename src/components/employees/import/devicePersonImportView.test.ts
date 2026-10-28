@@ -6,6 +6,7 @@ selectablePersons, showFingerprintConsent, togglePersonSelection,
 type DeviceImportPreview, type DeviceImportResult
 } from "./devicePersonImportView";
 const preview: DeviceImportPreview = {
+  biometricEnabled: true,
   rows: ["Okan ISMAN", "Cinar ZONGUR", "Bengu AYDIN", "Mustafa Bingeloglu"]
     .map((name, index) => ({
       employeeNo: String(index + 1),
@@ -80,8 +81,19 @@ it("sonuç metni atlanan şablonları, rızayı ve erişim kuralını içerir", 
   ).toContain(
     "· 2 parmak izi atlandı · 4 rıza kaydı · Erişim kuralı: ANKA mevcut kişiler",
   );
-  expect(importResultText({ ...imported, created: 0 }, "ANKA")).toContain(
+  expect(importResultText({ ...imported, created: 0, fingerprintsStored: 0 }, "ANKA")).toContain(
     "Yeni kişi eklenmedi (hepsi zaten kayıtlı).",
   );
 });
 
+
+it("yalnız eksik parmak izi olan matched satırlar seçilir; kapalı modül rızayı engeller", () => {
+  const matchedPreview: DeviceImportPreview = { ...preview, rows: [
+    { ...preview.rows[0], status: "matched", storedFingerCount: 0 },
+    { ...preview.rows[1], status: "matched", storedFingerCount: 1 },
+  ] };
+  expect(defaultPersonSelection(matchedPreview)).toEqual(["1"]);
+  expect(personImportSelection(matchedPreview, ["1", "2"], true, true)).toEqual({ employeeNos: ["1"], biometricConsentConfirmed: true });
+  expect(showFingerprintConsent({ ...matchedPreview, biometricEnabled: false }, ["1"], true)).toBe(false);
+  expect(importResultText({ ...imported, created: 0, fingerprintsStored: 2 }, "ANKA")).toContain("2 parmak izi kaydedildi");
+});
