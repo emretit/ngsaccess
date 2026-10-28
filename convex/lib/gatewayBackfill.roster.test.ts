@@ -173,7 +173,7 @@ it.each(["cursor", "events"])("stops without scheduling when %s does not advance
   });
   await runBackfillContinuation(f.ctx, {
     deviceId: f.deviceId, devIndex: "index", searchID: "stuck", position: 30, startedAt: Date.now(), maxPages: 50,
-    lastEventAt: eventAt, observedSerialNo: stuck === "events" ? 42 : undefined,
+    lastEventAt: eventAt, lastPageKey: stuck === "events" ? "42" : undefined,
   });
   expect(searchAcsEventsOnDevice).toHaveBeenCalledTimes(1);
   expect(f.runAfter).not.toHaveBeenCalled();
@@ -181,6 +181,19 @@ it.each(["cursor", "events"])("stops without scheduling when %s does not advance
     deviceId: f.deviceId, cursor: undefined, at: f.device.hikLastBackfillAt,
   });
   expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("ilerlemediği"));
+});
+
+it("keeps scanning when the device restarts from older serials in a second result group", async () => {
+  const f = historyContext();
+  const at = (day: number) => new Date(Date.UTC(2026, 9, day, 9)).toISOString();
+  const page = (serials: number[], day: number) => ({ ok: true, events: serials.map(serialNo => ({ time: at(day), serialNo, cardNo: "CARD", major: 5, minor: 75 })), total: 4, numMatches: serials.length, hasMore: true });
+  vi.mocked(searchAcsEventsOnDevice).mockReset()
+    .mockResolvedValueOnce({ ...page([50, 51], 20), nextPosition: 2 })
+    .mockResolvedValueOnce({ ...page([3, 4], 1), nextPosition: 4 })
+    .mockResolvedValueOnce({ ok: true, events: [], total: 4, numMatches: 0, nextPosition: 4, hasMore: false });
+  await runBackfillContinuation(f.ctx, { deviceId: f.deviceId, devIndex: "index", searchID: "grouped", position: 0, startedAt: Date.now(), maxPages: 50 });
+  expect(searchAcsEventsOnDevice).toHaveBeenCalledTimes(3);
+  expect(f.runAfter).not.toHaveBeenCalled();
 });
 
 it("defaults an authorized manual scan to the last 24 hours", async () => {

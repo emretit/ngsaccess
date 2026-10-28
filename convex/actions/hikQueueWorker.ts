@@ -255,7 +255,9 @@ export const continueHikBackfill = internalAction({
     deviceId: v.id("devices"), devIndex: v.string(), searchID: v.string(),
     position: v.number(), startedAt: v.number(), maxPages: v.number(),
     startTime: v.optional(v.string()), lastEventAt: v.optional(v.number()),
-    maxSerialNo: v.optional(v.number()), observedSerialNo: v.optional(v.number()),
+    maxSerialNo: v.optional(v.number()), lastPageKey: v.optional(v.string()),
+    // Eski planlı işler için kabul edilir; artık kullanılmıyor.
+    observedSerialNo: v.optional(v.number()),
     hop: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<void> => {

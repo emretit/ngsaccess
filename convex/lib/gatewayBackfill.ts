@@ -18,7 +18,8 @@ type BackfillContinuation = {
   startTime?: string;
   lastEventAt?: number;
   maxSerialNo?: number;
-  observedSerialNo?: number;
+  /** Önceki sayfanın sıralı serial listesi; aynı sayfa tekrar dönerse imleç takılı sayılır. */
+  lastPageKey?: string;
   hop?: number;
 };
 
@@ -49,7 +50,7 @@ async function _runBackfill(
   const searchID = opts.continuation?.searchID ?? newHikSearchId();
 
   const hop = opts.continuation?.hop ?? 1;
-  let observedSerialNo = opts.continuation?.observedSerialNo;
+  let lastPageKey = opts.continuation?.lastPageKey;
   let stoppedReason: string | undefined;
   let position = opts.continuation?.position ?? 0;
   let scanned = 0;
@@ -73,20 +74,15 @@ async function _runBackfill(
       return { ok: false, scanned, inserted, skipped, error: page.error };
     }
 
-    const pageSerialNo = page.events.reduce<number | undefined>((max, event) =>
-      max === undefined ? event.serialNo : Math.max(max, event.serialNo), undefined);
-    const pageEventAt = page.events.reduce<number | undefined>((max, event) => {
-      const at = Date.parse(event.time);
-      return Number.isFinite(at) ? Math.max(max ?? at, at) : max;
-    }, undefined);
-    if (page.hasMore && (page.nextPosition <= position ||
-        (observedSerialNo !== undefined && pageSerialNo !== undefined && pageSerialNo <= observedSerialNo &&
-          (pageEventAt === undefined || (lastEventAt !== undefined && pageEventAt <= lastEventAt))))) {
+    // Sonuçlar serial/zaman sırasında gelmeyebilir (DS-K1T804AMF olayları gruplayıp ikinci grupta
+    // en eskiden yeniden başlar); imleç yalnız aynı sayfa tekrar dönünce takılı sayılır.
+    const pageKey = page.events.map(event => event.serialNo).sort((a, b) => a - b).join(",");
+    if (page.hasMore && (page.nextPosition <= position || (pageKey !== "" && pageKey === lastPageKey))) {
       hasMore = true;
       stoppedReason = "Cihazın olay imleci ilerlemediği için tarama durduruldu. Cihazı kontrol edip taramayı yeniden başlatın.";
       break;
     }
-    if (pageSerialNo !== undefined) observedSerialNo = Math.max(observedSerialNo ?? pageSerialNo, pageSerialNo);
+    lastPageKey = pageKey;
 
     for (const event of page.events) {
       scanned++;
@@ -134,7 +130,7 @@ async function _runBackfill(
     if (canContinue) await ctx.scheduler.runAfter(0, internal.actions.hikQueueWorker.continueHikBackfill, {
       deviceId: opts.deviceId, devIndex: opts.devIndex, searchID, position,
       startedAt, maxPages, hop: hop + 1,
-      ...(observedSerialNo !== undefined ? { observedSerialNo } : {}),
+      ...(lastPageKey ? { lastPageKey } : {}),
       ...(opts.startTime ? { startTime: opts.startTime } : {}),
       ...(lastEventAt !== undefined ? { lastEventAt } : {}),
       ...(maxSerialNo !== undefined ? { maxSerialNo } : {}),
