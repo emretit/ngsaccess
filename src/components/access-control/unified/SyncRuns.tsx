@@ -11,7 +11,15 @@ import { useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Doc, Id } from "../../../../convex/_generated/dataModel";
+import type { FunctionReturnType } from "convex/server";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -34,6 +42,35 @@ import {
   targetTone,
 } from "./lib/presentation";
 
+type RunTarget = NonNullable<
+  FunctionReturnType<typeof api.deviceSyncRuns.get>
+>["targets"][number];
+function RunTargets({ targets }: { targets: RunTarget[] }) {
+  if (targets.length === 0) return <p>Hedef cihaz bulunamadı.</p>;
+  return (
+    <ul className="divide-y">
+      {targets.map((target) => (
+        <li key={target._id} className="py-3 space-y-1">
+          <p className="break-words font-medium">
+            {target.deviceName}{" "}
+            <span className="text-muted-foreground">
+              ({deviceBrandLabel(target.brand)})
+            </span>
+          </p>
+          <StatusBadge tone={targetTone(target.status)}>
+            {targetLabels[target.status]}
+          </StatusBadge>
+          {target.reason && (
+            <p className="break-words text-xs text-muted-foreground">
+              {target.deviceName}:{" "}
+              {pastAttemptText(target.updatedAt, target.reason)}
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 function RunResult({ runId }: { runId: Id<"deviceSyncRuns"> }) {
   const run = useQuery(api.deviceSyncRuns.get, { runId });
   if (!run) return <SectionSkeleton label="Gönderim yükleniyor" />;
@@ -46,30 +83,15 @@ function RunResult({ runId }: { runId: Id<"deviceSyncRuns"> }) {
       <p className="text-muted-foreground text-xs break-words">
         {runSummary(run.counts)}
       </p>
-      {run.targets.length === 0 && <p>Hedef cihaz bulunamadı.</p>}
-      <ul className="divide-y">
-        {run.targets.map((target) => (
-          <li key={target._id} className="py-3 space-y-1">
-            <p className="break-words font-medium">
-              {target.deviceName}{" "}
-              <span className="text-muted-foreground">
-                ({deviceBrandLabel(target.brand)})
-              </span>
-            </p>
-            <StatusBadge tone={targetTone(target.status)}>
-              {targetLabels[target.status]}
-            </StatusBadge>
-            {target.reason && (
-              <p className="break-words text-xs text-muted-foreground">
-                {target.deviceName}:{" "}
-                {pastAttemptText(target.updatedAt, target.reason)}
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
+      <RunTargets targets={run.targets} />
     </div>
   );
+}
+/** Header row already shows status and counts; the dropdown only lists the devices. */
+function RunTargetsInline({ runId }: { runId: Id<"deviceSyncRuns"> }) {
+  const run = useQuery(api.deviceSyncRuns.get, { runId });
+  if (!run) return <SectionSkeleton rows={2} label="Gönderim yükleniyor" />;
+  return <RunTargets targets={run.targets} />;
 }
 export function SyncRunSheet({
   runId,
@@ -126,7 +148,7 @@ function RunHeader({ run }: { run: RunHeaderData }) {
 }
 export function RecentRuns({ projectId }: { projectId: Id<"projects"> }) {
   const runs = useQuery(api.deviceSyncRuns.listRecent, { projectId, limit: 1 });
-  const [selected, setSelected] = useState<Id<"deviceSyncRuns"> | null>(null);
+  const [open, setOpen] = useState(false);
   if (!runs)
     return <SectionSkeleton rows={1} label="Son gönderim yükleniyor" />;
   const run = runs[0];
@@ -136,18 +158,36 @@ export function RecentRuns({ projectId }: { projectId: Id<"projects"> }) {
       {!run ? (
         <p className="text-muted-foreground text-xs">Henüz gönderim yok.</p>
       ) : (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border px-4 py-3">
-          <RunHeader run={run} />
-          <Button
-            variant="outline"
-            onClick={() => setSelected(run._id)}
-            aria-label={`${formatTrDateTime(run.startedAt)} gönderiminin ayrıntısı`}
-          >
-            Ayrıntı
-          </Button>
-        </div>
+        <Collapsible
+          open={open}
+          onOpenChange={setOpen}
+          className="rounded-md border"
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+            <RunHeader run={run} />
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="outline"
+                aria-label={`${formatTrDateTime(run.startedAt)} gönderiminin ayrıntısı`}
+              >
+                Ayrıntı
+                <ChevronDown
+                  aria-hidden
+                  className={cn(
+                    "size-4 transition-transform",
+                    open && "rotate-180",
+                  )}
+                />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="border-t px-4">
+            <QuerySectionBoundary resetKey={run._id}>
+              <RunTargetsInline runId={run._id} />
+            </QuerySectionBoundary>
+          </CollapsibleContent>
+        </Collapsible>
       )}
-      <SyncRunSheet runId={selected} onClose={() => setSelected(null)} />
     </section>
   );
 }

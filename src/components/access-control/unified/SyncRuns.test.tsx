@@ -94,3 +94,12 @@ it("kuralın son gönderimini ayrı sayfa açmadan, yalnız sorunlu cihazları t
   expect(html).not.toContain("Hikvision");
   state.detail = undefined;
 });
+
+it("son gönderim ayrıntısını yan panel yerine kartın altında açar", () => {
+  state.runs = [{ _id: "run", kind: "rule_sync", status: "done", startedAt: Date.parse("2026-10-22T10:09:00Z"), counts: { queued: 0, sent: 1, verified: 0, failed: 0, skipped: 0, unknown: 0 } }];
+  const html = renderToStaticMarkup(<RecentRuns projectId={"p" as Id<"projects">} />);
+  expect(html).toContain("Ayrıntı");
+  expect(html).toContain('aria-expanded="false"');
+  expect(html).not.toContain("Gönderim sonucu");
+  state.runs = undefined;
+});
