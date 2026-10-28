@@ -6,6 +6,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { authedAction } from "../lib/customFunctions";
 import { isProjectAllowed } from "../lib/auth";
+import { newHikSearchId } from "../lib/gateway/core";
 import { searchPersonOnDevice } from "../lib/gateway/persons";
 import { readImportCardsPage } from "../lib/gateway/cards";
 import { searchFingerprintsOnDevice, readFingerprintTemplates } from "../lib/gateway/biometrics";
@@ -29,7 +30,7 @@ export async function authorizeImportDevice(ctx: ImportCtx, deviceId: Id<"device
 }
 
 async function countFingers(devIndex: string, employeeNo: string): Promise<number> {
-  const searchID = crypto.randomUUID();
+  const searchID = newHikSearchId();
   const ids = new Set<string>();
   for (let page = 0; page < 10; page++) {
     const result = await searchFingerprintsOnDevice(devIndex, { searchID, position: page * 30, maxResults: 30, employeeNo });
@@ -44,7 +45,7 @@ async function countFingers(devIndex: string, employeeNo: string): Promise<numbe
 /** Returns metadata only; fingerprint templates never escape the node action. */
 export async function readDevicePersons(devIndex: string, selected?: readonly string[]) {
   const cardsByPerson = new Map<string, string[]>();
-  const cardSearch = crypto.randomUUID();
+  const cardSearch = newHikSearchId();
   let cardTotal = 0;
   let position = 0;
   for (let page = 0; page < MAX_CARD_PAGES; page++) {
@@ -60,7 +61,7 @@ export async function readDevicePersons(devIndex: string, selected?: readonly st
     position = result.nextPosition;
   }
   const persons: ImportPerson[] = [];
-  const searchID = crypto.randomUUID();
+  const searchID = newHikSearchId();
   let total = 0;
   position = 0;
   let truncated = false;

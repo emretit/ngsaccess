@@ -43,6 +43,14 @@ export const FINGERPRINT_CAPTURE_TIMEOUT_MS = 35_000;
 export const MAX_FINGERPRINTS_PER_PERSON = 10;
 
 /**
+ * Hik ISAPI arama oturumu kimliği. Cihazlar en fazla 32 karakter kabul eder
+ * (DS-K1T804AMF 33+ karakterde `badParameters` döner); tiresiz UUID tam 32 karakterdir.
+ */
+export function newHikSearchId(): string {
+  return crypto.randomUUID().replace(/-/g, "");
+}
+
+/**
  * Gateway ISAPI çağrısı yapar. devIndex verilirse passthrough cihaza iletilir.
  */
 export async function gatewayApiCall(

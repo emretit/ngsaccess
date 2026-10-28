@@ -5,6 +5,7 @@ import { type ActionCtx } from "../_generated/server";
 import { isProjectAllowed } from "./auth";
 import type { Doc, Id } from "../_generated/dataModel";
 import { searchAcsEventsOnDevice } from "./hikGateway";
+import { newHikSearchId } from "./gateway/core";
 import { auditDeviceCommand } from "./gatewayCommand";
 
 type BackfillContinuation = {
@@ -45,7 +46,7 @@ async function _runBackfill(
     ? Math.min(DEFAULT_BACKFILL_MAX_PAGES, Math.max(1, Math.floor(requestedPages)))
     : DEFAULT_BACKFILL_MAX_PAGES;
   const startedAt = opts.continuation?.startedAt ?? Date.now();
-  const searchID = opts.continuation?.searchID ?? `backfill-${opts.deviceId}-${startedAt}`;
+  const searchID = opts.continuation?.searchID ?? newHikSearchId();
 
   const hop = opts.continuation?.hop ?? 1;
   let observedSerialNo = opts.continuation?.observedSerialNo;

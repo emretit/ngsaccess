@@ -1,6 +1,7 @@
 "use node";
 
 import {
+  newHikSearchId,
   gatewayApiCall,
   gatewayApiCallChecked,
   gatewayXmlCall,
@@ -467,7 +468,7 @@ export async function searchFingerprintsOnDevice(
 
 /** Sensitive read: callers must never return or log these templates. */
 export async function readFingerprintTemplates(devIndex: string, employeeNo: string): Promise<Array<{ fingerPrintID: number; fingerData: string }>> {
-  const searchID = crypto.randomUUID();
+  const searchID = newHikSearchId();
   const templates: Array<{ fingerPrintID: number; fingerData: string }> = [];
   const seen = new Set<number>();
   for (let page = 0; page < MAX_FINGERPRINTS_PER_PERSON; page++) {

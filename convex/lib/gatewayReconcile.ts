@@ -13,6 +13,7 @@ import {
   type SearchCardInfo,
 } from "./hikGateway";
 import { diffIds } from "./reconcileMath";
+import { newHikSearchId } from "./gateway/core";
 import { auditDeviceCommand } from "./gatewayCommand";
 
 export async function collectAllPages<TItem, TPage extends DrainPage>(opts: {
@@ -180,7 +181,7 @@ export async function runReconcileDevice(
     ]);
 
     const MAX_RECONCILE_PAGES = 100;
-    const now = Date.now();
+    const [cardSearchId, faceSearchId, fingerprintSearchId] = [newHikSearchId(), newHikSearchId(), newHikSearchId()];
     const [cardDrain, faceDrain, fingerprintDrain] = await Promise.all([
       collectAllPages<string, {
         ok: boolean;
@@ -195,7 +196,7 @@ export async function runReconcileDevice(
         maxPages: MAX_RECONCILE_PAGES,
         loadPage: (position) =>
           searchCardsOnDevice(devIndex, {
-            searchID: `reconcile-card-${args.deviceId}-${now}`,
+            searchID: cardSearchId,
             position,
             maxResults: 50,
           }),
@@ -214,7 +215,7 @@ export async function runReconcileDevice(
         maxPages: MAX_RECONCILE_PAGES,
         loadPage: (position) =>
           searchFacesOnDevice(devIndex, {
-            searchID: `reconcile-face-${args.deviceId}-${now}`,
+            searchID: faceSearchId,
             position,
             maxResults: 50,
           }),
@@ -239,7 +240,7 @@ export async function runReconcileDevice(
         maxPages: MAX_RECONCILE_PAGES,
         loadPage: (position) =>
           searchFingerprintsOnDevice(devIndex, {
-            searchID: `reconcile-fp-${args.deviceId}-${now}`,
+            searchID: fingerprintSearchId,
             position,
             maxResults: 50,
           }),
