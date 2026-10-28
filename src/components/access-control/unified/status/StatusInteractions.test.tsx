@@ -36,7 +36,8 @@ vi.mock("@/components/ui/sheet", () => {
       runner.focus = onCloseAutoFocus; return <div>{children}</div>;
     } };
 });
-vi.mock("@/components/shared/FilterBar", () => ({
+vi.mock("@/components/shared/FilterBar", async original => ({
+  ...await original<typeof import("@/components/shared/FilterBar")>(),
   FilterBar: ({ children, search, onClear, hasFilters }: { children?: ReactNode; search?: string; onClear?: () => void; hasFilters?: boolean }) => {
     if (onClear) runner.clear = onClear;
     return <div data-active={hasFilters}><input value={search ?? ""} readOnly />{children}</div>;

@@ -2,7 +2,7 @@ vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permis
 import { getFunctionName } from "convex/server";
 import { MemoryRouter } from "react-router-dom";
 import CardReadings from "../access-control/CardReadings";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CardReadingsFilters } from "../access-control/CardReadingsFilters";
@@ -23,7 +23,10 @@ describe("monitoring UI audit", () => {
     const html = renderToStaticMarkup(<CardReadingsFilters projectId={projectId} filters={emptyFilters} change={vi.fn()} />);
     expect(html).toContain("Başlangıç (TR günü)"); expect(html).toContain("Bitiş (TR günü)"); expect(html).not.toContain("Diğer filtreler");
     expect(html.match(/<select /g)).toHaveLength(4); expect(html.match(/<select aria-hidden="true"/g)).toHaveLength(4);
-    expect(html).toContain('aria-label="Kaynak"'); expect(html).toContain('aria-label="Cihaz"');
+    for (const label of ["Kaynak", "Cihaz", "Kapı", "Sonuç", "Kişi"]) expectLabel(html, label);
+    expect(html).toContain('for="reading-start">Başlangıç (TR günü)</label>');
+    expect(html).toContain('for="reading-end">Bitiş (TR günü)</label>');
+    for (const text of ["Tüm kaynaklar", "Tüm cihazlar", "Tüm kapılar", "Tüm sonuçlar", "Tüm kişiler", "Filtreleri temizle"]) expect(html).toContain(text);
   });
   it("renders one view without live/history toggles or a pause control", () => {
     for (const entry of ["/", "/?mode=history"]) {
@@ -61,3 +64,19 @@ describe("monitoring UI audit", () => {
     }
   });
 });
+
+function expectLabel(html: string, label: string) {
+  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
+  expect(labelTag).not.toBeNull();
+  const id = labelTag?.[1];
+  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
+  expect(control).toBeDefined();
+  expect(control).not.toContain('aria-label=');
+  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
+}
+
+vi.mock("@/components/ui/select", async original => ({
+  ...await original<typeof import("@/components/ui/select")>(),
+  SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children }: { children: ReactNode }) => <div role="option">{children}</div>,
+}));

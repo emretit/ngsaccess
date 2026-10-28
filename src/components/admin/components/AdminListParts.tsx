@@ -1,7 +1,8 @@
 import { NativeSelect } from "@/components/ui/native-select";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PaginationBar } from "@/components/shared/PaginationBar";
-import { useState, type ReactNode } from "react";
+import { FilterField } from "@/components/shared/FilterBar";
+import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 export function AdminSelect({
@@ -17,19 +18,19 @@ export function AdminSelect({
   children: ReactNode;
   disabled?: boolean;
 }) {
+  const id = useId();
   return (
-    <label className="flex min-w-0 max-w-full items-center gap-2 text-xs text-muted-foreground">
-      {label}
+    <FilterField label={label} htmlFor={id}>
       <NativeSelect
-        aria-label={label}
+        id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="min-w-0 max-w-[210px]"
+        className="w-full min-w-0"
       >
         {children}
       </NativeSelect>
-    </label>
+    </FilterField>
   );
 }
 

@@ -1,16 +1,16 @@
-import { useEffect, type ReactNode } from "react";
+import { useId, useEffect, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { FilterBar } from "@/components/shared/FilterBar";
+import { FilterBar, FilterField } from "@/components/shared/FilterBar";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { emptyFilters, type Filters } from "@/components/live-monitoring/lib/readings";
 import { MonitoringPersonPicker } from "@/components/live-monitoring/MonitoringPersonPicker";
 import { DateInput } from "@/components/ui/date-picker";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-const FIELD = "grid w-full min-w-0 gap-1 text-xs min-[761px]:w-40";
 function FilterSelect({ label, value, change, children }: { label: string; value: string; change: (value: string) => void; children: ReactNode }) {
-  return <div className={FIELD}><span>{label}</span><Select value={value || "all"} onValueChange={change}><SelectTrigger aria-label={label} className="w-full min-w-0"><SelectValue /></SelectTrigger><SelectContent>{children}</SelectContent></Select></div>;
+  const id = useId();
+  return <FilterField label={label} htmlFor={id}><Select value={value || "all"} onValueChange={change}><SelectTrigger id={id} className="w-full min-w-0"><SelectValue /></SelectTrigger><SelectContent>{children}</SelectContent></Select></FilterField>;
 }
 function Options({ projectId, filters, change }: { projectId: Id<"projects">; filters: Filters; change: (next: Partial<Filters>) => void }) {
   const badDate = Boolean(filters.start && filters.end && filters.start > filters.end);
@@ -25,11 +25,11 @@ function Options({ projectId, filters, change }: { projectId: Id<"projects">; fi
   return <>
     <FilterSelect label="Cihaz" value={filters.device} change={value => change({ device: value === "all" ? "" : value, door: "" })}><SelectItem value="all">Tüm cihazlar</SelectItem>{devices?.map(d => <SelectItem key={d._id} value={d._id}>{d.name}</SelectItem>)}</FilterSelect>
     <FilterSelect label="Kapı" value={filters.door} change={value => { const door = doors?.find(d => d._id === value); change({ door: value === "all" ? "" : value, device: door?.deviceId ?? filters.device }); }}><SelectItem value="all">Tüm kapılar</SelectItem>{doors?.filter(d => !filters.device || d.deviceId === filters.device).map(d => <SelectItem key={d._id} value={d._id}>{d.name}</SelectItem>)}</FilterSelect>
-    <div className={FIELD}><span>Kişi</span><MonitoringPersonPicker projectId={projectId} value={filters.employee} allowClear onChange={person => change({ employee: person?._id ?? "" })} /></div>
+    <FilterField label="Kişi" htmlFor="reading-person"><MonitoringPersonPicker id="reading-person" projectId={projectId} value={filters.employee} allowClear onChange={person => change({ employee: person?._id ?? "" })} /></FilterField>
     <FilterSelect label="Sonuç" value={filters.result} change={result => { if (result === "all" || result === "granted" || result === "denied" || result === "unknown") change({ result }); }}><SelectItem value="all">Tüm sonuçlar</SelectItem><SelectItem value="granted">İzin verildi</SelectItem><SelectItem value="denied">Reddedildi</SelectItem><SelectItem value="unknown">Sonuç bilinmiyor</SelectItem></FilterSelect>
     <FilterSelect label="Kaynak" value={filters.source} change={source => { if (source === "all" || source === "card" || source === "qr" || source === "mobile" || source === "biometric") change({ source }); }}><SelectItem value="all">Tüm kaynaklar</SelectItem><SelectItem value="card">Kart</SelectItem><SelectItem value="qr">QR</SelectItem><SelectItem value="mobile">Mobil</SelectItem><SelectItem value="biometric">Biyometrik</SelectItem></FilterSelect>
-    <label className={FIELD}>Başlangıç (TR günü)<DateInput className="min-w-0" value={filters.start} aria-invalid={badDate} aria-describedby={badDate ? "reading-date-error" : undefined} onChange={start => change({ start })} /></label>
-    <label className={FIELD}>Bitiş (TR günü)<DateInput className="min-w-0" value={filters.end} aria-invalid={badDate} aria-describedby={badDate ? "reading-date-error" : undefined} onChange={end => change({ end })} /></label>
+    <FilterField label="Başlangıç (TR günü)" htmlFor="reading-start"><DateInput id="reading-start" className="min-w-0" value={filters.start} aria-invalid={badDate} aria-describedby={badDate ? "reading-date-error" : undefined} onChange={start => change({ start })} /></FilterField>
+    <FilterField label="Bitiş (TR günü)" htmlFor="reading-end"><DateInput id="reading-end" className="min-w-0" value={filters.end} aria-invalid={badDate} aria-describedby={badDate ? "reading-date-error" : undefined} onChange={end => change({ end })} /></FilterField>
   </>;
 }
 export function CardReadingsFilters({ projectId, filters, change }: { projectId: Id<"projects">; filters: Filters; change: (next: Partial<Filters>) => void }) {

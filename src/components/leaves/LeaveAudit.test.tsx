@@ -28,10 +28,28 @@ describe("leave audit controls", () => {
   });
   it("names the month with its value and provides one period group", () => {
     const html = renderFilters();
-    expect(html).toContain('for="leave-month" class="sr-only">Dönem ayı: Ekim 2026');
-    expect(html).toContain("Özel aralık…");
+    expect(html).toContain('for="leave-month">Dönem</label>');
+    expect(html).toMatch(/<button[^>]*id="leave-month"[^>]*><span[^>]*>Ekim 2026<\/span>/);
+    expect(html).toContain("Aralık seç");
     expect(html).not.toContain("Ay seçimi");
     expect(html).not.toContain('id="leave-period"');
+  });
+  it("uses labeled FIELD controls and keeps clearing visible with no people", () => {
+    const html = renderFilters();
+    expect(html).toContain('for="leave-filter-person">Kişi</label>');
+    expect(html).toContain('for="leave-filter-type">İzin türü</label>');
+    expect(html).toContain('min-[761px]:w-40');
+    expect(html).toContain('Tüm kişiler');
+    expect(html).toContain('Tüm türler');
+    expect(html).toContain('Filtreleri temizle');
+  });
+  it("renders the custom range inline before clearing without a dialog or apply button", () => {
+    const html = renderToStaticMarkup(<LeaveFilters projectId={projectId} filters={readFilters(new URLSearchParams("period=custom&from=2026-10-01&to=2026-10-31"))} onChange={() => {}} onClear={() => {}} />);
+    expect(html).toContain('for="leave-range-start">Başlangıç</label>');
+    expect(html).toContain('for="leave-range-end">Bitiş</label>');
+    expect(html.indexOf('id="leave-range-end"')).toBeLessThan(html.indexOf('Filtreleri temizle'));
+    expect(html).not.toContain('role="dialog"');
+    expect(html).not.toContain('Uygula');
   });
   it("collapses mobile filters behind an accessible toggle", () => {
     mocks.mobile = true;

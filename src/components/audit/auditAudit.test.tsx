@@ -19,7 +19,7 @@ vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => (
 vi.mock('convex/react', () => ({ useQuery: () => ({ actors: [{ userId: 'author', label: 'author@example.com', status: 'active' }], includesSystem: false }) }));
 vi.mock('@/components/ui/select', () => {
   const Part = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
-  return { Select: Part, SelectContent: Part, SelectTrigger: Part, SelectValue: () => null, SelectItem: Part };
+  return { Select: Part, SelectContent: Part, SelectTrigger: ({ id, children }: { id?: string; children?: ReactNode }) => <button id={id}>{children}</button>, SelectValue: () => null, SelectItem: Part };
 });
 vi.mock('@/components/ui/sheet', () => {
   const Part = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
@@ -50,12 +50,23 @@ describe('denetim kaydı audit düzeltmeleri', () => {
   expect(html).toContain('author@example.com');
   expect(html).toContain('Kayıtları yapan kişi');
   expect(html).not.toContain('Proje üyesi değil');
-  expect(html).toContain('aria-label="Başlangıç: 20.10.2026"');
-  expect(html).toContain('aria-label="Bitiş: Tarih seçin"');
+  expect(html).toContain('for="audit-start">Başlangıç</label>');
+  expect(html).toMatch(/<button[^>]*id="audit-start"[^>]*>20.10.2026/);
+  expect(html).toContain('for="audit-end">Bitiş</label>');
+  expect(html).toMatch(/<button[^>]*id="audit-end"[^>]*>Tarih seçin/);
   expect(html).toContain('aria-describedby="audit-range-error"');
   expect(html).toContain('aria-invalid="true"');
   expect(html).toContain('</div><p id="audit-range-error" role="alert" class="w-full');
   expect(html.match(/Filtreleri temizle/g)).toHaveLength(1);
+  for (const label of ['Kullanıcı', 'Eylem', 'Varlık', 'Başlangıç', 'Bitiş', 'Tüm kullanıcılar', 'Tüm eylemler', 'Tüm varlıklar']) expect(html).toContain(label);
+  expect(html.match(/grid w-full min-w-0 gap-1 text-xs min-\[761px\]:w-40/g)).toHaveLength(5);
+  expect(html).not.toContain('md:w-[420px]');
+  expect(html).not.toContain('md:grid-cols-3');
+  for (const [key, label] of [['user', 'Kullanıcı'], ['action', 'Eylem'], ['target', 'Varlık']]) {
+   expect(html).toContain(`for="audit-${key}">${label}</label>`);
+   expect(html).toContain(`<button id="audit-${key}">`);
+   expect(html).not.toContain(`aria-label="${label}"`);
+  }
  });
  it('sonuçlar boşken tekrar eden sayaç, tamamlandı metni ve temizleme düğmesi eklemez', () => {
   const html = renderToStaticMarkup(<AuditResultsContent args={{ actor: 'system' }} rows={[]} more={false} filtered active status="Exhausted" loadMore={vi.fn()} onSelect={vi.fn()} />);

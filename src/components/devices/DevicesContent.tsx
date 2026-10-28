@@ -115,7 +115,6 @@ export function DevicesContent({
           onAddFromCloud={onAddFromCloud}
           showNewDevice={canManage}
           deviceCount={devices.length}
-          filteredCount={filteredDevices.length}
         />
 
         <div className="min-w-0">

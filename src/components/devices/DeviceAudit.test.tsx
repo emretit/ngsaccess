@@ -265,14 +265,15 @@ describe("cihaz audit görünümü", () => {
         onAddFromCloud={noop}
       />,
     );
-    expect(html.match(/Tümü \(2\)/g)).toHaveLength(2);
+    expect(html).toContain("Tüm bağlantılar (2)");
+    expect(html).toContain("Tüm tipler (2)");
     expect(html).toContain("Çevrimiçi (0)");
     expect(html).toContain("Çevrimdışı (2)");
     expect(html).toContain("Okuyucu (2)");
     expect(html).toContain("okuyucu (2)");
     expect(html).toContain("Turnike (0)");
   });
-  it("boş sonuçta yalnız temizleme düğmesini gizler, seçeneklerin önekini tekrarlamaz", () => {
+  it("boş sonuçta temizleme düğmesini gösterir, seçeneklerin önekini tekrarlamaz", () => {
     const html = renderToStaticMarkup(
       <DeviceFilters
         statusCounts={{ all: 1, online: 0, offline: 1, never: 0 }}
@@ -287,10 +288,10 @@ describe("cihaz audit görünümü", () => {
         onAddNew={noop}
         onAddFromCloud={noop}
         deviceCount={1}
-        filteredCount={0}
       />,
     );
-    expect(html).toContain("button:last-child]:hidden");
+    expect(html).not.toContain("button:last-child]:hidden");
+    expect(html).toContain("Filtreleri temizle");
     expect(html).not.toContain("<option>Bağlantı:");
     expect(html).not.toContain("<option>Tip:");
   });

@@ -22,7 +22,6 @@ import { PdksPeriodSwitcher } from "@/components/pdks/records/PdksPeriodSwitcher
 import { PdksRecordsResults } from "@/components/pdks/records/PdksRecordsResults";
 import { PdksAssistantSheet } from "@/components/pdks/records/PdksAssistantSheet";
 import { PdksWarningsSheet } from "@/components/pdks/records/PdksWarningsSheet";
-import { PdksDatesSheet } from "@/components/pdks/records/PdksDatesSheet";
 import { CorrectionRequestsEntry, CorrectionRequestsPanel } from "@/components/pdks/CorrectionRequestsPanel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 const DEFAULT_FILTERS: FilterValues = {
@@ -62,7 +61,7 @@ function PDKSContent({
   const {
     projectId, activeProject, canManage, setImport, setWarningsOpen, setAi,
     exportRows, dateRangeLabel, selectedDate, filterSummary, selectedIds,
-    records, isLoading, setDatesOpen, setSmartPreset,
+    records, isLoading, setSmartPreset,
     effectiveSmartPreset, detailTrigger, detail, setDrilldown,
     startDate, endDate, importOpen,
   } = view;
@@ -119,12 +118,9 @@ function PDKSContent({
             onSelectShift={shiftId => setFilters({ ...filters, shiftId })}
             createOpen={createShiftOpen} onCreateOpenChange={setCreateShiftOpen} />
         </QuerySectionBoundary>}>
-        <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <PdksPeriodSwitcher filters={filters} setFilters={setFilters} />
           <PDKSDateNavigator values={filters} onChange={setFilters} />
-          <Button variant="ghost" onClick={() => setDatesOpen(true)}>
-            Tarih ve kayıtlı görünümler
-          </Button>
         </div>
         <PDKSFilterBar
           values={filters}
@@ -171,7 +167,6 @@ function PDKSContent({
       <PDKSImportDialog open={importOpen} onOpenChange={setImport} />
       <PdksAssistantSheet {...view} />
       <PdksWarningsSheet {...view} />
-      <PdksDatesSheet {...view} />
     </div>
   );
 }

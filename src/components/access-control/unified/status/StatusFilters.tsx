@@ -1,5 +1,6 @@
+import { useId } from "react";
 import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
-import { FilterBar } from "@/components/shared/FilterBar";
+import { FilterBar, FilterField } from "@/components/shared/FilterBar";
 import {
   Select,
   SelectContent,
@@ -10,31 +11,35 @@ import {
 import type { Filters } from "./model";
 import type { Options } from "./useStatusData";
 
+
 export function StatusFilter({
   label,
+  allLabel,
   value,
   options,
   onChange,
 }: {
   label: string;
+  allLabel: string;
   value?: string;
   options: { _id: string; name: string }[];
   onChange: (value: string) => void;
 }) {
+  const id = useId();
   return (
-    <div className="min-w-0">
+    <FilterField label={label} htmlFor={id}>
       <Select
         value={value || "all"}
         onValueChange={(v) => onChange(v === "all" ? "" : v)}
       >
         <SelectTrigger
-          aria-label={label}
+          id={id}
           className="w-full min-w-0 max-lg:min-h-11 [&>span]:truncate"
         >
           <SelectValue placeholder={label} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">{label}: Tümü</SelectItem>
+          <SelectItem value="all">{allLabel}</SelectItem>
           {options.map((o) => (
             <SelectItem key={o._id} value={o._id}>
               {o.name}
@@ -42,7 +47,7 @@ export function StatusFilter({
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </FilterField>
   );
 }
 
@@ -74,38 +79,40 @@ export function StatusFilters({
         onClear={clear}
         hasFilters={activeCount > 0 || Boolean(filters.state)}
       >
-        <CollapsibleFilters collapseOn="all" activeCount={activeCount}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <StatusFilter
-              label="Departman"
-              value={filters.departmentId}
-              options={options.departments}
-              onChange={(v) =>
-                change({
-                  departmentId: options.departments.find((d) => d._id === v)
-                    ?._id,
-                })
-              }
-            />
-            <StatusFilter
-              label="Cihaz"
-              value={filters.deviceId}
-              options={options.devices}
-              onChange={(v) =>
-                change({
-                  deviceId: options.devices.find((d) => d._id === v)?._id,
-                })
-              }
-            />
-            <StatusFilter
-              label="Kural"
-              value={filters.ruleId}
-              options={options.rules}
-              onChange={(v) =>
-                change({ ruleId: options.rules.find((d) => d._id === v)?._id })
-              }
-            />
-          </div>
+        <CollapsibleFilters desktopDisplay="contents" activeCount={activeCount}>
+
+          <StatusFilter
+            label="Departman"
+            allLabel="Tüm departmanlar"
+            value={filters.departmentId}
+            options={options.departments}
+            onChange={(v) =>
+              change({
+                departmentId: options.departments.find((d) => d._id === v)
+                  ?._id,
+              })
+            }
+          />
+          <StatusFilter
+            label="Cihaz"
+            allLabel="Tüm cihazlar"
+            value={filters.deviceId}
+            options={options.devices}
+            onChange={(v) =>
+              change({
+                deviceId: options.devices.find((d) => d._id === v)?._id,
+              })
+            }
+          />
+          <StatusFilter
+            label="Kural"
+            allLabel="Tüm kurallar"
+            value={filters.ruleId}
+            options={options.rules}
+            onChange={(v) =>
+              change({ ruleId: options.rules.find((d) => d._id === v)?._id })
+            }
+          />
         </CollapsibleFilters>
       </FilterBar>
     </div>

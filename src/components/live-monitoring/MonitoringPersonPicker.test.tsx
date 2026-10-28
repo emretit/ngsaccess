@@ -60,3 +60,13 @@ it("marks the stored person or the empty clear option as selected", () => {
     expect(markup).not.toContain('role="status"');
   }
 });
+
+it("uses the external visible label when given an id and preserves the standalone name", () => {
+  const props = { projectId: "p" as Id<"projects">, value: "", allowClear: true, onChange: vi.fn() };
+  const labeled = renderToStaticMarkup(<><label htmlFor="monitor-person">Kişi</label><MonitoringPersonPicker {...props} id="monitor-person" /></>);
+  expect(labeled).toContain('for="monitor-person">Kişi</label>');
+  expect(labeled).toMatch(/<button[^>]*id="monitor-person"/);
+  expect(labeled).not.toContain('aria-label="Kişi"');
+  expect(labeled).toContain('Tüm kişiler');
+  expect(renderToStaticMarkup(<MonitoringPersonPicker {...props} />)).toContain('aria-label="Kişi"');
+});

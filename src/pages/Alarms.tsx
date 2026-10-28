@@ -17,7 +17,7 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { notify } from "@/lib/notify";
-import { alarmListArgs, AlarmAcknowledgeButton, AlarmFilters, type AlarmFiltersValue } from "@/components/alarms/AlarmFilters";
+import { DEFAULT_ALARM_FILTERS, alarmListArgs, AlarmAcknowledgeButton, AlarmFilters, type AlarmFiltersValue } from "@/components/alarms/AlarmFilters";
 import { AlarmEmailStatus } from "@/components/alarms/AlarmEmailStatus";
 
 function OfflineDuration({ rawData }: { rawData: string }) {
@@ -95,7 +95,7 @@ export default function Alarms() {
   const { can } = usePermissions();
   const canManage = can("alarms.ack");
   const [category, setCategory] = useState<Category>("alarm");
-  const [filters, setFilters] = useState<AlarmFiltersValue>({ status: "open", severity: "", deviceId: "", fromDay: "", toDay: "" });
+  const [filters, setFilters] = useState<AlarmFiltersValue>(DEFAULT_ALARM_FILTERS);
   const { status } = filters;
   const [selected, setSelected] = useState<Id<"deviceEvents">[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(searchParams.get("settings") === "notifications");

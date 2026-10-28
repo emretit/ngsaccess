@@ -187,7 +187,6 @@ function EmployeePage() {
           sort={sort}
           onSortChange={(value) => update({ sort: value })}
           hasFilters={hasFilters}
-          hideClear={filtered.length === 0}
           onClear={() => {
             setPrivateQuery(null);
             update({ q: "", department: "", company: "", position: "", status: "" });

@@ -19,14 +19,16 @@ it("02-O1/D4: empty department explains direct membership and has one return act
   expect(html).toContain("<thead>");
   expect(html).toContain("Bu departmanda doğrudan bağlı kişi yok");
   expect(html).toContain("Tüm personele dön");
-  expect(html).toContain("[&amp;&gt;[role=search]&gt;button:last-of-type]:hidden");
+  expect(html).not.toContain("button:last-of-type");
+  expect(html.slice(html.indexOf('role="search"'), html.indexOf('role="status"'))).toContain("Filtreleri temizle");
   expect(html).toContain("0 sonuç");
   expect(html).not.toContain("0–0");
 });
-it("02-O1/D4: empty search has exactly one clear action and short summary", () => {
+it("02-O1/D4: empty search keeps the filter bar clear action and recovery action", () => {
   const html = render("q=bulunamayan");
   expect(html).toContain("Aramanızla eşleşen personel yok");
-  expect(html).toContain("[&amp;&gt;[role=search]&gt;button:last-of-type]:hidden");
+  expect(html).not.toContain("button:last-of-type");
+  expect(html.slice(html.indexOf('role="search"'), html.indexOf('role="status"'))).toContain("Filtreleri temizle");
   expect(html.slice(html.indexOf('role="status"')).match(/Filtreleri temizle/g)).toHaveLength(1);
   expect(html).toContain("0 sonuç");
   expect(html).not.toContain("0–0");

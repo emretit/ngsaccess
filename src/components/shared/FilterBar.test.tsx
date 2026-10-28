@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { FilterBar } from "./FilterBar";
+import { FilterBar, FilterField, FILTER_FIELD_CLASS } from "./FilterBar";
 
 describe("FilterBar", () => {
   it("renders children and an inactive clear button without a search input", () => {
@@ -37,4 +37,14 @@ describe("FilterBar", () => {
     expect(html).toContain('sr-only');
     expect(html).not.toContain('Filtreleri temizle');
   });
+});
+
+it("shares the field width and gives a control one visible associated label", () => {
+  const html = renderToStaticMarkup(<FilterField label="Durum" htmlFor="status"><select id="status"><option>Tüm durumlar</option></select></FilterField>);
+  expect(html).toContain(`class="${FILTER_FIELD_CLASS}"`);
+  expect(html).toContain('<label for="status">Durum</label>');
+  expect(html).toContain('<select id="status">');
+  expect(html.match(/>Durum</g)).toHaveLength(1);
+  expect(html).not.toContain('aria-label');
+  expect(renderToStaticMarkup(<FilterField label="Bilgi"><span>Değer</span></FilterField>)).toContain('<span>Bilgi</span>');
 });

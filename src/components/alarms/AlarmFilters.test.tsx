@@ -1,9 +1,11 @@
-import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { Select } from "@/components/ui/select";
 import { alarmListArgs, AlarmAcknowledgeButton, AlarmFilters, type AlarmFiltersValue } from "./AlarmFilters";
 
-type ElementNode = ReactElement<{ children?: unknown; onChange?: (event: { target: { value: string } }) => void; onClick?: () => void; "aria-label"?: string }>;
+type ElementNode = ReactElement<{ children?: unknown; onChange?: (event: { target: { value: string } }) => void; onValueChange?: (value: string) => void; value?: string; id?: string; onClick?: () => void; "aria-label"?: string }>;
 function findElement(node: unknown, predicate: (element: ElementNode) => boolean): ElementNode | undefined {
   if (Array.isArray(node)) {
     for (const child of node) { const match = findElement(child, predicate); if (match) return match; }
@@ -21,12 +23,24 @@ describe("alarm filtre ve onay bileşenleri", () => {
     const onChange = vi.fn();
     const configured = { ...value, severity: "critical" as const, deviceId: "device-id" as Id<"devices">, fromDay: "2026-10-19", toDay: "2026-10-20" };
     const tree = AlarmFilters({ value: configured, devices: [], onChange });
-    const status = findElement(tree, node => node.props["aria-label"] === "Durum");
-    if (!status?.props.onChange) throw new Error("Durum filtresi bulunamadı");
-    status.props.onChange({ target: { value: "acked" } });
+    const status = findElement(tree, node => node.type === Select && node.props.value === "open");
+    if (!status?.props.onValueChange) throw new Error("Durum filtresi bulunamadı");
+    status.props.onValueChange("acked");
     const changed = { ...configured, status: "acked" as const };
     expect(onChange).toHaveBeenCalledWith(changed);
     expect(alarmListArgs("project-id" as Id<"projects">, "alarm", changed)).toEqual({ projectId: "project-id", category: "alarm", status: "acked", severity: "critical", deviceId: "device-id", from: "2026-10-18T21:00:00.000Z", to: "2026-10-20T20:59:59.999Z" });
+  });
+  it("üst etiketleri ve tüm seçeneklerini aynı wrap satırında, temizlemeyi boş sonuçta da sunar", () => {
+    const html = renderToStaticMarkup(<AlarmFilters value={value} devices={[]} onChange={vi.fn()} />);
+    for (const label of ["Durum", "Önem", "Cihaz", "Başlangıç", "Bitiş", "Tüm durumlar", "Tüm önemler", "Tüm cihazlar", "Filtreleri temizle"]) expect(html).toContain(label);
+    expect(html.match(/grid w-full min-w-0 gap-1 text-xs min-\[761px\]:w-40/g)).toHaveLength(5);
+    expect(html).toContain("flex flex-wrap items-end gap-3");
+    expect(html).not.toContain('type="search"');
+    for (const label of ["Durum", "Önem", "Cihaz", "Başlangıç", "Bitiş"]) expectLabel(html, label);
+    const onChange = vi.fn();
+    const tree = AlarmFilters({ value: { ...value, status: "all", severity: "critical", fromDay: "2026-10-19" }, devices: [], onChange });
+    tree.props.onClear();
+    expect(onChange).toHaveBeenCalledWith(value);
   });
   it("olay onay düğmesi onay akışını çağırır", () => {
     const onAcknowledge = vi.fn();
@@ -34,4 +48,32 @@ describe("alarm filtre ve onay bileşenleri", () => {
     button.props.onClick?.();
     expect(onAcknowledge).toHaveBeenCalledOnce();
   });
+});
+
+vi.mock("@/components/ui/select", async original => ({
+  ...await original<typeof import("@/components/ui/select")>(),
+  SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children }: { children: ReactNode }) => <div role="option">{children}</div>,
+}));
+
+function expectLabel(html: string, label: string) {
+  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
+  expect(labelTag).not.toBeNull();
+  const id = labelTag?.[1];
+  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
+  expect(control).toBeDefined();
+  expect(control).not.toContain('aria-label=');
+  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
+}
+
+it("maps all severity and device selections back to the existing empty query values", () => {
+  const configured: AlarmFiltersValue = { ...value, severity: "critical", deviceId: "device-id" as Id<"devices"> };
+  const onChange = vi.fn();
+  const tree = AlarmFilters({ value: configured, devices: [], onChange });
+  for (const [selected, patch] of [["critical", { severity: "" }], ["device-id", { deviceId: "" }]] as const) {
+    const select = findElement(tree, node => node.type === Select && node.props.value === selected);
+    if (!select?.props.onValueChange) throw new Error("Seçici bulunamadı");
+    select.props.onValueChange("all");
+    expect(onChange).toHaveBeenLastCalledWith({ ...configured, ...patch });
+  }
 });

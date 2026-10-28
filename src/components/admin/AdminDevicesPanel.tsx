@@ -200,7 +200,7 @@ function AdminDevicesContent() {
             })
           }
         >
-          <option value="all">Tümü</option>
+          <option value="all">Tüm projeler</option>
           <option value="pool">Havuzda</option>
           <option value="assigned">Projeye atanmış</option>
           {projects?.map((project) => (
@@ -220,7 +220,7 @@ function AdminDevicesContent() {
             })
           }
         >
-          <option value="all">Tümü</option>
+          <option value="all">Tüm bağlantılar</option>
           <option value="online">Çevrimiçi</option>
           <option value="offline">Çevrimdışı</option>
           <option value="never">Henüz görülmedi</option>

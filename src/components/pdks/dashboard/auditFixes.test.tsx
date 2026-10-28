@@ -8,7 +8,7 @@ import { PDKSDateNavigator } from "./PDKSDateNavigator";
 import { PDKSHeatmapView } from "./PDKSHeatmapView";
 import { restorePdksFocus } from "../lib/focus";
 import { ManualPdksEditDialog } from "../ManualPdksEditDialog";
-import { pdksToday } from "../lib/calendar";
+import { currentPeriodRange, pdksToday } from "../lib/calendar";
 
 const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, actions: [] as { label: string; invoke: () => void }[], remove: vi.fn(), apply: vi.fn() }));
 vi.mock("react", async importOriginal => {
@@ -54,7 +54,7 @@ vi.mock("@/components/ui/button", () => ({ Button: ({ children, onClick, ...prop
   return <button {...props}>{children}</button>;
 } }));
 vi.mock("@/components/ui/date-picker", () => ({ DatePicker: ({ trigger }: { trigger: ReactNode }) => trigger }));
-vi.mock("@/components/shared/FilterBar", () => ({ FilterBar: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
+vi.mock("@/components/shared/FilterBar", async original => ({ ...await original<typeof import("@/components/shared/FilterBar")>(), FilterBar: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
 vi.mock("convex/react", () => ({ useMutation: () => vi.fn(), useAction: () => vi.fn() }));
 vi.mock("@/components/shared/UnsavedChangesDialog", () => ({ useUnsavedChangesGuard: () => ({ requestClose: vi.fn() }) }));
 const values: FilterValues = { reportType: "weekly", dateRange: { from: undefined, to: undefined }, statusFilter: "all", person: "" };
@@ -87,7 +87,7 @@ describe("08 UI denetim düzeltmeleri", () => {
     const component = <PDKSFilterBar values={values} onChange={vi.fn()} />;
     const html = render(component);
     expect(html).toContain('aria-expanded="false"');
-    expect(html).toContain('aria-label="Durum"');
+    expectLabel(html, "Durum");
     const controls = html.match(/<button[^>]*aria-expanded="false" aria-controls="([^"]+)"[^>]*>Filtreler<\/button>/)?.[1];
     expect(controls).toBeTruthy();
     expect(html).toContain(`id="${controls}" class="hidden md:block"`);
@@ -105,8 +105,20 @@ describe("08 UI denetim düzeltmeleri", () => {
     expect(html).toContain("1 Kasım 2026");
     expect(html).toContain('class="h-9 w-9"');
     expect(html).toMatch(/aria-label="Sonraki dönem" disabled/);
-    state.actions.find(a => a.label === "Bugün")?.invoke();
-    expect(onChange.mock.calls[0]?.[0].anchorDate.getDate()).toBe(1);
+    expect(html).not.toContain(">Bugün<");
+  });
+  it("Özel aralık sayfada iki tarih seçicisiyle düzenlenir; ayrı panel yok", () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-28T09:00:00Z"));
+    const html = render(<PDKSDateNavigator values={{ ...values, reportType: "custom", dateRange: { from: new Date("2026-10-01T12:00:00"), to: new Date("2026-10-20T12:00:00") } }} onChange={vi.fn()} />);
+    expect(html).toContain('aria-label="Başlangıç: 1 Eki 2026"');
+    expect(html).toContain('aria-label="Bitiş: 20 Eki 2026"');
+    expect(html).not.toContain("Önceki dönem");
+  });
+  it("Özel aralık ekrandaki dönemle açılır, bugünü aşmaz", () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-28T09:00:00Z"));
+    const range = currentPeriodRange({ ...values, reportType: "monthly", anchorDate: pdksToday() });
+    expect(range.from.getDate()).toBe(1);
+    expect(range.to.getDate()).toBe(28);
   });
   it("O6: mobil puantaj kişi sütunu 120px, geniş ekranda 192px", () => {
     const html = render(<PDKSHeatmapView records={[]} loading={false} startDate="2026-10-19" endDate="2026-10-25" />);
@@ -148,3 +160,13 @@ it("08-H2: assigned overnight manual form labels the following day", () => {
   state.values = [];
   expect(render(<ManualPdksEditDialog {...props} />)).not.toContain("Çıkış ertesi gün kaydedilecek.");
 });
+
+function expectLabel(html: string, label: string) {
+  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
+  expect(labelTag).not.toBeNull();
+  const id = labelTag?.[1];
+  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
+  expect(control).toBeDefined();
+  expect(control).not.toContain('aria-label=');
+  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
+}

@@ -1,5 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FilterBar } from "@/components/shared/FilterBar";
+import { FilterBar, FilterField } from "@/components/shared/FilterBar";
 
 interface DeviceFiltersProps {
   onClearFilters?: () => void;
@@ -21,28 +21,27 @@ interface DeviceFiltersProps {
   /** "Cihaz Ekle" menüsünü gösterir (admin değilse gizlenir). Vars: true. */
   showNewDevice?: boolean;
   deviceCount: number;
-  filteredCount: number;
 }
 
 export function DeviceFilters({ onClearFilters, locationActive, statusCounts, typeCounts,
-  filteredCount, search, onSearchChange, statusFilter, onStatusFilterChange, typeFilter, onTypeFilterChange, deviceTypes }: DeviceFiltersProps) {
-  return <div className={filteredCount === 0 ? "[&_[role=search]>button:last-child]:hidden" : undefined}><FilterBar search={search} onSearchChange={onSearchChange}
+  search, onSearchChange, statusFilter, onStatusFilterChange, typeFilter, onTypeFilterChange, deviceTypes }: DeviceFiltersProps) {
+  return <FilterBar search={search} onSearchChange={onSearchChange}
     searchLabel="Cihaz adı, seri numarası veya UUID ile ara" placeholder="Ad, seri no veya UUID ara…"
     hasFilters={statusFilter !== "all" || typeFilter !== "all" || !!locationActive} onClear={() => onClearFilters?.()}>
-    <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-      <SelectTrigger aria-label="Bağlantı filtresi" className="w-auto max-w-full min-w-36"><span className="mr-1">Bağlantı:</span><SelectValue /></SelectTrigger>
+    <FilterField label="Bağlantı" htmlFor="device-status"><Select value={statusFilter} onValueChange={onStatusFilterChange}>
+      <SelectTrigger id="device-status" className="w-full min-w-0"><SelectValue /></SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">Tümü ({statusCounts.all})</SelectItem>
+        <SelectItem value="all">Tüm bağlantılar ({statusCounts.all})</SelectItem>
         <SelectItem value="online">Çevrimiçi ({statusCounts.online})</SelectItem>
         <SelectItem value="offline">Çevrimdışı ({statusCounts.offline})</SelectItem>
         <SelectItem value="never">Henüz bağlanmadı ({statusCounts.never})</SelectItem>
       </SelectContent>
-    </Select>
-    <Select value={typeFilter} onValueChange={onTypeFilterChange}>
-      <SelectTrigger aria-label="Cihaz tipi filtresi" className="w-auto max-w-full min-w-28"><span className="mr-1">Tip:</span><SelectValue /></SelectTrigger>
-      <SelectContent><SelectItem value="all">Tümü ({statusCounts.all})</SelectItem>
+    </Select></FilterField>
+    <FilterField label="Tip" htmlFor="device-type"><Select value={typeFilter} onValueChange={onTypeFilterChange}>
+      <SelectTrigger id="device-type" className="w-full min-w-0"><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="all">Tüm tipler ({statusCounts.all})</SelectItem>
         {deviceTypes.map(type => <SelectItem key={type} value={type}>{type} ({typeCounts[type] ?? 0})</SelectItem>)}
       </SelectContent>
-    </Select>
-  </FilterBar></div>;
+    </Select></FilterField>
+  </FilterBar>;
 }

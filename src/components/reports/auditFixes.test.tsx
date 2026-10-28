@@ -1,5 +1,6 @@
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
 import { describe, it, expect, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Reports from '@/pages/Reports';
@@ -13,6 +14,11 @@ import { readHiddenColumns, saveHiddenColumns, columnStorageKey } from '@/lib/re
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { _id: 'user-a', role: 'project_admin' } }) }));
 vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ projectId: 'project-a', activeProject: { name: 'Proje' }, loading: false }) }));
 vi.mock('convex/react', () => ({ useQuery: () => [], useConvex: () => ({ query: async () => [] }) }));
+vi.mock('@/components/ui/select', async original => ({
+  ...await original<typeof import('@/components/ui/select')>(),
+  SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children, value }: { children: ReactNode; value: string }) => <option value={value}>{children}</option>,
+}));
 const meta = { from: '2026-10-01', to: '2026-10-31' };
 function report(slug: string) { const value = REPORTS.find(item => item.slug === slug); if (!value) throw new Error(slug); return value; }
 describe('reports audit fixes', () => {
@@ -61,6 +67,13 @@ describe('reports audit fixes', () => {
     const controls = html.match(/<button[^>]*aria-expanded="false" aria-controls="([^"]+)"[^>]*>Filtreler<\/button>/)?.[1];
     expect(controls).toBeTruthy(); expect(html).toContain(`id="${controls}" class="hidden md:block"`);
     expect(html).toContain('Başlangıç tarihi bitiş tarihinden sonra olamaz.'); expect(html).not.toContain('Dönem seçimini düzeltin.');
+    expect(html).toContain('for="report-period">Dönem</label>');
+    expect(html).toContain('for="report-department">Departman</label>');
+    expect(html).toContain('min-[761px]:w-40');
+    expect(html).toContain('Tüm departmanlar');
+    expectLabel(html, "Departman");
+    expect(html.indexOf('id="report-to"')).toBeLessThan(html.indexOf('Filtreleri temizle'));
+    expect(html).toContain('id="report-range-error"');
     expect(html).toMatch(/<button[^>]*id="report-from"/); expect(html).toContain('20 Ekim 2026'); expect(html).not.toContain('GG.AA.YYYY');
   });
   it('adds numeric minutes to Excel and scopes saved columns to project and user', () => {
@@ -83,3 +96,13 @@ it('shows the break filter and enables clearing a URL-only violation selection',
   expect(html).toContain('for="report-break"');
   expect(html).toMatch(/<button(?![^>]* disabled=)[^>]*>Filtreleri temizle<\/button>/);
 });
+
+function expectLabel(html: string, label: string) {
+  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
+  expect(labelTag).not.toBeNull();
+  const id = labelTag?.[1];
+  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
+  expect(control).toBeDefined();
+  expect(control).not.toContain('aria-label=');
+  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
+}

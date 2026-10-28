@@ -3,6 +3,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
+export const FILTER_FIELD_CLASS = "grid w-full min-w-0 gap-1 text-xs min-[761px]:w-40";
+
+export function FilterField({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
+  return <div className={FILTER_FIELD_CLASS}>{htmlFor ? <label htmlFor={htmlFor}>{label}</label> : <span>{label}</span>}{children}</div>;
+}
+
 type SearchProps = {
   search: string;
   onSearchChange: (value: string) => void;

@@ -12,6 +12,7 @@ import { todayInTurkey } from "@/lib/date";
 import { TableStateRow } from "@/components/shared/TableStateRow";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { FilterBar, FilterField } from "@/components/shared/FilterBar";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { Input } from "@/components/ui/input";
@@ -79,13 +80,15 @@ function HolidayCalendarContent() {
   const close = () => { if (!pending) guard.requestClose(() => { setOpen(false); setValues(empty); setErrors({}); setFailed(false); }); };
   return <section className="min-w-0 space-y-4 border-t pt-6">
     <h3 className="text-base font-semibold">Tatil takvimi</h3>
-    <div className="flex flex-wrap items-end gap-3">
-      <FormFieldWrapper htmlFor="holiday-year" label="Yıl">
-        <Input type="number" min={1900} max={2100} value={yearText} disabled={pending} className="w-24" onChange={event => {
+    <FilterBar label="Tatil takvimi filtreleri" hasFilters={yearText !== todayInTurkey().slice(0, 4)} onClear={() => { const currentYear = todayInTurkey().slice(0, 4); setYear(Number(currentYear)); setYearText(currentYear); }}>
+      <FilterField label="Yıl" htmlFor="holiday-year">
+        <Input id="holiday-year" type="number" min={1900} max={2100} value={yearText} disabled={pending} className="w-full min-w-0" onChange={event => {
           const text = event.target.value; setYearText(text);
           const next = Number(text); if (/^\d{4}$/.test(text) && next >= 1900 && next <= 2100) setYear(next);
         }} onBlur={() => setYearText(String(year))} />
-      </FormFieldWrapper>
+      </FilterField>
+    </FilterBar>
+    <div className="flex flex-wrap gap-3">
       <Button variant="outline" disabled={pending || !projectId || holidays === undefined} onClick={() => setSeedOpen(true)}>{seedAction.pending ? "Yükleniyor…" : "Resmi tatilleri yükle"}</Button>
       <Button variant="outline" disabled={pending || !projectId} onClick={() => setOpen(true)}>Tatil ekle</Button>
     </div>

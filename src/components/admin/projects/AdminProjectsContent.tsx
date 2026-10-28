@@ -110,7 +110,7 @@ export function AdminProjectsContent() {
             )
           }
         >
-          <option value="all">Tümü</option>
+          <option value="all">Tüm durumlar</option>
           <option value="active">Aktif</option>
           <option value="inactive">Pasif</option>
         </AdminSelect>
