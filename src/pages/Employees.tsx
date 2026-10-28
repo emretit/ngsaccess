@@ -145,7 +145,7 @@ function EmployeePage() {
     setEditingEmployee(employee);
     setIsPanelOpen(true);
   };
-  if ((projectLoading || isLoading) && !isPanelOpen)
+  if (projectLoading && !isPanelOpen)
     return <SectionSkeleton label="Personel bilgileri yükleniyor…" />;
   if (!hasProjectAccess)
     return (
@@ -199,37 +199,59 @@ function EmployeePage() {
           {canManage && <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>}
           {exportError && <span role="alert" className="text-sm text-destructive">{exportError}</span>}
         </div>}
-        {isLoading ? (
-          <SectionSkeleton label="Personel bilgileri yükleniyor…" />
-        ) : employees.length === 0 ? (
-          <EmptyState
-            title="Henüz personel eklenmedi"
-            description={`${activeProject?.name ?? "Bu proje"} için ilk personel kaydını oluşturun.`}
-          />
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            title={q ? "Aramanızla eşleşen personel yok" : department && !position && status === "all" ? "Bu departmanda doğrudan bağlı kişi yok" : company && !position && status === "all" ? "Bu şirkette kişi yok" : "Seçili filtrelerle eşleşen personel yok"}
-            description="Aramayı veya şirket, departman ve pozisyon seçimini değiştirin."
-            action={{
-              label: (department || company) && !q && !position && status === "all" ? "Tüm personele dön" : "Filtreleri temizle",
-              onClick: () => {
-                setPrivateQuery(null);
-                update({ q: "", department: "", company: "", position: "", status: "" });
-              },
-            }}
-          />
-        ) : (
-          <EmployeeTable
-            key={`${projectId}/${q}/${department}/${company}/${position}/${status}/${sort}/${page}/${size}`}
-            sort={sort}
-            onSortChange={(value) => update({ sort: value })}
-            showDepartment={!department}
-            showCompany={!company && !department && employees.some((item) => item.companies)}
-            employees={filtered.slice((page - 1) * size, page * size)}
-            onViewDetails={(employee) => open(employee)}
-            onRefresh={refetch}
-          />
-        )}
+        <EmployeeTable
+          key={`${projectId}/${q}/${department}/${company}/${position}/${status}/${sort}/${page}/${size}`}
+          loading={isLoading}
+          emptyState={
+            employees.length === 0 ? (
+              <EmptyState
+                title="Henüz personel eklenmedi"
+                description={`${activeProject?.name ?? "Bu proje"} için ilk personel kaydını oluşturun.`}
+              />
+            ) : (
+              <EmptyState
+                title={
+                  q
+                    ? "Aramanızla eşleşen personel yok"
+                    : department && !position && status === "all"
+                      ? "Bu departmanda doğrudan bağlı kişi yok"
+                      : company && !position && status === "all"
+                        ? "Bu şirkette kişi yok"
+                        : "Seçili filtrelerle eşleşen personel yok"
+                }
+                description="Aramayı veya şirket, departman ve pozisyon seçimini değiştirin."
+                action={{
+                  label:
+                    (department || company) &&
+                    !q &&
+                    !position &&
+                    status === "all"
+                      ? "Tüm personele dön"
+                      : "Filtreleri temizle",
+                  onClick: () => {
+                    setPrivateQuery(null);
+                    update({
+                      q: "",
+                      department: "",
+                      company: "",
+                      position: "",
+                      status: "",
+                    });
+                  },
+                }}
+              />
+            )
+          }
+          sort={sort}
+          onSortChange={(value) => update({ sort: value })}
+          showDepartment={!department}
+          showCompany={
+            !company && !department && employees.some((item) => item.companies)
+          }
+          employees={filtered.slice((page - 1) * size, page * size)}
+          onViewDetails={(employee) => open(employee)}
+          onRefresh={refetch}
+        />
         <PaginationBar
           summary={filtered.length === 0 ? "0 sonuç" : `${employees.length} personelden ${filtered.length} sonuç · ${pageRange(filtered.length, page, size)} gösteriliyor`}
           page={page}

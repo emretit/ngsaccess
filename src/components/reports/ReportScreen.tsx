@@ -24,6 +24,7 @@ import { formatDateString, parseDateString } from '@/lib/date';
 import { EmployeePicker } from '@/components/leaves/EmployeePicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ReportResults } from './ReportResults';
+import { ReportPage } from './ReportPage';
 
 function ScopedReport({ definition, projectId, projectName }: { definition: ReportDefinition; projectId: Id<'projects'>; projectName?: string }) {
   const [params, setParams] = useSearchParams();
@@ -89,7 +90,7 @@ function ScopedReport({ definition, projectId, projectName }: { definition: Repo
     {unknownCompany && <p role="alert" className="text-sm text-destructive">Seçili şirket bu projede bulunamadı. Şirket filtresini temizleyin.</p>}
     {unknownDepartment && <p role="alert" className="text-sm text-destructive">Seçili departman bu projede bulunamadı. Departman filtresini temizleyin.</p>}
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3"><p className="text-xs text-muted-foreground">{!rangeError ? `${formatReportDate(from)} – ${formatReportDate(to)}` : ''}</p><Button variant="outline" size="sm" onClick={() => setRevision(value => value + 1)}>{transactions ? 'Listeyi baştan yükle' : 'Yeniden yükle'}</Button></div>
-    {rangeError || unknownDepartment || unknownCompany ? null : (params.get('dept') && departments === undefined) || (params.get('company') && companies === undefined) ? <SectionSkeleton label="Departman yükleniyor…" /> : <QuerySectionBoundary resetKey={queryKey} title="Rapor yüklenemedi" description="Dönemi kontrol edip yeniden deneyebilirsiniz."><ReportResults violationsOnly={definition.filters.includes('breakViolation') && params.get('ihlal') === '1'} key={queryKey} definition={definition} onClear={clear} employeeId={transactions && params.get('employee') ? params.get('employee') as Id<'employees'> : undefined} projectId={projectId} projectName={projectName} from={from} to={to} companyId={company?._id} departmentId={department?._id} departmentName={department?.name} person={person} result={result} year={month?.year ?? 2000} month={month?.month ?? 1} /></QuerySectionBoundary>}
+    {rangeError || unknownDepartment || unknownCompany ? null : (params.get('dept') && departments === undefined) || (params.get('company') && companies === undefined) ? <ReportPage definition={definition} projectId={projectId} rows={[]} loading meta={{ from, to, projectName }} /> : <QuerySectionBoundary resetKey={queryKey} title="Rapor yüklenemedi" description="Dönemi kontrol edip yeniden deneyebilirsiniz."><ReportResults violationsOnly={definition.filters.includes('breakViolation') && params.get('ihlal') === '1'} key={queryKey} definition={definition} onClear={clear} employeeId={transactions && params.get('employee') ? params.get('employee') as Id<'employees'> : undefined} projectId={projectId} projectName={projectName} from={from} to={to} companyId={company?._id} departmentId={department?._id} departmentName={department?.name} person={person} result={result} year={month?.year ?? 2000} month={month?.month ?? 1} /></QuerySectionBoundary>}
   </div>;
 }
 export function ReportScreen({ definition }: { definition: ReportDefinition }) {

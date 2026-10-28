@@ -9,13 +9,14 @@ vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ a
 vi.mock("@/hooks/useEmployees", () => ({ useEmployees: () => ({ employees: [{ _id: "e", firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", departmentId: "d", isActive: true }], isLoading: navigation.loading, hasProjectAccess: true }) }));
 vi.mock("@/components/departments/DepartmentTree", () => ({ default: () => null }));
 vi.mock("./SlideOverPanel", () => ({ default: () => null }));
-vi.mock("./EmployeeTable", () => ({ default: () => null }));
+vi.mock("./EmployeeTable", () => ({ default: ({ employees, emptyState }: { employees: unknown[]; emptyState?: ReactNode }) => <table><thead><tr><th>Ad soyad</th></tr></thead><tbody><tr><td>{employees.length === 0 ? emptyState : null}</td></tr></tbody></table> }));
 vi.mock("@/components/shared/QuerySectionBoundary", () => ({ QuerySectionBoundary: ({ children }: { children: ReactNode }) => <>{children}</> }));
 const permissionState = vi.hoisted(() => ({ allowed: null as string[] | null, loading: false }));
 afterEach(() => { permissionState.allowed = null; permissionState.loading = false; });
 function render(query: string) { return renderToStaticMarkup(<MemoryRouter initialEntries={[`/employees?${query}`]}><Employees /></MemoryRouter>); }
 it("02-O1/D4: empty department explains direct membership and has one return action", () => {
   const html = render("department=empty");
+  expect(html).toContain("<thead>");
   expect(html).toContain("Bu departmanda doğrudan bağlı kişi yok");
   expect(html).toContain("Tüm personele dön");
   expect(html).toContain("[&amp;&gt;[role=search]&gt;button:last-of-type]:hidden");

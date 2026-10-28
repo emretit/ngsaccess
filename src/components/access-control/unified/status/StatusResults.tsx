@@ -1,6 +1,5 @@
 import { SegmentedViewControl } from "@/components/shared/SegmentedViewControl";
 import { LoadMoreFooter } from "@/components/shared/LoadMoreFooter";
-import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import {
@@ -70,6 +69,8 @@ export function StatusResults({
         onToggle={toggle}
         onEmployee={setEmployee}
         canManage
+        loading={busy}
+        emptyTitle={cursor ? "Yüklenen kayıtlarda bu filtrelerde eşleşme bulunamadı." : "Bu filtrelerde kayıt bulunamadı."}
         hideDevice={view === "device"}
       />
       <LoadMoreFooter
@@ -84,12 +85,6 @@ export function StatusResults({
     <>
       {view === "person" ? (
         <>
-          {!busy && rows.length === 0 && (
-            <EmptyState
-              compact
-              title={cursor ? "Yüklenen kayıtlarda bu filtrelerde eşleşme bulunamadı." : "Bu filtrelerde kayıt bulunamadı."}
-            />
-          )}
           {rowView}
         </>
       ) : (
@@ -136,12 +131,6 @@ export function StatusResults({
                 )}
                 {expanded === device._id && (
                   <>
-                    {!busy && !rows.length && (
-                      <EmptyState
-                        compact
-                        title={cursor ? "Yüklenen kayıtlarda bu filtrelerde eşleşme bulunamadı." : "Bu filtrelerde kayıt bulunamadı."}
-                      />
-                    )}
                     {rowView}
                   </>
                 )}

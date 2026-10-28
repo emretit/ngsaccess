@@ -42,6 +42,31 @@ export function AdminProjectsContent() {
     setStatus(undefined);
   };
   const filtered = Boolean(search || status);
+  const listState = !result ? (
+        <SectionSkeleton label="Projeler yükleniyor" />
+      ) : result.page.length === 0 && !result.isDone ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Bu sayfada eşleşme yok. Tarama devam ediyor; sonraki sayfaya geçin.
+        </p>
+      ) : result.page.length === 0 && paging.page > 1 ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Bu sayfada kayıt yok. Önceki sayfaya dönebilir veya filtreleri
+          değiştirebilirsiniz.
+        </p>
+      ) : result.page.length === 0 ? (
+        <EmptyState
+          title={filtered ? "Filtrelere uygun kayıt yok" : "Henüz proje yok"}
+          description={
+            filtered
+              ? "Aramayı veya filtreleri değiştirin."
+              : "Kullanıcı ve cihaz atamak için önce bir proje oluşturun."
+          }
+          action={{
+            label: filtered ? "Filtreleri temizle" : "Yeni proje",
+            onClick: filtered ? clear : () => setEditing({ project: null }),
+          }}
+        />
+      ) : null;
   return (
     <div className="min-w-0 space-y-5">
       <h2 id="admin-projects-heading" tabIndex={-1} className="sr-only">
@@ -90,37 +115,13 @@ export function AdminProjectsContent() {
           <option value="inactive">Pasif</option>
         </AdminSelect>
       </FilterBar>
-      {!result ? (
-        <SectionSkeleton label="Projeler yükleniyor" />
-      ) : result.page.length === 0 && !result.isDone ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Bu sayfada eşleşme yok. Tarama devam ediyor; sonraki sayfaya geçin.
-        </p>
-      ) : result.page.length === 0 && paging.page > 1 ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Bu sayfada kayıt yok. Önceki sayfaya dönebilir veya filtreleri
-          değiştirebilirsiniz.
-        </p>
-      ) : result.page.length === 0 ? (
-        <EmptyState
-          title={filtered ? "Filtrelere uygun kayıt yok" : "Henüz proje yok"}
-          description={
-            filtered
-              ? "Aramayı veya filtreleri değiştirin."
-              : "Kullanıcı ve cihaz atamak için önce bir proje oluşturun."
-          }
-          action={{
-            label: filtered ? "Filtreleri temizle" : "Yeni proje",
-            onClick: filtered ? clear : () => setEditing({ project: null }),
-          }}
-        />
-      ) : (
         <ProjectsTable
-          projects={result.page}
+          loading={!result}
+          emptyState={listState}
+          projects={result?.page ?? []}
           onEdit={(project) => setEditing({ project })}
           onDelete={setDeleting}
         />
-      )}
       <AdminPagination
         page={paging.page}
         count={result?.page.length ?? 0}

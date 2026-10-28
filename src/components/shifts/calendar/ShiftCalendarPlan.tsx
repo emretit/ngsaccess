@@ -52,12 +52,14 @@ export function ShiftCalendarPlan({
   employees,
   shifts,
   openDefinitions,
+  definitionsLoading = false,
 }: {
   projectId: Id<"projects">;
   projectName: string;
   employees: Employee[];
   shifts: Shift[];
   openDefinitions: () => void;
+  definitionsLoading?: boolean;
 }) {
   const { can } = usePermissions();
   const canManage = can("schedule.manage");
@@ -96,7 +98,7 @@ export function ShiftCalendarPlan({
   };
   const active = shifts.filter((s) => s.isActive !== false);
   const loading =
-    assignments === undefined || leaves === undefined || holidays === undefined || cells === undefined || departmentAssignments === undefined || departments === undefined;
+    definitionsLoading || assignments === undefined || leaves === undefined || holidays === undefined || cells === undefined || departmentAssignments === undefined || departments === undefined;
   const assignmentsByEmployee = useMemo(() => groupAssignments(assignments ?? []), [assignments]);
   const cellMap = useMemo(() => new Map((cells ?? []).map(cell => [`${cell.employeeId}|${cell.date}`, cell])), [cells]);
   const getData = (employee: Employee, date: string) => {
@@ -130,20 +132,26 @@ export function ShiftCalendarPlan({
     } : {}),
     selected,
   };
+  const emptyState =
+    !shifts.length ? (
+        <EmptyState
+          title="Henüz vardiya tanımlanmamış"
+          description={canManage ? "Atama yapmak için önce bir vardiya tanımlayın." : "Vardiya tanımlarını yetkili yöneticiler ekler."}
+          action={canManage ? { label: "Vardiya tanımla", onClick: openDefinitions } : undefined}
+        />
+      ) : !employees.length ? (
+        <EmptyState title="Bu projede çalışan yok" description="Plan oluşturmak için önce çalışan ekleyin." action={{ label: "Kişileri aç", onClick: () => navigate("/employees") }} />
+      ) : !filtered.length ? (
+        <EmptyState title="Aramayla eşleşen çalışan yok" description="Başka bir ad deneyin veya filtreleri temizleyin." />
+      ) : undefined;
+
   return (
     <div className="space-y-4 [&_button]:max-sm:min-h-11 [&_input]:max-sm:min-h-11">
       <CalendarHeader activeCount={active.length} loading={loading} exporting={exporting}
         onAssign={() => setAssign(assignmentInitial(day))}
         onExport={exportPlan} onClear={() => setClearOpen(true)} />
       {clearOpen && <ClearAssignmentsDialog projectId={projectId} employees={employees} initialIds={[...selected]} start={range.rangeStart} end={range.rangeEnd} onClose={() => { setClearOpen(false); clearSelection(); }} />}
-      {!shifts.length ? (
-        <EmptyState
-          title="Henüz vardiya tanımlanmamış"
-          description={canManage ? "Atama yapmak için önce bir vardiya tanımlayın." : "Vardiya tanımlarını yetkili yöneticiler ekler."}
-          action={canManage ? { label: "Vardiya tanımla", onClick: openDefinitions } : undefined}
-        />
-      ) : <>
-      {!active.length && (
+      {!definitionsLoading && shifts.length > 0 && !active.length && (
         <p role="status" className="text-sm text-muted-foreground">
           Tüm vardiya tanımları pasif; mevcut atamalar görünür ama yeni atama yapılamaz.
           {canManage && <> <Button variant="link" className="h-auto p-0 align-baseline" onClick={openDefinitions}>Sol panelden bir vardiyayı etkinleştirin</Button>.</>}
@@ -176,37 +184,13 @@ export function ShiftCalendarPlan({
           Seçilenlere ata
         </Button>
       </BulkBar>}
-      {loading ? (
-        <SectionSkeleton label="Plan, izin ve tatiller kontrol ediliyor" />
-      ) : !employees.length ? (
-        <EmptyState
-          title="Bu projede çalışan yok"
-          description="Plan oluşturmak için önce çalışan ekleyin."
-          action={{
-            label: "Kişileri aç",
-            onClick: () => navigate("/employees"),
-          }}
-        />
-      ) : !filtered.length ? (
-        <EmptyState
-          title="Aramayla eşleşen çalışan yok"
-          description="Başka bir ad deneyin veya filtreleri temizleyin."
-        />
-      ) : (
-        <>
-          {!(cells ?? []).some(cell => cell.kind !== "none") && assignments.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Bu dönemde atama yok.
-            </p>
-          )}
-          {compact ? (
-            <ShiftAgendaView {...calendarProps} />
-          ) : (
-            <ShiftCalendarGrid {...calendarProps} />
-          )}
-        </>
+      {!loading && !emptyState && !(cells ?? []).some(cell => cell.kind !== "none") && assignments?.length === 0 && (
+        <p className="text-sm text-muted-foreground">Bu dönemde atama yok.</p>
       )}
-      <PaginationBar
+      {compact ? loading ? <SectionSkeleton label={definitionsLoading ? "Çalışanlar ve vardiyalar yükleniyor" : "Plan, izin ve tatiller kontrol ediliyor"} /> : emptyState ?? <ShiftAgendaView {...calendarProps} /> : (
+        <ShiftCalendarGrid {...calendarProps} loading={loading} loadingLabel={definitionsLoading ? "Çalışanlar ve vardiyalar yükleniyor" : undefined} emptyState={emptyState} />
+      )}
+      {shifts.length > 0 && <PaginationBar
         summary={`${pageRange(filtered.length, currentPage + 1, 50)} / ${filtered.length} çalışan`}
         page={currentPage + 1}
         pageCount={pageCount}
@@ -218,8 +202,7 @@ export function ShiftCalendarPlan({
           setPage(currentPage + 1);
           clearSelection();
         }}
-      />
-      </>}
+      />}
       {assign && (
         <AssignShiftDialog
           open

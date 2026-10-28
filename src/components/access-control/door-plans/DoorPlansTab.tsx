@@ -1,3 +1,4 @@
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { pastAttemptText } from "@/lib/pastAttempt";
 import { CopyDoorPlansDialog } from "./CopyDoorPlansDialog";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -95,20 +96,21 @@ export function DoorPlansTab() {
       </p>
     </div>
   );
-  if (loading || (projectId && targets === undefined))
+  if (loading)
     return (
       <div className="space-y-4 min-w-0">
         {heading}
         <p role="status">Kapı planları yükleniyor…</p>
       </div>
     );
-  if (!projectId || !targets?.length)
+  if (!projectId)
     return (
       <div className="space-y-4 min-w-0">
         {heading}
         <EmptyState title="Plan kurulabilecek Hikvision kapısı yok" />
       </div>
     );
+  const doors = targets ?? [];
   return (
     <div className="space-y-4 min-w-0">
       {heading}
@@ -135,15 +137,16 @@ export function DoorPlansTab() {
                   className="size-5"
                   type="checkbox"
                   aria-label="Tüm kapıları seç"
+                  disabled={targets === undefined || doors.length === 0}
                   checked={
                     checked.length > 0 &&
-                    checked.length === Math.min(targets.length, MAX_BULK_DOORS)
+                    checked.length === Math.min(doors.length, MAX_BULK_DOORS)
                   }
                   onChange={(event) =>
                     setSelection({
                       projectId,
                       ids: event.target.checked
-                        ? targets
+                        ? doors
                             .slice(0, MAX_BULK_DOORS)
                             .map((door) => door.doorId)
                         : [],
@@ -161,7 +164,8 @@ export function DoorPlansTab() {
           </TableRow>
         </TableHeader>
         <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
-          {targets.map((door) => (
+          {targets === undefined ? <TableStateRow colSpan={4} state="loading" label="Kapı planları yükleniyor…" /> : doors.length === 0 ? <TableStateRow colSpan={4} state="empty" title="Plan kurulabilecek Hikvision kapısı yok" /> : null}
+          {doors.map((door) => (
             <TableRow
               key={door.doorId}
               className={`${ROW_CLICK_CLASS} flex flex-col rounded-lg border p-3 min-w-0 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:p-0 [&>td]:block [&>td]:p-1 [&>td]:h-auto [&>td]:min-w-0 [&>td]:break-words md:[&>td]:table-cell md:[&>td]:px-4 md:[&>td]:py-2 md:[&>td]:h-[42px]`}
@@ -290,7 +294,7 @@ export function DoorPlansTab() {
       {copyProject === projectId && checked.length > 0 && (
         <CopyDoorPlansDialog
           key={projectId}
-          targets={targets}
+          targets={doors}
           selectedIds={checked}
           onClose={() => setCopyProject(undefined)}
         />

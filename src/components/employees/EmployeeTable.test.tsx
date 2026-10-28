@@ -78,3 +78,20 @@ it.each([
   expect(mocks.items.some(item => item.children === "Cihazlara gönder")).toBe(sync);
   expect(html.includes("Biyometrik")).toBe(biometric);
 });
+
+it.each([false, true])("keeps employee headers and dynamic colspan while empty (biometrics=%s)", biometrics => {
+  mocks.permissions = biometrics ? ["biometrics.manage"] : [];
+  mocks.cursor = 0;
+  const html = renderToStaticMarkup(<EmployeeTable employees={[]} showDepartment showCompany onViewDetails={() => {}} />);
+  for (const label of ["Ad soyad", "E-posta", "Şirket", "Departman", "Pozisyon", "Kart no", "Durum", "İşlemler"]) expect(html).toContain(label);
+  expect(html).toMatch(new RegExp(`<tbody[^>]*><tr[^>]*><td[^>]*colSpan="${biometrics ? 10 : 9}"`));
+  expect(html).toContain("Henüz personel eklenmedi");
+});
+
+it("keeps employee headers while loading", () => {
+  const html = renderToStaticMarkup(<EmployeeTable employees={[]} loading onViewDetails={() => {}} />);
+  expect(html).toContain("Ad soyad");
+  expect(html).toContain("<tbody");
+  expect(html).toContain('aria-busy="true"');
+  expect(html).toContain("Personel bilgileri yükleniyor…");
+});

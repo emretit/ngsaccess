@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { PaginationBar } from "@/components/shared/PaginationBar";
 import { RuleRow } from "./RuleRow";
 import type { Props } from "./types";
@@ -44,13 +44,10 @@ export function RulesPage({
       numItems: 20,
     },
   });
-  if (!result)
-    return <SectionSkeleton rows={4} label="Erişim kuralları yükleniyor" />;
-  const rows = result.page;
-  return (
-    <div className="space-y-3 min-w-0">
-      {result.searchLimited ? (
+  const rows = result?.page ?? [];
+  const emptyState = result?.searchLimited ? (
         <EmptyState
+          compact
           title="Aramayı daraltın"
           description="Çok fazla eşleşme var. Daha uzun bir kişi veya kapı adı yazın."
         />
@@ -59,11 +56,13 @@ export function RulesPage({
           search={search}
           status={status}
           type={type}
-          isDone={result.isDone}
+          isDone={result?.isDone ?? false}
           clear={clear}
           onCreateRule={onCreateRule}
         />
-      ) : (
+      ) : null;
+  return (
+    <div className="space-y-3 min-w-0">
         <div className="min-w-0 overflow-x-auto rounded-md border">
           <Table className="w-full table-fixed">
             <TableHeader>
@@ -83,7 +82,8 @@ export function RulesPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((rule) => (
+              {!result ? <TableStateRow colSpan={6} state="loading" label="Erişim kuralları yükleniyor" /> : result.searchLimited || rows.length === 0 ? <TableStateRow colSpan={6} state="custom">{emptyState}</TableStateRow> : null}
+              {(!result?.searchLimited ? rows : []).map((rule) => (
                 <RuleRow
                   key={rule._id}
                   rule={rule}
@@ -94,15 +94,14 @@ export function RulesPage({
             </TableBody>
           </Table>
         </div>
-      )}
-      <PaginationBar
+      {result && <PaginationBar
         className="max-md:[&_button]:min-h-11"
         summary={`Sayfa ${cursors.length} · ${rows.length} kural gösteriliyor`}
         page={cursors.length}
         onPrevious={() => setCursors((prev) => prev.slice(0, -1))}
         onNext={() => setCursors((prev) => [...prev, result.continueCursor])}
         nextDisabled={result.isDone}
-      />
+      />}
     </div>
   );
 }

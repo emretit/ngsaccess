@@ -1,3 +1,7 @@
+import type { ReactNode } from "react";
+import { TableStateRow } from "@/components/shared/TableStateRow";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RowActions } from "@/components/shared/RowActions";
@@ -12,11 +16,15 @@ import {
 
 export function LeaveList({
   rows,
+  loading = false,
+  emptyState,
   canManage,
   onDetails,
   onEdit,
 }: {
   rows: LeaveRow[];
+  loading?: boolean;
+  emptyState?: ReactNode;
   canManage: boolean;
   onDetails: (row: LeaveRow) => void;
   onEdit: (row: LeaveRow) => void;
@@ -57,7 +65,9 @@ export function LeaveList({
   const duration = (row: LeaveRow) =>
     row.calendarDays === null ? "—" : `${row.calendarDays} takvim günü`;
   return (
-    <ResponsiveResults label="İzin kayıtları" desktop={
+    <ResponsiveResults
+      label="İzin kayıtları"
+      desktop={
         <table className="w-full table-fixed text-xs">
           <caption className="sr-only">
             İzin kayıtları, başlangıç tarihi azalan
@@ -82,47 +92,67 @@ export function LeaveList({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row._id}
-                className={`h-[42px] border-t hover:bg-subtle/50 ${ROW_CLICK_CLASS}`}
-                onClick={onRowActivate(() => onDetails(row))}
-              >
-                <td className="px-3 py-1">{person(row)}</td>
-                <td className="px-3 py-1 break-words">
-                  {leaveTypes[row.leaveType]}
-                </td>
-                <td className="px-3 py-1 tabular-nums">{dates(row)}</td>
-                <td className="px-3 py-1 tabular-nums">{duration(row)}</td>
-                <td className="px-3 py-1">{badge(row)}</td>
-                <td className="px-3 py-0 text-right">{actions(row)}</td>
-              </tr>
-            ))}
+            {loading ? (
+              <TableStateRow
+                colSpan={6}
+                state="loading"
+                label="İzin kayıtları yükleniyor."
+              />
+            ) : rows.length === 0 ? (
+              <TableStateRow colSpan={6} state="custom">
+                {emptyState ?? <EmptyState title="Henüz izin kaydı yok." />}
+              </TableStateRow>
+            ) : (
+              rows.map((row) => (
+                <tr
+                  key={row._id}
+                  className={`h-[42px] border-t hover:bg-subtle/50 ${ROW_CLICK_CLASS}`}
+                  onClick={onRowActivate(() => onDetails(row))}
+                >
+                  <td className="px-3 py-1">{person(row)}</td>
+                  <td className="px-3 py-1 break-words">
+                    {leaveTypes[row.leaveType]}
+                  </td>
+                  <td className="px-3 py-1 tabular-nums">{dates(row)}</td>
+                  <td className="px-3 py-1 tabular-nums">{duration(row)}</td>
+                  <td className="px-3 py-1">{badge(row)}</td>
+                  <td className="px-3 py-0 text-right">{actions(row)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-      } mobile={
-      <ul className="divide-y">
-        {rows.map((row) => (
-          <li
-            key={row._id}
-            className={`min-w-0 p-3 text-sm ${ROW_CLICK_CLASS}`}
-            onClick={onRowActivate(() => onDetails(row))}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                {person(row)}
-                <p className="mt-1">{leaveTypes[row.leaveType]}</p>
-              </div>
-              {actions(row)}
-            </div>
-            <p className="mt-2 tabular-nums text-xs">{dates(row)}</p>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs">{duration(row)}</span>
-              {badge(row)}
-            </div>
-          </li>
-        ))}
-      </ul>
-      } />
+      }
+      mobile={
+        loading ? (
+          <SectionSkeleton rows={5} label="İzin kayıtları yükleniyor." />
+        ) : rows.length === 0 ? (
+          (emptyState ?? <EmptyState title="Henüz izin kaydı yok." />)
+        ) : (
+          <ul className="divide-y">
+            {rows.map((row) => (
+              <li
+                key={row._id}
+                className={`min-w-0 p-3 text-sm ${ROW_CLICK_CLASS}`}
+                onClick={onRowActivate(() => onDetails(row))}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    {person(row)}
+                    <p className="mt-1">{leaveTypes[row.leaveType]}</p>
+                  </div>
+                  {actions(row)}
+                </div>
+                <p className="mt-2 tabular-nums text-xs">{dates(row)}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs">{duration(row)}</span>
+                  {badge(row)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    />
   );
 }

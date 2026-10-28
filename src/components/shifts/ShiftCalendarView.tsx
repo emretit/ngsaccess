@@ -1,5 +1,4 @@
 import type { Id } from "../../../convex/_generated/dataModel";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { ShiftCalendarPlan } from "./calendar/ShiftCalendarPlan";
 import { useShiftCalendarDefinitions } from "./calendar/useShiftCalendarData";
@@ -13,8 +12,6 @@ export function ShiftCalendarView({
   openDefinitions: (hasDefinitions: boolean) => void;
 }) {
   const { employees, shifts } = useShiftCalendarDefinitions(projectId);
-  if (!employees || !shifts)
-    return <SectionSkeleton label="Çalışanlar ve vardiyalar yükleniyor" />;
   return (
     <div className="group/plan min-w-0 max-w-full space-y-5">
       <QuerySectionBoundary
@@ -25,9 +22,10 @@ export function ShiftCalendarView({
         <ShiftCalendarPlan
           projectId={projectId}
           projectName={projectName}
-          employees={employees}
-          shifts={shifts}
-          openDefinitions={() => openDefinitions(shifts.length > 0)}
+          employees={employees ?? []}
+          shifts={shifts ?? []}
+          definitionsLoading={employees === undefined || shifts === undefined}
+          openDefinitions={() => openDefinitions((shifts?.length ?? 0) > 0)}
         />
       </QuerySectionBoundary>
     </div>

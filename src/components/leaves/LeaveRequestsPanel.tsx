@@ -20,8 +20,7 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { notify } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { dateLabel, leaveTypes } from "./lib/leaveState";
@@ -70,11 +69,6 @@ export function LeaveRequestsPanel({
   }
   return (
     <section className="space-y-4" aria-label="İzin talepleri">
-      {result === undefined ? (
-        <SectionSkeleton rows={4} label="Talepler yükleniyor." />
-      ) : result.page.length === 0 ? (
-        <EmptyState title="Bekleyen izin talebi yok." />
-      ) : (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -89,7 +83,11 @@ export function LeaveRequestsPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {result.page.map((row) => (
+              {result === undefined ? (
+                <TableStateRow colSpan={7} state="loading" label="Talepler yükleniyor." />
+              ) : result.page.length === 0 ? (
+                <TableStateRow colSpan={7} state="empty" title="Bekleyen izin talebi yok." />
+              ) : result.page.map((row) => (
                 <TableRow key={row._id}>
                   <TableCell>
                     {row.employeeName}
@@ -134,7 +132,6 @@ export function LeaveRequestsPanel({
             </TableBody>
           </Table>
         </div>
-      )}
       {result && (
         <div className="flex gap-2">
           <Button

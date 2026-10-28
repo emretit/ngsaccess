@@ -1,3 +1,4 @@
+import { AuditTable } from '@/components/audit/AuditTable';
 import { AuditExportButton } from '@/components/audit/AuditExportButton';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -31,7 +32,7 @@ function AuthorizedAuditLog() {
     <AuditCoverage />
     <AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError} />
     {!allProjects && <p className="text-xs text-muted-foreground">Seçili projenin kayıtları gösteriliyor. Projeyi üst çubuktan değiştirebilirsiniz.</p>}
-    {loading || state.changingScope ? <SectionSkeleton label="Denetim kayıtları yükleniyor…" rows={5} /> : !ready ? <EmptyState title="Bir proje seçin" description="Denetim kayıtlarını görmek için üst çubuktan bir proje seçin." /> : rangeError ? null : <AuditResults key={JSON.stringify(args)} args={args} />}
+    {loading || state.changingScope ? <AuditTable rows={[]} allProjects={allProjects} loading onSelect={() => {}} /> : !ready ? <EmptyState title="Bir proje seçin" description="Denetim kayıtlarını görmek için üst çubuktan bir proje seçin." /> : rangeError ? <AuditTable rows={[]} allProjects={allProjects} onSelect={() => {}} message={<p className="text-xs text-muted-foreground">Geçerli bir tarih aralığı seçilince kayıtlar listelenir.</p>} /> : <AuditResults key={JSON.stringify(args)} args={args} />}
   </div>;
 }
 

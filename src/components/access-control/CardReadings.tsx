@@ -7,11 +7,9 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { CardReadingsFilters } from "./CardReadingsFilters";
 import { CardReadingsTable } from "./CardReadingsTable";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
-import { Button } from "@/components/ui/button";
 import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 import { useFilteredReadings } from "@/components/live-monitoring/useFilteredReadings";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -50,14 +48,14 @@ function ReadingList({ projectId, filters, search, range, liveRows, freshIds, on
   const waiting = !badDate && page > loadedPages && !history.isDone;
   const { loading: historyLoading, loadMore } = history;
   useEffect(() => { if (waiting && !historyLoading) loadMore(); }, [waiting, historyLoading, loadMore]);
-  if (badDate) return <p id="reading-date-error" role="alert" className="text-xs text-danger">Bitiş tarihi başlangıçtan önce olamaz.</p>;
-  if (!readings.length) {
-    if (history.loading) return <SectionSkeleton rows={6} label="Erişim okumaları yükleniyor" />;
-    return <div className="min-w-0 space-y-3">
-      <CardReadingsTable readings={readings} onOpen={onOpen} emptyMessage={history.isDone ? "Seçili kapsamda okuma yok." : "Yüklenen kayıtlarda eşleşme yok. Daha eski kayıtlarda olabilir."} />
-      {!history.isDone && <Button variant="outline" onClick={history.loadMore}>Daha eski kayıtlarda ara</Button>}
-    </div>;
-  }
+  if (badDate || !readings.length) return <div className="min-w-0 space-y-3">
+    {badDate && <p id="reading-date-error" role="alert" className="text-xs text-danger">Bitiş tarihi başlangıçtan önce olamaz.</p>}
+    <CardReadingsTable readings={[]} onOpen={onOpen}
+    loading={!badDate && (!ready || history.loading)}
+    message={badDate ? <p className="text-xs text-muted-foreground">Geçerli bir tarih aralığı seçilince okumalar listelenir.</p> : undefined}
+    emptyMessage={history.isDone ? "Seçili kapsamda okuma yok." : "Yüklenen kayıtlarda eşleşme yok. Daha eski kayıtlarda olabilir."}
+    emptyAction={!badDate && ready && !history.loading && !history.isDone ? { label: "Daha eski kayıtlarda ara", onClick: history.loadMore } : undefined} />
+  </div>;
   const currentPage = Math.min(page, loadedPages);
   return <CardReadingsTable readings={readings.slice((currentPage - 1) * pageSize, currentPage * pageSize)} freshIds={freshIds} onOpen={onOpen} footer={<PaginationBar
     summary={`${readings.length}${history.isDone ? "" : "+"} okuma · ${pageRange(readings.length, currentPage, pageSize)} gösteriliyor`}
@@ -82,7 +80,7 @@ function Readings({ projectId, filters, onOpen }: { projectId: Id<"projects">; f
     const timer = window.setTimeout(() => setFreshIds(new Set()), 2000);
     return () => window.clearTimeout(timer);
   }, [feed.rows, feed.initialized]);
-  if (!dated && feed.loading) return <SectionSkeleton rows={6} label="Erişim okumaları yükleniyor" />;
+  if (!dated && feed.loading) return <CardReadingsTable readings={[]} onOpen={onOpen} loading />;
   // Bugün canlı akışta tamsa eski kayıtlar dünde biter; sorgu bugünkü yeni okumalarla yeniden çalışmaz.
   const range: Range = dated ? { startDate: filters.start || undefined, endDate: filters.end || undefined } : feed.truncated ? {} : { startDate: OLDEST_DAY, endDate: previousDay(feed.day) };
   const liveRows = dated ? [] : feed.rows.filter(r => matches(r, { ...filters, search: search ?? "" }));
@@ -126,7 +124,7 @@ function ProjectReadings({ projectId }: { projectId: Id<"projects"> }) {
 export default function CardReadings() {
   const { can } = usePermissions();
   const { projectId, loading } = useActiveProjectScope();
-  if (loading) return <SectionSkeleton rows={6} label="Proje yükleniyor" />;
+  if (loading) return <CardReadingsTable readings={[]} onOpen={() => {}} loading />;
   if (!projectId) return <EmptyState title="Proje seçin" description="Okumaları görmek için üst çubuktan bir proje seçin." />;
   if (!can("reports.view") && !can("devices.manage")) return null;
   return <ProjectReadings key={projectId} projectId={projectId} />;

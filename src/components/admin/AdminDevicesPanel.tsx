@@ -1,3 +1,4 @@
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAdminPrimaryAction } from "./hooks/useAdminPrimaryAction";
@@ -134,6 +135,33 @@ function AdminDevicesContent() {
       </DropdownMenuItem>
     </RowActions>
   );
+  const listState = !result ? (
+        <SectionSkeleton label="Cihaz havuzu yükleniyor" />
+      ) : result.page.length === 0 && !result.isDone ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Bu sayfada eşleşme yok. Tarama devam ediyor; sonraki sayfaya geçin.
+        </p>
+      ) : result.page.length === 0 && paging.page > 1 ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Bu sayfada kayıt yok. Önceki sayfaya dönebilir veya filtreleri
+          değiştirebilirsiniz.
+        </p>
+      ) : result.page.length === 0 ? (
+        <EmptyState
+          title={
+            filtered ? "Filtrelere uygun kayıt yok" : "Envanterde cihaz yok"
+          }
+          description={
+            filtered
+              ? "Aramayı veya filtreleri değiştirin."
+              : "Panel UUID’si ile bir cihaz kaydedin."
+          }
+          action={{
+            label: filtered ? "Filtreleri temizle" : "Cihaz kaydet",
+            onClick: filtered ? () => setFilters({}) : create,
+          }}
+        />
+      ) : null;
   return (
     <div className="min-w-0 space-y-5">
       <h2 id="admin-devices-heading" tabIndex={-1} className="sr-only">
@@ -198,33 +226,6 @@ function AdminDevicesContent() {
           <option value="never">Henüz görülmedi</option>
         </AdminSelect>
       </FilterBar>
-      {!result ? (
-        <SectionSkeleton label="Cihaz havuzu yükleniyor" />
-      ) : result.page.length === 0 && !result.isDone ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Bu sayfada eşleşme yok. Tarama devam ediyor; sonraki sayfaya geçin.
-        </p>
-      ) : result.page.length === 0 && paging.page > 1 ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Bu sayfada kayıt yok. Önceki sayfaya dönebilir veya filtreleri
-          değiştirebilirsiniz.
-        </p>
-      ) : result.page.length === 0 ? (
-        <EmptyState
-          title={
-            filtered ? "Filtrelere uygun kayıt yok" : "Envanterde cihaz yok"
-          }
-          description={
-            filtered
-              ? "Aramayı veya filtreleri değiştirin."
-              : "Panel UUID’si ile bir cihaz kaydedin."
-          }
-          action={{
-            label: filtered ? "Filtreleri temizle" : "Cihaz kaydet",
-            onClick: filtered ? () => setFilters({}) : create,
-          }}
-        />
-      ) : (
         <ResponsiveResults label="Cihaz havuzu" desktop={
             <Table className="table-fixed">
               <TableHeader>
@@ -242,7 +243,8 @@ function AdminDevicesContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {result.page.map((device) => (
+                {!result ? <TableStateRow colSpan={6} state="loading" label="Cihaz havuzu yükleniyor" /> : result.page.length === 0 ? <TableStateRow colSpan={6} state="custom">{listState}</TableStateRow> : null}
+                {result?.page.map((device) => (
                   <TableRow
                     key={device._id}
                     className={ROW_CLICK_CLASS}
@@ -278,11 +280,12 @@ function AdminDevicesContent() {
               </TableBody>
             </Table>
           } mobile={
+          !result || result.page.length === 0 ? listState :
           <ul
             aria-label="Cihaz havuzu"
             className="divide-y"
           >
-            {result.page.map((device) => (
+            {result?.page.map((device) => (
               <li
                 key={device._id}
                 className={`flex min-w-0 gap-2 p-3 ${ROW_CLICK_CLASS}`}
@@ -309,7 +312,6 @@ function AdminDevicesContent() {
             ))}
           </ul>
       } />
-      )}
       <AdminPagination
         page={paging.page}
         count={result?.page.length ?? 0}

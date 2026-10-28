@@ -1,3 +1,5 @@
+import { TableStateRow } from "@/components/shared/TableStateRow";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -45,6 +47,8 @@ export function GrantRows({
   onEmployee,
   canManage,
   hideDevice = false,
+  loading = false,
+  emptyTitle = "Bu filtrelerde kayıt bulunamadı.",
 }: {
   rows: GrantRow[];
   selected: Pair[];
@@ -52,6 +56,8 @@ export function GrantRows({
   onEmployee: (row: GrantRow, trigger?: HTMLElement) => void;
   canManage: boolean;
   hideDevice?: boolean;
+  loading?: boolean;
+  emptyTitle?: string;
 }) {
   const cells = (row: GrantRow) => [
     <Button
@@ -93,6 +99,7 @@ export function GrantRows({
             </tr>
           </thead>
           <tbody>
+            {rows.length === 0 && (loading ? <TableStateRow colSpan={3 + (canManage ? 1 : 0)} state="loading" label="Yükleniyor…" /> : <TableStateRow colSpan={3 + (canManage ? 1 : 0)} state="empty" title={emptyTitle} />)}
             {rows.map((row) => (
               <tr
                 key={pairKey(row)}
@@ -118,6 +125,7 @@ export function GrantRows({
         </table>
       </div>
       <div className="lg:hidden space-y-3">
+        {loading ? <p role="status">Yükleniyor…</p> : rows.length === 0 ? <EmptyState compact title={emptyTitle} /> : null}
         {rows.map((row) => (
           <article
             key={pairKey(row)}

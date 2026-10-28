@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { ShiftCalendarCell } from "./ShiftCalendarCell";
 import {
   calendarDayLabel,
@@ -8,6 +9,9 @@ import {
   type DayData,
 } from "./lib/planning";
 export interface CalendarProps {
+  loading?: boolean;
+  loadingLabel?: string;
+  emptyState?: ReactNode;
   employees: Employee[];
   days: string[];
   getData: (employee: Employee, date: string) => DayData;
@@ -45,13 +49,13 @@ export function CalendarSelectAll({ selection, label }: {
 }
 
 export function ShiftCalendarGrid({
-  employees, days, getData, onOpen, selected, onSelect, canAssign, selectAll,
+  employees, days, getData, onOpen, selected, onSelect, canAssign, selectAll, loading, loadingLabel, emptyState,
 }: CalendarProps) {
   const viewport = useRef<HTMLDivElement>(null);
   const [overflowing, setOverflowing] = useState(false);
   const compact = days.length > 7;
   const today = istanbulToday();
-  const rows = employees.map((employee) => ({ employee, cells: days.map((day) => getData(employee, day)) }));
+  const rows = (loading || emptyState ? [] : employees).map((employee) => ({ employee, cells: days.map((day) => getData(employee, day)) }));
   const mutedDays = days.map((day, index) => {
     const weekday = new Date(`${day}T12:00:00Z`).getUTCDay();
     return weekday === 0 || weekday === 6 || rows.some(({ cells }) => cells[index]?.holiday);
@@ -111,7 +115,7 @@ export function ShiftCalendarGrid({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ employee, cells }) => (
+            {loading ? <TableStateRow colSpan={1 + days.length} state="loading" label={loadingLabel ?? "Plan, izin ve tatiller kontrol ediliyor"} /> : emptyState ? <TableStateRow colSpan={1 + days.length} state="custom">{emptyState}</TableStateRow> : rows.map(({ employee, cells }) => (
               <tr key={employee._id} className="border-t">
                 <th scope="row" className="sticky left-0 z-10 bg-surface px-2 py-1 text-left font-normal">
                   <label className={`flex min-h-11 gap-2 items-center ${onSelect ? "cursor-pointer" : ""}`}>

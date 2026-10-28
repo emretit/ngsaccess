@@ -57,9 +57,16 @@ describe("LeaveRequestsPanel", () => {
   });
   it("shows loading and the empty queue", () => {
     state.result = undefined;
-    expect(render()).toContain("Talepler yükleniyor.");
+    const loadingHtml = render();
+    expect(loadingHtml).toContain("Talepler yükleniyor.");
+    expect(loadingHtml).toContain("<thead");
+    expect(loadingHtml).toContain('colSpan="7"');
     state.result = { page: [], isDone: true, continueCursor: "" };
-    expect(render()).toContain("Bekleyen izin talebi yok.");
+    const emptyHtml = render();
+    expect(emptyHtml).toContain("Bekleyen izin talebi yok.");
+    expect(emptyHtml).toContain("<thead");
+    for (const label of ["Çalışan", "Tür", "Tarih aralığı", "Gün", "Çalışan notu", "Talep zamanı", "İşlemler"]) expect(emptyHtml).toContain(label);
+    expect(emptyHtml).toContain('colSpan="7"');
   });
   it("renders request details and decision controls", () => {
     state.result = {

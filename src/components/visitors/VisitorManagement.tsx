@@ -49,7 +49,7 @@ export default function VisitorManagement() {
       primaryAction={canManage && projectId ? { label: "Ziyaretçi kaydet", onClick: () => setPanel({ visitor: null, projectId }) } : undefined}>
       {projectId && canView && can("devices.manage") && <Button variant="outline" size="sm" onClick={() => setZoneOpen(true)}>Erişim bölgesi oluştur</Button>}
     </PageHeader>
-    {loading || permissionsLoading ? <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" /> : !projectId ? !isSuperAdmin ? <AccessDenied compact /> : <EmptyState title="Proje seçin" description="Ziyaretçileri görmek için erişiminiz olan aktif bir proje seçin." /> : !canView ? <AccessDenied compact message="Ziyaretçileri görüntüleme yetkiniz yok. Proje yöneticinizle iletişime geçin." /> : <>
+    {permissionsLoading ? <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" /> : loading ? <VisitorTable visitors={[]} onOpen={() => {}} loading /> : !projectId ? !isSuperAdmin ? <AccessDenied compact /> : <EmptyState title="Proje seçin" description="Ziyaretçileri görmek için erişiminiz olan aktif bir proje seçin." /> : !canView ? <AccessDenied compact message="Ziyaretçileri görüntüleme yetkiniz yok. Proje yöneticinizle iletişime geçin." /> : <>
       <QuerySectionBoundary title="Ziyaretçi özeti yüklenemedi" resetKey={projectId}><VisitorStats now={now} onNextExpiry={onNextExpiry} /></QuerySectionBoundary>
       <VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} />
       <QuerySectionBoundary title="Ziyaretçiler yüklenemedi" description="Bağlantınızı kontrol edip tekrar deneyin." resetKey={resetKey}>
@@ -70,16 +70,16 @@ export function VisitorList({ search, status, pageSize, onPageSizeChange, now, o
   const result = useVisitors({ search, status: status === "all" ? undefined : status, cursor, pageSize, now });
   // Project/filter changes remount VisitorList via resetKey; pagination resets this cache too.
   const page = useStableQuery(result.page, JSON.stringify([search, status, pageSize, cursor]));
-  if (!page) return <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" />;
+  if (!page) return <VisitorTable visitors={[]} onOpen={onOpen} loading />;
   const visitors = page.page.map(visitor => ({ ...visitor, status: displayVisitorStatus(visitor, now) }));
   const filtered = !!search.trim() || status !== "all";
   return <div className="min-w-0 space-y-3">
-    {visitors.length ? <VisitorTable visitors={visitors} onOpen={onOpen} /> : !page.isDone ? <EmptyState
+    <VisitorTable visitors={visitors} onOpen={onOpen} emptyState={!page.isDone ? <EmptyState
       title="Arama devam ediyor" description="Diğer ziyaretçi kayıtlarında aramaya devam edin."
       action={{ label: "Daha fazla kayıt tara", onClick: () => setCursors(previous => [...previous, page.continueCursor]) }} /> : <EmptyState
       title={filtered ? "Eşleşen ziyaretçi yok" : cursors.length === 1 && page.isDone ? "Henüz ziyaretçi kaydı yok" : "Bu sayfada ziyaretçi kaydı yok"}
       description={filtered ? "Aramayı veya durum filtrelerini değiştirin." : "Bu projede geçici erişim verilen ziyaretçiler burada görünür."}
-      action={filtered ? { label: "Filtreleri temizle", onClick: onClear } : undefined} />}
+      action={filtered ? { label: "Filtreleri temizle", onClick: onClear } : undefined} />} />
     {(visitors.length > 0 || cursors.length > 1) && <PaginationBar summary={`Sayfa ${cursors.length} · ${visitors.length} kayıt`} page={cursors.length}
       onPrevious={() => setCursors(previous => previous.slice(0, -1))} onNext={() => setCursors(previous => [...previous, page.continueCursor])} nextDisabled={page.isDone}
       pageSize={pageSize} pageSizes={[25, 50]} onPageSizeChange={onPageSizeChange} pageSizeLabel="Sayfadaki ziyaretçi sayısı" />}

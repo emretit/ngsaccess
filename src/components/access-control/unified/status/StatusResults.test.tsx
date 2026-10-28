@@ -1,12 +1,17 @@
+import type { ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { GrantRow } from "./model";
 import { StatusViewToggle, StatusResults } from "./StatusResults";
 
-vi.mock("./StatusViews", () => ({
-  DeviceCounters: () => null,
-  GrantRows: () => null,
-}));
+vi.mock("./StatusViews", async importOriginal => {
+  const actual = await importOriginal<typeof import("./StatusViews")>();
+  return {
+    ...actual,
+    DeviceCounters: () => null,
+    GrantRows: (props: ComponentProps<typeof actual.GrantRows>) => props.rows.length === 0 ? <actual.GrantRows {...props} /> : null,
+  };
+});
 
 function render(cursor: string | null, busy = false, rows: GrantRow[] = []) {
   return renderToStaticMarkup(
@@ -53,7 +58,8 @@ describe("StatusResults boş sonuç", () => {
 
   it("yükleme sırasında boş sonuç duyurmaz ve devam düğmesini devre dışı tutar", () => {
     const html = render("next-page", true);
-    expect(html).not.toContain('role="status"');
+    expect(html).toMatch(/<tbody>.*Yükleniyor….*<\/tbody>/s);
+    expect(html).not.toContain("Bu filtrelerde kayıt bulunamadı.");
     expect(html).toContain('disabled=""');
     expect(html).toContain("Daha fazla yükle");
   });

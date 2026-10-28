@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -17,8 +16,7 @@ import { DeviceDeleteDialog } from "./DeviceDeleteDialog";
 import { useDeviceTable } from "@/hooks/useDeviceTable";
 import { ListSelectAll } from "@/components/shared/ListSelectAll";
 
-import { EmptyState } from "@/components/shared/EmptyState";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 
 interface DeviceListProps {
@@ -130,6 +128,7 @@ export function DeviceList({
                   label="Görünen tüm cihazları seç"
                   checked={checked}
                   onChange={handleSelectAll}
+                  disabled={isLoading || pageDevices.length === 0}
                 />
               </TableHead>
               {showProject && (
@@ -157,11 +156,7 @@ export function DeviceList({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={colCount} className="text-center py-16">
-                  <SectionSkeleton rows={4} label="Cihazlar yükleniyor" />
-                </TableCell>
-              </TableRow>
+              <TableStateRow colSpan={colCount} state="loading" label="Cihazlar yükleniyor" />
             ) : filteredDevices.length > 0 ? (
               pageDevices.map((device, i) => (
                 <DeviceTableRow
@@ -184,33 +179,31 @@ export function DeviceList({
                 />
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={colCount} className="text-center py-16">
-                  <EmptyState
-                    icon={Smartphone}
-                    title={
-                      devices.length
-                        ? "Filtrelere uygun cihaz bulunamadı"
-                        : "Bu projede henüz cihaz yok"
-                    }
-                    description={
-                      devices.length
-                        ? "Etkin filtreleri temizleyerek tüm cihazları görüntüleyin."
-                        : "Bu projeye henüz cihaz eklenmemiş."
-                    }
-                    action={
-                      devices.length && onClearFilters
-                        ? {
-                            label: "Filtreleri temizle",
-                            onClick: onClearFilters,
-                          }
-                        : onAddDevice
-                          ? { label: "Cihaz ekle", onClick: onAddDevice }
-                          : undefined
-                    }
-                  />
-                </TableCell>
-              </TableRow>
+              <TableStateRow
+                colSpan={colCount}
+                state="empty"
+                icon={Smartphone}
+                title={
+                  devices.length
+                    ? "Filtrelere uygun cihaz bulunamadı"
+                    : "Bu projede henüz cihaz yok"
+                }
+                description={
+                  devices.length
+                    ? "Etkin filtreleri temizleyerek tüm cihazları görüntüleyin."
+                    : "Bu projeye henüz cihaz eklenmemiş."
+                }
+                action={
+                  devices.length && onClearFilters
+                    ? {
+                        label: "Filtreleri temizle",
+                        onClick: onClearFilters,
+                      }
+                    : onAddDevice
+                      ? { label: "Cihaz ekle", onClick: onAddDevice }
+                      : undefined
+                }
+              />
             )}
           </TableBody>
         </Table>

@@ -3,11 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RolesSettings } from "./RolesSettings";
 import { PERMISSIONS, PROJECT_ROLES, ROLE_DEFAULTS, ROLE_LABELS } from "../../../../convex/lib/roleCatalog";
-const state = vi.hoisted(() => ({ save: vi.fn(), optimistic: vi.fn(), allowed: true }));
+const state = vi.hoisted(() => ({ save: vi.fn(), optimistic: vi.fn(), allowed: true, loading: false }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p" }) }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => state.allowed }) }));
 vi.mock("convex/react", () => ({
-  useQuery: () => PROJECT_ROLES.map(role => ({ role, permissions: [...ROLE_DEFAULTS[role]], locked: role === "admin", isDefault: true })),
+  useQuery: () => state.loading ? undefined : PROJECT_ROLES.map(role => ({ role, permissions: [...ROLE_DEFAULTS[role]], locked: role === "admin", isDefault: true })),
   useMutation: () => Object.assign(state.save, { withOptimisticUpdate: (callback: unknown) => { state.optimistic(callback); return state.save; } }),
 }));
 vi.mock("@/lib/notify", () => ({ notify: { error: vi.fn() } }));
@@ -21,8 +21,19 @@ function tree() {
   renderToStaticMarkup(<Harness />);
   return elements(result);
 }
-beforeEach(() => { state.allowed = true; state.save.mockReset().mockResolvedValue(null); state.optimistic.mockClear(); });
+beforeEach(() => { state.loading = false; state.allowed = true; state.save.mockReset().mockResolvedValue(null); state.optimistic.mockClear(); });
 describe("proje rol matrisi", () => {
+  it("keeps role headers and a loading body row while disabling reset actions", () => {
+    state.loading = true;
+    const html = renderToStaticMarkup(<RolesSettings />);
+    expect(html).toContain("<thead>");
+    for (const role of PROJECT_ROLES) expect(html).toContain(ROLE_LABELS[role]);
+    expect(html).toMatch(/<tbody>.*colSpan="6".*Roller yükleniyor.*<\/tbody>/s);
+    expect(html).not.toContain('type="checkbox"');
+    const resets = tree().filter(element => typeof element.props["aria-label"] === "string" && String(element.props["aria-label"]).endsWith(": Varsayılana dön"));
+    expect(resets).toHaveLength(PROJECT_ROLES.length);
+    for (const reset of resets) expect(reset.props.disabled).toBe(true);
+  });
   it("has 13 × 5 checkboxes, with the entire admin column locked and described", () => {
     const inputs = tree().filter(element => element.type === "input");
     expect(inputs).toHaveLength(65);

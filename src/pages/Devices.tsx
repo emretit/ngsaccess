@@ -21,7 +21,6 @@ import { useActiveProjectScope } from '@/hooks/useActiveProjectScope';
 import { notify } from '@/lib/notify';
 import { Device, ServerDevice } from '@/types/device';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
-import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
 import { DeviceListErrorBoundary } from '@/components/devices/DeviceListErrorBoundary';
 import { readDeviceFilters, writeDeviceFilters, resetDeviceFiltersForProject } from '@/lib/deviceDisplay';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -152,7 +151,7 @@ const Devices = () => {
     {unavailable ?? (
     <div className="min-h-full min-w-0 space-y-4">
       <div className="flex-1 min-w-0 space-y-3">
-        {projectLoading ? <SectionSkeleton rows={5} label="Proje yükleniyor" /> : <DevicesContent
+        <DevicesContent
           sidebar={<LocationTree
             key={projectId ?? "none"}
             selectedZoneId={selectedZoneId}
@@ -162,7 +161,7 @@ const Devices = () => {
             canManage={canManage}
           />}
           devices={devices}
-          isLoading={isLoading}
+          isLoading={projectLoading || isLoading}
           zones={zones}
           selectedZoneId={selectedZoneId}
           selectedDoorId={selectedDoorId}
@@ -174,8 +173,8 @@ const Devices = () => {
           onAddVirtualReader={() => setVirtualReader({ mode: "create" })}
           onQRClick={handleDeviceQRClick}
           onReleaseDevice={canManage ? handleReleaseDevice : undefined}
-          canManage={canManage}
-        />}
+          canManage={canManage && !projectLoading}
+        />
       </div>
 
       {/* Havuzdan cihaz claim */}

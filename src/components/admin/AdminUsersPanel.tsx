@@ -140,6 +140,33 @@ export function AdminUsersContent() {
   };
   const primaryInHeader = useAdminPrimaryAction("Kullanıcı davet et", create);
   const filtered = Boolean(filters.search || filters.role || filters.project);
+  const listState = users === undefined ? (
+        <SectionSkeleton label="Kullanıcılar yükleniyor" />
+      ) : users.length === 0 && result && !result.isDone ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Bu sayfada eşleşme yok. Tarama devam ediyor; sonraki sayfaya geçin.
+        </p>
+      ) : users.length === 0 && paging.page > 1 ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Bu sayfada kayıt yok. Önceki sayfaya dönebilir veya filtreleri
+          değiştirebilirsiniz.
+        </p>
+      ) : users.length === 0 ? (
+        <EmptyState
+          title={
+            filtered ? "Filtrelere uygun kayıt yok" : "Henüz kullanıcı yok"
+          }
+          description={
+            filtered
+              ? "Aramayı veya filtreleri değiştirin."
+              : "Erişim vermek için bir kullanıcı davet edin."
+          }
+          action={{
+            label: filtered ? "Filtreleri temizle" : "Kullanıcı davet et",
+            onClick: filtered ? () => setFilters({}) : create,
+          }}
+        />
+      ) : null;
   return (
     <div className="min-w-0 space-y-5">
       <h2 id="admin-users-heading" tabIndex={-1} className="sr-only">
@@ -208,35 +235,10 @@ export function AdminUsersContent() {
           </AdminSelect>
         )}
       </FilterBar>
-      {users === undefined ? (
-        <SectionSkeleton label="Kullanıcılar yükleniyor" />
-      ) : users.length === 0 && result && !result.isDone ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Bu sayfada eşleşme yok. Tarama devam ediyor; sonraki sayfaya geçin.
-        </p>
-      ) : users.length === 0 && paging.page > 1 ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          Bu sayfada kayıt yok. Önceki sayfaya dönebilir veya filtreleri
-          değiştirebilirsiniz.
-        </p>
-      ) : users.length === 0 ? (
-        <EmptyState
-          title={
-            filtered ? "Filtrelere uygun kayıt yok" : "Henüz kullanıcı yok"
-          }
-          description={
-            filtered
-              ? "Aramayı veya filtreleri değiştirin."
-              : "Erişim vermek için bir kullanıcı davet edin."
-          }
-          action={{
-            label: filtered ? "Filtreleri temizle" : "Kullanıcı davet et",
-            onClick: filtered ? () => setFilters({}) : create,
-          }}
-        />
-      ) : (
         <UserTable
-          users={users}
+          loading={users === undefined}
+          emptyState={listState}
+          users={users ?? []}
           onResetPassword={management.canResetPassword ? user => {
             if (!("projects" in user) || !("canResetPassword" in user) || !user.canResetPassword || user.role === "super_admin" || !user.email) return;
             const project = user.projects.find(project => project._id === filters.project) ?? user.projects[0];
@@ -252,7 +254,6 @@ export function AdminUsersContent() {
             setDeleteOpen(true);
           }}
         />
-      )}
       <AdminPagination
           page={paging.page}
           count={users?.length ?? 0}

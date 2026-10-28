@@ -9,8 +9,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { notify } from "@/lib/notify";
 import { getTurkishHolidaysForYear } from "../../../../../convex/lib/turkishHolidays";
 import { todayInTurkey } from "@/lib/date";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
-import { EmptyState } from "@/components/shared/EmptyState";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
@@ -90,16 +89,14 @@ function HolidayCalendarContent() {
       <Button variant="outline" disabled={pending || !projectId || holidays === undefined} onClick={() => setSeedOpen(true)}>{seedAction.pending ? "Yükleniyor…" : "Resmi tatilleri yükle"}</Button>
       <Button variant="outline" disabled={pending || !projectId} onClick={() => setOpen(true)}>Tatil ekle</Button>
     </div>
-    {loading || holidays === undefined ? <SectionSkeleton label="Tatiller yükleniyor" /> : holidays.length === 0 ?
-      <EmptyState title={`${year} yılı için tanımlı tatil yok`} description="Bir tatil ekleyin veya resmi tatilleri yükleyin." /> :
       <div className="min-w-0 overflow-x-auto rounded-md border"><Table density="compact">
         <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Tatil adı</TableHead><TableHead><span className="sr-only">İşlemler</span></TableHead></TableRow></TableHeader>
-        <TableBody>{[...holidays].sort((a, b) => a.date.localeCompare(b.date)).map(holiday => <TableRow key={holiday._id} id={`holiday-${holiday.date}`} tabIndex={-1} className="h-[42px]">
+        <TableBody>{loading || holidays === undefined ? <TableStateRow colSpan={3} state="loading" label="Tatiller yükleniyor" /> : holidays.length === 0 ? <TableStateRow colSpan={3} state="empty" title={`${year} yılı için tanımlı tatil yok`} description="Bir tatil ekleyin veya resmi tatilleri yükleyin." /> : [...holidays].sort((a, b) => a.date.localeCompare(b.date)).map(holiday => <TableRow key={holiday._id} id={`holiday-${holiday.date}`} tabIndex={-1} className="h-[42px]">
           <TableCell className="tabular-nums whitespace-nowrap">{new Date(`${holiday.date}T12:00:00`).toLocaleDateString("tr-TR")}<span className="block text-xs text-muted-foreground">{new Date(`${holiday.date}T12:00:00`).toLocaleDateString("tr-TR", { weekday: "long" })}</span></TableCell>
           <TableCell className="break-words whitespace-normal">{holiday.name}<span className="block text-xs text-muted-foreground">{holiday.isHalfDay ? "Yarım gün" : "Tam gün"}</span></TableCell>
           <TableCell className="w-12"><Button variant="ghost" size="icon" className="h-9 w-9" aria-label={`${holiday.name} tatilini sil`} disabled={pending} onClick={() => { setDeleteHoliday(holiday); setDeleteOpen(true); }}><Trash2 className="h-4 w-4" /></Button></TableCell>
         </TableRow>)}</TableBody>
-      </Table></div>}
+      </Table></div>
     <Dialog open={open} onOpenChange={next => { if (!next) close(); }}>
       <DialogContent onCloseAutoFocus={event => { if (focusDate) { event.preventDefault(); document.getElementById(`holiday-${focusDate}`)?.focus(); } }}>
         <DialogHeader><DialogTitle>Tatil ekle</DialogTitle><DialogDescription>Tatil seçili projenin takvimine eklenir. Yıldızlı alanlar zorunludur.</DialogDescription></DialogHeader>

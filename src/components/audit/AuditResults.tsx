@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePaginatedQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { QuerySectionBoundary } from '@/components/shared/QuerySectionBoundary';
-import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
+import { AuditTable } from './AuditTable';
 import { AuditResultsContent } from './AuditResultsContent';
 import { AuditDetailPanel } from './AuditDetailPanel';
 import type { AuditArgs, AuditRow } from './auditState';
@@ -28,7 +28,7 @@ function AuditQuery({ args, onSnapshot, onActive, hasRows }: { args: AuditArgs; 
       request();
     }
   }, [results, status, loadMore, onSnapshot]);
-  return status === 'LoadingFirstPage' && !hasRows ? <SectionSkeleton label="Denetim kayıtları yükleniyor…" rows={5} /> : null;
+  return status === 'LoadingFirstPage' && !hasRows ? <AuditTable rows={[]} allProjects={args.allProjects} loading onSelect={() => {}} /> : null;
 }
 
 export function AuditResults({ args }: { args: AuditArgs }) {

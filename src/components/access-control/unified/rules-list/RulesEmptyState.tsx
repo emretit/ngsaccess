@@ -14,6 +14,7 @@ export function RulesEmptyState({
 }) {
   return (
     <EmptyState
+      compact
       title={
         search || status !== "all" || type !== "all"
           ? "Eşleşen kural yok"

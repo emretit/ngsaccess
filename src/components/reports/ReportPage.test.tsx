@@ -200,3 +200,21 @@ it('displays one summary row per person and labels the specialized exports', () 
   }
   expect(reportExportLabel('csv', report)).toBe('CSV');
 });
+
+it.each([false, true])('keeps report headers and a spanning status row when loading=%s', loading => {
+  const html = renderToStaticMarkup(<ReportPage definition={definition} rows={[]} loading={loading} onClear={() => undefined} meta={{ from: '2026-10-19', to: '2026-10-19' }} />);
+  expect(html).toContain('>Ad Soyad</th>');
+  expect(html).toContain('>Departman</th>');
+  expect(html).toContain('colSpan="2"');
+  expect(html).toContain(loading ? 'Rapor yükleniyor…' : 'Filtreleri temizle');
+});
+it.each([false, true])('derives monthly headers from the selected period when loading=%s', loading => {
+  const report = REPORTS.find(item => item.monthlyDays);
+  if (!report) throw new Error('Missing monthly report');
+  const html = renderToStaticMarkup(<ReportPage definition={report} rows={[]} loading={loading} meta={{ from: '2026-10-01', to: '2026-10-31' }} />);
+  const header = html.match(/<thead[\s\S]*?<\/thead>/)?.[0] ?? '';
+  expect(header).toContain('>01</th>');
+  expect(header).toContain('>31</th>');
+  const count = (header.match(/<th /g) ?? []).length;
+  expect(html).toContain(`colSpan="${count}"`);
+});

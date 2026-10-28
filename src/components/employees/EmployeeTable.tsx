@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import { TableStateRow } from "@/components/shared/TableStateRow";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { usePermissions } from "@/hooks/usePermissions";
 import { EmployeeSelectAll } from "./table/EmployeeSelectAll";
 import { EmployeeSortColumn } from "./table/EmployeeSortColumn";
@@ -29,6 +32,8 @@ import {
 } from "./table/employeeTableModel";
 interface EmployeeTableProps {
   employees: Employee[];
+  loading?: boolean;
+  emptyState?: ReactNode;
   sort?: string;
   onSortChange?: (sort: string) => void;
   onViewDetails: (employee: Employee) => void;
@@ -41,6 +46,8 @@ interface EmployeeTableProps {
 
 export default function EmployeeTable({
   employees,
+  loading = false,
+  emptyState,
   sort = "name:asc",
   onSortChange,
   onViewDetails,
@@ -320,6 +327,8 @@ export default function EmployeeTable({
               <EmployeeSelectAll
                 disabled={
                   !canSelect ||
+                  loading ||
+                  sortedEmployees.length === 0 ||
                   departmentPending ||
                   isBulkSyncing ||
                   syncAction.pending
@@ -351,7 +360,9 @@ export default function EmployeeTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedEmployees.map((employee) => (
+            {loading ? <TableStateRow colSpan={7 + Number(showCompany) + Number(showDepartment) + Number(canSeeBiometrics)} state="loading" label="Personel bilgileri yükleniyor…" /> : sortedEmployees.length === 0 ? (
+              <TableStateRow colSpan={7 + Number(showCompany) + Number(showDepartment) + Number(canSeeBiometrics)} state="custom">{emptyState ?? <EmptyState title="Henüz personel eklenmedi" />}</TableStateRow>
+            ) : sortedEmployees.map((employee) => (
               <EmployeeTableRow
                 key={employee._id}
                 employee={employee}

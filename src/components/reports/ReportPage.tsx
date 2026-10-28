@@ -4,8 +4,8 @@ import { Columns3, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
+import { TableStateRow } from '@/components/shared/TableStateRow';
+import { periodError } from '@/lib/reports/period';
 import { PaginationBar, pageRange } from '@/components/shared/PaginationBar';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { STATUS_META } from '@/components/pdks/statusMeta';
@@ -25,7 +25,10 @@ export function ReportPage(props: ReportPageProps) {
   return <ReportTable key={`${scope?.projectId}:${scope?.userId}:${props.definition.slug}`} {...props} scope={scope} />;
 }
 function ReportTable({ definition, rows, days, meta, loading = false, hasMoreTransactions = false, loadedCount, children, onClear, scope }: ReportPageProps & { scope?: ColumnScope }) {
-  const columns = reportColumns(definition, days);
+  const periodDays = definition.monthlyDays && !periodError(meta.from, meta.to)
+    ? Array.from({ length: (Date.parse(`${meta.to}T00:00:00Z`) - Date.parse(`${meta.from}T00:00:00Z`)) / 86400000 + 1 }, (_, index) => new Date(Date.parse(`${meta.from}T00:00:00Z`) + index * 86400000).toISOString().slice(0, 10))
+    : [];
+  const columns = reportColumns(definition, days?.length ? days : periodDays);
   const [hidden, setHidden] = useState(() => readHiddenColumns(definition.slug, scope));
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
@@ -58,13 +61,13 @@ function ReportTable({ definition, rows, days, meta, loading = false, hasMoreTra
       </div>
     </div>
     {pdfOverLimit && definition.formats.includes('pdf') && <p className="text-xs text-muted-foreground">{PDF_ROW_LIMIT_MESSAGE}</p>}
-    {loading ? <SectionSkeleton rows={5} label="Rapor yükleniyor…" /> : rows.length === 0 ? hasMoreTransactions ? <p role="status" className="rounded-md border border-line p-6 text-sm text-muted-foreground">Taranan kayıtlarda eşleşme yok. Daha eski kayıtlar için “Daha fazla yükle”.</p> : <EmptyState title={emptyTitle} description="Seçili dönem ve filtreler için." action={onClear ? { label: 'Filtreleri temizle', onClick: onClear } : undefined} /> : <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
+    <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
       <Table aria-label={definition.title}><TableHeader><TableRow>{visible.map(column => <TableHead scope="col" key={column.key} title={column.fullLabel} aria-label={column.fullLabel} className={`${column.key === 'name' ? 'sticky left-0 z-20 bg-surface' : ''} whitespace-nowrap ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>{column.label}</TableHead>)}</TableRow></TableHeader>
-        <TableBody>{rows.slice((currentPage - 1) * 50, currentPage * 50).map(row => <TableRow key={row.id}>{visible.map(column => <TableCell key={column.key} className={`${column.key === 'name' ? 'sticky left-0 z-10 bg-surface' : ''} ${column.key === 'punches' ? 'min-w-64 max-w-lg whitespace-normal break-words' : 'whitespace-nowrap'} tabular-nums ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>
+        <TableBody>{loading ? <TableStateRow colSpan={Math.max(1, visible.length)} state="loading" label="Rapor yükleniyor…" /> : rows.length === 0 ? hasMoreTransactions ? <TableStateRow colSpan={Math.max(1, visible.length)} state="custom"><p role="status" className="text-sm text-muted-foreground">Taranan kayıtlarda eşleşme yok. Daha eski kayıtlar için “Daha fazla yükle”.</p></TableStateRow> : <TableStateRow colSpan={Math.max(1, visible.length)} state="empty" title={emptyTitle} description="Seçili dönem ve filtreler için." action={onClear ? { label: 'Filtreleri temizle', onClick: onClear } : undefined} /> : rows.slice((currentPage - 1) * 50, currentPage * 50).map(row => <TableRow key={row.id}>{visible.map(column => <TableCell key={column.key} className={`${column.key === 'name' ? 'sticky left-0 z-10 bg-surface' : ''} ${column.key === 'punches' ? 'min-w-64 max-w-lg whitespace-normal break-words' : 'whitespace-nowrap'} tabular-nums ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>
           {column.key === 'status' && row.kind === 'daily' ? <StatusBadge tone={STATUS_META[row.cell.status].tone}>{STATUS_META[row.cell.status].label}</StatusBadge> : column.key === 'result' && row.kind === 'transaction' ? <StatusBadge tone={row.transaction.result === 'granted' ? 'success' : row.transaction.result === 'denied' ? 'danger' : 'neutral'}>{column.value(row) ?? '—'}</StatusBadge> : column.value(row) ?? '—'}
         </TableCell>)}</TableRow>)}</TableBody></Table>
-      <PaginationBar summary={`${pageRange(rows.length, currentPage, 50)} / ${rows.length} kayıt`} page={currentPage} pageCount={pageCount} onPrevious={() => setPage(Math.max(1, currentPage - 1))} onNext={() => setPage(Math.min(pageCount, currentPage + 1))} />
-    </div>}
+      {!loading && rows.length > 0 && <PaginationBar summary={`${pageRange(rows.length, currentPage, 50)} / ${rows.length} kayıt`} page={currentPage} pageCount={pageCount} onPrevious={() => setPage(Math.max(1, currentPage - 1))} onNext={() => setPage(Math.min(pageCount, currentPage + 1))} />}
+    </div>
     {children}
   </div>;
 }

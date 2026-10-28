@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import {
   Table,
@@ -16,10 +18,14 @@ import type { Project } from "./projectSchema";
 
 export function ProjectsTable({
   projects,
+  loading = false,
+  emptyState,
   onEdit,
   onDelete,
 }: {
   projects: Project[];
+  loading?: boolean;
+  emptyState?: ReactNode;
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
 }) {
@@ -58,6 +64,7 @@ export function ProjectsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {loading ? <TableStateRow colSpan={5} state="loading" label="Projeler yükleniyor" /> : projects.length === 0 && emptyState ? <TableStateRow colSpan={5} state="custom">{emptyState}</TableStateRow> : null}
             {projects.map((project) => (
               <TableRow
                 key={project._id}
@@ -85,6 +92,7 @@ export function ProjectsTable({
           </TableBody>
         </Table>
       } mobile={
+      loading || projects.length === 0 ? emptyState :
       <ul
         aria-label="Projeler"
         className="divide-y"

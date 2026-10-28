@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { ResponsiveResults } from "@/components/shared/ResponsiveResults";
 import { useState } from "react";
 import { AccountAccessActions, AccountAccessBadges, AccountAccessDialog } from "./AccountAccessActions";
@@ -20,11 +22,15 @@ import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 
 export function UserTable({
   users,
+  loading = false,
+  emptyState,
   onEditUser,
   onDeleteUser,
   onResetPassword,
 }: {
   users: User[];
+  loading?: boolean;
+  emptyState?: ReactNode;
   onEditUser: (user: User) => void;
   onDeleteUser: (user: User) => void;
   onResetPassword?: (user: User) => void;
@@ -101,6 +107,7 @@ export function UserTable({
             </TableRow>
           </TableHeader>
           <TableBody>
+            {loading ? <TableStateRow colSpan={4} state="loading" label="Kullanıcılar yükleniyor" /> : users.length === 0 && emptyState ? <TableStateRow colSpan={4} state="custom">{emptyState}</TableStateRow> : null}
             {users.map((user) => (
               <TableRow key={user._id} className={rowClass} onClick={openUser(user)}>
                 <TableCell>{identity(user)}</TableCell>
@@ -114,6 +121,7 @@ export function UserTable({
           </TableBody>
         </Table>
       } mobile={
+      loading || users.length === 0 ? emptyState :
       <ul
         aria-label="Kullanıcılar"
         className="divide-y"

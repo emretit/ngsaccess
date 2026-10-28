@@ -4,7 +4,6 @@ import type { FunctionArgs } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { PaginationBar } from "@/components/shared/PaginationBar";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { LeaveList } from "./LeaveList";
 import {
@@ -14,12 +13,35 @@ import {
   type LeaveRow,
 } from "./lib/leaveState";
 
-export type LeaveQueryFilters = Omit<FunctionArgs<typeof api.leaves.listPage>, "paginationOpts">;
-function LeaveSummary({ filters, onProjectRecords }: { filters: LeaveQueryFilters; onProjectRecords: (value: boolean) => void }) {
-  const { results, status, loadMore } = usePaginatedQuery(api.leaves.summary, filters, { initialNumItems: 500 });
-  useEffect(() => { if (status === "CanLoadMore") loadMore(500); }, [status, loadMore]);
-  useEffect(() => { if (results[0]) onProjectRecords(results[0].projectHasRecords); }, [results, onProjectRecords]);
-  return <p className="text-sm text-muted-foreground" role="status">{status === "Exhausted" ? `${results.reduce((count, page) => count + page.recordCount, 0)} kayıt · ${new Set(results.flatMap(page => page.employeeIds)).size} kişi` : "İzin özeti hesaplanıyor…"}</p>;
+export type LeaveQueryFilters = Omit<
+  FunctionArgs<typeof api.leaves.listPage>,
+  "paginationOpts"
+>;
+function LeaveSummary({
+  filters,
+  onProjectRecords,
+}: {
+  filters: LeaveQueryFilters;
+  onProjectRecords: (value: boolean) => void;
+}) {
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.leaves.summary,
+    filters,
+    { initialNumItems: 500 },
+  );
+  useEffect(() => {
+    if (status === "CanLoadMore") loadMore(500);
+  }, [status, loadMore]);
+  useEffect(() => {
+    if (results[0]) onProjectRecords(results[0].projectHasRecords);
+  }, [results, onProjectRecords]);
+  return (
+    <p className="text-sm text-muted-foreground" role="status">
+      {status === "Exhausted"
+        ? `${results.reduce((count, page) => count + page.recordCount, 0)} kayıt · ${new Set(results.flatMap((page) => page.employeeIds)).size} kişi`
+        : "İzin özeti hesaplanıyor…"}
+    </p>
+  );
 }
 export function LeaveResults({
   filters,
@@ -74,8 +96,6 @@ export function LeaveResults({
       onDetails(row);
     }
   }, [requestedId, results, onDetails]);
-  if (status === "LoadingFirstPage")
-    return <SectionSkeleton rows={5} label="İzin kayıtları yükleniyor." />;
   const rows = pageSlice(results, boundaries, index, pending);
   const loading = status === "LoadingMore" || pending !== null;
   const hasNext = index < boundaries.length || status === "CanLoadMore";
@@ -88,48 +108,73 @@ export function LeaveResults({
   };
   return (
     <div className="min-w-0 space-y-4">
-      <QuerySectionBoundary
-        title="İzin özeti yüklenemedi."
-        resetKey={JSON.stringify(filters)}
-      >
-        <LeaveSummary filters={filters} onProjectRecords={setProjectHasRecords} />
-      </QuerySectionBoundary>
-      {requestedId && !results.some((row) => row._id === requestedId) && (
-        <p role="status" className="text-sm text-muted-foreground">
-          Aranan kayıt bu sayfada bulunamadı. Sonraki kayıtları tarayın; kayıt
-          başka projedeyse o projeyi seçin.
-        </p>
+      {status !== "LoadingFirstPage" && (
+        <QuerySectionBoundary
+          title="İzin özeti yüklenemedi."
+          resetKey={JSON.stringify(filters)}
+        >
+          <LeaveSummary
+            filters={filters}
+            onProjectRecords={setProjectHasRecords}
+          />
+        </QuerySectionBoundary>
       )}
-      {rows.length ? (
-        <LeaveList
-          rows={rows}
-          canManage={canManage}
-          onDetails={onDetails}
-          onEdit={onEdit}
-        />
-      ) : (
-        <EmptyState title={projectHasRecords ? "Bu filtrelerle eşleşen izin yok." : "Henüz izin kaydı yok."}
-          description={projectHasRecords ? "Kişi, tür veya dönemi değiştirin." : "Bu proje için izin kaydı eklenmedi."}
-          action={projectHasRecords ? { label: "Filtreleri temizle", onClick: onClear } : canManage ? { label: "İzin ekle", onClick: onCreate } : undefined} />
-      )}
-
-      <PaginationBar
-        summary={
-          loading
-            ? "İzin kayıtları yükleniyor…"
-            : `${index + 1}. sayfa · ${rows.length} kayıt gösteriliyor`
+      {status !== "LoadingFirstPage" &&
+        requestedId &&
+        !results.some((row) => row._id === requestedId) && (
+          <p role="status" className="text-sm text-muted-foreground">
+            Aranan kayıt bu sayfada bulunamadı. Sonraki kayıtları tarayın; kayıt
+            başka projedeyse o projeyi seçin.
+          </p>
+        )}
+      <LeaveList
+        loading={status === "LoadingFirstPage"}
+        rows={rows}
+        canManage={canManage}
+        onDetails={onDetails}
+        onEdit={onEdit}
+        emptyState={
+          <EmptyState
+            title={
+              projectHasRecords
+                ? "Bu filtrelerle eşleşen izin yok."
+                : "Henüz izin kaydı yok."
+            }
+            description={
+              projectHasRecords
+                ? "Kişi, tür veya dönemi değiştirin."
+                : "Bu proje için izin kaydı eklenmedi."
+            }
+            action={
+              projectHasRecords
+                ? { label: "Filtreleri temizle", onClick: onClear }
+                : canManage
+                  ? { label: "İzin ekle", onClick: onCreate }
+                  : undefined
+            }
+          />
         }
-        page={index + 1}
-        onPrevious={() => setIndex(index - 1)}
-        onNext={next}
-        previousDisabled={index === 0 || loading}
-        nextDisabled={!hasNext || loading}
-        nextLabel="Sonraki"
-        pageSize={pageSize}
-        pageSizes={[25, 50]}
-        onPageSizeChange={onPageSizeChange}
-        pageSizeLabel="Sayfadaki izin sayısı"
       />
+
+      {status !== "LoadingFirstPage" && (
+        <PaginationBar
+          summary={
+            loading
+              ? "İzin kayıtları yükleniyor…"
+              : `${index + 1}. sayfa · ${rows.length} kayıt gösteriliyor`
+          }
+          page={index + 1}
+          onPrevious={() => setIndex(index - 1)}
+          onNext={next}
+          previousDisabled={index === 0 || loading}
+          nextDisabled={!hasNext || loading}
+          nextLabel="Sonraki"
+          pageSize={pageSize}
+          pageSizes={[25, 50]}
+          onPageSizeChange={onPageSizeChange}
+          pageSizeLabel="Sayfadaki izin sayısı"
+        />
+      )}
     </div>
   );
 }
