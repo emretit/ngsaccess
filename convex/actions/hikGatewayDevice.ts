@@ -197,6 +197,7 @@ export const backfillDeviceEvents = authedAction({
   args: {
     deviceId: v.id("devices"),
     startTime: v.optional(v.string()),
+    fromAll: v.optional(v.boolean()),
     maxPages: v.optional(v.number()),
   },
   handler: async (
@@ -208,6 +209,7 @@ export const backfillDeviceEvents = authedAction({
     inserted: number;
     skipped: number;
     cursor?: number;
+    partial?: boolean;
     error?: string;
   }> => {
     return await runBackfillDeviceEvents(ctx, args);

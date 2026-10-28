@@ -183,3 +183,24 @@ export async function searchCardsOnDevice(
   };
 }
 
+
+/** Import reader for the documented CardInfoSearch wrapper (including empty NO MATCH). */
+export async function readImportCardsPage(devIndex: string, position: number, searchID: string): Promise<SearchCardsResult> {
+  const result = await gatewayApiCall("/ISAPI/AccessControl/CardInfo/Search", "POST", {
+    CardInfoSearchCond: { searchID, searchResultPosition: position, maxResults: 30 },
+  }, devIndex);
+  if (result.status !== 200) throw new Error(`Kart listesi okunamadı (HTTP ${result.status})`);
+  const data = result.data as Record<string, unknown> | undefined;
+  const wrap = (data?.CardInfoSearch ?? data?.CardInfo) as Record<string, unknown> | undefined;
+  if (!wrap) throw new Error("Kart listesi yanıtı geçersiz");
+  const raw = wrap.CardInfo ?? wrap.InfoList;
+  const cards: SearchCardInfo[] = [];
+  for (const item of Array.isArray(raw) ? raw : []) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.cardNo === "string" && typeof row.employeeNo === "string") cards.push({ cardNo: row.cardNo.trim(), employeeNo: row.employeeNo.trim() });
+  }
+  const numMatches = typeof wrap.numOfMatches === "number" ? wrap.numOfMatches : cards.length;
+  const total = typeof wrap.totalMatches === "number" ? wrap.totalMatches : numMatches;
+  return { ok: true, cards, total, numMatches, nextPosition: position + numMatches, hasMore: wrap.responseStatusStrg === "MORE" || position + numMatches < total };
+}

@@ -287,7 +287,7 @@ export async function syncEmployeeDevices(
           error: `${t.device.name} (person): ${personResult.error ?? "?"}`,
         };
       }
-      const cardResult = await addCardToDevice(t.device.hikDevIndex, {
+      const cardResult: { ok: boolean; alreadyExists?: boolean; error?: string } = employee.hikCardless === true ? { ok: true } : await addCardToDevice(t.device.hikDevIndex, {
         employeeNo: employee.cardNumber,
         cardNo: employee.cardNumber,
         cardType: "normalCard",

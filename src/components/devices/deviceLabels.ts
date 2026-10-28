@@ -3,7 +3,6 @@ export const deviceLabels = {
   workStatus: "Çalışma durumu",
   reconcile: "Eşitlik kontrolü",
   reboot: "Yeniden başlat",
-  backfillEvents: "Olayları tara",
   captureCard: "Kart okut",
   triggerSync: "Panel senkronu",
   zone: "Bölge seçin",

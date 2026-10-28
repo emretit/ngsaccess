@@ -374,6 +374,11 @@ export interface SearchFingerprintsResult {
   error?: string;
 }
 
+/** K1T804 kişi bazlı parmak izi okuma koşulu (arama + şablon okuma aynı gövdeyi kullanır). */
+function employeeFingerprintCond(searchID: string, employeeNo: string) {
+  return { searchID, employeeNo, cardReaderNo: 1 };
+}
+
 /**
  * Cihazdaki parmak izi kayıtlarını sayfalı olarak sorgular.
  * POST /ISAPI/AccessControl/FingerPrintUpload (isim yanıltıcı — bu ARAMA endpoint'idir)
@@ -389,13 +394,17 @@ export async function searchFingerprintsOnDevice(
     employeeNo?: string;
   },
 ): Promise<SearchFingerprintsResult> {
+  // Kişi bazlı okuma imleç tabanlıdır (position/maxResults gönderilmez); boş employeeNo tam liste sayılır.
+  const scopedEmployeeNo = opts.employeeNo || undefined;
+  const byEmployee = scopedEmployeeNo !== undefined;
   const body = {
-    FingerPrintCond: {
-      searchID: opts.searchID,
-      searchResultPosition: opts.position,
-      maxResults: opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE,
-      ...(opts.employeeNo ? { EmployeeNoList: [{ employeeNo: opts.employeeNo }] } : {}),
-    },
+    FingerPrintCond: scopedEmployeeNo !== undefined
+      ? employeeFingerprintCond(opts.searchID, scopedEmployeeNo)
+      : {
+          searchID: opts.searchID,
+          searchResultPosition: opts.position,
+          maxResults: opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE,
+        },
   };
   const result = await gatewayApiCall(
     "/ISAPI/AccessControl/FingerPrintUpload",
@@ -416,8 +425,10 @@ export async function searchFingerprintsOnDevice(
   }
 
   const data = result.data as Record<string, unknown> | undefined;
-  // VERIFY: wrap key (FingerPrintList? FingerPrint?)
-  const wrap = (data?.FingerPrintList ?? data?.FingerPrint ?? data) as
+  // Kişi bazlı okuma K1T804 şeklini kullanır: {FingerPrintInfo:{status, FingerPrintList:[…]}}.
+  // Tam liste (reconcile) yolu eski ayrıştırmayla aynı kalır.
+  // VERIFY: tam liste wrap key (FingerPrintList? FingerPrint?)
+  const wrap = (byEmployee ? data?.FingerPrintInfo : (data?.FingerPrintList ?? data?.FingerPrint ?? data)) as
     | Record<string, unknown>
     | undefined;
 
@@ -425,20 +436,21 @@ export async function searchFingerprintsOnDevice(
   const numOfMatches = (wrap?.numOfMatches as number | undefined) ?? 0;
   const maxResults = opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE;
   const responseStatusStrg = wrap?.responseStatusStrg as string | undefined;
-  const hasMore = responseStatusStrg === "MORE" || numOfMatches >= maxResults;
+  const hasMore = responseStatusStrg === "MORE" || numOfMatches >= maxResults ||
+    (byEmployee && wrap?.status === "OK" && Array.isArray(wrap?.FingerPrintList) && wrap.FingerPrintList.length > 0);
 
-  const rawList = wrap?.FingerPrintInfo ?? wrap?.InfoList;
+  const rawList = byEmployee ? wrap?.FingerPrintList : (wrap?.FingerPrintInfo ?? wrap?.InfoList);
   const fingerprints: FingerprintRecord[] = [];
 
   if (Array.isArray(rawList)) {
     for (const item of rawList) {
       if (typeof item !== "object" || item === null) continue;
       const row = item as Record<string, unknown>;
-      const employeeNo = row.employeeNo as string | undefined;
+      const employeeNo = (row.employeeNo as string | undefined) ?? scopedEmployeeNo;
       if (!employeeNo) continue;
       fingerprints.push({
         employeeNo,
-        fingerPrintID: row.fingerPrintID as string | undefined,
+        fingerPrintID: row.fingerPrintID === undefined ? undefined : String(row.fingerPrintID),
       });
     }
   }
@@ -453,3 +465,34 @@ export async function searchFingerprintsOnDevice(
   };
 }
 
+/** Sensitive read: callers must never return or log these templates. */
+export async function readFingerprintTemplates(devIndex: string, employeeNo: string): Promise<Array<{ fingerPrintID: number; fingerData: string }>> {
+  const searchID = crypto.randomUUID();
+  const templates: Array<{ fingerPrintID: number; fingerData: string }> = [];
+  const seen = new Set<number>();
+  for (let page = 0; page < MAX_FINGERPRINTS_PER_PERSON; page++) {
+    const result = await gatewayApiCall("/ISAPI/AccessControl/FingerPrintUpload", "POST", {
+      FingerPrintCond: employeeFingerprintCond(searchID, employeeNo),
+    }, devIndex);
+    if (result.status !== 200) throw new Error(`Parmak izi okunamadı (HTTP ${result.status})`);
+    const data = result.data as Record<string, unknown> | undefined;
+    const wrap = data?.FingerPrintInfo as Record<string, unknown> | undefined;
+    if (!wrap || typeof wrap.status !== "string") throw new Error("Parmak izi yanıtı geçersiz");
+    if (wrap.status === "NoFP" || wrap.status === "NO MATCH") break;
+    if (wrap.status !== "OK") throw new Error("Parmak izi okunamadı");
+    const rows = wrap.FingerPrintList;
+    if (!Array.isArray(rows)) throw new Error("Parmak izi listesi geçersiz");
+    let added = 0;
+    for (const value of rows) {
+      if (!value || typeof value !== "object") continue;
+      const row = value as Record<string, unknown>;
+      const fingerPrintID = Number(row.fingerPrintID);
+      if (typeof row.fingerData !== "string" || !row.fingerData || !Number.isFinite(fingerPrintID) || seen.has(fingerPrintID)) continue;
+      seen.add(fingerPrintID);
+      added++;
+      templates.push({ fingerPrintID, fingerData: row.fingerData });
+    }
+    if (!added) break;
+  }
+  return templates;
+}

@@ -398,3 +398,18 @@ describe("queued person retry heals stale warnings", () => {
     expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "done", lastError: expect.stringContaining("erişim kuralı kalmadı") });
   });
 });
+
+it("cardless gateway people upsert normally and replay fingerprints without adding a card", async () => {
+  const f = await fixture();
+  await f.t.run(async ctx => {
+    await ctx.db.patch(f.employeeId, { hikCardless: true });
+    await ctx.db.patch(f.r2, { isActive: false });
+    await ctx.db.insert("employeeFingerprints", { employeeId: f.employeeId, projectId: f.projectId, fingerPrintID: 6, encData: "encrypted", iv: "iv", keyVersion: "v1", addedAt: Date.now() });
+  });
+  expect(await f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId })).toMatchObject({ synced: 1, failed: 0 });
+  expect(wire.person).toHaveBeenCalled();
+  expect(wire.card).not.toHaveBeenCalled();
+  expect(wire.remove).not.toHaveBeenCalled();
+  const jobs = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(jobs.some(job => job.name === "actions/hikFingerprint:pushFingerprintToDevices")).toBe(true);
+});

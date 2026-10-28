@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { DeviceHistoryImportCard } from "./DeviceHistoryImportCard";
 import { usePermissions } from "@/hooks/usePermissions";
 import { DeviceActionsSection } from "./DeviceActionsSection";
 import { DeviceConnectionSection } from "./DeviceConnectionSection";
@@ -37,7 +39,14 @@ function DeviceCenter({
   const clock = useNow(15_000);
   const { can } = usePermissions();
   const canManage = can("devices.manage");
-  const commands = useDeviceCommands(device, onPendingChange);
+  const [importPending, setImportPending] = useState(false);
+  const commands = useDeviceCommands(device);
+  const panelPending =
+    (commands.pending && !commands.longRunning) || importPending;
+  useEffect(() => {
+    onPendingChange?.(panelPending);
+  }, [panelPending, onPendingChange]);
+  useEffect(() => () => onPendingChange?.(false), [onPendingChange]);
   const {
     pending,
     pendingAction,
@@ -85,7 +94,18 @@ function DeviceCenter({
       )}
       <DeviceConnectionSection {...view} />
 
-      <DeviceActionsSection {...view} />
+      <DeviceActionsSection
+        {...view}
+        busy={importPending ? "deviceImport" : view.busy}
+      />
+
+      <DeviceHistoryImportCard
+        key={device._id}
+        device={device}
+        connection={connection}
+        commandPending={pending}
+        onPendingChange={setImportPending}
+      />
 
       <ConfirmDestructive
         open={pendingAction?.destructive === true}

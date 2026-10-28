@@ -66,17 +66,10 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
-it("olay tarama ve kart okutma onayı kabul edilene kadar komut göndermez", async () => {
+it("kart okutma onayı kabul edilene kadar komut göndermez", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-10-26T12:00:00.000Z"));
   render();
-  commands.handleBackfill();
-  expect(mocks.action).not.toHaveBeenCalled();
-  render();
-  expect(commands.pendingAction?.id).toBe("backfillEvents");
-  await commands.runConfirmed();
-  expect(mocks.action).toHaveBeenCalledExactlyOnceWith({ deviceId: "d", startTime: "2026-10-25T12:00:00.000Z" });
-  mocks.action.mockClear();
   commands.handleCaptureCard();
   render();
   expect(commands.pendingAction?.id).toBe("captureCard");

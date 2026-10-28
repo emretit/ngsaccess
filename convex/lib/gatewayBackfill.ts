@@ -200,13 +200,14 @@ export async function runBackfillDeviceFromGroups(
 
 export async function runBackfillDeviceEvents(
   ctx: ActionCtx & { user: Doc<"users"> },
-  args: { deviceId: Id<"devices">; startTime?: string; maxPages?: number }
+  args: { deviceId: Id<"devices">; startTime?: string; maxPages?: number; fromAll?: boolean }
 ): Promise<{
     ok: boolean;
     scanned: number;
     inserted: number;
     skipped: number;
     cursor?: number;
+    partial?: boolean;
     error?: string;
   }> {
   const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
@@ -236,12 +237,13 @@ export async function runBackfillDeviceEvents(
       inserted: number;
       skipped: number;
       cursor?: number;
+    partial?: boolean;
       error?: string;
   }> => {
     return await _runBackfill(ctx, {
       deviceId: args.deviceId,
       devIndex: devIndex,
-      startTime: args.startTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      startTime: args.fromAll ? "2000-01-01T00:00:00+03:00" : args.startTime || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       progressAt: device.hikLastBackfillAt,
       maxPages: args.maxPages,
     });

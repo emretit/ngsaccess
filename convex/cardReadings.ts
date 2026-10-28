@@ -20,7 +20,7 @@ import { matchesPersonSearch, readingSearchTerm } from "./lib/readingSearch";
 import { getEmployeeTargetDevices } from "./lib/peopleHikSnapshot";
 import { writeAudit } from "./lib/audit";
 import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./lib/alarmNotify";
-import { toUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
+import { hikWallClockToUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { internalMutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { api } from "./_generated/api";
@@ -784,11 +784,11 @@ export const backfillHikEventRow = internalMutation({
 
     // Cihaz zamanı (+03:00 vb.) UTC Z'ye: aralık sorguları ve index sırası string karşılaştırır.
     // Geçersizse atla — tarihsel olayı "şimdi" ile yazmak PDKS'te yanlış güne düşürür.
-    const eventTime = toUtcISO(args.event.time);
+    const eventTime = hikWallClockToUtcISO(args.event.time);
     if (!eventTime) {
       return { inserted: false, reason: "invalid-time" };
     }
-    const cardNo = args.event.cardNo.trim();
+    const cardNo = args.event.cardNo.trim() || args.event.employeeNoString?.trim() || "";
     const shouldCreateCardReading = shouldCreateCardReadingForHikEvent(
       args.event.major,
       args.event.minor,

@@ -33,7 +33,6 @@ export function DeviceActionsSection({
   handleFetchCapabilities,
   handleFetchWorkStatus,
   handleReconcile,
-  handleBackfill,
   handleCaptureCard,
   handleTriggerIdeSync,
   handleReboot,
@@ -51,7 +50,6 @@ export function DeviceActionsSection({
   | "handleFetchCapabilities"
   | "handleFetchWorkStatus"
   | "handleReconcile"
-  | "handleBackfill"
   | "handleCaptureCard"
   | "handleTriggerIdeSync"
   | "handleReboot"
@@ -84,13 +82,6 @@ export function DeviceActionsSection({
             icon: <ListChecks className="h-4 w-4" />,
             supported: adapter.supported.reconcile,
             onClick: handleReconcile,
-          },
-          {
-            key: "backfillEvents",
-            label: deviceLabels.backfillEvents,
-            icon: <RefreshCw className="h-4 w-4" />,
-            supported: adapter.supported.capabilities,
-            onClick: handleBackfill,
           },
           {
             key: "captureCard",

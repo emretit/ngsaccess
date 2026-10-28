@@ -103,3 +103,32 @@ describe("canlı parmak izi yakalama (XML)", () => {
     expect((await captureFingerprintLive("dev")).ok).toBe(false);
   });
 });
+
+describe("ANKA fingerprint read fixtures", () => {
+  it("returns numeric slot 6 metadata without exposing fingerData", async () => {
+    const { searchFingerprintsOnDevice } = await import("./biometrics");
+    api.mockResolvedValue({ status: 200, data: { FingerPrintInfo: { FingerPrintList: [{ cardReaderNo: 1, fingerData: "private-base64", fingerPrintID: 6, fingerType: "normalFP" }], searchID: "search", status: "OK" } } });
+    const result = await searchFingerprintsOnDevice("ANKA001", { searchID: "search", position: 0, employeeNo: "1" });
+    expect(result.fingerprints).toEqual([{ employeeNo: "1", fingerPrintID: "6" }]);
+    expect(JSON.stringify(result)).not.toContain("private-base64");
+  });
+  it("reads cursor-based templates until NoFP, retaining one searchID", async () => {
+    const { readFingerprintTemplates } = await import("./biometrics");
+    api.mockResolvedValueOnce({ status: 200, data: { FingerPrintInfo: { status: "OK", FingerPrintList: [{ fingerPrintID: 6, fingerData: "a" }] } } })
+      .mockResolvedValueOnce({ status: 200, data: { FingerPrintInfo: { status: "OK", FingerPrintList: [{ fingerPrintID: 7, fingerData: "b" }] } } })
+      .mockResolvedValueOnce({ status: 200, data: { FingerPrintInfo: { status: "NoFP" } } });
+    expect(await readFingerprintTemplates("ANKA001", "1")).toEqual([{ fingerPrintID: 6, fingerData: "a" }, { fingerPrintID: 7, fingerData: "b" }]);
+    expect(api).toHaveBeenCalledTimes(3);
+    const conditions = api.mock.calls.map(call => call[2].FingerPrintCond);
+    expect(new Set(conditions.map(condition => condition.searchID)).size).toBe(1);
+    expect(conditions[0]).toMatchObject({ employeeNo: "1", cardReaderNo: 1 });
+  });
+  it("stops repeated firmware pages and never returns raw failure bodies", async () => {
+    const { readFingerprintTemplates } = await import("./biometrics");
+    api.mockResolvedValue({ status: 200, data: { FingerPrintInfo: { status: "OK", FingerPrintList: [{ fingerPrintID: 6, fingerData: "a" }] } } });
+    expect(await readFingerprintTemplates("ANKA001", "1")).toHaveLength(1);
+    expect(api).toHaveBeenCalledTimes(2);
+    api.mockResolvedValue({ status: 500, raw: "private-template" });
+    await expect(readFingerprintTemplates("ANKA001", "1")).rejects.toThrow("HTTP 500");
+  });
+});

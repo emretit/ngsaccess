@@ -38,3 +38,9 @@ export function toUtcISO(time: string): string | undefined {
   const d = new Date(hasZone ? s : `${s.replace(" ", "T")}+03:00`);
   return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
 }
+
+/** Hik history preserves the configured wall clock even when its offset label is wrong. */
+export function hikWallClockToUtcISO(time: string): string | undefined {
+  const match = /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)(?:Z|[+-]\d{2}:?\d{2})?$/i.exec(time.trim());
+  return match ? toUtcISO(`${match[1]}+03:00`) : undefined;
+}

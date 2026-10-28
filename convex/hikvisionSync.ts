@@ -166,6 +166,7 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
       firstName: employee.firstName,
       lastName: employee.lastName,
       cardNumber: employee.cardNumber,
+      hikCardless: employee.hikCardless,
       projectId: employee.projectId,
       isActive: employee.isActive,
       accessStartsAt: employee.accessStartsAt,

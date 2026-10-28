@@ -200,3 +200,16 @@ it("defaults an authorized manual scan to the last 24 hours", async () => {
     startTime: "2026-10-25T12:00:00.000Z", endTime: "2026-10-26T12:00:00.000Z",
   }));
 });
+
+it("fromAll uses the full device history epoch", async () => {
+  const f = historyContext();
+  f.runQuery.mockImplementation(async ref => {
+    const name = getFunctionName(ref);
+    if (name.endsWith(":getByIdInternal")) return f.device;
+    return name.endsWith(":listProjectIdsForCurrentUser") ? ["project"] : true;
+  });
+  vi.mocked(auditDeviceCommand).mockImplementation(async (_ctx, _id, _label, run) => await run());
+  vi.mocked(searchAcsEventsOnDevice).mockReset().mockResolvedValue({ ok: true, events: [], total: 0, numMatches: 0, nextPosition: 0, hasMore: false });
+  await runBackfillDeviceEvents({ ...f.ctx, user: { _id: "user" } as Doc<"users"> }, { deviceId: f.deviceId, fromAll: true, startTime: "2026-10-01T00:00:00Z" });
+  expect(searchAcsEventsOnDevice).toHaveBeenCalledExactlyOnceWith("index", expect.objectContaining({ startTime: "2000-01-01T00:00:00+03:00" }));
+});

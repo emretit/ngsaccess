@@ -18,9 +18,6 @@ export function useDeviceCommands(
     api.actions.hikGatewayDevice.fetchDeviceWorkStatus,
   );
   const reconcile = useAction(api.actions.hikGatewayDevice.reconcileDevice);
-  const backfillEvents = useAction(
-    api.actions.hikGatewayDevice.backfillDeviceEvents,
-  );
   const captureCard = useAction(
     api.actions.hikGatewayDevice.captureCardFromDevice,
   );
@@ -112,19 +109,6 @@ export function useDeviceCommands(
         `Kart ${result.onDeviceCount}/${result.expectedCount}, yüz ${result.faceOnDeviceCount}/${result.faceExpectedCount}, parmak izi ${result.fingerprintOnDeviceCount}/${result.fingerprintExpectedCount}`,
       );
       return { ok: true };
-    });
-
-  const handleBackfill = () =>
-    setPendingAction({
-      id: "backfillEvents",
-      title: deviceLabels.backfillEvents,
-      description: "Cihazdan geçmiş olaylar alınacak; işlem zaman alabilir.",
-      run: async () => {
-        const result = await backfillEvents({ deviceId: device._id, startTime: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() });
-        return result.ok
-          ? { ok: true }
-          : { ok: false, error: result.error ?? "Geçmiş olaylar alınamadı" };
-      },
     });
 
   const handleCaptureCard = () =>
@@ -243,7 +227,6 @@ export function useDeviceCommands(
     handleFetchCapabilities,
     handleFetchWorkStatus,
     handleReconcile,
-    handleBackfill,
     handleCaptureCard,
     handleFetchReaderCfg,
     handleOpenDoor,

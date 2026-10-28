@@ -15,6 +15,8 @@ import type * as actions_biometricDestruction from "../actions/biometricDestruct
 import type * as actions_getChatData from "../actions/getChatData.js";
 import type * as actions_hikBridgeWake from "../actions/hikBridgeWake.js";
 import type * as actions_hikDebug from "../actions/hikDebug.js";
+import type * as actions_hikDeviceImport from "../actions/hikDeviceImport.js";
+import type * as hikDeviceImport from "../hikDeviceImport.js";
 import type * as actions_hikFingerprint from "../actions/hikFingerprint.js";
 import type * as actions_hikGatewayDevice from "../actions/hikGatewayDevice.js";
 import type * as actions_hikQueueWorker from "../actions/hikQueueWorker.js";
@@ -154,6 +156,7 @@ import type * as lib_hikKeyPart from "../lib/hikKeyPart.js";
 import type * as lib_hikModels from "../lib/hikModels.js";
 import type * as lib_hikReaderNumbers from "../lib/hikReaderNumbers.js";
 import type * as lib_hikSync from "../lib/hikSync.js";
+import type * as lib_hikDeviceImport from "../lib/hikDeviceImport.js";
 import type * as lib_hikSyncEmployee from "../lib/hikSyncEmployee.js";
 import type * as lib_hikWake from "../lib/hikWake.js";
 import type * as lib_leaveRules from "../lib/leaveRules.js";
@@ -281,6 +284,8 @@ declare const fullApi: ApiFromModules<{
   "actions/getChatData": typeof actions_getChatData;
   "actions/hikBridgeWake": typeof actions_hikBridgeWake;
   "actions/hikDebug": typeof actions_hikDebug;
+  "actions/hikDeviceImport": typeof actions_hikDeviceImport;
+  hikDeviceImport: typeof hikDeviceImport;
   "actions/hikFingerprint": typeof actions_hikFingerprint;
   "actions/hikGatewayDevice": typeof actions_hikGatewayDevice;
   "actions/hikQueueWorker": typeof actions_hikQueueWorker;
@@ -420,6 +425,7 @@ declare const fullApi: ApiFromModules<{
   "lib/hikModels": typeof lib_hikModels;
   "lib/hikReaderNumbers": typeof lib_hikReaderNumbers;
   "lib/hikSync": typeof lib_hikSync;
+  "lib/hikDeviceImport": typeof lib_hikDeviceImport;
   "lib/hikSyncEmployee": typeof lib_hikSyncEmployee;
   "lib/hikWake": typeof lib_hikWake;
   "lib/leaveRules": typeof lib_leaveRules;

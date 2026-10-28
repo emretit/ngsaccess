@@ -14,6 +14,7 @@ import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 import { useEmployees } from "@/hooks/useEmployees";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { AccessDenied } from "@/components/shared/AccessDenied";
+import { EmployeeAddMenu } from "@/components/employees/EmployeeAddMenu";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
@@ -163,14 +164,9 @@ function EmployeePage() {
   };
   return (
     <div className="min-w-0 space-y-6">
-      <PageHeader
-        title="Kişiler"
-        primaryAction={
-          canManage
-            ? { label: "Personel ekle", onClick: () => open(null) }
-            : undefined
-        }
-      />
+      <PageHeader title="Kişiler">
+        {canManage && <EmployeeAddMenu onAddNew={() => open(null)} />}
+      </PageHeader>
       <MasterDetailListLayout sidebar={<DepartmentTree
           selectedValue={department}
           selectedCompany={company}

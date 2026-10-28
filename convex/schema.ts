@@ -95,6 +95,7 @@ export default defineSchema({
     email: v.string(),
     tcNo: v.optional(v.string()),
     cardNumber: v.string(),
+    hikCardless: v.optional(v.boolean()),
     payrollCode: v.optional(v.string()),
     departmentId: v.optional(v.id("departments")),
     companyId: v.optional(v.id("companies")),
