@@ -78,8 +78,14 @@ function HolidayCalendarContent() {
     }
   }, [holidays, focusDate]);
   const close = () => { if (!pending) guard.requestClose(() => { setOpen(false); setValues(empty); setErrors({}); setFailed(false); }); };
-  return <section className="min-w-0 space-y-4 border-t pt-6">
-    <h3 className="text-base font-semibold">Tatil takvimi</h3>
+  return <section className="min-w-0 space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <h3 className="text-base font-semibold">Tatil takvimi</h3>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" disabled={pending || !projectId || holidays === undefined} onClick={() => setSeedOpen(true)}>{seedAction.pending ? "Yükleniyor…" : "Resmi tatilleri yükle"}</Button>
+        <Button variant="outline" size="sm" disabled={pending || !projectId} onClick={() => setOpen(true)}>Tatil ekle</Button>
+      </div>
+    </div>
     <FilterBar label="Tatil takvimi filtreleri" hasFilters={yearText !== todayInTurkey().slice(0, 4)} onClear={() => { const currentYear = todayInTurkey().slice(0, 4); setYear(Number(currentYear)); setYearText(currentYear); }}>
       <FilterField label="Yıl" htmlFor="holiday-year">
         <Input id="holiday-year" type="number" min={1900} max={2100} value={yearText} disabled={pending} className="w-full min-w-0" onChange={event => {
@@ -88,10 +94,6 @@ function HolidayCalendarContent() {
         }} onBlur={() => setYearText(String(year))} />
       </FilterField>
     </FilterBar>
-    <div className="flex flex-wrap gap-3">
-      <Button variant="outline" disabled={pending || !projectId || holidays === undefined} onClick={() => setSeedOpen(true)}>{seedAction.pending ? "Yükleniyor…" : "Resmi tatilleri yükle"}</Button>
-      <Button variant="outline" disabled={pending || !projectId} onClick={() => setOpen(true)}>Tatil ekle</Button>
-    </div>
       <div className="min-w-0 overflow-x-auto rounded-md border"><Table density="compact">
         <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Tatil adı</TableHead><TableHead><span className="sr-only">İşlemler</span></TableHead></TableRow></TableHeader>
         <TableBody>{loading || holidays === undefined ? <TableStateRow colSpan={3} state="loading" label="Tatiller yükleniyor" /> : holidays.length === 0 ? <TableStateRow colSpan={3} state="empty" title={`${year} yılı için tanımlı tatil yok`} description="Bir tatil ekleyin veya resmi tatilleri yükleyin." /> : [...holidays].sort((a, b) => a.date.localeCompare(b.date)).map(holiday => <TableRow key={holiday._id} id={`holiday-${holiday.date}`} tabIndex={-1} className="h-[42px]">

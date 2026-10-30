@@ -19,7 +19,7 @@ export default function PdksSettings() {
     : !can("schedule.manage") ? <div role="status" className="space-y-3 py-8"><p className="text-base font-semibold">PDKS ayarlarını görüntüleme yetkiniz yok.</p><p className="text-sm text-muted-foreground">Bu sayfa vardiya yönetme yetkisi olanlar içindir.</p><Button variant="outline" asChild><Link to="/pdks-records">PDKS sayfasına dön</Link></Button></div>
     : !projectId ? <EmptyState title="Bir proje seçin." description="PDKS ayarlarını görmek için üst çubuktan proje seçin." />
     : <PdksSettingsPanel key={projectId} projectId={projectId} />;
-  return <div className="min-w-0 space-y-6">
+  return <div className="min-w-0 space-y-4">
     <div className="space-y-2">
       <Button variant="ghost" size="sm" className="-ml-2" onClick={back}><ChevronLeft className="h-4 w-4" aria-hidden="true" />PDKS</Button>
       <PageHeader title="PDKS Ayarları" scope={activeProject?.name ?? "Proje seçin"} />

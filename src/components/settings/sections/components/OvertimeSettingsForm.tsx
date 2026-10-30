@@ -72,9 +72,9 @@ export function OvertimeSettingsForm() {
   const visibleErrors: Partial<Record<keyof Values, string>> = {};
   if ((draft.dirty || Object.keys(errors).length > 0) && !parsed.success) for (const issue of parsed.error.issues) visibleErrors[issue.path[0] as keyof Values] = issue.message;
   if (loading || work === undefined || rates === undefined) return <SectionSkeleton label="Mesai ayarları yükleniyor" />;
-  return <section className="space-y-4"><h3 className="text-base font-semibold">Mesai politikası</h3>
+  return <section className="space-y-3"><h3 className="text-base font-semibold">Mesai politikası</h3>
     <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
-    <form noValidate className="space-y-4" onSubmit={async event => {
+    <form noValidate className="space-y-3" onSubmit={async event => {
       event.preventDefault();
       const result = overtimeSettingsSchema.safeParse(values);
       if (!result.success) {
@@ -90,7 +90,7 @@ export function OvertimeSettingsForm() {
       setErrors({});
       setFailed(!await run(result.data));
     }}>
-      <fieldset disabled={pending} className="grid grid-cols-1 gap-4 min-[761px]:grid-cols-2">
+      <fieldset disabled={pending} className="grid grid-cols-1 gap-x-4 gap-y-3 min-[761px]:grid-cols-2 min-[1200px]:grid-cols-4">
         <FormFieldWrapper htmlFor="overtimeBasis" label="Fazla mesai esası" hint={overtimeHints.overtimeBasis} error={visibleErrors.overtimeBasis}>
           {(control) => <Select disabled={pending} value={values.overtimeBasis} onValueChange={basis => {
             if (basis === "weekly45" || basis === "dailyShift") change({ overtimeBasis: basis });
@@ -99,17 +99,6 @@ export function OvertimeSettingsForm() {
             <SelectContent>
               <SelectItem value="weekly45">Haftalık 45 saat (İş Kanunu)</SelectItem>
               <SelectItem value="dailyShift">Günlük vardiya aşımı</SelectItem>
-            </SelectContent>
-          </Select>}
-        </FormFieldWrapper>
-        <FormFieldWrapper htmlFor="nightShiftDayMode" label="Gece yarısını geçen vardiya" hint={overtimeHints.nightShiftDayMode} error={visibleErrors.nightShiftDayMode}>
-          {(control) => <Select disabled={pending} value={values.nightShiftDayMode} onValueChange={mode => {
-            if (mode === "shiftStart" || mode === "splitAtMidnight") change({ nightShiftDayMode: mode });
-          }}>
-            <SelectTrigger {...control}><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="shiftStart">Başladığı günün ücreti</SelectItem>
-              <SelectItem value="splitAtMidnight">Gece yarısında böl</SelectItem>
             </SelectContent>
           </Select>}
         </FormFieldWrapper>
@@ -125,6 +114,17 @@ export function OvertimeSettingsForm() {
               <SelectItem value="max">Büyük olan</SelectItem>
               <SelectItem value="multiply">Çarpım</SelectItem>
               <SelectItem value="additive">Ek prim</SelectItem>
+            </SelectContent>
+          </Select>}
+        </FormFieldWrapper>
+        <FormFieldWrapper htmlFor="nightShiftDayMode" label="Gece yarısını geçen vardiya" hint={overtimeHints.nightShiftDayMode} error={visibleErrors.nightShiftDayMode}>
+          {(control) => <Select disabled={pending} value={values.nightShiftDayMode} onValueChange={mode => {
+            if (mode === "shiftStart" || mode === "splitAtMidnight") change({ nightShiftDayMode: mode });
+          }}>
+            <SelectTrigger {...control}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shiftStart">Başladığı günün ücreti</SelectItem>
+              <SelectItem value="splitAtMidnight">Gece yarısında böl</SelectItem>
             </SelectContent>
           </Select>}
         </FormFieldWrapper>

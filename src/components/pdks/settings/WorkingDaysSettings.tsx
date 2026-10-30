@@ -28,8 +28,8 @@ export function WorkingDaysSettings({ projectId }: { projectId: Id<"projects"> }
   const toggle = (day: string, checked: boolean) => draft.change({ days: WEEKDAY_NAMES.filter(name => name === day ? checked : days.includes(name)) });
   return <SettingsSection title="Çalışma günleri" description="Seçilmeyen günler hafta tatili sayılır; o günkü çalışma hafta tatili çarpanıyla hesaplanır.">
     <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
-    <form noValidate className="space-y-4" onSubmit={async event => { event.preventDefault(); setFailed(!await run()); }}>
-      <fieldset disabled={pending} className="flex flex-wrap gap-x-6 gap-y-3">
+    <form noValidate className="space-y-3" onSubmit={async event => { event.preventDefault(); setFailed(!await run()); }}>
+      <fieldset disabled={pending} className="flex flex-wrap gap-x-5 gap-y-2">
         <legend className="sr-only">Çalışma günleri</legend>
         {WEEKDAY_NAMES.map(day => <Label key={day} className="flex items-center gap-2 font-normal">
           <Checkbox checked={days.includes(day)} onCheckedChange={checked => toggle(day, checked === true)} />{day}

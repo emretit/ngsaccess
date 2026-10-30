@@ -119,16 +119,16 @@ function RulesEditor({
     });
   };
   return (
-    <section className="space-y-5" aria-labelledby="pdks-rules-heading">
+    <section className="space-y-3" aria-labelledby="pdks-rules-heading">
       <div>
-        <h2 id="pdks-rules-heading" className="text-lg font-semibold">
+        <h2 id="pdks-rules-heading" className="text-base font-semibold">
           PDKS devam kuralları
         </h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Cihaz senkronu gerekmez. Geçmiş günler değişmez.
         </p>
       </div>
-      <div className="space-y-3 rounded-md border p-4">
+      <div className="space-y-2 rounded-md border p-3">
         <p className="text-sm">
           <strong>Şu an geçerli: </strong>
           {ruleSummary(rules.current, targets)}
@@ -182,7 +182,7 @@ function RulesEditor({
       </div>
       <form
         noValidate
-        className="space-y-4"
+        className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
           if (pending) return;
@@ -210,7 +210,7 @@ function RulesEditor({
         }}
       >
         <h3 className="font-medium">Yeni sürüm</h3>
-        <fieldset disabled={pending} className="space-y-4">
+        <fieldset disabled={pending} className="space-y-3">
           <PdksRulesPunchFields values={values} change={change} errors={fieldErrors} />
           <PdksRulesCheckpointFields
             values={values}
