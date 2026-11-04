@@ -356,8 +356,8 @@ export const update = authedMutation({
     // Sadece DEĞİŞEN alanlar için duplicate kontrol — mevcut çoğaltma kayıtlar
     // başka alanları güncellenirken (örn. pozisyon) bozulmadan saklanır.
     for (const field of ["cardNumber", "email", "tcNo"] as const) {
-      const newValue = updates[field];
-      if (newValue != null && newValue !== emp[field]) {
+      const newValue = changedText(field);
+      if (newValue != null) {
         const dup = await findDuplicateEmployee(ctx, field, newValue, employeeId);
         if (dup) throw new Error(field === "cardNumber" ? cardConflictMessage(newValue, dup, DUPLICATE_MESSAGES[field]) : DUPLICATE_MESSAGES[field]);
       }
