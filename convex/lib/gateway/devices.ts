@@ -1,6 +1,6 @@
 "use node";
 
-import { gatewayApiCall, gatewayApiCallChecked, parseHikJsonStatus } from "./core";
+import { gatewayApiCall, gatewayApiCallChecked, gatewayXmlCall, parseHikJsonStatus } from "./core";
 import { validateIsapiResult } from "./isapiResult";
 
 // Device lifecycle (gateway-local registry)
@@ -186,17 +186,20 @@ export async function listGatewayDevices(): Promise<GatewayDeviceStatus[]> {
   return parseGatewayDeviceList(result.data);
 }
 
+/** Türkiye (UTC+3, yaz saati yok). POSIX yazımında işaret terstir: `CST-3` = UTC+3. */
+export const TURKEY_DEVICE_TIME_ZONE = "CST-3:00:00";
+
 /**
- * Cihazın saat dilimi + NTP ayarı — saat drift cihaz lokal karar verirken
- * `Valid` window ve week plan time evaluation'ı bozar. Default Asia/Istanbul (UTC+3).
- * NOT: ISAPI `/System/time` body shape firmware'a göre değişebilir; manuel time
- * push'u "Type:manual" + localTime ile yapıyoruz (NTP optional).
+ * Cihazın saat dilimi + saati — saat drift cihaz lokal karar verirken
+ * `Valid` window ve week plan time evaluation'ı bozar. Varsayılan Türkiye (UTC+3).
+ * Önce JSON denenir; DS-K1T804AMF gibi `timeZone`'u JSON'da kabul etmeyen
+ * firmware'lar için aynı ayar XML ile tekrar gönderilir.
  */
 export async function setDeviceTime(
   devIndex: string,
   opts: { timezone?: string } = {},
 ): Promise<{ ok: boolean; error?: string }> {
-  const tz = opts.timezone ?? "CST-3:00:00";
+  const tz = opts.timezone ?? TURKEY_DEVICE_TIME_ZONE;
   // Cihaza local TR saatini gönder — Convex'in çalıştığı sunucu UTC olduğu için
   // 3 saat ekliyoruz. Cihaz local time ile interpret eder.
   const now = new Date(Date.now() + 3 * 60 * 60 * 1000);
@@ -213,8 +216,11 @@ export async function setDeviceTime(
     },
     devIndex,
   );
-  if (result.status === 200) return { ok: true };
-  return { ok: false, error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}` };
+  if (result.status === 200 && parseHikJsonStatus(result).ok) return { ok: true };
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Time version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema"><timeMode>manual</timeMode><localTime>${iso}</localTime><timeZone>${tz}</timeZone></Time>`;
+  const fallback = await gatewayXmlCall("/ISAPI/System/time", "PUT", xml, devIndex);
+  if (fallback.status === 200 && !/<statusCode>(?!1<)/.test(fallback.raw)) return { ok: true };
+  return { ok: false, error: `HTTP ${result.status}/${fallback.status}: ${fallback.raw.slice(0, 200)}` };
 }
 
 /**
