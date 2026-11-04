@@ -6,7 +6,7 @@ export function PdksPlanSummary({ day, compact = false }: { day?: PdksPlanDay; c
   const label = planDayLabel(day);
   if (!label) return null;
   if (compact) return <span title={label} className="mx-auto block w-fit whitespace-nowrap rounded-sm border px-1 text-[10px] leading-[10px]">
-    {day?.planKind === "rest" ? "Boş gün" : `${day?.segments?.length} vardiya`}
+    {day?.planKind === "rest" ? label : `${day?.segments?.length} vardiya`}
   </span>;
   if (day?.planKind === "rest") return <StatusBadge className="whitespace-normal text-left" tone={STATUS_META.weekend.tone}>{label}</StatusBadge>;
   return <span className="block min-w-0 text-xs">

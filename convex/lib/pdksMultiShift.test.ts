@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
 import { computePdksDay } from "./pdksDay";
-import { computePdksPlannedDay, manualForSegment, splitReadingsByShift, shiftForInstant } from "./pdksMultiShift";
+import { computePdksPlannedDay, usesPlanDayRules, manualForSegment, splitReadingsByShift, shiftForInstant } from "./pdksMultiShift";
 import { computePdksTableRow } from "./pdksTable";
 import { computePayrollCell } from "./pdksPayroll";
 import { computeAttendanceDetailDay } from "./pdksDetail";
@@ -14,14 +14,13 @@ import { DEFAULT_FLEXIBLE } from "./pdksFlexible";
 
 const date = "2026-06-22";
 const employee: Doc<"employees"> = { _id: "employee" as Id<"employees">, _creationTime: 0, firstName: "Ada", lastName: "Test", cardNumber: "1", email: "ada@test", isActive: true };
-const workingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const shift = (name: string, startTime: string, endTime: string, extra: Partial<Doc<"shifts">> = {}): Doc<"shifts"> => ({ _id: name as Id<"shifts">, _creationTime: 0, name, startTime, endTime, createdAt: "", updatedAt: "", overtimeStartToleranceMinutes: 0, ...extra });
 const morning = shift("Sabah", "08:00", "12:00"), evening = shift("Akşam", "14:00", "18:00");
-const plan = (shifts = [morning, evening], calendar: "project" | "plan" = "project"): DayPlan => ({ kind: "shifts", source: "employee", calendar, shifts });
+const plan = (shifts = [morning, evening], calendar: "plan" = "plan"): DayPlan => ({ kind: "shifts", source: "employee", calendar, origin: "cycle", shifts });
 const reading = (time: string, direction?: "entry" | "exit", day = date): Doc<"cardReadings"> => ({ _id: `${day}-${time}-${direction}` as Id<"cardReadings">, _creationTime: 0, employeeId: employee._id, cardNo: "1", accessStatus: "izin_verildi", accessTime: new Date(`${day}T${time}:00+03:00`).toISOString(), ...(direction ? { direction } : {}) });
 const full = [reading("08:00", "entry"), reading("12:00", "exit"), reading("14:00", "entry"), reading("18:00", "exit")];
-const params = (readings: Doc<"cardReadings">[] = full) => ({ date, readings, shift: morning, workSettings: DEFAULT_WORK_SETTINGS, workingDays, overtimeRates: { ...DEFAULT_OVERTIME_RATES, overtimeBasis: "dailyShift" as const }, hourlyRate: 100 });
-const rowParams = () => ({ empKey: employee._id, employee, empReadings: full, availableDateKeys: new Set([date]), firstRecordDate: date, departmentName: "", periodDateKeys: [date], startDate: date, isSingleDay: true, viewMode: "matrix" as const, manualPdksByEmpDate: new Map<string, Doc<"pdksRecords">>(), allLeaves: [], holidayMap: new Map<string, Doc<"holidays">>(), workingDays, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: params().overtimeRates, resolveShift: () => morning, manualEditedBy: null });
+const params = (readings: Doc<"cardReadings">[] = full) => ({ date, readings, shift: morning, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: { ...DEFAULT_OVERTIME_RATES, overtimeBasis: "dailyShift" as const }, hourlyRate: 100 });
+const rowParams = () => ({ empKey: employee._id, employee, empReadings: full, availableDateKeys: new Set([date]), firstRecordDate: date, departmentName: "", periodDateKeys: [date], startDate: date, isSingleDay: true, viewMode: "matrix" as const, manualPdksByEmpDate: new Map<string, Doc<"pdksRecords">>(), allLeaves: [], holidayMap: new Map<string, Doc<"holidays">>(), workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: params().overtimeRates, resolveShift: () => morning, manualEditedBy: null });
 
 describe("planned PDKS day", () => {
   it.each(["weekend", "holiday"] as const)("weekly multi-shift %s retains the single-shift calendar status", classification => {
@@ -32,13 +31,30 @@ describe("planned PDKS day", () => {
     for (const count of [4, 2, 0]) {
       const empReadings = punches.slice(0, count);
       const input = { ...rowParams(), empReadings, availableDateKeys: new Set([day]), firstRecordDate: day, periodDateKeys: [day], startDate: day, holidayMap };
-      const single = computePdksTableRow(input).days[0];
-      const multiple = computePdksTableRow({ ...input, resolvePlan: () => plan(), resolveLast: () => evening }).days[0];
+      const rest = (shifts: Doc<"shifts">[]): DayPlan => ({ kind: "rest", shifts, calendar: "plan", origin: "weekly", source: "employee" });
+      const single = computePdksTableRow({ ...input, resolvePlan: () => rest([morning]) }).days[0];
+      const multiple = computePdksTableRow({ ...input, resolvePlan: () => rest([morning, evening]), resolveLast: () => evening }).days[0];
       expect(multiple?.status).toBe(single?.status);
       expect(multiple?.status).toBe(count ? "present" : classification);
       expect(multiple?.totalMinutes).toBe(count * 112.5);
-      const merged = computePdksPlannedDay({ ...params(empReadings), date: day, holiday, holidayMap, dayPlan: plan() });
+      const merged = computePdksPlannedDay({ ...params(empReadings), date: day, holiday, holidayMap, dayPlan: rest([morning, evening]) });
       expect(merged).not.toHaveProperty("attendanceDecision");
+    }
+  });
+  it.each(["employee", "department"] as const)("cycle holiday keeps multi-shift decisions for %s plans", source => {
+    const holiday: Doc<"holidays"> = { _id: "holiday" as Id<"holidays">, _creationTime: 0, date, name: "Resmi tatil", createdAt: "", isHalfDay: false };
+    for (const [readings, decision] of [[[], "absent"], [full.slice(0, 2), "incomplete"], [full, "present"]] as const) {
+      const result = computePdksPlannedDay({ ...params([...readings]), holiday, dayPlan: { kind: "shifts", shifts: [morning, evening], calendar: "plan", origin: "cycle", source } });
+      expect(result).toMatchObject({ classification: "holiday", attendanceDecision: decision });
+    }
+  });
+  it("weekly multi-shift rest omits the decision, while cycle rest retains it", () => {
+    for (const origin of ["weekly", "cycle"] as const) {
+      const rest: DayPlan = { kind: "rest", source: "employee", calendar: "plan", shifts: [morning, evening], origin };
+      const result = computePdksPlannedDay({ ...params([]), dayPlan: rest });
+      expect(result.classification).toBe("weekend");
+      if (origin === "weekly") expect(result).not.toHaveProperty("attendanceDecision");
+      else expect(result.attendanceDecision).toBe("absent");
     }
   });
   it.each([[], [reading("08:00")], full.slice(0, 2), [reading("08:17"), reading("19:30")]].map(readings => ({ readings })))("ordinary zero/one shift is structurally identical to the old engine: $readings", ({ readings }) => {
@@ -118,7 +134,7 @@ describe("planned PDKS day", () => {
     expect(totals.overtimeMinutes).toBe(days.reduce((sum, day) => sum + day.totalMinutes, 0) - 2700);
   });
   it("cycle rest is weekend, Saturday filled slot is workday, holidays retain priority", () => {
-    const rest: DayPlan = { kind: "rest", source: "department", calendar: "plan" };
+    const rest: DayPlan = { kind: "rest", shifts: [], source: "department", calendar: "plan", origin: "cycle" };
     expect(computePdksPlannedDay({ ...params([]), dayPlan: rest })).toMatchObject({ classification: "weekend", planKind: "rest" });
     expect(computePdksPlannedDay({ ...params([]), date: "2026-06-27", dayPlan: plan([morning], "plan") }).classification).toBe("workday");
     const holiday: Doc<"holidays"> = { _id: "holiday" as Id<"holidays">, _creationTime: 0, date, name: "Tatil", createdAt: "", isHalfDay: false };
@@ -126,7 +142,7 @@ describe("planned PDKS day", () => {
     expect(computePdksPlannedDay({ ...params([]), holiday, dayPlan: plan([{ ...morning, holidayWorkRequired: true }], "plan") }).classification).toBe("workday");
   });
   it("payroll and detail expose pieces while preserving mixed decisions", () => {
-    const input = { date, availableDateKeys: new Set([date]), firstRecordDate: date, dayReadings: full.slice(0, 2), dayShift: morning, dayPlan: plan(), manual: undefined, manualDay: undefined, leaves: [], hasLeave: false, holiday: undefined, workingDays, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: params().overtimeRates, empHourlyRate: 100 };
+    const input = { date, availableDateKeys: new Set([date]), firstRecordDate: date, dayReadings: full.slice(0, 2), dayShift: morning, dayPlan: plan(), manual: undefined, manualDay: undefined, leaves: [], hasLeave: false, holiday: undefined, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: params().overtimeRates, empHourlyRate: 100 };
     expect(computePayrollCell(input)).toMatchObject({ status: "incomplete", totalMinutes: 225, payrollCode: "—", segments: [{ decision: "present" }, { decision: "absent" }] });
     expect(computeAttendanceDetailDay(input)).toMatchObject({ status: "incomplete", totalMinutes: 225, segments: [{ decision: "present" }, { decision: "absent" }] });
   });
@@ -135,7 +151,7 @@ describe("planned PDKS day", () => {
   });
 });
 
-it("cycle Friday night keeps its start-day work classification across Saturday midnight", () => {
+it("split Friday night follows the next planned day for weekly and cycle plans", () => {
   const friday = "2026-06-26", saturday = "2026-06-27";
   const night = shift("Gece", "22:00", "06:00");
   const input = { ...params([reading("22:00", "entry", friday), reading("06:00", "exit", saturday)]), date: friday, shift: night,
@@ -144,7 +160,19 @@ it("cycle Friday night keeps its start-day work classification across Saturday m
   expect(cycle.overtimeSegments.some(segment => segment.calendarDate === saturday)).toBe(true);
   expect(cycle.overtimeSegments.every(segment => segment.classification === "workday")).toBe(true);
   expect(cycle.overtimeMinutes).toBe(0);
-  const ordinary = computePdksPlannedDay({ ...input, dayPlan: plan([night]) });
+  const ordinary = computePdksPlannedDay({ ...input, nextDayKind: "rest", dayPlan: plan([night]) });
   expect(ordinary.overtimeSegments.some(segment => segment.calendarDate === saturday && segment.classification === "weekend")).toBe(true);
   expect(ordinary.overtimeMinutes).toBeGreaterThan(0);
+});
+
+
+it("routes ordinary weekly work/rest through legacy reports and cycle/multiple/department days through managed reports", () => {
+  for (const kind of ["shifts", "rest"] as const) {
+    const weekly = { kind, source: "employee", calendar: "plan", origin: "weekly", shifts: [morning] } satisfies DayPlan;
+    expect(usesPlanDayRules(weekly)).toBe(false);
+    expect(usesPlanDayRules({ ...weekly, origin: "cycle" })).toBe(true);
+    expect(usesPlanDayRules({ ...weekly, shifts: [morning, evening] })).toBe(true);
+    expect(usesPlanDayRules({ ...weekly, source: "department" })).toBe(true);
+  }
+  expect(usesPlanDayRules({ kind: "none", source: "project" })).toBe(false);
 });

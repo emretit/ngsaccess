@@ -15,7 +15,6 @@ import { computeAttendanceDetailDay, summarizeAttendanceDays } from "./pdksDetai
 import { DEFAULT_OVERTIME_RATES, DEFAULT_WORK_SETTINGS } from "./pdksHelpers";
 import { addWorkDate } from "./pdksWorkDay";
 
-const workingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const period = { startDate: "2026-06-22", endDate: "2026-06-28", hourlyRate: 100 };
 const segment = (netMinutes: number, overrides: Partial<OvertimeSegment> = {}): OvertimeSegment => ({
   netMinutes, dailyOvertimeMinutes: 0, classification: "workday",
@@ -62,7 +61,7 @@ describe("project overtime settlement", () => {
       date: addWorkDate(period.startDate, i), readings: [], manual: manual("08:00", "20:00"),
       // Ten hours on site minus the scheduled one-hour break = nine hours.
       shift: shift("08:00", "18:00", { breakStart: "12:00", breakEnd: "13:00" }),
-      workSettings: DEFAULT_WORK_SETTINGS, workingDays,
+      workSettings: DEFAULT_WORK_SETTINGS,
     }));
     expect(days.map((d) => d.totalMinutes)).toEqual([660, 660, 660, 660]);
     expect(calculatePeriodOvertime(days, { ...period, overtimeBasis: "dailyShift" }))
@@ -74,15 +73,15 @@ describe("project overtime settlement", () => {
   it("preserves the legacy daily night-break cap and conserves integer net minutes", () => {
     const day = computePdksDay({
       date: period.startDate, readings: [], manual: manual("19:00", "23:00"),
-      shift: null, workSettings: DEFAULT_WORK_SETTINGS, workingDays,
+      shift: null, workSettings: DEFAULT_WORK_SETTINGS,
       overtimeRates: { ...DEFAULT_OVERTIME_RATES, nightShiftMultiplier: 3 },
     });
     expect(day).toMatchObject({ totalMinutes: 225, overtimeMinutes: 225, nightMinutes: 56, nightOvertimeMinutes: 56 });
     expect(calculatePeriodOvertime([day], { ...period, overtimeBasis: "dailyShift" }))
       .toMatchObject({ overtimeMinutes: 225, overtimePayTRY: 702.5 });
     const odd = computePdksDay({
-      date: "2026-06-26", readings: [], manual: manual("21:07", "06:03"),
-      shift: shift("22:00", "06:00"), workSettings: DEFAULT_WORK_SETTINGS, workingDays,
+      date: "2026-06-26", nextDayKind: "rest" as const, readings: [], manual: manual("21:07", "06:03"),
+      shift: shift("22:00", "06:00"), workSettings: DEFAULT_WORK_SETTINGS,
       overtimeRates: { ...DEFAULT_OVERTIME_RATES, nightShiftDayMode: "splitAtMidnight" },
     });
     expect(odd.overtimeSegments.reduce((sum, s) => sum + s.netMinutes, 0)).toBe(odd.totalMinutes);
@@ -95,8 +94,8 @@ describe("project overtime settlement", () => {
     ["additive", 1400, 1662.5],
   ] as const)("Friday 22–Saturday 06 splits the rate without moving the work date (%s)", (mode, startPay, splitPay) => {
     const base = {
-      date: "2026-06-26", readings: [], manual: manual("22:00", "06:00"),
-      shift: shift("22:00", "06:00"), workSettings: DEFAULT_WORK_SETTINGS, workingDays,
+      date: "2026-06-26", nextDayKind: "rest" as const, readings: [], manual: manual("22:00", "06:00"),
+      shift: shift("22:00", "06:00"), workSettings: DEFAULT_WORK_SETTINGS,
     };
     const rates = { ...DEFAULT_OVERTIME_RATES, nightCombineMode: mode };
     const start = computePdksDay({ ...base, overtimeRates: rates });
@@ -116,7 +115,7 @@ describe("project overtime settlement", () => {
     const day = computePdksDay({
       date: "2026-06-23", readings: [], manual: manual("22:00", "06:00"),
       shift: shift("22:00", "06:00", { breakStart: "00:00", breakEnd: "01:00" }),
-      workSettings: DEFAULT_WORK_SETTINGS, workingDays,
+      workSettings: DEFAULT_WORK_SETTINGS,
       holidayMap: new Map([[holiday.date, holiday]]),
       overtimeRates: { ...DEFAULT_OVERTIME_RATES, nightShiftDayMode: "splitAtMidnight" },
     });
@@ -211,12 +210,12 @@ describe("project overtime settlement", () => {
     const availableDateKeys = new Set(dates);
     const cells = dates.map((date) => computePayrollCell({
       date, availableDateKeys, manual: manual("09:00", "20:00"), dayReadings: [],
-      hasLeave: false, holiday: null, workingDays, dayShift,
+      hasLeave: false, holiday: null, dayShift,
       workSettings: DEFAULT_WORK_SETTINGS, overtimeRates, empHourlyRate: 100,
     }));
     const detail = dates.map((date) => computeAttendanceDetailDay({
       date, availableDateKeys, manualDay: manual("09:00", "20:00"), dayReadings: [],
-      leaves: [], holiday: null, workingDays, dayShift,
+      leaves: [], holiday: null, dayShift,
       workSettings: DEFAULT_WORK_SETTINGS, overtimeRates,
     }));
     const row = computePdksTableRow({
@@ -224,7 +223,7 @@ describe("project overtime settlement", () => {
       periodDateKeys: [...dates, "2026-06-27", period.endDate],
       startDate: period.startDate, isSingleDay: false, viewMode: "matrix",
       manualPdksByEmpDate: new Map(dates.map((d) => [`${id}__${d}`, manual("09:00", "20:00")])),
-      allLeaves: [], holidayMap: new Map(), workingDays,
+      allLeaves: [], holidayMap: new Map(),
       workSettings: DEFAULT_WORK_SETTINGS, overtimeRates,
       resolveShift: () => dayShift, manualEditedBy: null,
     });

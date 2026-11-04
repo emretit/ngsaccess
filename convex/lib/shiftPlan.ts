@@ -32,7 +32,7 @@ export function slotForDate(row: PlanRow, date: string): Id<"shifts">[] | null {
   if (!validPlanDate(date) || date < row.startDate || date > row.endDate) return null;
   const plan = row.plan;
   if (!plan || plan.kind === "weekly") {
-    if (row.weekPattern?.length && !row.weekPattern.includes(WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()])) return null;
+    if (row.weekPattern?.length && !row.weekPattern.includes(WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()])) return [];
     return plan ? plan.shiftIds : [row.shiftId];
   }
   const days = Math.round((Date.parse(date) - Date.parse(plan.anchorDate)) / DAY);
@@ -75,6 +75,7 @@ export function validateDayShifts<T extends DayShift>(shifts: T[]): T[] {
 /** Validate shape before resolving ids; the largest legal cycle has 364×8 entries. */
 export function validatePlanStructure(plan: ShiftPlan, weekPattern?: string[]): void {
   if (plan.kind === "weekly") {
+    if (!weekPattern?.length) throw new ConvexError("En az bir çalışma günü seçin");
     if (plan.shiftIds.length < 1 || plan.shiftIds.length > MAX_SHIFTS_PER_DAY) throw new ConvexError("En az 1, en fazla 8 vardiya seçin");
     return;
   }
@@ -117,6 +118,7 @@ export function validateShiftPlan(row: PlanRow & { projectId?: Id<"projects"> },
     }
   };
   const plan = row.plan;
+  if (!plan && !row.weekPattern?.length) throw new ConvexError("En az bir çalışma günü seçin");
   if (!plan) { normalize([row.shiftId]); return { shiftId: row.shiftId }; }
   validatePlanStructure(plan, row.weekPattern);
   if (plan.kind === "weekly") {

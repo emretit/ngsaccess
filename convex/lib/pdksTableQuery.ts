@@ -109,7 +109,7 @@ export async function getPdksTableData(
     const filterDates = buildPeriodDateKeys(startDate, endDate);
     employees = employees.filter(employee => filterDates.some(date => {
       const plan = scopedPdksPlan(tableBoundaryShiftResolver.resolvePlan(employee._id, date), args.projectId);
-      return plan.kind === "shifts" && plan.shifts.some(shift => shift._id === args.shiftId);
+      return plan.kind !== "none" && plan.shifts.some(shift => shift._id === args.shiftId);
     }));
   }
   const tableHasFlexible = [...tableBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") && hasFlexiblePdksShift(availabilityEmployees, (id, date) => scopedPdksShift(tableBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
@@ -134,20 +134,12 @@ export async function getPdksTableData(
   const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
 
   // Ayarlar ve tatiller seçili projeden (projectId zorunlu; global geri dönüş yok)
-  const [workSettings, holidayMap, generalSettings, shiftResolver] =
+  const [workSettings, holidayMap, shiftResolver] =
     await Promise.all([
       getEffectiveWorkSettings(ctx, referenceProjectId),
       getHolidaysMap(ctx, referenceProjectId, overtimeRange.startDate, addWorkDate(overtimeRange.endDate, 1)),
-      ctx.db
-        .query("generalSettings")
-        .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
-        .first(),
       Promise.resolve(tableBoundaryShiftResolver),
     ]);
-  const workingDays =
-    generalSettings?.workingDays && generalSettings.workingDays.length > 0
-      ? generalSettings.workingDays
-      : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 
   // pdksRecords manuel override haritası
   const manualPdksByEmpDate = new Map<string, Doc<"pdksRecords">>();
@@ -226,7 +218,6 @@ export async function getPdksTableData(
         manualPdksByEmpDate,
         allLeaves: allLeaves.filter(l => l.employeeId === employee?._id && pdksLeaveMatchesProject(l, employee?.projectId)),
         holidayMap,
-        workingDays,
         workSettings,
         overtimeRates,
         resolvePlan: (id, date) => scopedPdksPlan(shiftResolver.resolvePlan(id, date), args.projectId),

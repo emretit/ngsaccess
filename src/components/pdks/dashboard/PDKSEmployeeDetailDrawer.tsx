@@ -164,7 +164,7 @@ function Detail({
             {detail.employee.position && (
               <p>Pozisyon: {detail.employee.position}</p>
             )}
-            {!planDayLabel(day) && detail.employee.shift && <p>Vardiya: {detail.employee.shift}</p>}
+            {(!planDayLabel(day) || day.planKind === "rest") && detail.employee.shift && <p>Vardiya: {detail.employee.shift}</p>}
           </div>
           {day.manualNote && (
             <div className="border-y py-3 text-sm">

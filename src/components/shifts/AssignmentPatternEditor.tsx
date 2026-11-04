@@ -26,8 +26,7 @@ export function AssignmentPatternEditor({ values, shifts, onChange, errors = {},
     </div>
     {kind === 'weekly' ? <>
       <DayShiftsPicker value={values.plan?.kind === 'weekly' ? values.plan.shiftIds : values.shiftId ? [values.shiftId as Id<'shifts'>] : []} shifts={shifts} onChange={shiftIds => onPlan({ kind: 'weekly', shiftIds })} />
-      <label className="flex gap-2 items-center text-sm"><input type="checkbox" className="size-6 shrink-0 accent-primary" checked={values.specificDays} onChange={event => onChange({ ...values, specificDays: event.target.checked })} />Belirli günler</label>
-      {values.specificDays ? <WeekdaySelection id="assignment-days" value={values.weekPattern} error={errors.weekPattern} onChange={weekPattern => onChange({ ...values, weekPattern })} /> : <p className="text-sm">Her gün uygulanır.</p>}
+      <WeekdaySelection id="assignment-days" value={values.weekPattern} error={errors.weekPattern} onChange={weekPattern => onChange({ ...values, weekPattern })} />
     </> : values.plan && values.plan.kind !== 'weekly' && <RotationEditor value={values.plan} shifts={shifts} onChange={onPlan} />}
     {(errors.plan || errors.shiftId) && <p ref={errorRef} tabIndex={-1} role="alert" className="text-xs text-danger">{errors.plan || errors.shiftId}</p>}
     <div className="space-y-1">
@@ -35,7 +34,7 @@ export function AssignmentPatternEditor({ values, shifts, onChange, errors = {},
       <div className="grid grid-cols-7 gap-1" aria-label="14 günlük önizleme">
         {planPreview(values).map(({ date, shiftIds, outsideRange }) => {
           const selected = shifts.filter(shift => shiftIds?.includes(shift._id));
-          const label = shiftIds === null ? 'Uygulanmaz' : selected.map(shift => shift.name).join(' + ') || 'Boş';
+          const label = !shiftIds?.length ? 'Hafta tatili' : selected.map(shift => shift.name).join(' + ') || 'Vardiya seçin';
           return <div key={date} aria-label={`${shortDate(date)}, ${label}`} title={`${shortDate(date)} · ${label}`} className={`rounded border p-1 text-[10px] ${outsideRange ? 'opacity-40' : ''} ${selected.length ? '' : 'bg-subtle text-muted-foreground'}`}>
             <span className="block">{shortDate(date).slice(0, 5)}</span><span className="line-clamp-2">{label}</span>
           </div>;

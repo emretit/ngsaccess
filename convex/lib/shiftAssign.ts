@@ -66,7 +66,9 @@ export function evaluateShiftAssignment(input: {
     conflict: null, leave: null, holiday: null,
   };
   if (input.shift.isActive === false) return { ...base, status: "skipped", reason: "Pasif vardiya atanamaz" };
-  if (!intervals.length && (!input.range.plan || input.range.plan.kind === "weekly")) return { ...base, status: "skipped", reason: "Seçilen aralıkta tekrar desenine uyan gün yok" };
+
+  // Weekly patterns need a selected work date; cycle rest-only assignments remain valid.
+  if (!intervals.length && (!input.range.plan || input.range.plan.kind === "weekly")) return { ...base, status: "skipped", reason: "Seçilen günlere denk gelen tarih yok" };
 
   const touched = new Set<string>();
   for (const [start, end] of intervals) {
@@ -88,7 +90,8 @@ export function evaluateShiftAssignment(input: {
       endDate: existing.endDate < shiftDateOffset(input.range.endDate, 1) ? existing.endDate : shiftDateOffset(input.range.endDate, 1),
     };
     const other = scheduleIntervals(range, existing.shift, input.shifts);
-    if (intervalsOverlap(intervals, other)) {
+    const ownsSameDate = existing.startDate <= input.range.endDate && existing.endDate >= input.range.startDate;
+    if (ownsSameDate || intervalsOverlap(intervals, other)) {
       const { shift, ...assignment } = existing;
       base.conflict = { ...assignment, ...shift };
       break;
@@ -96,7 +99,7 @@ export function evaluateShiftAssignment(input: {
   }
   if (!input.calendarConfirmed && base.leave) return { ...base, status: "on_leave", reason: `İzin: ${base.leave.date}` };
   if (!input.calendarConfirmed && base.holiday) return { ...base, status: "holiday", reason: `${base.holiday.date}: ${base.holiday.name}` };
-  if (!input.forceConfirm && base.conflict) return { ...base, status: "conflict", reason: `OVERLAP:1 ${base.conflict.shiftName} ${shiftTimeLabel(base.conflict)} (${base.conflict.startDate}–${base.conflict.endDate})` };
+  if (!input.forceConfirm && base.conflict) return { ...base, status: "conflict", reason: `OVERLAP:1 Mevcut planın üstünü örter: ${base.conflict.shiftName} ${shiftTimeLabel(base.conflict)} (${base.conflict.startDate}–${base.conflict.endDate})` };
   return base;
 }
 
@@ -123,12 +126,14 @@ export async function syncPlanRefs(ctx: MutationCtx, owner: { assignmentId: Id<"
   for (const shiftId of planShiftIds(plan)) await ctx.db.insert("shiftPlanRefs", { ...owner, projectId, shiftId });
 }
 export async function loadPlanShifts(ctx: QueryCtx | MutationCtx, row: Pick<PlanRow, "shiftId" | "plan">): Promise<Map<string, Doc<"shifts">>> {
-  if (row.plan) validatePlanStructure(row.plan);
+  // Loading existing legacy rows must not impose the new write-time weekday requirement.
+  if (row.plan) validatePlanStructure(row.plan, row.plan.kind === "weekly" ? WEEKDAYS : undefined);
   const ids = [...new Set([row.shiftId, ...planShiftIds(row.plan)])];
   const shifts = (await Promise.all(ids.map(id => ctx.db.get(id)))).filter((shift): shift is NonNullable<typeof shift> => shift !== null);
   return new Map(shifts.map(shift => [String(shift._id), shift]));
 }
 export async function normalizeAssignmentPlan(ctx: QueryCtx | MutationCtx, row: PlanRow & { projectId?: Id<"projects"> }) {
+  if ((!row.plan || row.plan.kind === "weekly") && !row.weekPattern?.length) throw new ConvexError("En az bir çalışma günü seçin");
   const shifts = await loadPlanShifts(ctx, row);
   // Legacy inactive assignments keep their existing preview/skip behavior.
   const normalized = row.plan ? validateShiftPlan(row, shifts) : { shiftId: row.shiftId, plan: undefined };

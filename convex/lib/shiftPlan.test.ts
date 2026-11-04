@@ -13,7 +13,7 @@ const night = shift("night", "22:00", "06:00");
 const flexible = shift("flexible", "05:00", "22:00", { scheduleType: "flexible" });
 const shifts = new Map([morning, evening, night, flexible].map(item => [String(item._id), item]));
 const row = { shiftId: morning._id, projectId, startDate: "2026-06-01", endDate: "2026-06-30" };
-const normalized = (plan: ShiftPlan, extra = {}) => validateShiftPlan({ ...row, plan, ...extra }, shifts);
+const normalized = (plan: ShiftPlan, extra = {}) => validateShiftPlan({ ...row, weekPattern: plan.kind === "weekly" ? ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] : undefined, plan, ...extra }, shifts);
 
 describe("day plan validation", () => {
   it("exposes the agreed constants", () => expect([MAX_SHIFTS_PER_DAY, MIN_SPLIT_GAP_MINUTES, MAX_DAY_CYCLE, MAX_WEEK_CYCLE]).toEqual([8, 30, 31, 52]));
@@ -84,7 +84,7 @@ describe("slot selection and plan-aware intervals", () => {
     expect(slotForDate({ ...row, plan }, "2026-06-15")).toEqual([morning._id]);
     expect(planShiftIds(plan)).toEqual([morning._id, evening._id]);
     expect(planShiftIds()).toEqual([]);
-    expect(slotForDate({ ...row, weekPattern: ["TUE"] }, "2026-06-01")).toBeNull();
+    expect(slotForDate({ ...row, weekPattern: ["TUE"] }, "2026-06-01")).toEqual([]);
   });
   it("expands every shift, detects a secondary collision and skips rest days", () => {
     const range = { ...row, endDate: row.startDate, plan: { kind: "weekly" as const, shiftIds: [morning._id, evening._id] } };

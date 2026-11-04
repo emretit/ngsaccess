@@ -21,12 +21,12 @@ export function plannedDayFields(day: Pick<PlannedDay, "segments" | "planKind" |
 
 /** A project-scoped view must never leak a shift from another project. */
 export function scopedPdksPlan(plan: DayPlan, projectId?: Id<"projects">): DayPlan {
-  if (!projectId || plan.kind !== "shifts") return plan;
+  if (!projectId || plan.kind === "none") return plan;
   const shifts = plan.shifts.filter(shift => shift.projectId === projectId || shift.scheduleType === "flexible" && !shift.projectId);
-  return shifts.length ? { ...plan, shifts } : { kind: "none", source: "project" };
+  return shifts.length || plan.kind === "rest" ? { ...plan, shifts } : { kind: "none", source: "project" };
 }
 export function usesPlanDayRules(plan: DayPlan): boolean {
-  return plan.kind === "rest" || plan.kind === "shifts" && (plan.calendar === "plan" || plan.shifts.length > 1 || plan.source === "department");
+  return plan.kind !== "none" && (plan.origin === "cycle" || plan.shifts.length > 1 || plan.source === "department");
 }
 
 function segmentIndex(date: string, accessTime: string, shifts: readonly Doc<"shifts">[], direction?: string): number {
@@ -52,7 +52,7 @@ function segmentIndex(date: string, accessTime: string, shifts: readonly Doc<"sh
 }
 
 export function shiftForInstant(date: string, accessTime: string, plan: DayPlan, direction?: string): Doc<"shifts"> | null {
-  return plan.kind === "shifts" ? plan.shifts[segmentIndex(date, accessTime, plan.shifts, direction)] ?? null : null;
+  return plan.kind !== "none" ? plan.shifts[segmentIndex(date, accessTime, plan.shifts, direction)] ?? null : null;
 }
 
 export function splitReadingsByShift(date: string, readings: readonly Doc<"cardReadings">[], shifts: readonly Doc<"shifts">[], policy?: PdksDayPolicy): Doc<"cardReadings">[][] {
@@ -71,7 +71,7 @@ export function manualForSegment(manual: Doc<"pdksRecords"> | undefined, index: 
 }
 
 const decisionFor = (day: Day) => day.attendanceDecision ?? (day.hasAttendance ? day.durationMeasured ? "present" : "incomplete" : "absent");
-export function mergePdksDays(days: readonly Day[], shifts: readonly Doc<"shifts">[], dayKind?: Params["dayKind"]): PlannedDay {
+export function mergePdksDays(days: readonly Day[], shifts: readonly Doc<"shifts">[], origin?: "weekly" | "cycle"): PlannedDay {
   const first = days[0];
   if (!first) throw new Error("Birleştirilecek vardiya günü bulunamadı");
   const sum = (key: "rawTotalMinutes" | "breakMinutes" | "totalMinutes" | "nightMinutes" | "rawNightMinutes" | "overtimeMinutes" | "nightOvertimeMinutes" | "lateMinutes" | "earlyExitMinutes") => days.reduce((total, day) => total + day[key], 0);
@@ -100,7 +100,7 @@ export function mergePdksDays(days: readonly Day[], shifts: readonly Doc<"shifts
     }),
   };
   // Weekly non-working days use the same attendance/calendar precedence as a single shift.
-  if (dayKind === undefined && first.classification !== "workday") delete result.attendanceDecision;
+  if (origin === "weekly" && first.classification !== "workday") delete result.attendanceDecision;
   return result;
 }
 
@@ -117,14 +117,15 @@ export function computePdksPlannedDay(params: Params & { dayPlan?: DayPlan }): P
     isOvernightShift: false, hasAttendance: false, durationMeasured: false,
     punchQuality: "noPunch", overtimePayTRY: null, overtimeSegments: [],
   };
-  const dayKind = plan.kind === "rest" ? "rest" : plan.kind === "shifts" && plan.calendar === "plan" ? "work" : undefined;
-  if (plan.kind !== "shifts" || plan.shifts.length <= 1) {
-    const day = computePdksDay({ ...params, shift: plan.kind === "shifts" ? plan.shifts[0] ?? null : null, dayKind });
+  const dayKind = plan.kind === "rest" ? "rest" : "work";
+  if (plan.shifts.length <= 1) {
+    const day = computePdksDay({ ...params, shift: plan.shifts[0] ?? null, dayKind });
     return plan.kind === "rest" ? { ...day, planKind: "rest" } : day;
   }
   const buckets = splitReadingsByShift(params.date, params.readings, plan.shifts, params.policy);
-  return mergePdksDays(plan.shifts.map((shift, index) => computePdksDay({ ...params, shift, dayKind,
+  const result = mergePdksDays(plan.shifts.map((shift, index) => computePdksDay({ ...params, shift, dayKind,
     readings: buckets[index] ?? [], manual: manualForSegment(params.manual, index, plan.shifts.length),
     manualExitNextDay: index === plan.shifts.length - 1 && shift.endTime <= shift.startTime && !!params.manual?.exitTime && params.manual.exitTime <= shift.startTime,
-  })), plan.shifts, dayKind);
+  })), plan.shifts, plan.origin);
+  return plan.kind === "rest" ? { ...result, planKind: "rest" } : result;
 }

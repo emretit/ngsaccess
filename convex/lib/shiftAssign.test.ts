@@ -42,11 +42,12 @@ describe("vardiya atama kararı", () => {
     expect(evaluateShiftAssignment({ ...request, forceConfirm: true }).status).toBe("on_leave");
     expect(evaluateShiftAssignment({ ...request, calendarConfirmed: true, forceConfirm: true }).status).toBe("will_assign");
   });
-  it("ayrı saat, farklı desen ve sınırda bitiş çakışmaz", () => {
-    for (const other of [existing({ weekPattern: ["WED"] }), existing({ shift: { startTime: "18:00", endTime: "22:00" } }), existing({ endDate: "2026-10-18" })]) {
-      expect(evaluateShiftAssignment({ ...base, existing: [other] }).status).toBe("will_assign");
+  it("ayrı saat ve farklı desen takvim sahipliğinde çakışır; bitmiş seri çakışmaz", () => {
+    for (const other of [existing({ weekPattern: ["WED"] }), existing({ shift: { startTime: "18:00", endTime: "22:00" } }), ]) {
+      expect(evaluateShiftAssignment({ ...base, existing: [other] }).status).toBe("conflict");
     }
   });
+  it("bitmiş seriler çakışmaz", () => expect(evaluateShiftAssignment({ ...base, existing: [existing({ endDate: "2026-10-18" })] }).status).toBe("will_assign"));
   it("önceki gün gece devamı ve sonraki gün erken vardiyası çakışır", () => {
     expect(evaluateShiftAssignment({ ...base, range: { startDate: "2026-10-20", endDate: "2026-10-20" }, shift: { startTime: "05:00", endTime: "08:00" }, existing: [existing({ startDate: "2026-10-19", endDate: "2026-10-19", shift: night })] }).status).toBe("conflict");
     expect(evaluateShiftAssignment({ ...base, shift: night, range: { startDate: "2026-10-19", endDate: "2026-10-19" }, existing: [existing({ startDate: "2026-10-20", endDate: "2026-10-20", weekPattern: ["TUE"], shift: { startTime: "05:00", endTime: "08:00" } })] }).status).toBe("conflict");
@@ -55,6 +56,12 @@ describe("vardiya atama kararı", () => {
     expect(evaluateShiftAssignment({ ...base, range: { startDate: "2026-10-20", endDate: "2026-10-20", weekPattern: ["MON"] } })).toMatchObject({ status: "skipped", occurrenceCount: 0 });
     expect(evaluateShiftAssignment({ ...base, shift: { ...day, isActive: false } }).status).toBe("skipped");
     expect(() => validateAssignRange({ ...range, weekPattern: ["BAD"] })).toThrow();
+  });
+  it("yalnız Cumartesi aralığını hem eski hem açık haftalık Pzt–Cum planında atlar", () => {
+    const range = { startDate: "2026-10-24", endDate: "2026-10-24", weekPattern: ["MON", "TUE", "WED", "THU", "FRI"] };
+    for (const plan of [undefined, { kind: "weekly" as const, shiftIds: ["shift" as Id<"shifts">] }]) {
+      expect(evaluateShiftAssignment({ ...base, range: { ...range, plan } })).toMatchObject({ status: "skipped", occurrenceCount: 0, reason: "Seçilen günlere denk gelen tarih yok" });
+    }
   });
   it("eski boş desen her gün anlamını korur; uzun mevcut seriyi kırpar", () => {
     expect(evaluateShiftAssignment({ ...base, range: { ...range, weekPattern: [] } }).occurrenceCount).toBe(7);
@@ -147,7 +154,7 @@ function memoryContext(seed: Record<string, MemoryRow[]>) {
 const projectId = "project" as Id<"projects">;
 const employeeId = "employee" as Id<"employees">;
 const shiftId = "shift" as Id<"shifts">;
-const bulkInput = { projectId, employeeIds: [employeeId], shiftId, startDate: "2026-10-19", endDate: "2026-10-19" };
+const bulkInput = { weekPattern: ["MON"], projectId, employeeIds: [employeeId], shiftId, startDate: "2026-10-19", endDate: "2026-10-19" };
 const employeeRow = { _id: employeeId, projectId, firstName: "Ada", lastName: "Kaya" };
 const shiftRow = { _id: shiftId, projectId, name: "Gündüz", ...day, isActive: true };
 const assignmentRow = { _id: "assignment", employeeId, shiftId, projectId, startDate: "2026-10-19", endDate: "2026-10-19" };
@@ -175,6 +182,17 @@ describe("vardiya endpoint sözleşmeleri", () => {
     memory.tables.set("shiftAssignments", [assignmentRow]);
     const apply = await handlers.bulkAssignShift(memory.mutationCtx, { ...bulkInput, resultMode: "detailed" });
     expect(apply).toMatchObject({ insertedCount: 0, overlapCount: 1, results: [{ status: "skipped_conflict", assignmentId: null }] });
+    expect(memory.writes()).toBe(0);
+  });
+  it("Pzt–Cum desenli yalnız Cumartesi aralığını atlar ve atama yazmaz", async () => {
+    const memory = seedMemory();
+    const input = { ...bulkInput, startDate: "2026-10-24", endDate: "2026-10-24", weekPattern: ["MON", "TUE", "WED", "THU", "FRI"] };
+    const preview = await handlers.previewBulkAssign(memory.queryCtx, input);
+    expect(preview.results[0]).toMatchObject({ status: "skipped", reason: "Seçilen günlere denk gelen tarih yok", occurrenceCount: 0 });
+    const result = await handlers.bulkAssignShift(memory.mutationCtx, input);
+    expect(result.insertedCount).toBe(0);
+    expect(result.results[0]).toMatchObject({ previewStatus: "skipped", assignmentId: null });
+    expect(memory.tables.get("shiftAssignments")).toEqual([]);
     expect(memory.writes()).toBe(0);
   });
   it("çakışanı atlayıp diğerini yazar; eski sonuç alanlarını korur", async () => {

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import { DEFAULT_OVERTIME_RATES } from "./lib/pdksHelpers";
-import { loadRuleReportDays, hasUnsupportedShiftCalendar } from "./lib/reportAttendance";
+import { loadRuleReportDays, loadAttendanceReport } from "./lib/reportAttendance";
 import type { ShiftPlan } from "./lib/shiftPlan";
 import type { Id } from "./_generated/dataModel";
 
@@ -97,10 +97,15 @@ it("last night piece consumes D+1 exit in table/detail/mobile and manual validat
   await expect(f.caller.mutation(api.pdksRecords.upsertManual, { employeeId: f.employeeId, date, entryTime: "08:00", exitTime: "06:00", note: "Çoklu gece düzeltmesi" })).resolves.toBeTruthy();
 });
 
-it("cycle calendars do not emit the unsupported weekly calendar warning", async () => {
+it("cycle calendars use managed rows without a weekly calendar warning", async () => {
   const f = await fixture(false);
-  const unsupported = await f.t.run(async ctx => hasUnsupportedShiftCalendar(await ctx.db.query("shiftAssignments").collect(), [date, next], ["Salı"], new Map()));
-  expect(unsupported).toBe(false);
+  vi.setSystemTime(new Date("2026-07-01T12:00:00Z"));
+  await f.add("08:00", "entry"); await f.add("12:00", "exit");
+  const days = await f.report(date, next);
+  expect(days[0]).toMatchObject({ totalMinutes: 225, segments: [{ totalMinutes: 225 }, { totalMinutes: 0 }] });
+  expect(days[1]).toMatchObject({ planKind: "rest", payrollCode: "HT" });
+  const report = await f.t.run(ctx => loadAttendanceReport(ctx, [f.projectId], 2026, 6));
+  expect(report.rows[0]?.reliabilityNote).toBe("");
 });
 
 it("shift filters use the personal override throughout the period instead of the employee default", async () => {

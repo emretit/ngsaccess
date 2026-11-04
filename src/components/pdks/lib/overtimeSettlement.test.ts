@@ -20,7 +20,7 @@ describe("settled overtime in PDKS views", () => {
         `${id}__${date}`, { manualEntry: true, entryTime: "09:00", exitTime: "20:00" } as Doc<"pdksRecords">,
       ])),
       allLeaves: [], holidayMap: new Map(), manualEditedBy: null,
-      workingDays: ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"],
+
       workSettings: DEFAULT_WORK_SETTINGS,
       overtimeRates: { ...DEFAULT_OVERTIME_RATES, overtimeBasis },
       resolveShift: () => shift,

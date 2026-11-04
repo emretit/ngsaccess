@@ -25,9 +25,8 @@ import {
   getEffectiveWorkSettings,
   DEFAULT_WORK_SETTINGS,
   type EffectiveWorkSettings,
-  dailyOvertimeForShift,
   isoTimeToTRMinutes,
-  classifyDay,
+  dailyOvertimeForShift,
 } from "./lib/pdksHelpers";
 import { netWorkMinutes } from "./lib/breakDeduction";
 import {
@@ -236,8 +235,8 @@ async function loadPdksDataset(
   const resolvePlan: ShiftResolver["resolvePlan"] = (id, date) => scopedPdksPlan(loadedResolver.resolvePlan(id, date), employeeProjects.get(id));
   const shiftResolver: ShiftResolver = {
     ...loadedResolver, resolvePlan,
-    resolve: (id, date) => { const plan = resolvePlan(id, date); return plan.kind === "shifts" ? plan.shifts[0] ?? null : null; },
-    resolveLast: (id, date) => { const plan = resolvePlan(id, date); return plan.kind === "shifts" ? plan.shifts[plan.shifts.length - 1] ?? null : null; },
+    resolve: (id, date) => { const plan = resolvePlan(id, date); return plan.kind !== "none" ? plan.shifts[0] ?? null : null; },
+    resolveLast: (id, date) => { const plan = resolvePlan(id, date); return plan.kind !== "none" ? plan.shifts[plan.shifts.length - 1] ?? null : null; },
   };
   const ruleReport = await loadRuleReportDays(ctx, allowedProjectIds, trDateKey(rangeStartISO), trDateKey(rangeEndISO), {
     includeLegacyReadings: false, preloadedEmployees: employees, shiftResolver,
@@ -260,7 +259,7 @@ async function loadPdksDataset(
     const dates = buildPeriodDateKeys(trDateKey(rangeStartISO), trDateKey(rangeEndISO));
     employees = employees.filter(employee => dates.some(date => {
       const plan = shiftResolver.resolvePlan(employee._id, date);
-      return plan.kind === "shifts" && plan.shifts.some(shift => shift._id === filters.shiftId);
+      return plan.kind !== "none" && plan.shifts.some(shift => shift._id === filters.shiftId);
     }));
   }
   const deptNameById = new Map<string, string>(
@@ -356,11 +355,11 @@ export function computePdksCoreInMemory(
       const { lateThresholdMin } = thresholdsForShift(shift, workSettings);
       if (arrivalMin > lateThresholdMin) lateSet.add(key);
     }
-    if (!empDayReadings.has(key)) empDayReadings.set(key, []);
-    empDayReadings.get(key)!.push(r);
+    const list = empDayReadings.get(key) ?? [];
+    list.push(r);
+    empDayReadings.set(key, list);
   }
 
-  const defaultWorkingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
   const managedDates = new Map<string, Set<string>>();
   let totalOvertimeMinutes = 0;
   for (const [employeeId, row] of ruleRows) {
@@ -369,22 +368,20 @@ export function computePdksCoreInMemory(
     managedDates.set(employeeId, new Set(days.map(day => day.date)));
     totalOvertimeMinutes += days.reduce((sum, day) => sum + day.overtimeMinutes, 0);
   }
-  for (const [empId, allReadings] of empDayReadings.entries()) {
+
+  for (const [empId, allReadings] of empDayReadings) {
     const list = allReadings.filter(reading => !managedDates.get(empId)?.has(trDateKey(reading.accessTime)));
-    list.sort((a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime());
-    const first = list[0];
-    const last = list[list.length - 1];
+    list.sort((a, b) => Date.parse(a.accessTime) - Date.parse(b.accessTime));
+    const first = list[0], last = list[list.length - 1];
     if (!first || !last || first === last) continue;
-    const diff = new Date(last.accessTime).getTime() - new Date(first.accessTime).getTime();
-    const netMin = Math.floor(diff / 60000);
-    const dateISO = trDateKey(first.accessTime);
-    const cls = classifyDay(dateISO, defaultWorkingDays);
-    const shift = shiftResolver.resolve(empId as Id<"employees">, dateISO);
+    const date = trDateKey(first.accessTime);
+    const plan = shiftResolver.resolvePlan(empId as Id<"employees">, date);
+    if (plan.kind === "none") continue;
     totalOvertimeMinutes += dailyOvertimeForShift({
-      classification: cls,
-      netMinutes: netMin,
+      classification: plan.kind === "rest" ? "weekend" : "workday",
+      netMinutes: Math.floor((Date.parse(last.accessTime) - Date.parse(first.accessTime)) / 60000),
       lastExitMinutes: isoTimeToTRMinutes(last.accessTime),
-      shift,
+      shift: shiftResolver.resolve(empId as Id<"employees">, date),
       workSettings,
     });
   }
@@ -599,7 +596,7 @@ export const getBreakViolations = authedQuery({
       if (totalMin < 450) continue;
 
       const plan = shiftResolver.resolvePlan(emp._id, today);
-      const shifts = plan.kind === "shifts" ? plan.shifts : [];
+      const shifts = plan.kind !== "none" ? plan.shifts : [];
       const buckets = splitReadingsByShift(today, list, shifts);
       const missingBreak = shifts.some((shift, index) => {
         if (!shift.breakStart || !shift.breakEnd) return false;

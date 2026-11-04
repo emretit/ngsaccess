@@ -29,7 +29,7 @@ async function fixture(role: "project_admin" | "project_user" | "super_admin" = 
     await ctx.db.insert("userProjects", { projectId, userId });
     const shiftId = await ctx.db.insert("shifts", { projectId, name: "Gündüz", startTime: "08:00", endTime: "17:00", earlyExitToleranceMinutes: 15, createdAt: "", updatedAt: "" });
     const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "123", isActive: true, shiftId });
-    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, weekPattern: ["MON", "TUE", "WED", "THU", "FRI"], startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const deviceId = await ctx.db.insert("devices", { projectId, name: "IDE", brand: "ide_smart", createdAt: "", updatedAt: "" });
     const versionId = effectiveFrom ? await ctx.db.insert("pdksRuleVersions", { projectId, effectiveFrom, punchMode: "requirements", checkpointMode: "all", requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "review", noPunch: "absent", createdAt: "", createdBy: userId }) : null;
     await ctx.db.insert("employeeAuth", { employeeId, passwordHash: "fixture", passwordVersion: 1, createdAt: "", updatedAt: "" });
@@ -136,7 +136,7 @@ it("D4: saatsiz manuel kayıt legacy veri-yok sonucunu tablo/detay/bordroda koru
   expect(payroll.rows[0]?.cells.find(day => day.date === "2026-10-23")?.status).toBe("noData");
   const manual = await f.t.run(ctx => ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", f.employeeId)).first());
   if (!manual) throw new Error("Fixture kaydı yok");
-  const input = { date: "2026-10-23", availableDateKeys: new Set<string>(), firstRecordDate: "2026-01-01", dayShift: null, dayReadings: [], manual, manualDay: manual, hasLeave: false, leaves: [], holiday: null, workingDays: ["Cuma"], workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: DEFAULT_OVERTIME_RATES, empHourlyRate: null };
+  const input = { date: "2026-10-23", availableDateKeys: new Set<string>(), firstRecordDate: "2026-01-01", dayShift: null, dayReadings: [], manual, manualDay: manual, hasLeave: false, leaves: [], holiday: null, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: DEFAULT_OVERTIME_RATES, empHourlyRate: null };
   expect(computePayrollCell({ ...input, policyFor: () => LEGACY_PDKS_POLICY }).status).toBe("noData");
   expect(computeAttendanceDetailDay({ ...input, policyFor: () => LEGACY_PDKS_POLICY }).status).toBe("noData");
   expect(computePayrollCell({ ...input, policyFor: () => requirements }).status).toBe("absent");

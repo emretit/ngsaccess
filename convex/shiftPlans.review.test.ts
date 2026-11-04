@@ -23,8 +23,8 @@ async function fixture() {
   });
   const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
   const plan = { kind: "weekly" as const, shiftIds: [ids.morning, ids.evening] };
-  const bulk = { projectId: ids.projectId, employeeIds: [ids.employeeId], shiftId: ids.morning, ...dates, plan };
-  const department = { projectId: ids.projectId, departmentId: ids.departmentId, shiftId: ids.morning, ...dates, plan };
+  const bulk = { weekPattern: ["MON", "TUE", "WED", "THU", "FRI"], projectId: ids.projectId, employeeIds: [ids.employeeId], shiftId: ids.morning, ...dates, plan };
+  const department = { weekPattern: ["MON", "TUE", "WED", "THU", "FRI"], projectId: ids.projectId, departmentId: ids.departmentId, shiftId: ids.morning, ...dates, plan };
   return { t, caller, ...ids, bulk, department };
 }
 

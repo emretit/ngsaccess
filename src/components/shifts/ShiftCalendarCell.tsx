@@ -43,8 +43,8 @@ export function ShiftCalendarCell({
   const rest = data.resolved?.cell.kind === "rest";
   const source = data.resolved?.cell.source;
   const sourceLabel = source === "department" ? `Departmandan: ${data.resolved?.departmentName ?? "Departman"}` : "";
-  const title = [sourceLabel, rest ? "Boş" : records.map(({ shift }) => `${shift.name} · ${shiftTimeLabel(shift)}`).join(", ")].filter(Boolean).join(" · ");
-  const ariaLabel = [employeeName, dayLabel(date), rest ? "Boş" : records.length ? `${records.length} atama: ${records.map(({ shift }) => shift.name).join(", ")}` : "atama yok",
+  const title = [sourceLabel, rest ? "Hafta tatili" : records.map(({ shift }) => `${shift.name} · ${shiftTimeLabel(shift)}`).join(", ")].filter(Boolean).join(" · ");
+  const ariaLabel = [employeeName, dayLabel(date), rest ? "Hafta tatili" : records.length ? `${records.length} atama: ${records.map(({ shift }) => shift.name).join(", ")}` : "atama yok",
     sourceLabel, rest || records.length ? "ayrıntıları aç" : canAssign ? "vardiya ata" : "günü aç"].filter(Boolean).join(", ");
   return (
     <div title={title || undefined} data-source={source} data-kind={data.resolved?.cell.kind} style={rest ? { backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, hsl(var(--border)) 4px, hsl(var(--border)) 5px)" } : undefined} className={`group relative rounded text-left text-xs break-words hover:bg-subtle ${source === "department" ? "border border-dashed" : ""} ${rest ? "bg-subtle text-muted-foreground" : ""} ${compact ? "min-h-10 p-0.5" : "min-h-[68px] p-2"}`}>
@@ -60,7 +60,7 @@ export function ShiftCalendarCell({
         </button>
       )}
       <div className="pointer-events-none space-y-1">
-        {rest && <span className="block font-medium">Boş</span>}
+        {rest && <span className="block font-medium">Hafta tatili</span>}
         {records.slice(0, limit).map(({ key, shift, continuation }) => (
           <span key={key} className="relative block" title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
             {!compact && <span className="block font-medium">{shift.name}</span>}

@@ -12,10 +12,10 @@ export function WeekdaySelection({ value, onChange, error, id }: Props) {
   return (
     <fieldset
       role="group"
-      aria-describedby={error ? `${id}-error` : undefined}
+      aria-describedby={error ? `${id}-error` : `${id}-help`}
       tabIndex={error ? -1 : undefined}
     >
-      <legend className="text-sm mb-2">Uygulanacak günler</legend>
+      <legend className="text-sm mb-2">Çalışma günleri</legend>
       <div className="flex flex-wrap gap-3">
         {DAYS.map(([code, label]) => (
           <label key={code} className="flex min-h-11 gap-1 items-center text-sm">
@@ -29,6 +29,7 @@ export function WeekdaySelection({ value, onChange, error, id }: Props) {
           </label>
         ))}
       </div>
+      <p id={`${id}-help`} className="text-xs text-muted-foreground">Seçilmeyen günler hafta tatili sayılır.</p>
       {error && <p role="alert" id={`${id}-error`} className="text-danger text-xs">{error}</p>}
     </fieldset>
   );

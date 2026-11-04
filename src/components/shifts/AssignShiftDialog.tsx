@@ -27,6 +27,7 @@ import {
   type BulkAssignmentFormValues,
 } from "./assignmentFormSchema";
 import {
+  DEFAULT_WORKING_DAYS,
   decisionLabels,
   decisionTone,
   previewSummary,
@@ -62,8 +63,7 @@ export function AssignShiftDialog({
     shiftId: shifts.some(s => s._id === initial?.shiftId && s.isActive !== false) ? initial?.shiftId ?? "" : "",
     startDate: initial?.startDate ?? istanbulToday(),
     endDate: initial?.endDate ?? istanbulToday(),
-    specificDays: false,
-    weekPattern: [],
+    weekPattern: [...DEFAULT_WORKING_DAYS],
   }));
   const [baseline, setBaseline] = useState(() => JSON.stringify(values));
   const guard = useUnsavedChangesGuard(JSON.stringify(values) !== baseline);

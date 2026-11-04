@@ -59,9 +59,16 @@ describe("PDKS vardiya planı sunumu", () => {
   it("döngü boş günü tüm yüzeylerde hafta tatili tonuyla gösterir", () => {
     const rest = { ...day, planKind: "rest" as const, segments: undefined, status: "weekend" as const, totalMinutes: 0 };
     const record = { ...row, days: [rest], status: rest.status };
-    for (const html of [mobile(record), heatmap(record), drawer(rest), render(<PDKSTableView records={[record]} />)]) expect(html).toContain("Boş gün (döngü)");
+    for (const html of [mobile(record), heatmap(record), drawer(rest), render(<PDKSTableView records={[record]} />)]) expect(html).toContain("Hafta tatili");
     expect(heatmap(record)).toContain("bg-muted text-muted-foreground");
     expect(drawer(rest)).not.toContain("Manuel düzeltme girişi ilk vardiyaya");
+  });
+  it("haftalık hafta tatili etiketi aria ile aynı kalır ve detay bağlam vardiyasını gizlemez", () => {
+    const rest: PdksCell = { ...day, date: "2026-10-24", status: "weekend", planKind: "rest" };
+    expect(planDayLabel(rest)).toBe("Hafta tatili");
+    expect(cellLabel("Ada", rest.date, rest)).toContain(", Hafta tatili");
+    expect(drawer(rest)).toContain("Vardiya: Eski vardiya");
+    expect(render(<PdksPlanSummary day={rest} compact />)).toContain('title="Hafta tatili"');
   });
   it("opsiyonel alanlar yokken eski hücre ve detay çıktısı korunur", () => {
     expect(render(<PdksPlanSummary day={day} />)).toBe("");
@@ -97,7 +104,7 @@ describe("Birleşik denetim: sunucu günü ve segment etiketleri", () => {
     const cellMarkup = html.match(/<button[^>]*aria-label="Ada[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
     expect(cellMarkup).toContain(`${background} ${color}`);
     expect(cellMarkup).toContain(`>${code} · 03:50`);
-    expect(cellMarkup).toContain("Boş gün (döngü)");
+    expect(cellMarkup).toContain("Hafta tatili");
     if (status === "present") expect(cellMarkup).not.toContain(">HT ·");
   });
   it.each([
@@ -129,7 +136,7 @@ describe("Orca turu: kısa hücre ve boş saat aralığı", () => {
     expect(visibleText(cellMarkup)).not.toContain("TEST");
     expect(visibleText(cellMarkup)).toContain("2 vardiya");
     expect(visibleText(render(<PdksPlanSummary day={cell} />))).toContain("TEST Sabah (silinecek) + TEST Akşam (silinecek)");
-    expect(visibleText(render(<PdksPlanSummary day={{ ...day, planKind: "rest" }} compact />))).toBe("Boş gün");
+    expect(visibleText(render(<PdksPlanSummary day={{ ...day, planKind: "rest" }} compact />))).toBe("Hafta tatili");
   });
   it("okutmasız aralık ve detay tek çizgi gösterir, heatmap saat satırını basmaz", () => {
     const emptySegments = segments.map(segment => ({ ...segment, firstISO: null, lastISO: null }));

@@ -7,7 +7,6 @@ import { legalBreakMinutes } from "./breakDeduction";
 import { minutesBetweenISO } from "./pdksCalc";
 import {
   DEFAULT_OVERTIME_RATES,
-  classifyDay,
   isoTimeToTRMinutes,
   multiplierForClassification,
   parseHHMM,
@@ -55,6 +54,7 @@ export function computePdksDay(params: {
   includePunchSegments?: boolean;
   hasLeave?: boolean;
   dayKind?: "rest" | "work";
+  nextDayKind?: "rest" | "work";
   /** Split plans attribute a manual exit against the last piece, independently of the first entry. */
   manualExitNextDay?: boolean;
   date: string;
@@ -62,7 +62,6 @@ export function computePdksDay(params: {
   manual?: Doc<"pdksRecords">;
   shift: Doc<"shifts"> | null;
   workSettings: EffectiveWorkSettings;
-  workingDays: string[];
   holiday?: Doc<"holidays"> | null;
   holidayMap?: ReadonlyMap<string, Doc<"holidays">>;
   overtimeRates?: EffectiveOvertimeRates;
@@ -205,15 +204,13 @@ export function computePdksDay(params: {
   };
   const wholeMinutes = eachPunch ? Math.floor : Math.round;
   const holidayFor = (holiday: Doc<"holidays"> | null | undefined) => shift?.holidayWorkRequired ? undefined : holiday;
-  // A cycle shift owns its whole work day, including the next calendar day after midnight.
-  // dayKind therefore stays anchored to the shift-start date even in splitAtMidnight mode.
-  const classify = (day: string, holiday: Doc<"holidays"> | null | undefined) => {
+  // shiftStart anchors classification; splitAtMidnight uses the following date's plan.
+  const classify = (dayKind: "rest" | "work" | undefined, holiday: Doc<"holidays"> | null | undefined) => {
     const effectiveHoliday = holidayFor(holiday);
-    return effectiveHoliday || params.dayKind === undefined
-      ? classifyDay(day, params.workingDays, effectiveHoliday)
-      : params.dayKind === "rest" ? "weekend" as const : "workday" as const;
+    return effectiveHoliday ? effectiveHoliday.isHalfDay ? "halfDayHoliday" as const : "holiday" as const
+      : dayKind === "rest" ? "weekend" as const : "workday" as const;
   };
-  const classification = classify(date, params.holiday);
+  const classification = classify(params.dayKind, params.holiday);
   const requiredNetMinutes = flex ? params.hasLeave || classification === "weekend" || classification === "holiday" ? 0 : classification === "halfDayHoliday" ? flex.requiredNetMinutes / 2 : flex.requiredNetMinutes : undefined;
   const shiftStart = parseHHMM(shift?.startTime ?? workSettings.workStartTime);
   const shiftEnd =
@@ -253,7 +250,7 @@ export function computePdksDay(params: {
     const window = { start, end };
     const calendarDate = addWorkDate(date, Math.floor(start / 1440));
     const cls = rates.nightShiftDayMode === "splitAtMidnight"
-      ? classify(calendarDate, calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate))
+      ? classify(calendarDate === date ? params.dayKind : params.nextDayKind, calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate))
       : classification;
     const premium = cls === "weekend" || cls === "holiday";
     const isNight = nightWindows.some((night) => overlap(window, night) > 0);

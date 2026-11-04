@@ -62,7 +62,7 @@ export function ShiftDayDetails({
           {data.resolved.shifts.map(shift => <p key={shift._id} className="text-sm">{shift.name} · {shiftTimeLabel(shift)}</p>)}
           {can("schedule.manage") && data.resolved.departmentAssignment && onEditDepartment && <Button variant="outline" onClick={() => { if (data.resolved?.departmentAssignment) onEditDepartment(data.resolved.departmentAssignment); }}>Departman atamasını düzenle</Button>}
         </section>}
-        {data.resolved?.cell.kind === "rest" && <p className="rounded bg-subtle p-3 text-sm">Boş gün (döngü)</p>}
+        {data.resolved?.cell.kind === "rest" && <p className="rounded bg-subtle p-3 text-sm">Hafta tatili</p>}
         {data.resolved?.cell.kind === "rest" && data.resolved.assignment && can("schedule.manage") && <Button variant="outline" onClick={() => { if (data.resolved?.assignment) onEdit(data.resolved.assignment); }}>Tüm seriyi düzenle</Button>}
         {data.inheritedContinuations?.map(({ shift, source, departmentName, departmentAssignment }) => (
           <section key={`previous-${shift._id}`} className="border-t py-3 space-y-2">
@@ -84,7 +84,7 @@ export function ShiftDayDetails({
               Seri: {shortDate(assignment.startDate)} – {shortDate(assignment.endDate)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {assignment.plan && assignment.plan.kind !== "weekly" ? planSummary(assignment.plan) : assignment.weekPattern?.length
+              {assignment.plan && assignment.plan.kind !== "weekly" ? planSummary(assignment.plan) : assignment.weekPattern?.length && assignment.weekPattern.length < 7
                 ? DAYS.filter(([code]) =>
                     assignment.weekPattern?.includes(code),
                   )

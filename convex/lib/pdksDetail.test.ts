@@ -33,7 +33,6 @@ const leave = (
 ): Doc<"leaves"> =>
   ({ startDate, endDate, leaveType }) as unknown as Doc<"leaves">;
 
-const WORKING_DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const MONDAY = "2026-06-22"; // Pazartesi (workday)
 const SATURDAY = "2026-06-27"; // Cumartesi (weekend)
 
@@ -47,8 +46,8 @@ const day = (overrides: Partial<DayParams>): DayParams => ({
   holiday: null,
   dayShift: null,
   workSettings: DEFAULT_WORK_SETTINGS,
-  workingDays: WORKING_DAYS,
   ...overrides,
+  ...(overrides.date === SATURDAY ? { dayPlan: { kind: "rest", source: "employee", calendar: "plan", origin: "weekly", shifts: overrides.dayShift ? [overrides.dayShift] : [] } as const } : {}),
 });
 
 describe("pdksDetail – computeAttendanceDetailDay", () => {

@@ -3,10 +3,10 @@ import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../../convex/_generated/api";
 import {
   assignmentTouchesDay,
-  scheduleIntervals,
 } from "../../../../convex/lib/shiftUx";
 import {
   assignmentAppliesOnDate,
+  assignmentsConflictOnDate,
   holidayOn,
   leaveForEmployeeOn,
   type Leave,
@@ -32,6 +32,7 @@ export const DAYS = [
   ["SAT", "Cmt"],
   ["SUN", "Paz"],
 ] as const;
+export const DEFAULT_WORKING_DAYS: (typeof DAYS)[number][0][] = ["MON", "TUE", "WED", "THU", "FRI"];
 export function istanbulToday(now = new Date()) {
   return new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Istanbul",
@@ -140,36 +141,7 @@ export function cellData(
         ]
       : [];
   });
-  const dayStart = Date.parse(date) / 60000;
-  const intervals = records.map((r) =>
-    scheduleIntervals(
-      {
-        ...r.assignment,
-        startDate:
-          r.assignment.startDate > offsetDay(date, -1)
-            ? r.assignment.startDate
-            : offsetDay(date, -1),
-        endDate: r.assignment.endDate < date ? r.assignment.endDate : date,
-      },
-      r.shift,
-    )
-      .map(
-        ([start, end]) =>
-          [Math.max(start, dayStart), Math.min(end, dayStart + 1440)] as const,
-      )
-      .filter(([start, end]) => start < end),
-  );
-  const conflict = intervals.some((list, i) =>
-    intervals
-      .slice(i + 1)
-      .some((other) =>
-        list.some(([start, end]) =>
-          other.some(
-            ([otherStart, otherEnd]) => start < otherEnd && otherStart < end,
-          ),
-        ),
-      ),
-  );
+  const conflict = assignmentsConflictOnDate(assignments.filter(row => row.employeeId === employee._id), date, shifts);
   return {
     records,
     conflict,

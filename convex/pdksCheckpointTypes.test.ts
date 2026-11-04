@@ -165,7 +165,7 @@ it("legacy point types select endpoints: both remains first/last, one-way never 
     { targetType: "device", deviceId: bothDevice, pointType: "both" },
   ] };
   const reading = (deviceId: Id<"devices">, hour: string, direction: "entry" | "exit" = "entry"): Doc<"cardReadings"> => ({ _id: `${deviceId}-${hour}` as Id<"cardReadings">, _creationTime: 0, deviceId, cardNo: "TEST", accessStatus: "izin_verildi", accessTime: `2026-10-23T${hour}:00:00.000Z`, direction });
-  const run = (rows: Doc<"cardReadings">[], policy = typed) => computePdksDay({ policy, date: "2026-10-23", readings: filterPdksReadings(rows, undefined, () => policy), shift: null, workSettings: DEFAULT_WORK_SETTINGS, workingDays: ["Cuma"] });
+  const run = (rows: Doc<"cardReadings">[], policy = typed) => computePdksDay({ policy, date: "2026-10-23", readings: filterPdksReadings(rows, undefined, () => policy), shift: null, workSettings: DEFAULT_WORK_SETTINGS });
   expect(run([reading(exitDevice, "05"), reading(exitDevice, "14")])).toMatchObject({ firstISO: null, lastISO: "2026-10-23T14:00:00.000Z", durationMeasured: false, punchQuality: "missingEntry", totalMinutes: 0 });
   expect(run([reading(entryDevice, "05"), reading(entryDevice, "14")])).toMatchObject({ firstISO: "2026-10-23T05:00:00.000Z", lastISO: null, durationMeasured: false, punchQuality: "missingExit" });
   expect(run([reading(exitDevice, "04"), reading(bothDevice, "05", "exit"), reading(entryDevice, "15"), reading(bothDevice, "14", "entry")])).toMatchObject({ firstISO: "2026-10-23T05:00:00.000Z", lastISO: "2026-10-23T14:00:00.000Z", durationMeasured: true });

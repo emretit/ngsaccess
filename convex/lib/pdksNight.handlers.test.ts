@@ -81,7 +81,6 @@ const punches = [
   reading(`${date}T22:00:00+03:00`, 1),
   reading("2026-07-01T06:00:00+03:00", 2),
 ];
-const workingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 function fixture(readings = punches, assigned: boolean | "day" = true, extraRows: Record<string, Record<string, unknown>[]> = {}) {
   const rows: Record<string, Record<string, unknown>[]> = {
     employees: [employee],
@@ -299,11 +298,12 @@ describe("13-H1 night minutes and overtime pay", () => {
     (mode, pay) => {
       const day = computePdksDay({
         date: "2026-06-27",
+        dayKind: "rest",
         readings: [],
         manual: { entryTime: "22:00", exitTime: "06:00" } as Doc<"pdksRecords">,
         shift,
         workSettings: DEFAULT_WORK_SETTINGS,
-        workingDays,
+
         overtimeRates: { ...DEFAULT_OVERTIME_RATES, nightCombineMode: mode },
         hourlyRate: 100,
       });
@@ -334,7 +334,7 @@ describe("13-H1 night minutes and overtime pay", () => {
       readings: punches,
       shift,
       workSettings: DEFAULT_WORK_SETTINGS,
-      workingDays,
+
       overtimeRates: {
         ...DEFAULT_OVERTIME_RATES,
         nightShiftStart: "23:00",
@@ -357,7 +357,7 @@ describe("13-H1 night minutes and overtime pay", () => {
       ],
       shift: null,
       workSettings: DEFAULT_WORK_SETTINGS,
-      workingDays,
+
       overtimeRates: {
         ...DEFAULT_OVERTIME_RATES,
         nightShiftMultiplier: 10,
@@ -432,7 +432,7 @@ it("scheduled midnight break is removed from night minutes once", () => {
     readings: punches,
     shift: { ...shift, breakStart: "23:30", breakEnd: "00:30" },
     workSettings: DEFAULT_WORK_SETTINGS,
-    workingDays,
+
     overtimeRates: DEFAULT_OVERTIME_RATES,
   });
   expect(day).toMatchObject({
@@ -456,7 +456,7 @@ it("only the overtime segment inside the night window receives the night rate", 
       breakEnd: "19:30",
     },
     workSettings: DEFAULT_WORK_SETTINGS,
-    workingDays,
+
     overtimeRates: {
       ...DEFAULT_OVERTIME_RATES,
       nightShiftMultiplier: 2,
@@ -487,7 +487,7 @@ it("a scheduled break inside night overtime receives no overtime or night pay", 
       breakEnd: "22:45",
     },
     workSettings: DEFAULT_WORK_SETTINGS,
-    workingDays,
+
     overtimeRates: {
       ...DEFAULT_OVERTIME_RATES,
       nightShiftMultiplier: 2,

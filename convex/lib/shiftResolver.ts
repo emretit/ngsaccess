@@ -25,9 +25,9 @@ export function assignmentAppliesOnDate(
 }
 
 export type DayPlan =
-  | { kind: "shifts"; shifts: Doc<"shifts">[]; source: "employee" | "department"; calendar: "project" | "plan";
+  | { kind: "shifts"; shifts: Doc<"shifts">[]; source: "employee" | "department"; calendar: "plan"; origin: "weekly" | "cycle";
       assignmentId?: Id<"shiftAssignments">; departmentAssignmentId?: Id<"departmentShiftAssignments">; departmentId?: Id<"departments"> }
-  | { kind: "rest"; source: "employee" | "department"; calendar: "plan";
+  | { kind: "rest"; shifts: Doc<"shifts">[]; source: "employee" | "department"; calendar: "plan"; origin: "weekly" | "cycle";
       assignmentId?: Id<"shiftAssignments">; departmentAssignmentId?: Id<"departmentShiftAssignments">; departmentId?: Id<"departments"> }
   | { kind: "none"; source: "project" };
 export interface ShiftResolver {
@@ -129,13 +129,25 @@ export function createShiftResolver(employees: Doc<"employees">[], allShifts: Do
   function rowPlan(row: Doc<"shiftAssignments"> | Doc<"departmentShiftAssignments">, date: string): DayPlan | null {
     const ids = slotForDate(row, date);
     if (ids === null) return null;
+    const origin = !row.plan || row.plan.kind === "weekly" ? "weekly" as const : "cycle" as const;
     const source = "employeeId" in row ? { source: "employee" as const, assignmentId: row._id }
       : { source: "department" as const, departmentAssignmentId: row._id, departmentId: row.departmentId };
-    if (ids.length === 0) return { kind: "rest", ...source, calendar: "plan" };
+    if (ids.length === 0) {
+      // Rest owns the date even when its calculation context is unavailable.
+      const plan = row.plan;
+      const filled = plan && plan.kind !== "weekly" ? plan.slots.filter(slot => slot.length > 0) : [];
+      const first = filled[0] ?? [];
+      const contextIds = !plan ? [row.shiftId] : plan.kind === "weekly" ? plan.shiftIds
+        : filled.every(slot => slot.length === first.length && slot.every(id => first.includes(id))) ? first : [];
+      const context = contextIds.map(id => shiftAt(id, date));
+      const shifts = context.some(shift => shift === undefined) ? []
+        : context.filter((shift): shift is Doc<"shifts"> => shift !== undefined);
+      return { kind: "rest", shifts, ...source, calendar: "plan", origin };
+    }
     const shifts = ids.map(id => shiftAt(id, date));
     if (shifts.some(shift => shift === undefined)) return null;
     return { kind: "shifts", shifts: shifts.filter((shift): shift is Doc<"shifts"> => shift !== undefined), ...source,
-      calendar: row.plan && row.plan.kind !== "weekly" ? "plan" : "project" };
+      calendar: "plan", origin };
   }
   function uncached(employeeId: Id<"employees">, date: string): DayPlan {
     for (const row of assignmentsByEmp.get(employeeId) ?? []) {
@@ -167,8 +179,8 @@ export function createShiftResolver(employees: Doc<"employees">[], allShifts: Do
   }
   return {
     shifts: shiftMap, resolvePlan, shiftAt,
-    resolve(employeeId, date) { const plan = resolvePlan(employeeId, date); return plan.kind === "shifts" ? plan.shifts[0] ?? null : null; },
-    resolveLast(employeeId, date) { const plan = resolvePlan(employeeId, date); return plan.kind === "shifts" ? plan.shifts[plan.shifts.length - 1] ?? null : null; },
+    resolve(employeeId, date) { const plan = resolvePlan(employeeId, date); return plan.kind !== "none" ? plan.shifts[0] ?? null : null; },
+    resolveLast(employeeId, date) { const plan = resolvePlan(employeeId, date); return plan.kind !== "none" ? plan.shifts[plan.shifts.length - 1] ?? null : null; },
   };
 }
 

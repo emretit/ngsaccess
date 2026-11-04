@@ -39,9 +39,18 @@ async function prepare(ctx: ReadCtx, args: DepartmentInput, excludeId?: Id<"depa
     if (!shift) continue;
     const range = { ...other, startDate: other.startDate > shiftDateOffset(args.startDate, -1) ? other.startDate : shiftDateOffset(args.startDate, -1),
       endDate: other.endDate < shiftDateOffset(args.endDate, 1) ? other.endDate : shiftDateOffset(args.endDate, 1) };
-    if (intervalsOverlap(intervals, scheduleIntervals(range, shift, shifts))) sameDepartmentConflicts.push({
+    // A plan owns every date in its period, including its weekly rest days.
+    const coveredStart = other.startDate > args.startDate ? other.startDate : args.startDate;
+    const coveredEnd = other.endDate < args.endDate ? other.endDate : args.endDate;
+    const ownsSameDate = coveredStart <= coveredEnd;
+    const workToRestDates: string[] = [];
+    if (ownsSameDate) for (let date = coveredStart; date <= coveredEnd; date = shiftDateOffset(date, 1)) {
+      if (slotForDate(other, date)?.length && slotForDate(row, date)?.length === 0) workToRestDates.push(date);
+    }
+    if (ownsSameDate || intervalsOverlap(intervals, scheduleIntervals(range, shift, shifts))) sameDepartmentConflicts.push({
       departmentAssignmentId: other._id, departmentId: other.departmentId, shiftId: other.shiftId,
       shiftName: shift.name, startDate: other.startDate, endDate: other.endDate, weekPattern: other.weekPattern, plan: other.plan,
+      coveredStartDate: ownsSameDate ? coveredStart : null, coveredEndDate: ownsSameDate ? coveredEnd : null, workToRestDates,
     });
   }
   const tree = departmentData.departments.length ? departmentData.departments
@@ -62,6 +71,7 @@ async function prepare(ctx: ReadCtx, args: DepartmentInput, excludeId?: Id<"depa
     // Bound each indexed read, then charge only overlapping records to the shared preview budget.
     const personal = consume(bounded(await ctx.db.query("shiftAssignments").withIndex("by_employee_end", q => q.eq("employeeId", employee._id).gte("endDate", args.startDate)).take(ASSIGNMENT_SCAN_LIMIT + 1))
       .filter(assignment => assignment.startDate <= args.endDate));
+    // Non-null slots include weekly rest: personal plans own the complete date range.
     if (personal.some(assignment => (!assignment.projectId || assignment.projectId === args.projectId) && days.some(date => slotForDate(assignment, date) !== null))) personalOverrideCount++;
     const leaves = consume(bounded(await ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", leaveEnd)).take(ASSIGNMENT_SCAN_LIMIT + 1))
       .filter(leave => leave.endDate >= args.startDate));
@@ -158,6 +168,7 @@ export const planCells = authedQuery({
       const plan = resolver.resolvePlan(employee._id, date);
       // Geçmiş sürümle çözülen vardiyalar o günün saatleriyle gösterilsin (güncel tanım farklı olabilir).
       const versioned = plan.kind === "shifts" ? plan.shifts.filter(shift => shift !== resolver.shifts.get(shift._id)) : [];
+      // Rest cells expose no work shifts; their calculation context stays in the resolver.
       cells.push({ employeeId: employee._id, date, kind: plan.kind, source: plan.source,
         shiftIds: plan.kind === "shifts" ? plan.shifts.map(shift => shift._id) : [],
         ...(versioned.length ? { versionedShifts: versioned.map(shift => ({

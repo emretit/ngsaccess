@@ -34,7 +34,7 @@ async function fixture(versioned: boolean, assignmentOnly = false, globalShift =
       projectId, firstName: "Ada", lastName: "Test", email: "w53@example.test", cardNumber: "53", isActive: true,
       shiftId: assignmentOnly ? undefined : shiftId, employmentEndDate: date,
     });
-    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, weekPattern: ["MON", "TUE", "WED", "THU", "FRI"], startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" });
     const deviceId = await ctx.db.insert("devices", { projectId, name: "A", createdAt: "", updatedAt: "" });
     const otherDeviceId = await ctx.db.insert("devices", { projectId, name: "B", createdAt: "", updatedAt: "" });
     if (versioned) await ctx.db.insert("pdksRuleVersions", {
@@ -232,7 +232,7 @@ it("legacy manuel kayıtlar sınırlı okunur; esnekte yalnız gerekli indeksli 
     // Paket B adds two project-scoped metadata probes; employee/data read counts stay unchanged.
     shiftPlanRefs: 1, departmentShiftAssignments: 1,
     pdksRuleVersions: 2, shifts: 2, employees: 1, shiftAssignments: 1, pdksRecords: 1,
-    cardReadings: 2, workSettings: 1, overtimeRates: 1, holidays: 2, generalSettings: 1, leaves: 1,
+    cardReadings: 2, workSettings: 1, overtimeRates: 1, holidays: 2, leaves: 1,
   }, gets: 1 });
   await f.t.run(ctx => ctx.db.patch(f.shiftId, { scheduleType: "fixed", flexible: undefined }));
   expect(await counts()).toEqual({ tables: { shiftPlanRefs: 1, departmentShiftAssignments: 1, pdksRuleVersions: 2, shifts: 2, cardReadings: 1, employees: 1, pdksRecords: 1, shiftAssignments: 1 }, gets: 1 });

@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import * as pdksSource from "./pdksSource";
-import { loadAttendanceReport, attendanceCalendarIssues, hasUnsupportedShiftCalendar, summarizeAttendance } from "./reportAttendance";
+import { loadAttendanceReport, attendanceCalendarIssues, summarizeAttendance } from "./reportAttendance";
 import { buildPeriodDateKeys } from "./pdksCalc";
 import { buildPdksEmployeeReadingMap, computePdksTableRow } from "./pdksTable";
 import { DEFAULT_OVERTIME_RATES, DEFAULT_WORK_SETTINGS } from "./pdksHelpers";
@@ -18,11 +18,17 @@ const employee = (id: string): Doc<"employees"> => ({
   _id: id as Id<"employees">, _creationTime: 0, firstName: id, lastName: "Test", email: "test@example.com", cardNumber: id, isActive: true,
 });
 const holiday: Doc<"holidays"> = { _id: "holiday" as Id<"holidays">, _creationTime: 0, date: "2026-01-01", name: "Yılbaşı", createdAt: "2025-12-01" };
-const workingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
-const params = (emp: Doc<"employees">): Parameters<typeof computePdksTableRow>[0] => ({
-  availableDateKeys: new Set(),
-  empKey: emp._id, employee: emp, empReadings: [], departmentName: "Test", periodDateKeys: buildPeriodDateKeys("2026-01-01", "2026-01-31"), startDate: "2026-01-01", isSingleDay: false, viewMode: "matrix", manualPdksByEmpDate: new Map(), allLeaves: [], holidayMap: new Map([[holiday.date, holiday]]), workingDays, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: DEFAULT_OVERTIME_RATES, resolveShift: () => null, manualEditedBy: null,
-});
+const params = (emp: Doc<"employees">): Parameters<typeof computePdksTableRow>[0] => {
+  const input: Parameters<typeof computePdksTableRow>[0] = {
+    availableDateKeys: new Set(),
+    empKey: emp._id, employee: emp, empReadings: [], departmentName: "Test", periodDateKeys: buildPeriodDateKeys("2026-01-01", "2026-01-31"), startDate: "2026-01-01", isSingleDay: false, viewMode: "matrix", manualPdksByEmpDate: new Map(), allLeaves: [], holidayMap: new Map([[holiday.date, holiday]]), workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: DEFAULT_OVERTIME_RATES, resolveShift: () => null, manualEditedBy: null,
+  };
+  input.resolvePlan = (id, date) => {
+    const shift = input.resolveShift(id, date);
+    return { kind: [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay()) ? "rest" : "shifts", shifts: shift ? [shift] : [], source: "employee", calendar: "plan", origin: "weekly" };
+  };
+  return input;
+};
 
 describe("rapor devam adaptörü / PDKS tablo tutarlılığı", () => {
   it("ay ortasında sıfır okumalı iki personeli içerir; tatil, hafta sonu ve gelecek günleri dışlar", () => {
@@ -61,13 +67,6 @@ describe("rapor devam adaptörü / PDKS tablo tutarlılığı", () => {
     expect(summarizeAttendance(params(employee("zero")), "2026-01-15", ["Takvim eksik"])).toMatchObject({ absentDays: null, devamOrani: null, expectedDays: null, reliabilityNote: "Takvim eksik" });
   });
 
-  it("aynı hafta düzeni güvenilir kalır; yalnız farklı vardiya takvimi etkilenen satırı belirsiz yapar", () => {
-    const assignment: Doc<"shiftAssignments"> = { _id: "a" as Id<"shiftAssignments">, _creationTime: 0, employeeId: employee("x")._id, shiftId: "s" as Id<"shifts">, startDate: "2026-01-01", endDate: "2026-01-31", weekPattern: ["MON", "TUE", "WED", "THU", "FRI"], createdAt: "", updatedAt: "" };
-    const dates = buildPeriodDateKeys("2026-01-01", "2026-01-14");
-    expect(hasUnsupportedShiftCalendar([assignment], dates, workingDays, new Map())).toBe(false);
-    expect(hasUnsupportedShiftCalendar([{ ...assignment, weekPattern: ["SAT"] }], dates, workingDays, new Map())).toBe(true);
-    expect(hasUnsupportedShiftCalendar([{ ...assignment, weekPattern: ["SAT"] }], ["2026-02-02"], workingDays, new Map())).toBe(false);
-  });
 });
 
 

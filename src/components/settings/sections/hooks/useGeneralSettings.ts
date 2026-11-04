@@ -27,7 +27,6 @@ export const useGeneralSettings = () => {
     dateFormat?: string;
     timezone?: string;
     systemLanguage?: string;
-    workingDays?: string[];
     workingHoursStart?: string;
     workingHoursEnd?: string;
     notificationsEnabled?: boolean;

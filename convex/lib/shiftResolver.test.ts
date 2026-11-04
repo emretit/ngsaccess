@@ -4,7 +4,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import type { Doc, Id } from "../_generated/dataModel";
-import { assignmentAppliesOnDate, buildBoundedShiftResolver, buildShiftResolver, createShiftResolver, departmentChain } from "./shiftResolver";
+import { buildBoundedShiftResolver, buildShiftResolver, createShiftResolver, departmentChain } from "./shiftResolver";
 const modules = import.meta.glob("../**/*.ts");
 const projectId = "project" as Id<"projects">;
 const employee: Doc<"employees"> = { _id: "employee" as Id<"employees">, _creationTime: 0, projectId, departmentId: "child" as Id<"departments">, shiftId: "default" as Id<"shifts">, firstName: "Ada", lastName: "Test", email: "a@test.test", cardNumber: "1" };
@@ -26,16 +26,16 @@ describe("shared DayPlan resolution", () => {
   });
   it("uses personal > nearest department > no plan and carries sources", () => {
     const resolve = (people: Doc<"shiftAssignments">[], depts: Doc<"departmentShiftAssignments">[], emp = employee) => createShiftResolver([emp], shifts, [people], departments, depts).resolvePlan(emp._id, date);
-    expect(resolve([personal()], [dept("child"), dept("parent")])).toMatchObject({ kind: "shifts", source: "employee", calendar: "project", assignmentId: personal()._id, shifts: [shift("personal")] });
+    expect(resolve([personal()], [dept("child"), dept("parent")])).toMatchObject({ kind: "shifts", origin: "weekly", source: "employee", calendar: "plan", assignmentId: personal()._id, shifts: [shift("personal")] });
     expect(resolve([], [dept("parent"), dept("child")])).toMatchObject({ source: "department", departmentId: "child", departmentAssignmentId: "childAssignment", shifts: [shift("childShift")] });
     expect(resolve([], [dept("parent")])).toMatchObject({ source: "department", departmentId: "parent" });
     expect(resolve([], [])).toMatchObject({ kind: "none", source: "project" });
     expect(resolve([], [], { ...employee, shiftId: undefined })).toEqual({ kind: "none", source: "project" });
   });
-  it("falls through unmatched weekdays to parent, then none", () => {
+  it("owns unmatched weekdays as personal rest without falling through", () => {
     const resolver = createShiftResolver([employee], shifts, [[personal({ weekPattern: ["TUE"] })]], departments, [dept("child", { weekPattern: ["TUE"] }), dept("parent", { weekPattern: ["MON"] })]);
-    expect(resolver.resolvePlan(employee._id, date)).toMatchObject({ departmentId: "parent" });
-    expect(resolver.resolvePlan(employee._id, "2026-06-03")).toMatchObject({ kind: "none", source: "project" });
+    expect(resolver.resolvePlan(employee._id, date)).toMatchObject({ kind: "rest", origin: "weekly", source: "employee", shifts: [shift("personal")] });
+    expect(resolver.resolvePlan(employee._id, "2026-06-03")).toMatchObject({ kind: "rest", source: "employee" });
   });
   it("preserves stable index order for equal updatedAt and selects latest updates", () => {
     const first = personal();
@@ -49,9 +49,9 @@ describe("shared DayPlan resolution", () => {
   it("matches rest without falling through and exposes last shift with memo identity", () => {
     const row = personal({ plan: { kind: "dayCycle", anchorDate: date, slots: [[], ["personal" as Id<"shifts">, "last" as Id<"shifts">]] } });
     const resolver = createShiftResolver([employee], shifts, [[row]], departments, [dept("child")]);
-    expect(resolver.resolvePlan(employee._id, date)).toEqual({ kind: "rest", source: "employee", calendar: "plan", assignmentId: row._id });
-    expect(resolver.resolve(employee._id, date)).toBeNull();
-    expect(resolver.resolveLast(employee._id, date)).toBeNull();
+    expect(resolver.resolvePlan(employee._id, date)).toEqual({ kind: "rest", origin: "cycle", shifts: [shift("personal"), shift("last")], source: "employee", calendar: "plan", assignmentId: row._id });
+    expect(resolver.resolve(employee._id, date)?._id).toBe("personal");
+    expect(resolver.resolveLast(employee._id, date)?._id).toBe("last");
     const next = "2026-06-02";
     expect(resolver.resolve(employee._id, next)?._id).toBe("personal");
     expect(resolver.resolveLast(employee._id, next)?._id).toBe("last");
@@ -75,15 +75,16 @@ describe("shared DayPlan resolution", () => {
     const deep = Array.from({ length: 40 }, (_, i) => department(`d${i}`, `d${i + 1}`));
     expect(departmentChain("d0" as Id<"departments">, projectId, new Map(deep.map(item => [String(item._id), item])))).toHaveLength(32);
   });
-  it("preserves dated legacy assignments for all legacy dates, patterns, deleted ids and stable ties", () => {
-    const rows = [personal({ weekPattern: ["TUE"], updatedAt: "2026-06-03" }), personal({ shiftId: "deleted" as Id<"shifts">, updatedAt: "2026-06-04" }), personal({ shiftId: "last" as Id<"shifts">, weekPattern: ["MON", "FRI"], updatedAt: "2026-06-03" })];
-    const resolver = createShiftResolver([employee], shifts, [rows]);
-    const map = new Map(shifts.map(item => [String(item._id), item]));
+  it("preserves date bounds and stable ties while owning unselected weekdays", () => {
+    const first = personal({ weekPattern: ["TUE"] });
+    const second = personal({ shiftId: "last" as Id<"shifts">, weekPattern: ["MON", "FRI"] });
+    const resolver = createShiftResolver([employee], shifts, [[first, second]]);
     for (let i = 0; i < 45; i++) {
       const day = new Date(Date.parse("2026-05-25") + i * 86_400_000).toISOString().slice(0, 10);
-      const old = rows.slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).filter(row => assignmentAppliesOnDate(row, day)).map(row => map.get(row.shiftId)).find(item => item !== undefined) ?? null;
-      expect(resolver.resolve(employee._id, day)).toStrictEqual(old);
-      expect(resolver.resolveLast(employee._id, day)).toStrictEqual(old);
+      const inRange = day >= first.startDate && day <= first.endDate;
+      expect(resolver.resolve(employee._id, day)).toEqual(inRange ? shift("personal") : null);
+      expect(resolver.resolveLast(employee._id, day)).toEqual(inRange ? shift("personal") : null);
+      if (inRange) expect(resolver.resolvePlan(employee._id, day).kind).toBe(new Date(day).getUTCDay() === 2 ? "shifts" : "rest");
     }
   });
 });

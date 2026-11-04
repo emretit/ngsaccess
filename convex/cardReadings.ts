@@ -628,14 +628,10 @@ export const getEmployeeAttendanceDetail = authedQuery({
         new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
     );
 
-    const [workSettings, holidayMap, generalSettings, manualRecords, leaves, department, company, position, shift, detailShiftResolver] =
+    const [workSettings, holidayMap, manualRecords, leaves, department, company, position, shift, detailShiftResolver] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
         getHolidaysMap(ctx, referenceProjectId, overtimeRange.startDate, addWorkDate(overtimeRange.endDate, 1)),
-        ctx.db
-          .query("generalSettings")
-          .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
-          .first(),
         earlyDetailRecords ? Promise.resolve(earlyDetailRecords) : ctx.db
           .query("pdksRecords")
           .withIndex("by_employee_date", (q) => q.eq("employeeId", args.employeeId))
@@ -657,11 +653,6 @@ export const getEmployeeAttendanceDetail = authedQuery({
         employee.shiftId ? ctx.db.get(employee.shiftId) : Promise.resolve(null),
         Promise.resolve(detailBoundaryShiftResolver),
       ]);
-
-    const workingDays =
-      generalSettings?.workingDays && generalSettings.workingDays.length > 0
-        ? generalSettings.workingDays
-        : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 
     const manualByDate = new Map<string, Doc<"pdksRecords">>();
     for (const m of manualRecords) {
@@ -687,6 +678,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
         availableDateKeys,
         firstRecordDate,
         date: dk,
+        nextDayKind: detailShiftResolver.resolvePlan(employee._id, addWorkDate(dk, 1)).kind === "rest" ? "rest" : "work",
         dayReadings: readingsByDate.get(dk) ?? [],
         manualDay: manualByDate.get(dk),
         leaves: scopedLeaves,
@@ -696,7 +688,6 @@ export const getEmployeeAttendanceDetail = authedQuery({
         dayPlan: scopedPdksPlan(detailShiftResolver.resolvePlan(employee._id, dk), args.projectId),
         workSettings,
         overtimeRates,
-        workingDays,
       })
     );
 

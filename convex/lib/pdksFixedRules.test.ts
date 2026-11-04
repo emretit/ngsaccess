@@ -20,7 +20,6 @@ import { validateManualPdksInput } from "./pdksManual";
 import { validateShift } from "./shiftUx";
 
 const date = "2026-06-22";
-const workingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const shift: Doc<"shifts"> = { _id: "shift" as Id<"shifts">, _creationTime: 0, name: "Sabit", startTime: "09:00", endTime: "17:00", lateToleranceMinutes: 0, createdAt: "", updatedAt: "" };
 const window = { checkInStart: "08:00", checkInEnd: "10:00", checkOutStart: "16:00", checkOutEnd: "18:00", checkOutEndDayOffset: 0 as const };
 const requirements: PdksDayPolicy = { ...LEGACY_PDKS_POLICY, punchMode: "requirements", requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "absent" };
@@ -28,14 +27,14 @@ const reading = (time: string, direction?: "entry" | "exit", day = date): Doc<"c
   _id: `${day}-${time}` as Id<"cardReadings">, _creationTime: 0,
   accessTime: new Date(`${day}T${time}:00+03:00`).toISOString(), accessStatus: "izin_verildi", cardNo: "1", direction,
 });
-const params = { date, shift, readings: [reading("09:00", "entry"), reading("17:00", "exit")], workSettings: DEFAULT_WORK_SETTINGS, workingDays };
+const params = { date, shift, readings: [reading("09:00", "entry"), reading("17:00", "exit")], workSettings: DEFAULT_WORK_SETTINGS };
 function day(patch: Partial<Doc<"shifts">> = {}, extra: Partial<Parameters<typeof computePdksDay>[0]> = {}) {
   return computePdksDay({ ...params, ...extra, shift: { ...shift, ...patch } });
 }
 function payroll(patch: Partial<Doc<"shifts">>, readings: Doc<"cardReadings">[] = params.readings, extra: Partial<Parameters<typeof computePayrollCell>[0]> = {}) {
   return computePayrollCell({ date, dayShift: { ...shift, ...patch }, dayReadings: readings, manual: undefined,
     availableDateKeys: new Set([date]), firstRecordDate: date, hasLeave: false, holiday: null,
-    workingDays, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: DEFAULT_OVERTIME_RATES, empHourlyRate: null, ...extra });
+    workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: DEFAULT_OVERTIME_RATES, empHourlyRate: null, ...extra });
 }
 
 describe("fixed shift optional rules", () => {
@@ -49,7 +48,7 @@ describe("fixed shift optional rules", () => {
     const readings = [reading("07:59", "entry"), reading("17:00", "exit")];
     expect(day({ validWindow: window }, { readings })).toMatchObject({ firstISO: null, lastISO: readings[1]?.accessTime, attendanceDecision: "incomplete", hasAttendance: false, totalMinutes: 0 });
     const detail = computeAttendanceDetailDay({ date, dayShift: { ...shift, validWindow: window }, dayReadings: readings,
-      availableDateKeys: new Set([date]), firstRecordDate: date, manualDay: undefined, leaves: [], holiday: null, workingDays, workSettings: DEFAULT_WORK_SETTINGS });
+      availableDateKeys: new Set([date]), firstRecordDate: date, manualDay: undefined, leaves: [], holiday: null, workSettings: DEFAULT_WORK_SETTINGS });
     expect(detail).toMatchObject({ status: "incomplete", firstEntry: null, payrollCode: "—" });
     expect(detail.rawReadings).toHaveLength(2);
   });
@@ -111,7 +110,7 @@ describe("fixed shift optional rules", () => {
     expect(payroll({ holidayWorkRequired: true }, [reading("09:30", "entry"), reading("17:00", "exit")], { holiday })).toMatchObject({ status: "late", overtimeMinutes: 0 });
     expect(day({ holidayWorkRequired: false }, { holiday })).toEqual(day({}, { holiday }));
     expect(day({ holidayWorkRequired: true }, { holiday: { ...holiday, isHalfDay: true } })).toMatchObject({ classification: "workday", overtimeMinutes: 0 });
-    expect(day({ holidayWorkRequired: true }, { date: "2026-06-27", readings: [], holiday })).toMatchObject({ classification: "weekend" });
+    expect(day({ holidayWorkRequired: true }, { date: "2026-06-27", dayKind: "rest", readings: [], holiday })).toMatchObject({ classification: "weekend" });
   });
   it("removes next-day holiday premium when night overtime is split at midnight", () => {
     const next = "2026-06-23";
@@ -219,7 +218,7 @@ describe("daytime fixed shifts with a next-day exit window", () => {
       rawTotalMinutes: 960, durationMeasured: true, attendanceDecision: "present", exitNextDay: true, isOvernightShift: true,
     });
     const detail = computeAttendanceDetailDay({ date, dayShift: extended, dayReadings: grouped.get(date) ?? [],
-      availableDateKeys: new Set([date]), firstRecordDate: date, manualDay: undefined, leaves: [], holiday: null, workingDays, workSettings: DEFAULT_WORK_SETTINGS });
+      availableDateKeys: new Set([date]), firstRecordDate: date, manualDay: undefined, leaves: [], holiday: null, workSettings: DEFAULT_WORK_SETTINGS });
     expect(detail).toMatchObject({ firstEntry: "09:00", lastExit: "01:00", rawTotalMinutes: 960, exitNextDay: true });
   });
 

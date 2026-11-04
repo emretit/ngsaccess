@@ -31,13 +31,13 @@ describe("review: rest between consecutive planned days", () => {
     expect(() => validate({ kind: "weekCycle", anchorDate: row.startDate, slots: [[gap29._id], [], [], [], [], [], [night._id]] })).toThrow("30 dakika");
     expect(validate({ kind: "weekCycle", anchorDate: row.startDate, slots: [[gap30._id], [], [], [], [], [], [night._id]] })).toBeDefined();
   });
-  it.each([undefined, [], ["MON", "TUE"], ["SAT", "SUN"], ["SUN", "MON"]])("checks adjacent selected weekly days (%j)", weekPattern => {
+  it.each([["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"], ["MON", "TUE"], ["SAT", "SUN"], ["SUN", "MON"]].map(weekPattern => ({ weekPattern })))("checks adjacent selected weekly days ($weekPattern)", ({ weekPattern }) => {
     expect(() => validate({ kind: "weekly", shiftIds: [night._id, gap29._id] }, weekPattern)).toThrow("30 dakika");
     expect(validate({ kind: "weekly", shiftIds: [night._id, gap30._id] }, weekPattern)).toBeDefined();
   });
   it("allows non-adjacent weekly days and preserves no-plan legacy validation", () => {
     expect(validate({ kind: "weekly", shiftIds: [gap29._id, night._id] }, ["MON", "WED", "FRI"])).toBeDefined();
-    expect(validateShiftPlan(row, shifts)).toEqual({ shiftId: night._id });
+    expect(validateShiftPlan({ ...row, weekPattern: ["MON", "WED", "FRI"] }, shifts)).toEqual({ shiftId: night._id });
   });
 });
 

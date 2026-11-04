@@ -18,7 +18,6 @@ const manual = (
 ): Doc<"pdksRecords"> =>
   ({ entryTime, exitTime, manualEntry: true }) as unknown as Doc<"pdksRecords">;
 
-const WORKING_DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const MONDAY = "2026-06-22"; // Pazartesi (workday)
 const SATURDAY = "2026-06-27"; // Cumartesi (weekend)
 
@@ -39,12 +38,12 @@ const cell = (overrides: Partial<CellParams>): CellParams => ({
   dayReadings: [],
   hasLeave: false,
   holiday: null,
-  workingDays: WORKING_DAYS,
   dayShift: null,
   workSettings: DEFAULT_WORK_SETTINGS,
   overtimeRates: RATES,
   empHourlyRate: 100,
   ...overrides,
+  ...(overrides.date === SATURDAY ? { dayPlan: { kind: "rest", source: "employee", calendar: "plan", origin: "weekly", shifts: overrides.dayShift ? [overrides.dayShift] : [] } as const } : {}),
 });
 
 describe("pdksPayroll – computePayrollCell", () => {

@@ -19,7 +19,6 @@ import { evaluateShiftAssignment } from "./shiftAssign";
 import { LEGACY_PDKS_POLICY, type PdksDayPolicy } from "./pdksRules";
 
 const date = "2026-06-22";
-const workingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const employeeId = "emp" as Id<"employees">;
 const policy: PdksDayPolicy = { punchMode: "requirements", checkpointMode: "all", targets: [], requireCheckIn: true, requireCheckOut: true, missingRequiredPunch: "review", noPunch: "absent" };
 const rates = { ...DEFAULT_OVERTIME_RATES, overtimeBasis: "dailyShift" as const };
@@ -34,7 +33,7 @@ function undirected(...items: Doc<"cardReadings">[]) {
   return items.map(r => ({ ...r, direction: undefined }));
 }
 function run(readings: Doc<"cardReadings">[], extra: Partial<Parameters<typeof computePdksDay>[0]> = {}) {
-  return computePdksDay({ date, readings, shift: shift(), policy, workSettings: DEFAULT_WORK_SETTINGS, workingDays, overtimeRates: rates, ...extra });
+  return computePdksDay({ date, readings, shift: shift(), policy, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: rates, ...extra });
 }
 function status(day: ReturnType<typeof run>, hasLeave = false, now = Date.parse("2026-07-01")) {
   return classifyPdksDay({ date: day.date, today: "2026-07-01", now, dataAvailable: true, firstRecordDate: date, hasAssignedShift: true, classification: day.classification, hasAttendance: day.hasAttendance, hasLeave, isLate: day.isLate, attendanceDecision: day.attendanceDecision, pendingUntil: day.pendingUntil, durationMeasured: day.durationMeasured });
@@ -145,7 +144,7 @@ describe("esnek eşleme, mola ve mesai", () => {
   });
   it("hafta/ay sınırında splitAtMidnight net, gece ve mola dakikalarını korur", () => {
     const date = "2026-05-31"; // Sunday -> Monday / next month
-    const day = run([reading("21:00", "entry", date), reading("06:00", "exit", "2026-06-01")], { date, workingDays: [...workingDays, "Pazar"], overtimeRates: { ...rates, nightShiftDayMode: "splitAtMidnight" } });
+    const day = run([reading("21:00", "entry", date), reading("06:00", "exit", "2026-06-01")], { date, overtimeRates: { ...rates, nightShiftDayMode: "splitAtMidnight" } });
     expect(day.overtimeSegments.reduce((sum, s) => sum + s.netMinutes, 0)).toBe(480);
     expect(day.overtimeSegments.filter(s => s.calendarDate === date).reduce((sum, s) => sum + s.netMinutes, 0)).toBe(160);
     const preceding = { date: "2026-05-30", totalMinutes: 2700, overtimeSegments: [{ netMinutes: 2700, dailyOvertimeMinutes: 0, eligible: false, classification: "workday" as const, multiplier: 1.5 }] };
@@ -192,7 +191,7 @@ describe("doğrulama ve atama", () => {
 it("tablo, detay ve bordro aynı esnek alanları döndürür; geç/erken filtresine düşmez", () => {
   const readings = [reading("09:00", "entry"), reading("16:00", "exit")];
   const employee = { _id: employeeId, firstName: "Ada", lastName: "Test", cardNumber: "1", isActive: true } as Doc<"employees">;
-  const common = { date, workSettings: DEFAULT_WORK_SETTINGS, workingDays, overtimeRates: rates, availableDateKeys: new Set([date]), policyFor: () => policy, firstRecordDate: date };
+  const common = { date, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: rates, availableDateKeys: new Set([date]), policyFor: () => policy, firstRecordDate: date };
   const table = computePdksTableRow({ ...common, empKey: employeeId, empReadings: readings, employee, departmentName: "", periodDateKeys: [date], startDate: date, isSingleDay: true, viewMode: "matrix", manualPdksByEmpDate: new Map(), allLeaves: [], holidayMap: new Map(), resolveShift: () => shift({ breakStart: "12:00", breakEnd: "13:00" }), manualEditedBy: null });
   const detail = computeAttendanceDetailDay({ ...common, dayReadings: readings, manualDay: undefined, leaves: [], holiday: null, dayShift: shift() });
   const payroll = computePayrollCell({ ...common, dayReadings: readings, manual: undefined, hasLeave: false, holiday: null, dayShift: shift(), empHourlyRate: null });

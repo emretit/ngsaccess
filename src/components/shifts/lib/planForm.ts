@@ -2,7 +2,7 @@ import type { RefObject } from "react";
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { MAX_DAY_CYCLE, MAX_WEEK_CYCLE, slotForDate, validateDayShifts, validateShiftPlan, validPlanDate, type ShiftPlan } from '../../../../convex/lib/shiftPlan';
 import type { BulkAssignmentFormValues } from '../assignmentFormSchema';
-import { offsetDay, type Shift } from './planning';
+import { DEFAULT_WORKING_DAYS, offsetDay, type Shift } from './planning';
 import { shiftError } from './shiftError';
 
 export function buildRotation(parts: { shiftIds: Id<'shifts'>[]; days: number }[]) {
@@ -37,14 +37,14 @@ export function assignmentFields(values: BulkAssignmentFormValues, storedPlan = 
     shiftId: values.shiftId as Id<'shifts'>,
     startDate: values.startDate,
     endDate: values.endDate,
-    weekPattern: cycle ? undefined : values.specificDays ? values.weekPattern : undefined,
+    weekPattern: cycle ? undefined : values.weekPattern,
     ...(plan ? { plan } : storedPlan ? { plan: { kind: 'weekly' as const, shiftIds: [values.shiftId as Id<'shifts'>] } } : {}),
   };
 }
 export function withPlan(values: BulkAssignmentFormValues, plan: ShiftPlan): BulkAssignmentFormValues {
   const shiftId = plan.kind === 'weekly' ? plan.shiftIds[0] : plan.slots.find(slot => slot.length)?.[0];
   return { ...values, shiftId: shiftId ?? '', plan: plan.kind === 'weekly' && plan.shiftIds.length === 1 ? undefined : plan,
-    ...(plan.kind !== 'weekly' ? { specificDays: false, weekPattern: [] } : {}) };
+    ...(plan.kind === 'weekly' && values.weekPattern.length === 0 ? { weekPattern: [...DEFAULT_WORKING_DAYS] } : {}) };
 }
 export function planPreview(values: BulkAssignmentFormValues) {
   if (!validPlanDate(values.startDate) || (!values.shiftId && !values.plan)) return [];
@@ -66,7 +66,7 @@ export function bulkAssignmentRequest(values: BulkAssignmentFormValues, projectI
 export function focusAssignmentError(planErrorRef: RefObject<Pick<HTMLElement, "focus"> | null>, hasPlanError: boolean) {
   requestAnimationFrame(() => {
     if (hasPlanError && planErrorRef.current) planErrorRef.current.focus();
-    else document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+    else document.querySelector<HTMLElement>('[aria-invalid="true"], fieldset[role="group"][tabindex="-1"]')?.focus();
   });
 }
 

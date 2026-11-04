@@ -17,9 +17,10 @@ import { resolvedCalendarDay } from './calendar/shiftCalendarModel';
 import { openCalendarDay } from './calendar/calendarActions';
 import { bulkAssignmentFormSchema, type BulkAssignmentFormValues } from './assignmentFormSchema';
 import { assignmentFields, buildRotation, bulkAssignmentRequest, departmentAssignmentRequest, focusAssignmentError, dayShiftsError, mondayOf, planFormError, planPreview, resizeRotation } from './lib/planForm';
+import { shortDate } from './lib/planning';
 import type { Assignment, Department, DepartmentAssignment, Employee, PlanCell, Preview, Shift } from './lib/planning';
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), inputs: new Map<string, InputHTMLAttributes<HTMLInputElement>>(), clicks: new Map<string, () => void>(), selects: new Map<string, (value: string) => void>(), confirmation: undefined as (() => Promise<void>) | undefined, mutate: vi.fn(), preview: { employeeCount: 42, personalOverrideCount: 5, leaveCount: 2, holidayCount: 1, sameDepartmentConflicts: [] as { departmentAssignmentId: string; shiftName: string; startDate: string; endDate: string }[] } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), inputs: new Map<string, InputHTMLAttributes<HTMLInputElement>>(), clicks: new Map<string, () => void>(), selects: new Map<string, (value: string) => void>(), confirmation: undefined as (() => Promise<void>) | undefined, mutate: vi.fn(), preview: { employeeCount: 42, personalOverrideCount: 5, leaveCount: 2, holidayCount: 1, sameDepartmentConflicts: [] as { departmentAssignmentId: string; shiftName: string; startDate: string; endDate: string; coveredStartDate: string | null; coveredEndDate: string | null; workToRestDates: string[] }[] } }));
 vi.mock('convex/react', () => ({ useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => { const name = getFunctionName(ref); mocks.query(name, args); return name === 'shiftPlans:previewDepartmentAssign' ? mocks.preview : name === 'shifts:previewBulkAssign' ? personPreview : []; }, useMutation: (ref: Parameters<typeof getFunctionName>[0]) => (args: unknown) => mocks.mutate(getFunctionName(ref), args) }));
 vi.mock('@/hooks/usePermissions', () => ({ usePermissions: () => ({ can: () => true }) }));
 vi.mock('@/lib/notify', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/notify')>(), notify: { success: vi.fn() } }));
@@ -42,7 +43,7 @@ const morning = { _id: 'morning', projectId, name: 'Sabah', startTime: '08:00', 
 const evening = { ...morning, _id: 'evening', name: 'Akşam', startTime: '12:30', endTime: '16:00' } as Shift;
 const night = { ...morning, _id: 'night', name: 'Gece', startTime: '16:30', endTime: '20:00' } as Shift;
 const shifts = [morning, evening, night];
-const values: BulkAssignmentFormValues = { employeeIds: [employee._id], shiftId: morning._id, startDate: '2026-10-19', endDate: '2026-10-31', specificDays: false, weekPattern: [] };
+const values: BulkAssignmentFormValues = { employeeIds: [employee._id], shiftId: morning._id, startDate: '2026-10-19', endDate: '2026-10-31', weekPattern: ['MON', 'TUE', 'WED', 'THU', 'FRI'] };
 const department = { _id: 'department', name: 'Üretim', projectId } as Department;
 const assignment = { _id: 'assignment', employeeId: employee._id, projectId, shiftId: morning._id, startDate: values.startDate, endDate: values.endDate } as Assignment;
 const departmentAssignment = { _id: 'departmentAssignment', departmentId: department._id, projectId, shiftId: morning._id, startDate: values.startDate, endDate: values.endDate } as DepartmentAssignment;
@@ -101,9 +102,9 @@ describe('Plan kurucusu ve doğrulama', () => {
     expect(preview).toHaveLength(14);
     expect(preview.filter(day => day.shiftIds?.length)).toHaveLength(7);
     expect(preview[13]).toEqual({ date: '2026-11-01', shiftIds: [], outsideRange: true });
-    expect(planPreview({ ...values, specificDays: true, weekPattern: ['MON'] }).filter(day => day.shiftIds !== null)).toHaveLength(2);
+    expect(planPreview({ ...values, weekPattern: ['MON'] }).filter(day => day.shiftIds?.length)).toHaveLength(2);
     const html = renderToStaticMarkup(<AssignmentPatternEditor values={{ ...values, plan }} shifts={shifts} onChange={() => {}} />);
-    expect(html).toContain('aria-label="01.11.2026, Boş"');
+    expect(html).toContain('aria-label="01.11.2026, Hafta tatili"');
     expect(html).toContain('aria-label="14 günlük önizleme"');
   });
   it('eski kişi-tek-vardiya payloadı değişmez ve plan alanı hiç gönderilmez', () => {
@@ -121,7 +122,13 @@ describe('Plan kurucusu ve doğrulama', () => {
         "resultMode": "detailed",
         "shiftId": "morning",
         "startDate": "2026-10-19",
-        "weekPattern": undefined,
+        "weekPattern": [
+          "MON",
+          "TUE",
+          "WED",
+          "THU",
+          "FRI",
+        ],
       }
     `);
     expect(assignmentFields(values, true).plan).toEqual({ kind: 'weekly', shiftIds: [morning._id] });
@@ -137,10 +144,13 @@ describe('Plan kurucusu ve doğrulama', () => {
 describe('Departman ve takvim', () => {
   it('departman özeti kişi/kişisel öncelik/izin/tatil sayılarını açıklar, çakışma onay gerektirir', () => {
     expect(departmentPreviewSummary({ ...mocks.preview, sameDepartmentConflicts: [] })).toBe('Alt departmanlar da alır · 42 kişi · 5 kişide kişisel atama öncelikli');
-    mocks.preview.sameDepartmentConflicts = [{ departmentAssignmentId: 'row', shiftName: 'Sabah', startDate: values.startDate, endDate: values.endDate }];
+    mocks.preview.sameDepartmentConflicts = [{ departmentAssignmentId: 'row', shiftName: 'Sabah', startDate: values.startDate, endDate: values.endDate, coveredStartDate: values.startDate, coveredEndDate: values.endDate, workToRestDates: [values.startDate] }];
     const props = { values: { ...values, target: 'department' as const, employeeIds: [], departmentId: department._id }, projectId, forceConfirm: false, setForceConfirm: vi.fn(), pending: false, onSave: vi.fn() };
     const html = renderToStaticMarkup(<DepartmentPreviewPanel {...props} />);
     expect(html).toContain('2 izin günü · 1 tatil günü');
+    expect(html).toContain('Örtülen günler:');
+    expect(html).toContain('1 çalışma günü hafta tatiline dönüşür');
+    expect(html).toContain(`Hafta tatiline dönüşen günler: ${shortDate(values.startDate)}`);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Departmana uygula/);
     expect(renderToStaticMarkup(<DepartmentPreviewPanel {...props} forceConfirm />)).not.toMatch(/<button[^>]*disabled=""[^>]*>Departmana uygula/);
     expect(mocks.query).toHaveBeenCalledWith('shiftPlans:previewDepartmentAssign', expect.objectContaining({ departmentId: department._id }));
@@ -157,7 +167,7 @@ describe('Departman ve takvim', () => {
     expect(html).toContain(expected);
     expect(html).toContain('19 Ekim 2026 Pzt');
     if (cell.source === 'department') expect(html).toContain('border-dashed');
-    if (cell.kind === 'rest') expect(html).toContain('Boş');
+    if (cell.kind === 'rest') expect(html).toContain('Hafta tatili');
     if (cell.shiftIds.length === 3) { expect(html.match(/block font-medium/g)).toHaveLength(2); expect(html).toContain('Gece · 16:30–20:00'); }
   });
   it('departman boş günü kişi ataması formuna düşmez; kaynak düzenlemesi ve kişi istisnası açılır', () => {
@@ -237,7 +247,7 @@ describe('C1 denetim düzeltmeleri', () => {
   });
   it('kişi boş günü etiketinde çift virgül yoktur ve varsayılan hücrenin metni solmaz', () => {
     const rest = renderToStaticMarkup(<ShiftCalendarCell data={dataFor({ ...baseCell, kind: 'rest', shiftIds: [] })} date={baseCell.date} employeeName="Ada Test" onOpen={() => {}} />);
-    expect(rest).toContain('aria-label="Ada Test, 19 Ekim 2026 Pzt, Boş, ayrıntıları aç"');
+    expect(rest).toContain('aria-label="Ada Test, 19 Ekim 2026 Pzt, Hafta tatili, ayrıntıları aç"');
     expect(rest).not.toContain(', ,');
     const fallback = renderToStaticMarkup(<ShiftCalendarCell data={dataFor({ ...baseCell, source: 'employee' })} date={baseCell.date} employeeName="Ada Test" onOpen={() => {}} />);
     expect(fallback).not.toMatch(/class="group[^"]*opacity-/);
@@ -251,7 +261,7 @@ describe('C1 denetim düzeltmeleri', () => {
     const data = resolvedCalendarDay(employee, values.startDate, baseCell, [{ ...assignment, plan }, other], [morning, evening, late], [], [], [], []);
     expect(data.conflict).toBe(true);
     const rest = resolvedCalendarDay(employee, '2026-10-20', { ...baseCell, date: '2026-10-20', kind: 'rest', shiftIds: [] }, [{ ...assignment, plan }, other], [morning, evening, late], [], [], [], []);
-    expect(rest.conflict).toBe(kind === 'weekly');
+    expect(rest.conflict).toBe(true);
   });
   it('boş döngünün tek hatası sunucunun plan mesajıdır; hata paragrafına odaklanır', () => {
     const result = bulkAssignmentFormSchema.safeParse({ ...values, shiftId: '', plan: { kind: 'dayCycle', anchorDate: values.startDate, slots: [[], []] } });
@@ -270,7 +280,7 @@ describe('C1 denetim düzeltmeleri', () => {
     renderToStaticMarkup(<AssignmentEditDialog open onOpenChange={() => {}} assignment={assignment} shifts={shifts} shiftName="Sabah" employeeName="Ada" />);
     await mocks.confirmation?.();
     expect(mocks.mutate).toHaveBeenCalledWith('shifts:updateAssignment', {
-      assignmentId: assignment._id, shiftId: morning._id, startDate: values.startDate, endDate: values.endDate, weekPattern: [], forceConfirm: false, calendarConfirmed: false,
+      assignmentId: assignment._id, shiftId: morning._id, startDate: values.startDate, endDate: values.endDate, weekPattern: ['MON', 'TUE', 'WED', 'THU', 'FRI'], forceConfirm: false, calendarConfirmed: false,
     });
     expect(mocks.mutate.mock.calls[0]?.[1]).not.toHaveProperty('plan');
   });

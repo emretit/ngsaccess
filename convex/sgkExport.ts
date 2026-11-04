@@ -110,7 +110,7 @@ export const buildAphbForMonth = authedQuery({
       }
       const result = calculateSgkEksikGun({
         monthDays: employedDates(employee),
-        workingDays: generalSettings?.workingDays,
+        restDays: new Set(monthDays.filter(date => ruleReport.planResolvers.get(targetProjectId)?.resolvePlan(employee._id, date).kind === "rest")),
         holidayMap,
         workedDays,
         approvedLeaves,

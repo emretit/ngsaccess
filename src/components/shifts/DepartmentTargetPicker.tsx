@@ -38,7 +38,15 @@ export function DepartmentPreviewPanel({ values, projectId, forceConfirm, setFor
     <p role="status" className="text-sm">{departmentPreviewSummary(preview)}</p>
     <p className="text-sm">{preview.leaveCount} izin günü · {preview.holidayCount} tatil günü</p>
     {preview.sameDepartmentConflicts.length > 0 && <>
-      <ul className="text-xs">{preview.sameDepartmentConflicts.map(row => <li key={row.departmentAssignmentId}>{row.shiftName} · {shortDate(row.startDate)}–{shortDate(row.endDate)}</li>)}</ul>
+      <p className="text-sm">Yeni plan, örtüşen tarihlerde eski planın yerine geçer. Seçilmeyen günler hafta tatili olur.</p>
+      <ul className="space-y-2 text-xs">{preview.sameDepartmentConflicts.map(row => <li key={row.departmentAssignmentId}>
+        <p>{row.shiftName} · {shortDate(row.startDate)}–{shortDate(row.endDate)}</p>
+        {row.coveredStartDate && row.coveredEndDate && <p>Örtülen günler: {shortDate(row.coveredStartDate)}–{shortDate(row.coveredEndDate)} (tüm günler).</p>}
+        {row.workToRestDates.length > 0 && <details>
+          <summary>{row.workToRestDates.length} çalışma günü hafta tatiline dönüşür</summary>
+          <p>Hafta tatiline dönüşen günler: {row.workToRestDates.map(shortDate).join(', ')}</p>
+        </details>}
+      </li>)}</ul>
       <label className="flex gap-2 text-sm"><input type="checkbox" className="size-6 shrink-0 accent-primary" checked={forceConfirm} disabled={pending} onChange={e => setForceConfirm(e.target.checked)} />Aynı departmandaki çakışmalara rağmen atamayı onaylıyorum.</label>
     </>}
     <Button type="button" disabled={pending || (preview.sameDepartmentConflicts.length > 0 && !forceConfirm)} onClick={onSave}>{pending ? 'Atanıyor…' : 'Departmana uygula'}</Button>

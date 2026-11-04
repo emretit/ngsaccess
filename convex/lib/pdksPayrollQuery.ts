@@ -88,20 +88,12 @@ export async function getMonthlyPayrollSheet(
   const policies = await loadPdksPolicies(ctx, employees.map(e => e.projectId), payrollHasFlexible ? addWorkDate(overtimeRange.startDate, -1) : overtimeRange.startDate, overtimeRange.endDate);
   readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, payrollBoundaryWorkDate(r)));
 
-  const [workSettings, holidayMap, generalSettings, payrollShiftResolver] =
+  const [workSettings, holidayMap, payrollShiftResolver] =
     await Promise.all([
       getEffectiveWorkSettings(ctx, referenceProjectId),
       getHolidaysMap(ctx, referenceProjectId, overtimeRange.startDate, addWorkDate(overtimeRange.endDate, 1)),
-      ctx.db
-        .query("generalSettings")
-        .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
-        .first(),
       Promise.resolve(payrollBoundaryShiftResolver),
     ]);
-  const workingDays =
-    generalSettings?.workingDays && generalSettings.workingDays.length > 0
-      ? generalSettings.workingDays
-      : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 
   // Liste tüm günler için
   const days: string[] = [];
@@ -165,6 +157,7 @@ export async function getMonthlyPayrollSheet(
           availableDateKeys,
           firstRecordDate,
           date: d,
+          nextDayKind: payrollShiftResolver.resolvePlan(emp._id, addWorkDate(d, 1)).kind === "rest" ? "rest" : "work",
           manual: manualByEmpDate.get(`${emp._id}__${d}`),
           dayReadings: empDayReadings.get(`${emp._id}__${d}`) ?? [],
           hasLeave: approvedLeaves.some(
@@ -176,7 +169,6 @@ export async function getMonthlyPayrollSheet(
           ),
           holiday: holidayMap.get(d),
           holidayMap,
-          workingDays,
           dayShift: scopedPdksShift(payrollShiftResolver.resolve(emp._id, d), args.projectId),
           dayPlan: scopedPdksPlan(payrollShiftResolver.resolvePlan(emp._id, d), args.projectId),
           workSettings,

@@ -142,15 +142,14 @@ export const summary = employeeAuthedQuery({
     const resolvePlan = (id: Id<"employees">, date: string) => scopedPdksPlan(shifts.resolvePlan(id, date), projectId);
     const resolveLast = (id: Id<"employees">, date: string) => {
       const plan = resolvePlan(id, date);
-      return plan.kind === "shifts" ? plan.shifts[plan.shifts.length - 1] ?? null : null;
+      return plan.kind !== "none" ? plan.shifts[plan.shifts.length - 1] ?? null : null;
     };
-    const [manual, leaves, projectHolidays, globalHolidays, workSettings, general] = await Promise.all([
+    const [manual, leaves, projectHolidays, globalHolidays, workSettings] = await Promise.all([
       ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", hasFlexible ? addWorkDate(args.startDate, -1) : args.startDate).lte("date", hasFlexible ? addWorkDate(args.endDate, 1) : args.endDate)).take(1001),
       ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", args.endDate)).take(1001),
       ctx.db.query("holidays").withIndex("by_project_date", q => q.eq("projectId", projectId).gte("date", args.startDate).lte("date", args.endDate)).take(1001),
       ctx.db.query("holidays").withIndex("by_project_date", q => q.eq("projectId", undefined).gte("date", args.startDate).lte("date", args.endDate)).take(1001),
       getEffectiveWorkSettings(ctx, projectId),
-      ctx.db.query("generalSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first(),
     ]);
     if ([manual, leaves, projectHolidays, globalHolidays].some(list => list.length > 1000)) throw attendanceError("SUMMARY_TOO_LARGE");
     const manualByDate = new Map(manual.filter(record => record.manualEntry && record.projectId === projectId).map(record => [`${employee._id}__${record.date}`, record]));
@@ -165,7 +164,6 @@ export const summary = employeeAuthedQuery({
       manualPdksByEmpDate: manualByDate,
       allLeaves: leaves.filter(leave => leave.status === "approved" && (!leave.projectId || leave.projectId === projectId)),
       holidayMap: new Map([...globalHolidays, ...projectHolidays].map(holiday => [holiday.date, holiday])),
-      workingDays: general?.workingDays?.length ? general.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"],
       workSettings, overtimeRates: DEFAULT_OVERTIME_RATES, resolveShift, resolvePlan, resolveLast, manualEditedBy: null,
     });
     const presentDates = new Set(row.days.filter(day => day.status === "present" || day.status === "late").map(day => day.date));

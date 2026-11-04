@@ -22,7 +22,7 @@ import { DateRangeFields } from "@/components/shared/DateRangeFields";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { notify } from "@/lib/notify";
-import { DAYS, type Assignment, type Shift } from "./lib/planning";
+import { DEFAULT_WORKING_DAYS, DAYS, type Assignment, type Shift } from "./lib/planning";
 import {
   bulkAssignmentFormSchema,
   type BulkAssignmentFormValues,
@@ -60,9 +60,8 @@ function EditForm({
     shiftId: assignment.shiftId,
     startDate: assignment.startDate,
     endDate: assignment.endDate,
-    specificDays: !!assignment.weekPattern?.length,
     weekPattern: DAYS.filter(([code]) =>
-      assignment.weekPattern?.includes(code),
+      (assignment.weekPattern?.length ? assignment.weekPattern : DEFAULT_WORKING_DAYS).includes(code),
     ).map(([code]) => code),
   });
   const assignmentLabel = assignment.plan && planShiftIds(assignment.plan).length > 1 ? planSummary(assignment.plan) : shiftName;
@@ -115,10 +114,10 @@ function EditForm({
     try {
       if ("departmentId" in assignment) {
         if (confirm === "delete") await removeDepartment({ departmentAssignmentId: assignment._id });
-        else await updateDepartment({ departmentAssignmentId: assignment._id, ...assignmentFields(values, Boolean(assignment.plan)), weekPattern: values.plan && values.plan.kind !== "weekly" ? [] : values.specificDays ? values.weekPattern : [], forceConfirm });
+        else await updateDepartment({ departmentAssignmentId: assignment._id, ...assignmentFields(values, Boolean(assignment.plan)), weekPattern: values.plan && values.plan.kind !== "weekly" ? [] : values.weekPattern, forceConfirm });
       } else {
         if (confirm === "delete") await remove({ assignmentId: assignment._id });
-        else await update({ assignmentId: assignment._id, ...assignmentFields(values, Boolean(assignment.plan)), weekPattern: values.plan && values.plan.kind !== "weekly" ? [] : values.specificDays ? values.weekPattern : [], forceConfirm, calendarConfirmed });
+        else await update({ assignmentId: assignment._id, ...assignmentFields(values, Boolean(assignment.plan)), weekPattern: values.plan && values.plan.kind !== "weekly" ? [] : values.weekPattern, forceConfirm, calendarConfirmed });
       }
       notify.success(
         confirm === "delete"
@@ -174,22 +173,8 @@ function EditForm({
               value={{ start: values.startDate, end: values.endDate }}
               errors={{ start: errors.startDate, end: errors.endDate }}
               onChange={(next) => change({ ...values, startDate: next.start, endDate: next.end })} />
-            {!(assignment.plan || "departmentId" in assignment) && <><label className="flex gap-2 text-sm">
-              <input
-                type="checkbox" className="size-6 shrink-0 accent-primary"
-                checked={values.specificDays}
-                onChange={(e) =>
-                  change({ ...values, specificDays: e.target.checked })
-                }
-              />
-              Belirli günler
-            </label>
-            {values.specificDays ? (
-              <WeekdaySelection id="assignment-days" value={values.weekPattern} error={errors.weekPattern}
-                    onChange={(weekPattern) => change({ ...values, weekPattern })} />
-            ) : (
-              <p className="text-sm">Her gün</p>
-            )}</>}
+            {!(assignment.plan || "departmentId" in assignment) && <WeekdaySelection id="assignment-days" value={values.weekPattern} error={errors.weekPattern}
+              onChange={(weekPattern) => change({ ...values, weekPattern })} />}
             <p className="text-xs text-muted-foreground">
               {shortDate(values.startDate)}–{shortDate(values.endDate)} dahil tüm seri. Mevcut diğer
               atamalar korunur.

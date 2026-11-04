@@ -63,8 +63,7 @@ async function directionShift(ctx: MutationCtx, employeeId: Id<"employees">, dat
   const versions = await loadShiftVersions(ctx, shifts, date);
   const resolver = createShiftResolver([employee], shifts, [applicable], departmentData.departments, departmentData.assignments, versions);
   const plan = resolver.resolvePlan(employeeId, date);
-  if (plan.kind === "shifts") return plan.shifts[plan.shifts.length - 1] ?? null;
-  if (plan.kind === "rest") return null;
+  if (plan.kind !== "none") return plan.shifts[plan.shifts.length - 1] ?? null;
   // Raw access direction keeps its legacy overnight toggle; this is not PDKS eligibility.
   return employee.shiftId ? resolver.shiftAt?.(employee.shiftId, date) ?? null : null;
 }

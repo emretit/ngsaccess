@@ -9,7 +9,7 @@ export type PdksRow = FunctionReturnType<
 export type PdksCell = PdksRow["days"][number];
 export type PdksPlanDay = Pick<PdksCell, "segments" | "planKind" | "status">;
 export type PdksSegment = NonNullable<PdksCell["segments"]>[number];
-export const CYCLE_REST_LABEL = "Boş gün (döngü)";
+export const CYCLE_REST_LABEL = "Hafta tatili";
 
 /** Presentation only: the server supplies the day plan and attendance decisions. */
 export function planDayLabel(day?: Pick<PdksPlanDay, "segments" | "planKind">): string {

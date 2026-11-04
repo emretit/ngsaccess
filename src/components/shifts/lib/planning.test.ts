@@ -57,8 +57,7 @@ describe("Atama önizleme doğrulaması", () => {
     shiftId: "s1",
     startDate: "2026-01-01",
     endDate: "2027-01-01",
-    specificDays: false,
-    weekPattern: [],
+    weekPattern: ["MON", "TUE", "WED", "THU", "FRI"],
   };
   it("365 tarih farkını kabul eder; 366 farkı reddeder", () => {
     expect(bulkAssignmentFormSchema.safeParse(values).success).toBe(true);
@@ -67,9 +66,9 @@ describe("Atama önizleme doğrulaması", () => {
         .success,
     ).toBe(false);
   });
-  it("belirli günlerde boş desen ve 101 kişi reddedilir", () => {
+  it("haftalık boş desen ve 101 kişi reddedilir", () => {
     expect(
-      bulkAssignmentFormSchema.safeParse({ ...values, specificDays: true })
+      bulkAssignmentFormSchema.safeParse({ ...values, weekPattern: [] })
         .success,
     ).toBe(false);
     expect(
@@ -115,7 +114,7 @@ describe("Ortak ajanda ve tablo gün modeli", () => {
     );
     expect(data.records[0]?.continuation).toBe(true);
   });
-  it("aynı günde ayrık vardiyalar çakışma değildir", () => {
+  it("aynı güne sahip ayrık vardiyalar da çakışır", () => {
     const data = cellData(
       employee,
       "2026-10-19",
@@ -127,7 +126,7 @@ describe("Ortak ajanda ve tablo gün modeli", () => {
       [],
       [],
     );
-    expect(data.conflict).toBe(false);
+    expect(data.conflict).toBe(true);
   });
   it("gece devamındaki gerçek saat kesişmesini gösterir", () => {
     const data = cellData(

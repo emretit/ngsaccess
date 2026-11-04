@@ -10,7 +10,6 @@ import {
   filterPdksTableRows,
 } from "./pdksTable";
 
-const WORKING_DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const MONDAY = "2026-06-22";
 const TUESDAY = "2026-06-23";
 const SATURDAY = "2026-06-27";
@@ -86,7 +85,6 @@ const rowParams = (overrides: Partial<RowParams> = {}): RowParams => ({
   manualPdksByEmpDate: new Map(),
   allLeaves: [],
   holidayMap: new Map(),
-  workingDays: WORKING_DAYS,
   workSettings: DEFAULT_WORK_SETTINGS,
   // These legacy cell/formatting cases explicitly exercise daily settlement.
   overtimeRates: { ...DEFAULT_OVERTIME_RATES, overtimeBasis: "dailyShift" },
@@ -414,7 +412,7 @@ describe("C2 günlük sözleşme", () => {
     [MONDAY, "2026-07-01", new Map([[MONDAY, holiday(MONDAY)]]), "holiday"],
     [MONDAY, "2026-07-01", new Map(), "absent"],
   ])("%s günlük ve matrix aynı sınıfı döner: %s", (date, today, holidayMap, status) => {
-    const input = rowParams({ startDate: date, periodDateKeys: [date], today, holidayMap });
+    const input = rowParams({ startDate: date, periodDateKeys: [date], today, holidayMap, ...(date === SATURDAY ? { resolvePlan: () => ({ kind: "rest" as const, shifts: [], source: "employee" as const, calendar: "plan" as const, origin: "weekly" as const }) } : {}) });
     const single = computePdksTableRow(input);
     const matrix = computePdksTableRow({ ...input, viewMode: "matrix" });
     expect(single.status).toBe(status);
@@ -516,7 +514,7 @@ describe("R3B-E1: noData only suppresses absence", () => {
     expect(row.days[0]).toMatchObject({ status: "holiday", payrollCode: "RT" });
   });
   it("Sunday remains HT and an ordinary workday remains noData", () => {
-    const row = computePdksTableRow(rowParams({ firstRecordDate: null, availableDateKeys: new Set(), periodDateKeys: ["2026-06-28", MONDAY], viewMode: "matrix" }));
+    const row = computePdksTableRow(rowParams({ firstRecordDate: null, availableDateKeys: new Set(), periodDateKeys: ["2026-06-28", MONDAY], viewMode: "matrix", resolvePlan: (_id, date) => ({ kind: date === "2026-06-28" ? "rest" : "shifts", shifts: [], source: "employee", calendar: "plan", origin: "weekly" }) }));
     expect(row.days[0]).toMatchObject({ status: "weekend", payrollCode: "HT" });
     expect(row.days[1]).toMatchObject({ status: "noData", payrollCode: "—" });
   });
@@ -549,6 +547,6 @@ it("only includes display pairs and breaks when requested, preserving all durati
 it("does not count the gap between shift buckets as a break", () => {
   const shifts = [{ name: "Sabah", startTime: "08:00", endTime: "12:00" }, { name: "Akşam", startTime: "14:00", endTime: "18:00" }].map((piece, index) => ({ ...piece, _id: `shift-${index}` as Id<"shifts">, _creationTime: 0, createdAt: "", updatedAt: "" }));
   const empReadings = ["08:00", "12:00", "14:00", "18:00"].map((time, index) => reading(`${MONDAY}T${time}:00+03:00`, { direction: index % 2 === 0 ? "entry" : "exit" }));
-  const result = computePdksTableRow(rowParams({ empReadings, viewMode: "matrix", includePunches: true, resolveShift: () => shifts[0] ?? null, resolvePlan: () => ({ kind: "shifts", shifts, source: "department", calendar: "plan" }) }));
+  const result = computePdksTableRow(rowParams({ empReadings, viewMode: "matrix", includePunches: true, resolveShift: () => shifts[0] ?? null, resolvePlan: () => ({ kind: "shifts", shifts, source: "department", calendar: "plan", origin: "weekly" }) }));
   expect(result.days[0]?.detail).toMatchObject({ pairs: [{ in: "08:00", out: "12:00" }, { in: "14:00", out: "18:00" }], breaks: [], breakMinutes: 0 });
 });

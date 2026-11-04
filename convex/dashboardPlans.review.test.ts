@@ -9,8 +9,8 @@ import { buildShiftResolver, type DayPlan, type ShiftResolver } from "./lib/shif
 import { loadRuleReportDays } from "./lib/reportAttendance";
 import { computePdksTableRow } from "./lib/pdksTable";
 import { DEFAULT_OVERTIME_RATES, DEFAULT_WORK_SETTINGS } from "./lib/pdksHelpers";
+import { dailyOvertimeForShift, isoTimeToTRMinutes } from "./lib/pdksHelpers";
 import { trDayRangeISO } from "./lib/trDate";
-import { classifyDay, dailyOvertimeForShift, isoTimeToTRMinutes } from "./lib/pdksHelpers";
 
 const monday = "2026-06-22";
 const employee: Doc<"employees"> = { _id: "employee" as Id<"employees">, _creationTime: 0, firstName: "Ada", lastName: "Test", email: "ada@test", cardNumber: "1", isActive: true };
@@ -28,9 +28,9 @@ function readings(date: string): Doc<"cardReadings">[] {
 const rangeFor = (date: string) => { const { startISO, endISO } = trDayRangeISO(date, date); return { start: startISO, end: endISO }; };
 
 it.each([monday, "2026-06-27"])("dashboard uses merged piece overtime without gaps or cycle weekend premium on %s", date => {
-  const shifts = resolver(() => ({ kind: "shifts", source: "employee", calendar: "plan", shifts: [morning, afternoon] }));
+  const shifts = resolver(() => ({ kind: "shifts", source: "employee", calendar: "plan", origin: "cycle", shifts: [morning, afternoon] }));
   const raw = readings(date);
-  const row = computePdksTableRow({ employee, empKey: employee._id, empReadings: raw, availableDateKeys: new Set([date]), departmentName: "", periodDateKeys: [date], startDate: date, isSingleDay: true, viewMode: "matrix", manualPdksByEmpDate: new Map(), allLeaves: [], holidayMap: new Map(), workingDays: ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"], workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: { ...DEFAULT_OVERTIME_RATES, overtimeBasis: "dailyShift" }, resolveShift: shifts.resolve, resolvePlan: shifts.resolvePlan, manualEditedBy: null });
+  const row = computePdksTableRow({ employee, empKey: employee._id, empReadings: raw, availableDateKeys: new Set([date]), departmentName: "", periodDateKeys: [date], startDate: date, isSingleDay: true, viewMode: "matrix", manualPdksByEmpDate: new Map(), allLeaves: [], holidayMap: new Map(), workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: { ...DEFAULT_OVERTIME_RATES, overtimeBasis: "dailyShift" }, resolveShift: shifts.resolve, resolvePlan: shifts.resolvePlan, manualEditedBy: null });
   expect(row.days[0]).toMatchObject({ totalMinutes: 450, overtimeMinutes: 0, detail: { dayType: "workday" } });
   const legacy = computePdksCoreInMemory([employee], raw, [], rangeFor(date), new Map(), shifts, DEFAULT_WORK_SETTINGS);
   expect(legacy.core.overtimeHours).toBeGreaterThan(0);
@@ -40,11 +40,11 @@ it.each([monday, "2026-06-27"])("dashboard uses merged piece overtime without ga
 
 it("rest is excluded from the attendance-rate population; ordinary and leave behavior stays intact", () => {
   const other = { ...employee, _id: "rest" as Id<"employees">, cardNumber: "2" };
-  const working: DayPlan = { kind: "shifts", source: "employee", calendar: "project", shifts: [morning] };
+  const working: DayPlan = { kind: "shifts", source: "employee", calendar: "plan", origin: "weekly", shifts: [morning] };
   const run = (shifts: ShiftResolver) => computePdksCoreInMemory([employee, other], readings(monday).slice(0, 1), [], rangeFor(monday), new Map(), shifts, DEFAULT_WORK_SETTINGS).core;
   const ordinary = run(resolver(() => working));
   expect(ordinary).toMatchObject({ totalEmployees: 2, presentToday: 1, devamOrani: 50 });
-  expect(run(resolver(id => id === other._id ? { kind: "rest", source: "department", calendar: "plan" } : working))).toMatchObject({ totalEmployees: 2, presentToday: 1, devamOrani: 100 });
+  expect(run(resolver(id => id === other._id ? { kind: "rest", shifts: [], source: "department", calendar: "plan", origin: "weekly" } : working))).toMatchObject({ totalEmployees: 2, presentToday: 1, devamOrani: 100 });
   const explicitEmptyRows = computePdksCoreInMemory([employee, other], readings(monday).slice(0, 1), [], rangeFor(monday), new Map(), resolver(() => working), DEFAULT_WORK_SETTINGS, new Map()).core;
   expect(explicitEmptyRows).toStrictEqual(ordinary);
 });
@@ -75,7 +75,7 @@ it("ordinary versioned night policy preserves the legacy previous-day attributio
 
 it("one employee's plan does not switch an ordinary employee to report attribution", () => {
   const plannedEmployee = { ...employee, _id: "planned" as Id<"employees">, cardNumber: "2" };
-  const shifts = resolver(id => id === plannedEmployee._id ? { kind: "rest", source: "employee", calendar: "plan" } : { kind: "none", source: "project" });
+  const shifts = resolver(id => id === plannedEmployee._id ? { kind: "rest", shifts: [], source: "employee", calendar: "plan", origin: "cycle" } : { kind: "none", source: "project" });
   const reportDate = vi.fn(() => "report-day");
   const workDate = dashboardWorkDateResolver([employee, plannedEmployee], shifts, reportDate);
   const reading = readings(monday)[0];
@@ -101,11 +101,12 @@ it("versioned policy with an ordinary dated plan preserves the HEAD dashboard ov
     const report = await loadRuleReportDays(ctx, [projectId], monday, monday);
     expect(report.ruleRows.get(employeeId)?.days[0]?.overtimeMinutes).toBeGreaterThan(0);
     const shifts = await buildShiftResolver(ctx, [emp]);
-    // getActivitySummary passes only non-exit readings, as in 8f57a2d9.
+    // getActivitySummary passes only non-exit readings.
     const raw = report.readings.filter(reading => reading.direction !== "exit").sort((a, b) => a.accessTime.localeCompare(b.accessTime));
     const first = raw[0], last = raw[raw.length - 1];
     if (!first || !last) throw new Error("Fixture readings missing");
-    const headMinutes = dailyOvertimeForShift({ classification: classifyDay(monday, ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]), netMinutes: Math.floor((Date.parse(last.accessTime) - Date.parse(first.accessTime)) / 60000), lastExitMinutes: isoTimeToTRMinutes(last.accessTime), shift: shifts.resolve(employeeId, monday), workSettings: DEFAULT_WORK_SETTINGS });
+    const plan = shifts.resolvePlan(employeeId, monday);
+    const headMinutes = dailyOvertimeForShift({ classification: plan.kind === "rest" ? "weekend" : "workday", netMinutes: Math.floor((Date.parse(last.accessTime) - Date.parse(first.accessTime)) / 60000), lastExitMinutes: isoTimeToTRMinutes(last.accessTime), shift: shifts.resolve(employeeId, monday), workSettings: DEFAULT_WORK_SETTINGS });
     const result = computePdksCoreInMemory([emp], raw, [], rangeFor(monday), new Map(), shifts, DEFAULT_WORK_SETTINGS, report.ruleRows);
     expect(result.core.overtimeHours).toBe(Math.round(headMinutes / 60 * 10) / 10);
     expect(result.core.overtimeHours).toBe(0);

@@ -169,16 +169,6 @@ export type DayClassification =
   | "holiday"
   | "halfDayHoliday";
 
-export function classifyDay(
-  dateStr: string,
-  workingDays: string[],
-  holiday?: Doc<"holidays"> | null
-): DayClassification {
-  if (holiday) return holiday.isHalfDay ? "halfDayHoliday" : "holiday";
-  const weekday = dateToWeekdayName(dateStr);
-  return workingDays.includes(weekday) ? "workday" : "weekend";
-}
-
 export function multiplierForClassification(
   cls: DayClassification,
   rates: EffectiveOvertimeRates

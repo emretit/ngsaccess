@@ -22,14 +22,14 @@ vi.mock("./auth", async (original) => ({
 
 type Row = Record<string, unknown>;
 /** In-memory mock only; index and filter predicates really restrict the rows. */
-function fixture(extra: Record<string, Row[]> = {}) {
+function fixture(extra: Record<string, Row[]> = {}, weekPattern = ["MON", "TUE", "WED", "THU", "FRI"]) {
   const rows: Record<string, Row[]> = {
     employees: [{ _id: "e", projectId: "p", firstName: "Test", lastName: "Worker", cardNumber: "123", isActive: true, hourlyRate: 100 }],
     workSettings: [{ projectId: "p", overtimeStartToleranceMinutes: 0 }],
     ...extra,
   };
   rows.shifts ??= [{ _id: "s", projectId: "p", name: "Plan", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" }];
-  rows.shiftAssignments = [...(rows.shiftAssignments ?? []), { _id: "base", employeeId: "e", shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" }];
+  rows.shiftAssignments = [...(rows.shiftAssignments ?? []), { _id: "base", weekPattern, employeeId: "e", shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", createdAt: "", updatedAt: "" }];
   const bounds: Array<{ table: string; field: string; value: string; operator: "gte" | "lte" }> = [];
   const query = (table: string) => {
     let selected = rows[table] ?? [];
@@ -172,9 +172,8 @@ describe("overtime loader boundary regression", () => {
     vi.setSystemTime(new Date("2026-12-01T12:00:00Z"));
     const { ctx } = fixture({
       cardReadings: [0, 1, 2, 3, 4, 5, 6].flatMap((i) => readingsFor(addWorkDate("2026-10-26", i), "09:00", i === 6 ? "13:00" : "20:00")),
-      generalSettings: [{ projectId: "p", workingDays: ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"] }],
       holidays: [{ projectId: "p", date: "2026-10-29", isHalfDay: false }],
-    });
+    }, ["MON", "TUE", "WED", "THU", "FRI", "SAT"]);
     const october = await summaries(ctx, 10);
     const november = await summaries(ctx, 11);
     for (const result of [october.payroll, october.table, october.detail])
@@ -194,9 +193,8 @@ describe("overtime loader boundary regression", () => {
         { _id: "disabled", projectId: "p", startTime: "09:00", endTime: "19:00", overtimeEnabled: false },
       ],
       shiftAssignments: [{ employeeId: "e", shiftId: "disabled", startDate: "2026-06-27", endDate: "2026-06-27", updatedAt: "2026-06-01" }],
-      generalSettings: [{ projectId: "p", workingDays: ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"] }],
       cardReadings: [0, 1, 2, 3, 4, 5].flatMap((i) => readingsFor(addWorkDate("2026-06-22", i), "09:00", "19:00")),
-    });
+    }, ["MON", "TUE", "WED", "THU", "FRI", "SAT"]);
     const result = await summaries(ctx, 6);
     for (const value of [result.payroll, result.table, result.detail])
       expect(value).toMatchObject({ overtimeMinutes: 0, overtimePayTRY: 0 });

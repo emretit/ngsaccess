@@ -11,7 +11,7 @@ const punch = (time: string, direction?: string) => ({ accessTime: iso(time), di
 const readings = (...punches: ReturnType<typeof punch>[]): Doc<"cardReadings">[] => punches.map((p, i) => ({ ...p, direction: p.direction === "entry" || p.direction === "exit" ? p.direction : undefined, _id: String(i) as Id<"cardReadings">, _creationTime: 0, cardNo: "TEST", accessStatus: "izin_verildi" }));
 const policy: PdksDayPolicy = { ...LEGACY_PDKS_POLICY, calculationMode: "eachPunch" };
 function run(items: Doc<"cardReadings">[], extra: Partial<Parameters<typeof computePdksDay>[0]> = {}) {
-  return computePdksDay({ date, policy, readings: items, shift: null, workingDays: ["Cuma"], workSettings: DEFAULT_WORK_SETTINGS, ...extra });
+  return computePdksDay({ date, policy, readings: items, shift: null, workSettings: DEFAULT_WORK_SETTINGS, ...extra });
 }
 describe("effective punch pairing", () => {
   it("sums visits, ignores same-direction repeats and leaves input intact", () => {

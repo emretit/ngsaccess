@@ -1,3 +1,5 @@
+import { storedWorkingDays, type WeekdayName } from "./lib/workingDays";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { normalizeEmployeeEmail } from "./lib/employeeEmail";
@@ -179,5 +181,39 @@ export const clearShiftColors = internalMutation({
     if (!page.isDone) await ctx.scheduler.runAfter(0, internal.migrations.clearShiftColors, { cursor: page.continueCursor, cleared });
     console.info("Shift color cleanup batch", { cleared, isDone: page.isDone });
     return { cleared, isDone: page.isDone };
+  },
+});
+
+
+/** Snapshot the former project calendar on legacy weekly rows without changing precedence. */
+export const backfillWeeklyWorkingDays = internalMutation({
+  args: { dryRun: v.boolean() },
+  handler: async (ctx, { dryRun }) => {
+    const codes: Record<WeekdayName, string> = {
+      Pazartesi: "MON", Salı: "TUE", Çarşamba: "WED", Perşembe: "THU",
+      Cuma: "FRI", Cumartesi: "SAT", Pazar: "SUN",
+    };
+    const patterns = new Map<Id<"projects"> | undefined, string[]>();
+    const rows: { table: "shiftAssignments" | "departmentShiftAssignments";
+      id: Id<"shiftAssignments"> | Id<"departmentShiftAssignments">;
+      projectId: Id<"projects"> | null; weekPattern: string[] }[] = [];
+    let scanned = 0;
+    for (const table of ["shiftAssignments", "departmentShiftAssignments"] as const) {
+      // This one-off migration targets the audited small assignment tables.
+      for (const row of await ctx.db.query(table).collect()) {
+        scanned++;
+        if (row.weekPattern?.length || row.plan && row.plan.kind !== "weekly") continue;
+        let weekPattern = patterns.get(row.projectId);
+        if (!weekPattern) {
+          const settings = row.projectId ? await ctx.db.query("generalSettings")
+            .withIndex("by_project", q => q.eq("projectId", row.projectId)).first() : null;
+          weekPattern = storedWorkingDays(settings?.workingDays).map(day => codes[day]);
+          patterns.set(row.projectId, weekPattern);
+        }
+        rows.push({ table, id: row._id, projectId: row.projectId ?? null, weekPattern });
+        if (!dryRun) await ctx.db.patch(row._id, { weekPattern });
+      }
+    }
+    return { scanned, wouldUpdate: rows.length, updated: dryRun ? 0 : rows.length, rows };
   },
 });

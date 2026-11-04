@@ -114,7 +114,7 @@ describe("09 denetim düzeltmeleri", () => {
     expect(html).toContain("size-6 shrink-0 accent-primary");
   });
   it("D9: önizleme listesinin kendi kaydırma alanı yoktur", () => {
-    const html = renderToStaticMarkup(<PreviewPanel values={{ ...assignmentInitial("2026-10-19"), employeeIds: [employee._id], shiftId: shift._id, specificDays: false, weekPattern: [] }} projectId={"project" as Id<"projects">} forceConfirm={false} calendarConfirmed={false} setForceConfirm={() => undefined} setCalendarConfirmed={() => undefined} pending={false} onSave={() => undefined} />);
+    const html = renderToStaticMarkup(<PreviewPanel values={{ ...assignmentInitial("2026-10-19"), employeeIds: [employee._id], shiftId: shift._id, weekPattern: ['MON', 'TUE', 'WED', 'THU', 'FRI'] }} projectId={"project" as Id<"projects">} forceConfirm={false} calendarConfirmed={false} setForceConfirm={() => undefined} setCalendarConfirmed={() => undefined} pending={false} onSave={() => undefined} />);
     expect(html).toContain("Önizleme"); expect(html).not.toContain("overflow-y-auto"); expect(html).not.toContain("max-h-64");
   });
   it("D3/D4: tanım formu seçimleri tema rengi ve 24px alan kullanır, gece süresi korunur", () => {

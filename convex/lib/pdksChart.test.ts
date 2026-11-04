@@ -187,7 +187,7 @@ it("plan-aware chart keeps zero/one shift results structurally identical", () =>
   for (const dayShift of [null, shift()]) {
     const input = chartParams({ readings: [reading(`${MONDAY}T08:00:00Z`, EMP_A, "1")], resolveShift: () => dayShift });
     const result = computePdksChartData({ ...input, resolvePlan: () => dayShift
-      ? { kind: "shifts", source: "employee", calendar: "project", shifts: [dayShift] }
+      ? { kind: "shifts", source: "employee", calendar: "plan", origin: "weekly", shifts: [dayShift] }
       : { kind: "none", source: "project" } });
     if (dayShift) expect(result).toStrictEqual(computePdksChartData(input));
     else expect(result.dailyAttendance.every(day => day.present === 0 && day.absent === 0 && day.late === 0)).toBe(true);
@@ -199,7 +199,7 @@ it("multi-shift chart compares an afternoon arrival with the afternoon threshold
   const afternoon = shift({ _id: "afternoon" as Id<"shifts">, startTime: "14:00", endTime: "18:00", lateToleranceMinutes: 0 });
   const result = computePdksChartData(chartParams({
     readings: [reading(`${MONDAY}T11:10:00Z`, EMP_A, "1")], resolveShift: () => morning,
-    resolvePlan: () => ({ kind: "shifts", source: "employee", calendar: "project", shifts: [morning, afternoon] }),
+    resolvePlan: () => ({ kind: "shifts", source: "employee", calendar: "plan", origin: "weekly", shifts: [morning, afternoon] }),
   }));
   expect(result.lateMinutesSamples).toEqual([10]);
 });

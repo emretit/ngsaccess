@@ -28,8 +28,8 @@ async function fixture(role: "project_admin" | "project_user" = "project_admin")
     return { projectId, foreignProjectId, userId, sessionId, parentId, departmentId, foreignDepartmentId, employeeId, otherEmployeeId, foreignEmployeeId, morning, evening, night, foreignShift };
   });
   const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
-  const bulk = { projectId: ids.projectId, employeeIds: [ids.employeeId], shiftId: ids.morning, ...range };
-  const department = { projectId: ids.projectId, departmentId: ids.departmentId, shiftId: ids.morning, ...range };
+  const bulk = { weekPattern: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"], projectId: ids.projectId, employeeIds: [ids.employeeId], shiftId: ids.morning, ...range };
+  const department = { weekPattern: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"], projectId: ids.projectId, departmentId: ids.departmentId, shiftId: ids.morning, ...range };
   const cells = { projectId: ids.projectId, employeeIds: [ids.employeeId], rangeStart: range.startDate, rangeEnd: "2026-06-02" };
   const weekly = { kind: "weekly" as const, shiftIds: [ids.evening, ids.morning] };
   return { t, caller, ...ids, bulk, department, cells, weekly };
@@ -105,7 +105,7 @@ describe("employee plan API and transactional refs", () => {
   it("preserves cycle anchor and rebuilds refs when clear splits, then cleans deleted halves", async () => {
     const f = await fixture();
     const plan = { kind: "dayCycle" as const, anchorDate: range.startDate, slots: [[f.morning], [], [f.evening]] };
-    await f.caller.mutation(api.shifts.bulkAssignShift, { ...f.bulk, plan });
+    await f.caller.mutation(api.shifts.bulkAssignShift, { ...f.bulk, weekPattern: [], plan });
     await f.caller.mutation(api.shifts.clearAssignments, { projectId: f.projectId, employeeIds: [f.employeeId], startDate: "2026-06-05", endDate: "2026-06-07" });
     const state = await f.t.run(async ctx => ({ rows: await ctx.db.query("shiftAssignments").collect(), refs: await ctx.db.query("shiftPlanRefs").collect() }));
     expect(state.rows).toHaveLength(2);
@@ -128,14 +128,14 @@ describe("employee plan API and transactional refs", () => {
   it("counts future cyclic secondary references in definitionUsage beyond the first week", async () => {
     const f = await fixture();
     const startDate = "2099-06-01";
-    await f.caller.mutation(api.shifts.bulkAssignShift, { ...f.bulk, startDate, endDate: "2099-07-01", plan: { kind: "dayCycle", anchorDate: startDate, slots: [...Array.from({ length: 20 }, () => []), [f.evening]] } });
+    await f.caller.mutation(api.shifts.bulkAssignShift, { ...f.bulk, startDate, endDate: "2099-07-01", weekPattern: [], plan: { kind: "dayCycle", anchorDate: startDate, slots: [...Array.from({ length: 20 }, () => []), [f.evening]] } });
     expect(await f.caller.query(api.shifts.definitionUsage, { shiftId: f.evening })).toMatchObject({ assignmentCount: 1, employeeCount: 1 });
   });
   it("does not count another slot as future use of a referenced definition", async () => {
     const f = await fixture();
     const startDate = "2099-06-01";
     await f.caller.mutation(api.shifts.bulkAssignShift, { ...f.bulk, startDate, endDate: startDate,
-      plan: { kind: "dayCycle", anchorDate: startDate, slots: [[f.morning], [f.evening]] } });
+      weekPattern: [], plan: { kind: "dayCycle", anchorDate: startDate, slots: [[f.morning], [f.evening]] } });
     expect(await f.caller.query(api.shifts.definitionUsage, { shiftId: f.evening })).toMatchObject({ assignmentCount: 0 });
     expect(await f.caller.query(api.shifts.definitionUsage, { shiftId: f.morning })).toMatchObject({ assignmentCount: 1 });
   });
@@ -170,7 +170,7 @@ describe("department assignments and calendar cells", () => {
       await ctx.db.insert("holidays", { projectId: f.projectId, date: "2026-06-02", name: "Tail", createdAt: "" });
       await ctx.db.insert("holidays", { projectId: f.projectId, date: "2026-06-03", name: "Rest", createdAt: "" });
     });
-    const preview = await f.caller.query(api.shiftPlans.previewDepartmentAssign, { ...f.department, endDate: "2026-06-03", plan: { kind: "dayCycle", anchorDate: range.startDate, slots: [[f.night], [], []] } });
+    const preview = await f.caller.query(api.shiftPlans.previewDepartmentAssign, { ...f.department, endDate: "2026-06-03", weekPattern: [], plan: { kind: "dayCycle", anchorDate: range.startDate, slots: [[f.night], [], []] } });
     expect(preview).toMatchObject({ leaveCount: 1, holidayCount: 1 });
   });
   it("updates, preserves or replaces plans and atomically removes department refs", async () => {
@@ -178,7 +178,7 @@ describe("department assignments and calendar cells", () => {
     const departmentAssignmentId = await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, plan: f.weekly });
     await f.caller.mutation(api.shiftPlans.updateDepartmentAssignment, { departmentAssignmentId, endDate: "2026-06-15" });
     expect((await f.t.run(ctx => ctx.db.get(departmentAssignmentId)))?.plan).toEqual({ kind: "weekly", shiftIds: [f.morning, f.evening] });
-    await f.caller.mutation(api.shiftPlans.updateDepartmentAssignment, { departmentAssignmentId, plan: { kind: "dayCycle", anchorDate: range.startDate, slots: [[], [f.night]] } });
+    await f.caller.mutation(api.shiftPlans.updateDepartmentAssignment, { departmentAssignmentId, weekPattern: [], plan: { kind: "dayCycle", anchorDate: range.startDate, slots: [[], [f.night]] } });
     expect((await f.t.run(ctx => ctx.db.query("shiftPlanRefs").collect())).map(row => row.shiftId)).toEqual([f.night]);
     await f.caller.mutation(api.shiftPlans.removeDepartmentAssignment, { departmentAssignmentId });
     expect(await f.t.run(ctx => ctx.db.query("shiftPlanRefs").collect())).toEqual([]);
@@ -202,7 +202,7 @@ describe("department assignments and calendar cells", () => {
     ]);
     await f.t.run(ctx => ctx.db.patch(f.employeeId, { shiftId: f.evening }));
     expect((await f.caller.query(api.shiftPlans.planCells, f.cells))[0]).toEqual({ employeeId: f.employeeId, date: "2026-06-01", kind: "none", source: "project", shiftIds: [] });
-    const departmentAssignmentId = await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, departmentId: f.parentId, plan: { kind: "dayCycle", anchorDate: range.startDate, slots: [[], [f.morning, f.night]] } });
+    const departmentAssignmentId = await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, departmentId: f.parentId, weekPattern: [], plan: { kind: "dayCycle", anchorDate: range.startDate, slots: [[], [f.morning, f.night]] } });
     expect(await f.caller.query(api.shiftPlans.planCells, f.cells)).toEqual([
       { employeeId: f.employeeId, date: "2026-06-01", kind: "rest", source: "department", shiftIds: [], departmentId: f.parentId, departmentAssignmentId },
       { employeeId: f.employeeId, date: "2026-06-02", kind: "shifts", source: "department", shiftIds: [f.morning, f.night], departmentId: f.parentId, departmentAssignmentId },
@@ -236,5 +236,95 @@ describe("department assignments and calendar cells", () => {
       await ctx.db.insert("cardReadings", { projectId: f.projectId, employeeId: f.employeeId, deviceId, cardNo: "1", accessTime: "2026-06-01T19:00:00Z", accessStatus: "izin_verildi", direction: "entry" });
       expect(await resolveDirection(ctx, { device: await ctx.db.get(deviceId), employeeId: f.employeeId, nowISO: "2026-06-02T03:00:00Z" })).toBe("exit");
     });
+  });
+});
+
+it("weekly personal rest appears in cells, counts as an override, and warns before masking another plan", async () => {
+  const f = await fixture();
+  const weekPattern = ["MON", "TUE", "WED", "THU", "FRI"];
+  await f.caller.mutation(api.shifts.bulkAssignShift, { ...f.bulk, weekPattern });
+  const preview = await f.caller.query(api.shiftPlans.previewDepartmentAssign, { ...f.department, startDate: "2026-06-06", endDate: "2026-06-06" });
+  expect(preview.personalOverrideCount).toBe(1);
+  await f.caller.mutation(api.shiftPlans.assignDepartment, f.department);
+  expect(await f.caller.query(api.shiftPlans.planCells, { ...f.cells, rangeStart: "2026-06-06", rangeEnd: "2026-06-06" })).toMatchObject([{ kind: "rest", source: "employee", shiftIds: [] }]);
+  const replacement = { ...f.bulk, shiftId: f.evening, weekPattern: ["SAT"] };
+  expect((await f.caller.query(api.shifts.previewBulkAssign, replacement)).results[0]).toMatchObject({ status: "conflict" });
+  await expect(f.caller.mutation(api.shifts.bulkAssignShift, replacement)).rejects.toThrow("OVERLAP");
+  expect((await f.caller.mutation(api.shifts.bulkAssignShift, { ...replacement, resultMode: "detailed" })).insertedCount).toBe(0);
+  expect((await f.caller.mutation(api.shifts.bulkAssignShift, { ...replacement, forceConfirm: true })).insertedCount).toBe(1);
+});
+
+it("a weekly rest night uses the context's last shift for reader direction", async () => {
+  const f = await fixture();
+  await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, weekPattern: ["MON"], plan: { kind: "weekly", shiftIds: [f.morning, f.night] } });
+  await f.t.run(async ctx => {
+    const deviceId = await ctx.db.insert("devices", { projectId: f.projectId, name: "Reader", accessDirection: "both", createdAt: "", updatedAt: "" });
+    await ctx.db.insert("cardReadings", { projectId: f.projectId, employeeId: f.employeeId, deviceId, cardNo: "1", accessTime: "2026-06-06T19:00:00Z", accessStatus: "izin_verildi", direction: "entry" });
+    expect(await resolveDirection(ctx, { device: await ctx.db.get(deviceId), employeeId: f.employeeId, nowISO: "2026-06-07T03:00:00Z" })).toBe("exit");
+  });
+});
+
+it("rejects missing or empty weekly days through both assignment APIs", async () => {
+  const f = await fixture();
+  for (const weekPattern of [undefined, []]) {
+    await expect(f.caller.mutation(api.shifts.bulkAssignShift, { ...f.bulk, weekPattern })).rejects.toThrow("En az bir çalışma günü seçin");
+    await expect(f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, weekPattern })).rejects.toThrow("En az bir çalışma günü seçin");
+  }
+});
+
+
+describe("PDK-001: department date ownership", () => {
+  it("warns for complementary weekdays, reports work becoming rest, and requires confirmation", async () => {
+    const f = await fixture();
+    const weekdays = { ...f.department, startDate: "2026-11-01", endDate: "2026-11-30", weekPattern: ["MON", "TUE", "WED", "THU", "FRI"] };
+    const oldId = await f.caller.mutation(api.shiftPlans.assignDepartment, weekdays);
+    const weekends = { ...weekdays, weekPattern: ["SAT", "SUN"] };
+    const preview = await f.caller.query(api.shiftPlans.previewDepartmentAssign, weekends);
+    expect(preview.sameDepartmentConflicts).toHaveLength(1);
+    expect(preview.sameDepartmentConflicts[0]).toMatchObject({ departmentAssignmentId: oldId,
+      coveredStartDate: "2026-11-01", coveredEndDate: "2026-11-30" });
+    expect(preview.sameDepartmentConflicts[0].workToRestDates).toEqual([
+      "2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06",
+      "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13",
+      "2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20",
+      "2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27", "2026-11-30",
+    ]);
+    await expect(f.caller.mutation(api.shiftPlans.assignDepartment, weekends)).rejects.toThrow("SHIFT_OVERLAP");
+    expect(await f.caller.query(api.shiftPlans.listDepartmentAssignments, { projectId: f.projectId })).toHaveLength(1);
+    const newId = await f.caller.mutation(api.shiftPlans.assignDepartment, { ...weekends, forceConfirm: true });
+    expect(await f.caller.query(api.shiftPlans.planCells, { ...f.cells, rangeStart: "2026-11-02", rangeEnd: "2026-11-02" }))
+      .toMatchObject([{ kind: "rest", departmentAssignmentId: newId }]);
+  });
+  it("leaves other periods and departments independent, and clips covered dates", async () => {
+    const f = await fixture();
+    await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, weekPattern: ["MON"] });
+    for (const patch of [{ startDate: "2026-06-15", endDate: "2026-06-21" }, { departmentId: f.parentId }]) {
+      const args = { ...f.department, weekPattern: ["SAT", "SUN"], ...patch };
+      expect((await f.caller.query(api.shiftPlans.previewDepartmentAssign, args)).sameDepartmentConflicts).toEqual([]);
+      await f.caller.mutation(api.shiftPlans.assignDepartment, args);
+    }
+    const preview = await f.caller.query(api.shiftPlans.previewDepartmentAssign, { ...f.department, startDate: "2026-06-06", endDate: "2026-06-10", weekPattern: ["SAT", "SUN"] });
+    expect(preview.sameDepartmentConflicts).toHaveLength(1);
+    expect(preview.sameDepartmentConflicts[0]).toMatchObject({ coveredStartDate: "2026-06-06", coveredEndDate: "2026-06-10", workToRestDates: ["2026-06-08"] });
+  });
+  it("requires confirmation when an update moves a complementary plan into an owned period", async () => {
+    const f = await fixture();
+    await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, weekPattern: ["MON", "TUE", "WED", "THU", "FRI"] });
+    const id = await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, startDate: "2026-06-15", endDate: "2026-06-21", weekPattern: ["SAT", "SUN"] });
+    const update = { departmentAssignmentId: id, startDate: "2026-06-01", endDate: "2026-06-14" };
+    await expect(f.caller.mutation(api.shiftPlans.updateDepartmentAssignment, update)).rejects.toThrow("SHIFT_OVERLAP");
+    expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ startDate: "2026-06-15" });
+    await f.caller.mutation(api.shiftPlans.updateDepartmentAssignment, { ...update, forceConfirm: true });
+    expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ startDate: "2026-06-01" });
+  });
+  it("retains overnight conflicts across adjacent ownership periods", async () => {
+    const f = await fixture();
+    await f.caller.mutation(api.shiftPlans.assignDepartment, { ...f.department, shiftId: f.night, endDate: "2026-06-01" });
+    const args = { ...f.department, startDate: "2026-06-02", endDate: "2026-06-02" };
+    await f.t.run(ctx => ctx.db.patch(f.morning, { startTime: "05:00" }));
+    expect((await f.caller.query(api.shiftPlans.previewDepartmentAssign, args)).sameDepartmentConflicts).toMatchObject([
+      { coveredStartDate: null, coveredEndDate: null, workToRestDates: [] },
+    ]);
+    await expect(f.caller.mutation(api.shiftPlans.assignDepartment, args)).rejects.toThrow("SHIFT_OVERLAP");
   });
 });

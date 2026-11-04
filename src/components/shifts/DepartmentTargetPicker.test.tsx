@@ -13,7 +13,7 @@ vi.mock('./ShiftSelect', () => ({ ShiftSelect: ({ onChange }: { onChange: (value
 it('a failed live summary leaves the department selector visible and changeable', () => {
   const onChange = vi.fn();
   const html = renderToStaticMarkup(<DepartmentTargetPicker projectId={'project' as Id<'projects'>} value="department" onChange={onChange}
-    previewValues={{ target: 'department', departmentId: 'department', employeeIds: [], shiftId: 'shift', startDate: '2026-10-19', endDate: '2026-10-20', specificDays: false, weekPattern: [] }} />);
+    previewValues={{ target: 'department', departmentId: 'department', employeeIds: [], shiftId: 'shift', startDate: '2026-10-19', endDate: '2026-10-20', weekPattern: ['MON', 'TUE', 'WED', 'THU', 'FRI'] }} />);
   expect(html).toContain('role="alert"');
   expect(html).toContain('role="combobox" aria-label="Departman"');
   state.change?.('another');

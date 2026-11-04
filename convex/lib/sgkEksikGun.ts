@@ -5,11 +5,6 @@ import {
   type SgkEksikGunKodu,
 } from "./sgkCodes";
 
-const WEEKDAYS = [
-  "Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi",
-];
-const DEFAULT_WORKING_DAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
-
 export interface SgkApprovedLeave {
   startDate: string;
   endDate: string;
@@ -19,7 +14,7 @@ export interface SgkApprovedLeave {
 export interface SgkEksikGunInput {
   /** Türkiye takviminde YYYY-MM-DD biçimindeki ay günleri. */
   monthDays: readonly string[];
-  workingDays?: readonly string[];
+  restDays: ReadonlySet<string>;
   holidayMap: ReadonlyMap<string, unknown>;
   workedDays: ReadonlySet<string>;
   approvedLeaves: readonly SgkApprovedLeave[];
@@ -38,16 +33,11 @@ export interface SgkEksikGunResult {
  * işe giriş/çıkış (işe giriş tarihi alanı yok) ve kısmi süreli çalışanlar.
  */
 export function calculateSgkEksikGun(input: SgkEksikGunInput): SgkEksikGunResult {
-  const workingDays = new Set(
-    input.workingDays?.length ? input.workingDays : DEFAULT_WORKING_DAYS,
-  );
   const reasons = new Set<SgkEksikGunKodu>();
   let eksikGunSayisi = 0;
 
   for (const day of new Set(input.monthDays)) {
-    // Gün anahtarı zaten TR takvimindedir; UTC getter sunucu saat diliminden bağımsızdır.
-    const weekday = WEEKDAYS[new Date(`${day}T00:00:00.000Z`).getUTCDay()];
-    if (!workingDays.has(weekday) || input.holidayMap.has(day) || input.workedDays.has(day)) {
+    if (input.restDays.has(day) || input.holidayMap.has(day) || input.workedDays.has(day)) {
       continue;
     }
 

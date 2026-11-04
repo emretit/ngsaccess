@@ -22,7 +22,6 @@ export const bulkAssignmentFormSchema = z
     shiftId: z.string(),
     startDate: z.string().refine(validDay, "Başlangıç tarihi seçin"),
     endDate: z.string().refine(validDay, "Bitiş tarihi seçin"),
-    specificDays: z.boolean(),
     weekPattern: z.array(
       z.enum(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]),
     ),
@@ -32,8 +31,8 @@ export const bulkAssignmentFormSchema = z
       ctx.addIssue({ code: "custom", path: ["shiftId"], message: "Vardiya seçin" });
     if (value.target === "department" ? !value.departmentId : !value.employeeIds.length)
       ctx.addIssue({ code: "custom", path: [value.target === "department" ? "departmentId" : "employeeIds"], message: value.target === "department" ? "Departman seçin" : "En az bir çalışan seçin" });
-    if (value.plan) {
-      try { validatePlanStructure(value.plan, value.specificDays ? value.weekPattern : undefined); }
+    if (value.plan && (value.plan.kind !== "weekly" || value.weekPattern.length > 0)) {
+      try { validatePlanStructure(value.plan, value.plan.kind === "weekly" ? value.weekPattern : undefined); }
       catch (error) { ctx.addIssue({ code: "custom", path: ["plan"], message: shiftError(error).message }); }
     }
     if (new Set(value.employeeIds).size !== value.employeeIds.length)
@@ -57,11 +56,11 @@ export const bulkAssignmentFormSchema = z
         path: ["endDate"],
         message: "Tarih farkı en fazla 365 gün olabilir (366 dahil gün)",
       });
-    if (value.specificDays && !value.weekPattern.length)
+    if ((!value.plan || value.plan.kind === "weekly") && !value.weekPattern.length)
       ctx.addIssue({
         code: "custom",
         path: ["weekPattern"],
-        message: "En az bir gün seçin",
+        message: "En az bir çalışma günü seçin.",
       });
   });
 export type BulkAssignmentFormValues = z.infer<typeof bulkAssignmentFormSchema>;

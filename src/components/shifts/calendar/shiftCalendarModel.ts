@@ -1,7 +1,5 @@
-import { planShiftIds } from "../../../../convex/lib/shiftPlan";
-import { scheduleIntervals } from "../../../../convex/lib/shiftUx";
-import { holidayOn, leaveForEmployeeOn } from "../lib/calendarOverlays";
-import { offsetDay, type PlanCell, type DepartmentAssignment, type Department, type DayData } from "../lib/planning";
+import { assignmentsConflictOnDate, holidayOn, leaveForEmployeeOn } from "../lib/calendarOverlays";
+import { type PlanCell, type DepartmentAssignment, type Department, type DayData } from "../lib/planning";
 import { cellData, type Assignment, type Employee, type Shift } from "../lib/planning";
 import type { Leave, Holiday } from "../lib/calendarOverlays";
 
@@ -45,21 +43,8 @@ export function resolvedCalendarDay(
     return shift && shift.scheduleType !== "flexible" && shift.endTime < shift.startTime ? [shift] : [];
   });
   const continuations = previousAssignment ? previousNightShifts.map(shift => ({ assignment: previousAssignment, shift, continuation: true })) : [];
-  const shiftMap = new Map(shifts.map(shift => [String(shift._id), shiftOnDay(shifts, cell, shift._id) ?? shift]));
-  const dayStart = Date.parse(date) / 60000;
-  // Keep the existing personal-layer conflict marker without choosing a winner on the client.
-  const intervals = assignments.map(row => {
-    const referencedIds = row.plan ? planShiftIds(row.plan) : [row.shiftId];
-    const referencedShifts = new Map(referencedIds.flatMap(id => {
-      const shift = shiftMap.get(id);
-      return shift ? [[id, shift] as const] : [];
-    }));
-    const first = referencedShifts.values().next().value;
-    if (!first || referencedShifts.size !== referencedIds.length) return [];
-    return scheduleIntervals({ ...row, startDate: row.startDate > offsetDay(date, -1) ? row.startDate : offsetDay(date, -1), endDate: row.endDate < date ? row.endDate : date }, first, referencedShifts)
-      .map(([start, end]) => [Math.max(start, dayStart), Math.min(end, dayStart + 1440)] as const).filter(([start, end]) => start < end);
-  });
-  const conflict = intervals.some((list, index) => intervals.slice(index + 1).some(other => list.some(([start, end]) => other.some(([a, b]) => start < b && a < end))));
+  const conflictShifts = shifts.map(shift => shiftOnDay(shifts, cell, shift._id) ?? shift);
+  const conflict = assignmentsConflictOnDate(assignments.filter(row => row.employeeId === employee._id), date, conflictShifts);
   return {
     records: [...continuations, ...(assignment ? resolvedShifts.map(shift => ({ assignment, shift, continuation: false })) : [])],
     ...(previousCell && !previousAssignment && previousNightShifts.length ? {

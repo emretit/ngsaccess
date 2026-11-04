@@ -3,8 +3,6 @@ import { calculateSgkEksikGun, type SgkEksikGunInput } from "./sgkEksikGun";
 import { buildAphbXml, SGK_EKSIK_GUN_KODU, sgkCodeForLeaveType } from "./sgkCodes";
 import { trDateKey, trDayRangeISO } from "./trDate";
 
-const WEEKDAYS = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
-const ALL_DAYS = ["Pazar", ...WEEKDAYS, "Cumartesi"];
 const PAID_LEAVES = ["annual", "marriage", "bereavement", "paternity", "excuse", "compensatory", "lactation"];
 
 function monthDays(year: number, month: number): string[] {
@@ -17,6 +15,7 @@ function monthDays(year: number, month: number): string[] {
 function calculate(overrides: Partial<SgkEksikGunInput> = {}) {
   return calculateSgkEksikGun({
     monthDays: ["2026-06-01"], // Pazartesi
+    restDays: new Set((overrides.monthDays ?? ["2026-06-01"]).filter(day => [0, 6].includes(new Date(`${day}T00:00:00Z`).getUTCDay()))),
     holidayMap: new Map(),
     workedDays: new Set(),
     approvedLeaves: [],
@@ -89,15 +88,16 @@ describe("aylık eksik gün hesabı", () => {
     })).toEqual({ eksikGunSayisi: 0, eksikGunNedeni: null, primGunu: 30 });
   });
 
-  it("projenin özel çalışma günlerine uyar", () => {
+  it("kişinin tarih bazlı hafta tatillerine uyar", () => {
     expect(calculate({
       monthDays: ["2026-06-01", "2026-06-06", "2026-06-07"],
-      workingDays: ["Cumartesi"],
+      restDays: new Set(["2026-06-01", "2026-06-07"]),
     })).toEqual({ eksikGunSayisi: 1, eksikGunNedeni: "15", primGunu: 29 });
   });
 
-  it("boş çalışma günü ayarını Pazartesi–Cuma olarak kabul eder", () => {
-    expect(calculate({ workingDays: [] })).toEqual(calculate({ workingDays: WEEKDAYS }));
+  it("döngünün Çarşamba tatilini eksik saymaz, çalışılmayan Pazartesiyi sayar", () => {
+    expect(calculate({ monthDays: ["2026-06-01", "2026-06-03"], restDays: new Set(["2026-06-03"]) }))
+      .toEqual({ eksikGunSayisi: 1, eksikGunNedeni: "15", primGunu: 29 });
   });
 
   it("okuma varsa ücretsiz izinden eksik gün oluşturmaz", () => {
@@ -152,7 +152,7 @@ describe("aylık eksik gün hesabı", () => {
   });
 
   it("31 eksik günde prim gününü sıfırda sınırlar", () => {
-    expect(calculate({ monthDays: monthDays(2026, 7), workingDays: ALL_DAYS })).toEqual({
+    expect(calculate({ monthDays: monthDays(2026, 7), restDays: new Set() })).toEqual({
       eksikGunSayisi: 31, eksikGunNedeni: "15", primGunu: 0,
     });
   });
