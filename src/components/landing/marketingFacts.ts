@@ -5,8 +5,7 @@ export const marketingFacts = {
     'Plan kapsamı, çalışan kapasitesi ve ücretlendirme kuruluşunuzun ihtiyaçlarına göre netleştirilir.',
   mobileDescription:
     'Mobil uygulama yakında. Şimdilik işyerinizin web QR girişini kullanın; erişim için yöneticinize başvurun.',
-  heroCategory: 'Bulut PDKS ve Geçiş Kontrol',
-  heroTitle: "Kapıdaki her geçiş, Canlı İzleme'de.",
+  heroTitle: 'Bulut PDKS ve <br>Geçiş\u00a0Kontrol Sistemi',
   heroDescription:
     'Kart, terminal ve QR okutmaları puantaja dönüşür. Kapı yetkisi, vardiya ve izin aynı hesapta.',
   heroCaption: 'Ana Sayfa: günün özeti ve son kart okutmaları. Ekranlardaki veriler örnektir.',

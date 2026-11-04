@@ -14,13 +14,13 @@
   src: url('/fonts/overpass/overpass-700-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
-/* Width and font bounding metrics measured in Chromium at 1000px, Arial bold. */
+/* Bounding metrics measured in Chromium at 1000px, Arial bold; size-adjust re-measured 2026-11-04 against the hero title (fallback was ~2.7% wider) so the font swap rarely changes its line breaks. */
 @font-face {
   font-family: 'Overpass Fallback';
   src: local('Arial Bold'), local('Arial');
   font-style: normal;
   font-weight: 700;
-  size-adjust: 98.65493%;
+  size-adjust: 96.1%;
   ascent-override: 89.50389%;
   descent-override: 38.82219%;
   line-gap-override: 0%;
@@ -242,18 +242,8 @@
   max-width: 780px;
   text-wrap: balance;
 }
-.pub-hero-category {
-  display: block;
-  margin-bottom: 20px;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.4;
-  letter-spacing: 0;
-  color: hsl(var(--side-text));
-}
-.pub-hero-title {
-  display: block;
-  text-wrap: balance;
+.pub-hero h1 br {
+  display: none;
 }
 .pub-hero .pub-lead {
   font-size: 19px;
@@ -791,14 +781,6 @@ a.pub-contact-row:hover .pub-contact-icon {
     padding: 10px 14px;
     font-size: 14px;
     flex: 1;
-  }
-  .pub-hero-category {
-    font-size: 16px;
-    margin-bottom: 16px;
-  }
-  /* Keeps the title at three lines in both Overpass and its fallback; at ~405-425 px the two fonts wrap differently and the font swap shifted the live feed (CLS). */
-  .pub-hero-title {
-    max-width: 350px;
   }
   .pub-hero .pub-small {
     font-size: 13px;
