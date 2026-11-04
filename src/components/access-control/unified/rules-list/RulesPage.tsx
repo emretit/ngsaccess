@@ -64,19 +64,19 @@ export function RulesPage({
   return (
     <div className="space-y-3 min-w-0">
         <div className="min-w-0 overflow-x-auto rounded-md border">
-          <Table className="w-full table-fixed">
+          <Table resizeKey="access-rules" className="w-full table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Kural</TableHead>
-                <TableHead className="hidden lg:table-cell w-24">Kim</TableHead>
-                <TableHead className="hidden md:table-cell w-[24%]">
+                <TableHead columnId="rule">Kural</TableHead>
+                <TableHead columnId="people" className="hidden lg:table-cell w-24">Kim</TableHead>
+                <TableHead columnId="scope" className="hidden md:table-cell w-[24%]">
                   Nereye
                 </TableHead>
-                <TableHead className="hidden xl:table-cell w-40">
+                <TableHead columnId="schedule" className="hidden xl:table-cell w-40">
                   Ne zaman
                 </TableHead>
-                <TableHead className="w-24">Kural durumu</TableHead>
-                <TableHead className="w-14">
+                <TableHead columnId="status" className="w-24">Kural durumu</TableHead>
+                <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-14">
                   <span className="sr-only">İşlemler</span>
                 </TableHead>
               </TableRow>

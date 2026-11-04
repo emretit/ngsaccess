@@ -59,7 +59,7 @@ describe("StatusResults boş sonuç", () => {
 
   it("yükleme sırasında boş sonuç duyurmaz ve devam düğmesini devre dışı tutar", () => {
     const html = render("next-page", true);
-    expect(html).toMatch(/<tbody>.*Yükleniyor….*<\/tbody>/s);
+    expect(html).toMatch(/<tbody[^>]*>.*Yükleniyor….*<\/tbody>/s);
     expect(html).not.toContain("Bu filtrelerde kayıt bulunamadı.");
     expect(html).toContain('disabled=""');
     expect(html).toContain("Daha fazla yükle");

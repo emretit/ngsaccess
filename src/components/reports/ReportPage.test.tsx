@@ -27,7 +27,7 @@ describe('generic report display', () => {
     const hidden = toggleHiddenColumn([], 'department');
     vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(hidden) });
     const html = renderToStaticMarkup(<ReportPage projectId="project-a" definition={definition} rows={flattenDailyRows([dailySource([dailyCell()])])} meta={{ from: '2026-10-19', to: '2026-10-19' }} />);
-    expect(html).toContain('scope="col"'); expect(html).toContain('Ayşe Yılmaz'); expect(html).not.toContain('Üretim'); expect(html).not.toContain('>Departman</th>');
+    expect(html).toContain('scope="col"'); expect(html).toContain('Ayşe Yılmaz'); expect(html).not.toContain('Üretim'); expect(html).not.toContain('data-column-id="department"');
     expect(toggleHiddenColumn(hidden, 'department')).toEqual([]);
   });
   it('can reveal a column that is hidden by default and ignores malformed storage', () => {
@@ -102,7 +102,7 @@ describe('generic report display', () => {
     cell.detail.punches = [{ time: '08:58', direction: 'entry' }];
     mocks.query.mockReturnValue([dailySource([cell])]);
     const html = renderToStaticMarkup(<ReportResults definition={card} {...props} />);
-    expect(html).toContain('08:58 Giriş'); expect(html).toContain('whitespace-normal'); expect(html).not.toContain('Biyometrik doğrulamalı');
+    expect(html).toContain('08:58 Giriş'); expect(html).toMatch(/<td[^>]*class="[^"]*max-w-full truncate[^"]*"[^>]*title="08:58 Giriş">08:58 Giriş<\/td>/); expect(html).not.toContain('Biyometrik doğrulamalı');
     expect(mocks.query.mock.calls[1]?.[1]).toMatchObject({ viewMode: 'matrix', startDate: props.from, endDate: props.to, includePunches: true });
   });
 });
@@ -203,8 +203,8 @@ it('displays one summary row per person and labels the specialized exports', () 
 
 it.each([false, true])('keeps report headers and a spanning status row when loading=%s', loading => {
   const html = renderToStaticMarkup(<ReportPage definition={definition} rows={[]} loading={loading} onClear={() => undefined} meta={{ from: '2026-10-19', to: '2026-10-19' }} />);
-  expect(html).toContain('>Ad Soyad</th>');
-  expect(html).toContain('>Departman</th>');
+  expect(html).toMatch(/data-column-id="name"[^>]*>Ad Soyad<span[^>]*role="separator"/);
+  expect(html).toMatch(/data-column-id="department"[^>]*>Departman<span[^>]*role="separator"/);
   expect(html).toContain('colSpan="2"');
   expect(html).toContain(loading ? 'Rapor yükleniyor…' : 'Filtreleri temizle');
 });

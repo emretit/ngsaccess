@@ -92,6 +92,13 @@ const statuses = {
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Beklenmeyen bir hata oluştu.";
 
+function validityLabel(valid: Parameters<typeof importedValidity>[0]) {
+  if (valid?.enable === false) return "Tarih sınırı kapalı";
+  const dates = importedValidity(valid, Date.now());
+  const format = (value?: string) => value ? new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "Bilgi yok";
+  return `${format(dates.accessStartsAt)} – ${format(dates.accessExpiresAt)} (Türkiye saati)`;
+}
+
 function PersonImport({ device, connected, canBiometrics, canManageAccess, onPendingChange, onImported }: {
 device: ServerDevice; connected: boolean; canBiometrics: boolean; canManageAccess: boolean; onPendingChange: (pending: boolean) => void;
 onImported: (result: DeviceImportResult) => void;
@@ -207,12 +214,13 @@ onImported: (result: DeviceImportResult) => void;
               )}
               <div className="min-w-0 max-w-full">
                 <Table
+                  resizeKey="device-person-import"
                   className="table-fixed [&_th]:px-1"
                   aria-label="Cihazdaki kişiler"
                 >
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-10">
+                      <TableHead columnId="select" resizable={false} resizeLabel="Kişi seçimi" className="w-10">
                         <ListSelectAll
                           label="Tüm aktarılabilir kişileri seç"
                           disabled={disabled || newRows.length === 0}
@@ -227,13 +235,13 @@ onImported: (result: DeviceImportResult) => void;
                           }}
                         />
                       </TableHead>
-                      <TableHead className="break-words">
+                      <TableHead columnId="employee-number" className="break-words">
                         Cihaz kişi no
                       </TableHead>
-                      <TableHead>Ad</TableHead>
-                      <TableHead>Kart</TableHead>
-                      <TableHead className="break-words">Parmak izi</TableHead>
-                      <TableHead>Durum</TableHead>
+                      <TableHead columnId="name">Ad</TableHead>
+                      <TableHead columnId="cards">Kart</TableHead>
+                      <TableHead columnId="fingerprints" className="break-words">Parmak izi</TableHead>
+                      <TableHead columnId="status">Durum</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -259,20 +267,16 @@ onImported: (result: DeviceImportResult) => void;
                             onCheckedChange={() => togglePerson(row.employeeNo)}
                           />
                         </TableCell>
-                        <TableCell className="break-all px-1">
+                        <TableCell className="truncate px-1" title={row.employeeNo}>
                           {row.employeeNo}
                         </TableCell>
-                        <TableCell className="break-words px-1">
-                          {row.name}
-                          <p className="mt-1 text-xs text-muted-foreground">Kapılar: {row.doorRight || "Bilgi yok"}</p>
-                          <p className="text-xs text-muted-foreground">Kapı planları: {row.rightPlans?.map(plan => `${plan.doorNo}: ${plan.planTemplateNo}`).join("; ") || "Bilgi yok"}</p>
-                          <p className="text-xs text-muted-foreground">Geçerlilik: {row.valid?.enable === false ? "Tarih sınırı kapalı" : (() => {
-                            const dates = importedValidity(row.valid, Date.now());
-                            const format = (value?: string) => value ? new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "Bilgi yok";
-                            return `${format(dates.accessStartsAt)} – ${format(dates.accessExpiresAt)} (Türkiye saati)`;
-                          })()}</p>
+                        <TableCell className="px-1">
+                          <p className="truncate" title={row.name}>{row.name}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground" title={`Kapılar: ${row.doorRight || "Bilgi yok"}`}>Kapılar: {row.doorRight || "Bilgi yok"}</p>
+                          <p className="truncate text-xs text-muted-foreground" title={`Kapı planları: ${row.rightPlans?.map(plan => `${plan.doorNo}: ${plan.planTemplateNo}`).join("; ") || "Bilgi yok"}`}>Kapı planları: {row.rightPlans?.map(plan => `${plan.doorNo}: ${plan.planTemplateNo}`).join("; ") || "Bilgi yok"}</p>
+                          <p className="truncate text-xs text-muted-foreground" title={`Geçerlilik: ${validityLabel(row.valid)}`}>Geçerlilik: {validityLabel(row.valid)}</p>
                         </TableCell>
-                        <TableCell className="break-all px-1">
+                        <TableCell className="truncate px-1" title={row.cards.length ? row.cards.join(", ") : "Kartsız"}>
                           {row.cards.length ? row.cards.join(", ") : "Kartsız"}
                         </TableCell>
                         <TableCell className="px-1">
@@ -289,7 +293,7 @@ onImported: (result: DeviceImportResult) => void;
                             <p className="mt-1 text-xs text-muted-foreground">Parmak izi ngsplus'a aktarılacak</p>
                           )}
                           {row.reason && (
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-1 truncate text-xs text-muted-foreground" title={row.reason}>
                               {row.reason}
                             </p>
                           )}

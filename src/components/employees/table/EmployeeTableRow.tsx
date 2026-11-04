@@ -76,6 +76,7 @@ export function EmployeeTableRow({
             <button
               type="button"
               className="max-w-full truncate text-left font-medium"
+              title={`${employee.firstName} ${employee.lastName}`}
               onClick={() => onViewDetails(employee)}
             >
               {employee.firstName} {employee.lastName}
@@ -91,23 +92,23 @@ export function EmployeeTableRow({
           </div>
         </div>
       </TableCell>
-      <TableCell className="hidden truncate min-[1100px]:table-cell">
+      <TableCell className="hidden truncate min-[1100px]:table-cell" title={employee.email}>
         {employee.email}
       </TableCell>
       {showCompany && (
-        <TableCell className="hidden truncate min-[1100px]:table-cell">
+        <TableCell className="hidden truncate min-[1100px]:table-cell" title={employee.companies?.name ?? "—"}>
           {employee.companies?.name ?? "—"}
         </TableCell>
       )}
       {showDepartment && (
-        <TableCell className="hidden truncate min-[760px]:table-cell">
+        <TableCell className="hidden truncate min-[760px]:table-cell" title={employee.departments?.name ?? "Atanmamış"}>
           {employee.departments?.name ?? "Atanmamış"}
         </TableCell>
       )}
-      <TableCell className="hidden truncate min-[1100px]:table-cell">
+      <TableCell className="hidden truncate min-[1100px]:table-cell" title={employee.positions?.name ?? "—"}>
         {employee.positions?.name ?? "—"}
       </TableCell>
-      <TableCell className="hidden truncate tabular-nums min-[760px]:table-cell">
+      <TableCell className="hidden truncate tabular-nums min-[760px]:table-cell" title={employee.cardNumber || "—"}>
         {employee.cardNumber || "—"}
       </TableCell>
       {biometrics !== undefined && (

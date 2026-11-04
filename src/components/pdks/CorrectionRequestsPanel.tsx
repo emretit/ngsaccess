@@ -78,22 +78,22 @@ export function CorrectionRequestsPanel({
         <EmptyState title="Bekleyen düzeltme talebi yok." />
       ) : (
         <div className="overflow-x-auto">
-          <Table>
+          <Table resizeKey="pdks-correction-requests">
             <TableHeader>
               <TableRow>
-                <TableHead>Çalışan</TableHead>
-                <TableHead>Tarih</TableHead>
-                <TableHead>Tür</TableHead>
-                <TableHead>İstenen giriş / çıkış</TableHead>
-                <TableHead>Gerekçe</TableHead>
-                <TableHead>Talep zamanı</TableHead>
-                <TableHead>İşlemler</TableHead>
+                <TableHead columnId="employee" className="w-[200px]">Çalışan</TableHead>
+                <TableHead columnId="date">Tarih</TableHead>
+                <TableHead columnId="type">Tür</TableHead>
+                <TableHead columnId="requested-times">İstenen giriş / çıkış</TableHead>
+                <TableHead columnId="reason">Gerekçe</TableHead>
+                <TableHead columnId="created-at">Talep zamanı</TableHead>
+                <TableHead columnId="actions" resizable={false}>İşlemler</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {result.page.map((row) => (
                 <TableRow key={row._id}>
-                  <TableCell>{row.employeeName}</TableCell>
+                  <TableCell className="truncate" title={row.employeeName}>{row.employeeName}</TableCell>
                   <TableCell>
                     {row.date.split("-").reverse().join(".")}
                   </TableCell>
@@ -110,7 +110,7 @@ export function CorrectionRequestsPanel({
                     {row.requestedCheckIn || "—"} /{" "}
                     {row.requestedCheckOut || "—"}
                   </TableCell>
-                  <TableCell className="max-w-xs whitespace-pre-wrap break-words">
+                  <TableCell className="max-w-full truncate" title={row.reason}>
                     {row.reason}
                   </TableCell>
                   <TableCell>

@@ -79,7 +79,7 @@ describe('denetim kaydı audit düzeltmeleri', () => {
   const html = renderToStaticMarkup(<MemoryRouter initialEntries={['/audit-log?start=2026-10-20&end=2026-10-19']}><AuditLog /></MemoryRouter>);
   expect(html.match(/Başlangıç tarihi bitiş tarihinden sonra olamaz\./g)).toHaveLength(1);
   expect(html).toContain('<thead');
-  expect(html).toMatch(/<tbody>.*Geçerli bir tarih aralığı seçilince kayıtlar listelenir\./s);
+  expect(html).toMatch(/<tbody[^>]*>.*Geçerli bir tarih aralığı seçilince kayıtlar listelenir\./s);
   expect(html).not.toContain('Tarih aralığını düzeltin.');
   expect(html).toContain('Hangi eylemler kaydedilir');
  });

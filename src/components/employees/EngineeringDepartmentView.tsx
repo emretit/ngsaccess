@@ -43,12 +43,12 @@ export function EngineeringDepartmentView() {
         <CardTitle>Engineering Departmanı Çalışanları</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
+        <Table resizeKey="engineering-employees">
           <TableHeader>
             <TableRow>
-              <TableHead>Adı Soyadı</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Pozisyon</TableHead>
+              <TableHead columnId="name">Adı Soyadı</TableHead>
+              <TableHead columnId="email">Email</TableHead>
+              <TableHead columnId="position">Pozisyon</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -76,11 +76,11 @@ export function EngineeringDepartmentView() {
                   positionName?: string;
                 }) => (
                   <TableRow key={employee._id}>
-                    <TableCell>
+                    <TableCell className="truncate" title={`${employee.firstName ?? ""} ${employee.lastName ?? ""}`.trim()}>
                       {employee.firstName} {employee.lastName}
                     </TableCell>
-                    <TableCell>{employee.email}</TableCell>
-                    <TableCell>{employee.positionName ?? "-"}</TableCell>
+                    <TableCell className="truncate" title={employee.email}>{employee.email}</TableCell>
+                    <TableCell className="truncate" title={employee.positionName ?? "-"}>{employee.positionName ?? "-"}</TableCell>
                   </TableRow>
                 ),
               )

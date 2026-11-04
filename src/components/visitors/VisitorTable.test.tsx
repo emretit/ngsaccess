@@ -8,6 +8,10 @@ describe("Ziyaretçi tablosu durumları", () => {
     const html = renderToStaticMarkup(<VisitorTable visitors={[]} loading={loading} onOpen={vi.fn()} emptyState={<EmptyState title="Arama devam ediyor" action={{ label: "Daha fazla kayıt tara", onClick: vi.fn() }} />} />);
     expect(html).toContain("<thead");
     expect(html.match(/<th /g)).toHaveLength(7);
+    for (const id of ["name", "host", "access-region", "valid-until", "access", "presence", "actions"]) {
+      expect(html).toContain(`data-column-id="${id}"`);
+    }
+    expect(html.match(/role="separator"/g)).toHaveLength(6);
     expect(html).toContain('colSpan="7"');
     expect(html).toMatch(loading ? /<tbody.*aria-busy="true"/s : /<tbody.*Daha fazla kayıt tara/s);
   });

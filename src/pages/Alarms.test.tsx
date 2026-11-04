@@ -14,7 +14,7 @@ describe("Alarm tablosu durumları", () => {
     try {
       const html = renderToStaticMarkup(<MemoryRouter><Alarms /></MemoryRouter>);
       expect(html).toContain("<thead");
-      expect(html).toMatch(/<tbody>.*aria-busy="true"/s);
+      expect(html).toMatch(/<tbody[^>]*>.*aria-busy="true"/s);
     } finally { state.scopeLoading = false; }
   });
   it.each([[false, false], [true, false], [false, true], [true, true]])("yetkilere göre boş ve yükleme satırının kolon sayısını korur (%s, %s)", (manage, admin) => {
@@ -27,7 +27,7 @@ describe("Alarm tablosu durumları", () => {
       expect(html).toContain("<thead");
       expect(html.match(/<th /g)).toHaveLength(columns);
       expect(html).toContain(`colSpan="${columns}"`);
-      expect(html).toMatch(pageStatus === "LoadingFirstPage" ? /<tbody>.*aria-busy="true"/s : /<tbody>.*(?:Olay bulunamadı|Daha fazla yükle)/s);
+      expect(html).toMatch(pageStatus === "LoadingFirstPage" ? /<tbody[^>]*>.*aria-busy="true"/s : /<tbody[^>]*>.*(?:Olay bulunamadı|Daha fazla yükle)/s);
       if (pageStatus === "CanLoadMore") expect(html).toContain("Tarama sınırına ulaşıldı");
     }
   });

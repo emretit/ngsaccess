@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import type { ReactNode } from "react";
 import { TableStateRow } from "@/components/shared/TableStateRow";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -95,24 +96,26 @@ export function PDKSTableView({
         )
       }
       desktop={
-        <table className="w-full table-fixed border-collapse text-xs">
+        <Table resizeKey="pdks-daily-records" className="w-full table-fixed border-collapse text-xs">
           <caption className="sr-only">
             Günlük PDKS kayıtları. Saatler İstanbul saatidir. Toplam süreden
             mola düşülmüştür.
           </caption>
-          <thead className="sticky top-0 bg-muted">
-            <tr className="h-9 border-b">
-              <th className="w-9 px-2">
+          <TableHeader className="sticky top-0 bg-muted">
+            <TableRow className="h-9 border-b">
+              <TableHead columnId="select" resizable={false} resizeLabel="Çalışan seçimi" className="w-9 px-2">
                 <ListSelectAll
                   label="Görünen tüm çalışanları seç"
                   checked={checked}
                   onChange={selectAll}
                   disabled={loading || records.length === 0}
                 />
-              </th>
+              </TableHead>
               {columns.map((c) => (
-                <th
+                <TableHead
                   key={c.key}
+                  columnId={c.key}
+                  resizeLabel={c.label}
                   className={`px-2 text-left font-medium ${c.key === "name" ? "w-[21%]" : c.key === "status" ? "w-[20%]" : ""}`}
                   aria-sort={
                     sort.key === c.key
@@ -138,14 +141,14 @@ export function PDKSTableView({
                     {sort.key === c.key &&
                       (sort.direction === "asc" ? " ↑" : " ↓")}
                   </button>
-                </th>
+                </TableHead>
               ))}
-              <th className="w-11">
+              <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-11">
                 <span className="sr-only">İşlemler</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {loading ? (
               <TableStateRow
                 colSpan={columns.length + 2}
@@ -160,7 +163,7 @@ export function PDKSTableView({
               </TableStateRow>
             ) : (
               rows.map((r) => (
-                <tr
+                <TableRow
                   key={r.id}
                   className={`h-[42px] ${r.noShift ? "bg-muted text-muted-foreground hover:bg-muted" : "hover:bg-muted/50"} border-b ${onShowDetail ? ROW_CLICK_CLASS : ""} ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
                   onClick={
@@ -171,30 +174,31 @@ export function PDKSTableView({
                       : undefined
                   }
                 >
-                  <td className="px-2" onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="px-2" onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={selectedIds.has(r.id)}
                       aria-label={`${r.name} seç`}
                       onCheckedChange={() => toggle(r.id)}
                     />
-                  </td>
-                  <td className="px-2 py-1">
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
                     <button
-                      className="text-left font-medium break-words"
+                      className="max-w-full truncate text-left font-medium"
+                      title={r.name}
                       onClick={() => onShowDetail?.(r.id as Id<"employees">)}
                     >
                       {r.name}
                     </button>
                     <PdksPlanSummary day={singleRowDay(r)} />
-                  </td>
-                  <td className="break-words px-2">{r.department || "—"}</td>
-                  <td className="px-2 tabular-nums">
+                  </TableCell>
+                  <TableCell className="truncate px-2" title={r.department || "—"}>{r.department || "—"}</TableCell>
+                  <TableCell className="px-2 tabular-nums">
                     {displayTime(r.firstEntry)}
-                  </td>
-                  <td className="px-2 tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-2 tabular-nums">
                     {displayTime(r.lastExit)}
-                  </td>
-                  <td className="px-2 tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-2 tabular-nums">
                     {r.noShift ? (
                       "—"
                     ) : (
@@ -210,8 +214,8 @@ export function PDKSTableView({
                         Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}
                       </span>
                     )}
-                  </td>
-                  <td className="px-2 tabular-nums">
+                  </TableCell>
+                  <TableCell className="px-2 tabular-nums">
                     {r.noShift ? (
                       "—"
                     ) : (
@@ -221,11 +225,11 @@ export function PDKSTableView({
                         measured={r.durationMeasured}
                       />
                     )}
-                  </td>
-                  <td className="px-2 py-1">
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
                     <PdksRowStatus record={r} />
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <RowActions label={`${r.name} işlemleri`}>
                       <DropdownMenuItem
                         onClick={() => onShowDetail?.(r.id as Id<"employees">)}
@@ -233,12 +237,12 @@ export function PDKSTableView({
                         Gün detayını aç
                       </DropdownMenuItem>
                     </RowActions>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       }
     />
   );

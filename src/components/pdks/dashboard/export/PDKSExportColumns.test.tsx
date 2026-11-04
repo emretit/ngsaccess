@@ -9,8 +9,11 @@ describe('PDKS export column controls', () => {
     const preferences = { ...defaultPDKSPreferences(), orderedColumnKeys: ['department', 'name'] };
     const html = renderToStaticMarkup(<PDKSExportColumns canSeePay={false} records={Array.from({ length: 6 }, (_, i) => ({ ...record, id: String(i), name: `Kişi-${i}` }))} preferences={preferences} onChange={() => {}} />);
     expect(html).toContain('Kişi-4'); expect(html).not.toContain('Kişi-5');
-    expect(html.indexOf('>Departman</th>')).toBeLessThan(html.indexOf('>Çalışan</th>'));
-    expect(html).not.toContain('>Kart no</th>');
+    const header = html.match(/<thead[\s\S]*?<\/thead>/)?.[0] ?? '';
+    expect(header).toMatch(/data-column-id="department"[^>]*>Departman<span[^>]*role="separator"/);
+    expect(header).toMatch(/data-column-id="name"[^>]*>Çalışan<span[^>]*role="separator"/);
+    expect(header.indexOf('data-column-id="department"')).toBeLessThan(header.indexOf('data-column-id="name"'));
+    expect(header).not.toContain('>Kart no<');
     expect(html).toContain('aria-label="Çalışan yukarı"'); expect(html).toContain('aria-label="Departman aşağı"');
     expect(html).toContain('Varsayılana dön'); expect(html).toContain('En az bir kolon');
   });

@@ -227,17 +227,17 @@ function AdminDevicesContent() {
         </AdminSelect>
       </FilterBar>
         <ResponsiveResults label="Cihaz havuzu" desktop={
-            <Table className="table-fixed">
+            <Table resizeKey="admin-devices" className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[25%]">Ad / kimlik</TableHead>
-                  <TableHead>Marka</TableHead>
-                  <TableHead className="w-16">Kapı</TableHead>
-                  <TableHead className="w-[24%]">
+                  <TableHead columnId="identity" className="w-[25%]">Ad / kimlik</TableHead>
+                  <TableHead columnId="brand">Marka</TableHead>
+                  <TableHead columnId="doors" className="w-16">Kapı</TableHead>
+                  <TableHead columnId="connection" className="w-[24%]">
                     Bağlantı / son görülme
                   </TableHead>
-                  <TableHead>Proje</TableHead>
-                  <TableHead className="w-14">
+                  <TableHead columnId="project">Proje</TableHead>
+                  <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-14">
                     <span className="sr-only">İşlemler</span>
                   </TableHead>
                 </TableRow>
@@ -252,26 +252,27 @@ function AdminDevicesContent() {
                   >
                     <TableCell>
                       <button
-                        className="break-words text-left font-medium"
+                        className="block max-w-full truncate text-left font-medium"
+                        title={device.name}
                         onClick={() => setDialog({ device })}
                       >
                         {device.name}
                       </button>
-                      <p className="break-all text-xs text-muted-foreground">
+                      <p className="truncate text-xs text-muted-foreground" title={identity(device)}>
                         {identity(device)}
                       </p>
                     </TableCell>
-                    <TableCell>{brandLabel(device.brand)}</TableCell>
+                    <TableCell className="truncate" title={brandLabel(device.brand)}>{brandLabel(device.brand)}</TableCell>
                     <TableCell className="tabular-nums">
                       {device.ideDoorCount ?? "—"}
                     </TableCell>
                     <TableCell>
                       {status(device)}
-                      <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                      <p className="mt-1 truncate text-xs tabular-nums text-muted-foreground" title={adminDate(device.lastSeen)}>
                         {adminDate(device.lastSeen)}
                       </p>
                     </TableCell>
-                    <TableCell className="break-words">
+                    <TableCell className="truncate" title={assignment(device)}>
                       {assignment(device)}
                     </TableCell>
                     <TableCell className="px-1">{actions(device)}</TableCell>

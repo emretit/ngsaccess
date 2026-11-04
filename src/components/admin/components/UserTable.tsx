@@ -79,11 +79,11 @@ export function UserTable({
     canManage
       ? onRowActivate(() => onEditUser(user))
       : undefined;
-  const identity = (user: User) => (
+  const identity = (user: User, desktop = false) => (
     <>
-      <p className="break-words font-medium">{userName(user)}</p>
+      <p className={desktop ? "truncate font-medium" : "break-words font-medium"} title={desktop ? userName(user) : undefined}>{userName(user)}</p>
       <AccountAccessBadges user={user} />
-      {user.email && userName(user) !== user.email && <p className="break-all text-xs text-muted-foreground">{user.email}</p>}
+      {user.email && userName(user) !== user.email && <p className={desktop ? "truncate text-xs text-muted-foreground" : "break-all text-xs text-muted-foreground"} title={desktop ? user.email : undefined}>{user.email}</p>}
       {"pendingSetup" in user && user.pendingSetup && (
         <p className="text-xs text-muted-foreground">
           E-posta doğrulaması bekliyor
@@ -95,13 +95,13 @@ export function UserTable({
     <>
       {accessDialog && <AccountAccessDialog user={accessDialog.user} mode={accessDialog.mode} onClose={() => setAccessDialog(null)} />}
       <ResponsiveResults label="Kullanıcılar" desktop={
-        <Table className="table-fixed">
+        <Table resizeKey="admin-users" className="table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[38%]">Kullanıcı</TableHead>
-              <TableHead className="w-[20%]">Rol</TableHead>
-              <TableHead>Projeler</TableHead>
-              <TableHead className="w-14">
+              <TableHead columnId="user" className="w-[38%]">Kullanıcı</TableHead>
+              <TableHead columnId="role" className="w-[20%]">Rol</TableHead>
+              <TableHead columnId="projects">Projeler</TableHead>
+              <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-14">
                 <span className="sr-only">İşlemler</span>
               </TableHead>
             </TableRow>
@@ -110,9 +110,9 @@ export function UserTable({
             {loading ? <TableStateRow colSpan={4} state="loading" label="Kullanıcılar yükleniyor" /> : users.length === 0 && emptyState ? <TableStateRow colSpan={4} state="custom">{emptyState}</TableStateRow> : null}
             {users.map((user) => (
               <TableRow key={user._id} className={rowClass} onClick={openUser(user)}>
-                <TableCell>{identity(user)}</TableCell>
+                <TableCell>{identity(user, true)}</TableCell>
                 <TableCell>{role(user)}</TableCell>
-                <TableCell className="break-words">
+                <TableCell className="truncate" title={membership(user)}>
                   {membership(user)}
                 </TableCell>
                 <TableCell className="px-1">{actions(user)}</TableCell>

@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import type { ReactNode } from "react";
 import { TableStateRow } from "@/components/shared/TableStateRow";
 import { Button } from '@/components/ui/button';
@@ -7,17 +8,17 @@ import { actionLabels, timestampFormat, type AuditRow } from './auditState';
 import { onRowActivate, ROW_CLICK_CLASS } from '@/lib/tableRowClick';
 
 export function AuditTable({ rows, allProjects, onSelect, loading = false, message, emptyTitle = "Henüz denetim kaydı yok", emptyDescription }: { loading?: boolean; message?: ReactNode; emptyTitle?: string; emptyDescription?: string; rows: AuditRow[]; allProjects?: boolean; onSelect: (row: AuditRow, trigger: HTMLButtonElement) => void }) {
-  return <div className="min-w-0 overflow-x-auto rounded-md border"><table className="w-full table-fixed text-left text-xs" aria-label="Denetim kayıtları">
-    <thead className="h-9 border-b bg-muted/40 text-muted-foreground"><tr>
-      <th scope="col" className="hidden w-[172px] px-3 font-medium lg:table-cell">Zaman (TR)</th><th scope="col" className="hidden w-[140px] px-3 font-medium lg:table-cell">Kullanıcı</th><th scope="col" className="w-[104px] px-3 font-medium">Eylem</th><th scope="col" className="px-3 font-medium md:w-[150px]">Varlık</th>
-      {allProjects && <th scope="col" className="hidden w-[140px] px-3 font-medium xl:table-cell">Proje</th>}<th scope="col" className="hidden px-3 font-medium md:table-cell">Not</th><th scope="col" className="w-[76px] px-2 font-medium"><span className="sr-only">Ayrıntı</span></th>
-    </tr></thead>
-    <tbody>{message ? <TableStateRow colSpan={6 + (allProjects ? 1 : 0)} state="custom">{message}</TableStateRow> : loading ? <TableStateRow colSpan={6 + (allProjects ? 1 : 0)} state="loading" label="Denetim kayıtları yükleniyor…" /> : !rows.length ? <TableStateRow colSpan={6 + (allProjects ? 1 : 0)} state="empty" title={emptyTitle} description={emptyDescription} /> : rows.map(row => { const actor = row.userName ?? (row.userId ? 'Silinmiş kullanıcı' : 'Sistem'); return <tr key={row._id} className={`h-[42px] border-b last:border-0 hover:bg-muted/30 ${ROW_CLICK_CLASS}`} onClick={onRowActivate(event => { const trigger = event.currentTarget.querySelector('button'); if (trigger) onSelect(row, trigger); })}>
-      <td className="hidden px-3 tabular-nums lg:table-cell"><time dateTime={new Date(row.timestamp).toISOString()}>{timestampFormat.format(row.timestamp)}</time></td><td className="hidden [overflow-wrap:anywhere] px-3 lg:table-cell">{actor}</td>
-      <td className="px-3 py-2"><StatusBadge tone={row.action === 'delete' ? 'danger' : row.action === 'create' ? 'success' : 'info'}>{actionLabels[row.action]}</StatusBadge></td>
-      <td className="min-w-0 break-words px-3 py-2"><span>{AUDIT_TARGET_LABELS[row.targetTable] ?? row.targetTable}</span><div className="mt-1 break-words text-muted-foreground lg:hidden">{actor}<br /><time className="tabular-nums">{timestampFormat.format(row.timestamp)}</time></div>{allProjects && <div className="mt-1 break-words text-muted-foreground xl:hidden">{row.projectName}</div>}</td>
-      {allProjects && <td className="hidden truncate px-3 xl:table-cell">{row.projectName}</td>}<td className="hidden truncate px-3 text-muted-foreground md:table-cell">{row.note || '—'}</td>
-      <td className="px-1"><Button variant="ghost" size="sm" className="min-h-10 px-2 text-xs" aria-haspopup="dialog" aria-label={`${timestampFormat.format(row.timestamp)} · ${actor} · Olay ayrıntısı`} onClick={event => onSelect(row, event.currentTarget)}>Ayrıntı</Button></td>
-    </tr>; })}</tbody>
-  </table></div>;
+  return <div className="min-w-0 overflow-x-auto rounded-md border"><Table resizeKey="audit-log" className="w-full table-fixed text-left text-xs" aria-label="Denetim kayıtları">
+    <TableHeader className="h-9 border-b bg-muted/40 text-muted-foreground"><TableRow>
+      <TableHead columnId="time" scope="col" className="hidden w-[172px] px-3 font-medium lg:table-cell">Zaman (TR)</TableHead><TableHead columnId="actor" scope="col" className="hidden w-[140px] px-3 font-medium lg:table-cell">Kullanıcı</TableHead><TableHead columnId="action" scope="col" className="w-[104px] px-3 font-medium">Eylem</TableHead><TableHead columnId="target" scope="col" className="px-3 font-medium md:w-[150px]">Varlık</TableHead>
+      {allProjects && <TableHead columnId="project" scope="col" className="hidden w-[140px] px-3 font-medium xl:table-cell">Proje</TableHead>}<TableHead columnId="note" scope="col" className="hidden px-3 font-medium md:table-cell">Not</TableHead><TableHead columnId="actions" resizable={false} resizeLabel="Ayrıntı" scope="col" className="w-[76px] px-2 font-medium"><span className="sr-only">Ayrıntı</span></TableHead>
+    </TableRow></TableHeader>
+    <TableBody>{message ? <TableStateRow colSpan={6 + (allProjects ? 1 : 0)} state="custom">{message}</TableStateRow> : loading ? <TableStateRow colSpan={6 + (allProjects ? 1 : 0)} state="loading" label="Denetim kayıtları yükleniyor…" /> : !rows.length ? <TableStateRow colSpan={6 + (allProjects ? 1 : 0)} state="empty" title={emptyTitle} description={emptyDescription} /> : rows.map(row => { const actor = row.userName ?? (row.userId ? 'Silinmiş kullanıcı' : 'Sistem'); return <TableRow key={row._id} className={`h-[42px] border-b last:border-0 hover:bg-muted/30 ${ROW_CLICK_CLASS}`} onClick={onRowActivate(event => { const trigger = event.currentTarget.querySelector('button'); if (trigger) onSelect(row, trigger); })}>
+      <TableCell className="hidden px-3 tabular-nums lg:table-cell"><time dateTime={new Date(row.timestamp).toISOString()}>{timestampFormat.format(row.timestamp)}</time></TableCell><TableCell className="hidden [overflow-wrap:anywhere] px-3 lg:table-cell">{actor}</TableCell>
+      <TableCell className="px-3 py-2"><StatusBadge tone={row.action === 'delete' ? 'danger' : row.action === 'create' ? 'success' : 'info'}>{actionLabels[row.action]}</StatusBadge></TableCell>
+      <TableCell className="min-w-0 break-words px-3 py-2"><span className="block truncate" title={AUDIT_TARGET_LABELS[row.targetTable] ?? row.targetTable}>{AUDIT_TARGET_LABELS[row.targetTable] ?? row.targetTable}</span><div className="mt-1 break-words text-muted-foreground lg:hidden">{actor}<br /><time className="tabular-nums">{timestampFormat.format(row.timestamp)}</time></div>{allProjects && <div className="mt-1 break-words text-muted-foreground xl:hidden">{row.projectName}</div>}</TableCell>
+      {allProjects && <TableCell title={row.projectName} className="hidden truncate px-3 xl:table-cell">{row.projectName}</TableCell>}<TableCell title={row.note || "—"} className="hidden truncate px-3 text-muted-foreground md:table-cell">{row.note || '—'}</TableCell>
+      <TableCell className="px-1"><Button variant="ghost" size="sm" className="min-h-10 px-2 text-xs" aria-haspopup="dialog" aria-label={`${timestampFormat.format(row.timestamp)} · ${actor} · Olay ayrıntısı`} onClick={event => onSelect(row, event.currentTarget)}>Ayrıntı</Button></TableCell>
+    </TableRow>; })}</TableBody>
+  </Table></div>;
 }

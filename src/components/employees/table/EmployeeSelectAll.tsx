@@ -10,7 +10,7 @@ export function EmployeeSelectAll({
   onSelectAll: (checked: boolean) => void;
 }) {
   return (
-    <TableHead className="w-11 px-2">
+    <TableHead columnId="select" resizable={false} className="w-11 px-2">
       <ListSelectAll
         label="Bu sayfadaki personeli seç"
         disabled={disabled}

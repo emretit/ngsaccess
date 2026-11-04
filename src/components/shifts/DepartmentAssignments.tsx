@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { useState } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -27,13 +28,13 @@ export function DepartmentAssignments({ projectId }: { projectId: Id<'projects'>
   const name = (row: DepartmentAssignment) => labels.get(row.departmentId) ?? departmentPath(row.departmentId, departments ?? []);
   return <section className="mt-6 space-y-3 border-t pt-4" aria-label="Departman atamaları">
     <h3 className="font-semibold">Departman atamaları</h3>
-    {!assignments || !departments || !shifts ? <SectionSkeleton label="Departman atamaları yükleniyor" /> : !assignments.length ? <p className="text-sm text-muted-foreground">Henüz departman ataması yok.</p> : <div className="overflow-x-auto"><table className="w-full text-sm">
-      <thead><tr className="border-b text-left"><th className="p-2">Departman</th><th className="p-2">Desen</th><th className="p-2">Tarih aralığı</th><th className="p-2"><span className="sr-only">İşlemler</span></th></tr></thead>
-      <tbody>{assignments.map(row => <tr key={row._id} className={`border-b ${can('schedule.manage') ? ROW_CLICK_CLASS : ''}`} onClick={can('schedule.manage') ? onRowActivate(() => setEdit(row)) : undefined}>
-        <td className="p-2">{name(row)}</td><td className="p-2">{planSummary(row.plan)}</td><td className="p-2 whitespace-nowrap">{shortDate(row.startDate)}–{shortDate(row.endDate)}</td>
-        <td className="p-2">{can('schedule.manage') && <div className="flex gap-1"><Button variant="ghost" onClick={() => setEdit(row)} aria-label={`${name(row)} atamasını düzenle`}>Düzenle</Button><Button variant="ghost" onClick={() => setDeleting(row)} aria-label={`${name(row)} atamasını sil`}>Sil</Button></div>}</td>
-      </tr>)}</tbody>
-    </table></div>}
+    {!assignments || !departments || !shifts ? <SectionSkeleton label="Departman atamaları yükleniyor" /> : !assignments.length ? <p className="text-sm text-muted-foreground">Henüz departman ataması yok.</p> : <div className="overflow-x-auto"><Table resizeKey="shift-department-assignments" className="w-full text-sm">
+      <TableHeader><TableRow className="border-b text-left"><TableHead columnId="department" className="p-2">Departman</TableHead><TableHead columnId="pattern" className="p-2">Desen</TableHead><TableHead columnId="date-range" className="p-2">Tarih aralığı</TableHead><TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="p-2"><span className="sr-only">İşlemler</span></TableHead></TableRow></TableHeader>
+      <TableBody>{assignments.map(row => <TableRow key={row._id} className={`border-b ${can('schedule.manage') ? ROW_CLICK_CLASS : ''}`} onClick={can('schedule.manage') ? onRowActivate(() => setEdit(row)) : undefined}>
+        <TableCell className="p-2 truncate" title={name(row)}>{name(row)}</TableCell><TableCell className="p-2 truncate" title={planSummary(row.plan)}>{planSummary(row.plan)}</TableCell><TableCell className="p-2 whitespace-nowrap">{shortDate(row.startDate)}–{shortDate(row.endDate)}</TableCell>
+        <TableCell className="p-2">{can('schedule.manage') && <div className="flex gap-1"><Button variant="ghost" onClick={() => setEdit(row)} aria-label={`${name(row)} atamasını düzenle`}>Düzenle</Button><Button variant="ghost" onClick={() => setDeleting(row)} aria-label={`${name(row)} atamasını sil`}>Sil</Button></div>}</TableCell>
+      </TableRow>)}</TableBody>
+    </Table></div>}
     <AssignmentEditDialog open={Boolean(edit)} onOpenChange={open => { if (!open) setEdit(null); }} assignment={edit} shifts={shifts ?? []} employeeName={edit ? name(edit) : ''} shiftName={shifts?.find(s => s._id === edit?.shiftId)?.name ?? 'Vardiya'} />
     <ConfirmDestructive open={Boolean(deleting)} onOpenChange={open => { if (!open) setDeleting(null); }} title="Departman ataması silinsin mi?" objectName={deleting ? `${name(deleting)} · ${shortDate(deleting.startDate)}–${shortDate(deleting.endDate)}` : ''} effects={['Bu departman ve alt departmanların tüm seri planı kaldırılır. Kişisel atamalar korunur.']} confirmLabel="Atamayı sil" onConfirm={async () => { if (!deleting) return; await remove({ departmentAssignmentId: deleting._id }); notify.success('Departman ataması silindi'); setDeleting(null); }} />
   </section>;

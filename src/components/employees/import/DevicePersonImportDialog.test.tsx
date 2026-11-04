@@ -24,21 +24,26 @@ const mocks = vi.hoisted(() => ({
   buttons: new Map<string, () => void>(),
   checks: new Map<string, (checked: boolean) => void>(),
 }));
-vi.mock("react", async (original) => ({
-  ...(await original<typeof import("react")>()),
-  useState: (initial: unknown) => {
-    const index = mocks.cursor++;
-    if (!(index in mocks.states)) mocks.states[index] = initial;
-    return [
-      mocks.states[index],
-      (value: unknown) => {
-        mocks.states[index] =
-          typeof value === "function" ? value(mocks.states[index]) : value;
-      },
-    ];
-  },
-  useEffect: (effect: () => void | (() => void)) => mocks.effects.push(effect),
-}));
+vi.mock("react", async (original) => {
+  const actual = await original<typeof import("react")>();
+  return {
+    ...actual,
+    useState: (initial: unknown) => {
+      // Tablo altyapısının lazy state'i senaryonun sıralı fixture'ından bağımsızdır.
+      if (typeof initial === "function") return actual.useState(initial as () => unknown);
+      const index = mocks.cursor++;
+      if (!(index in mocks.states)) mocks.states[index] = initial;
+      return [
+        mocks.states[index],
+        (value: unknown) => {
+          mocks.states[index] =
+            typeof value === "function" ? value(mocks.states[index]) : value;
+        },
+      ];
+    },
+    useEffect: (effect: () => void | (() => void)) => mocks.effects.push(effect),
+  };
+});
 vi.mock("convex/react", () => ({
   useQuery: () => mocks.devices,
   useAction: (ref: Parameters<typeof getFunctionName>[0]) => {

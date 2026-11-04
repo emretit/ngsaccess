@@ -18,7 +18,12 @@ export function EmployeeSortColumn({
   onSortChange?: (sort: string) => void;
 }) {
   return (
-    <TableHead className={className} aria-sort={employeeColumnSort(sort, key)}>
+    <TableHead
+      columnId={key}
+      resizeLabel={label}
+      className={className}
+      aria-sort={employeeColumnSort(sort, key)}
+    >
       <button
         type="button"
         className="min-h-9 text-left"

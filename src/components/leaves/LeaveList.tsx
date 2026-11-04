@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { TableStateRow } from "@/components/shared/TableStateRow";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -68,12 +69,12 @@ export function LeaveList({
     <ResponsiveResults
       label="İzin kayıtları"
       desktop={
-        <table className="w-full table-fixed text-xs">
+        <Table resizeKey="leaves" className="w-full table-fixed text-xs">
           <caption className="sr-only">
             İzin kayıtları, başlangıç tarihi azalan
           </caption>
-          <thead className="h-9 bg-subtle text-left text-muted-foreground">
-            <tr>
+          <TableHeader className="h-9 bg-subtle text-left text-muted-foreground">
+            <TableRow>
               {[
                 "Kişi",
                 "İzin türü",
@@ -82,16 +83,18 @@ export function LeaveList({
                 "Durum",
                 "İşlemler",
               ].map((title, i) => (
-                <th
+                <TableHead
                   key={title}
+                  columnId={["employee", "type", "dates", "duration", "status", "actions"][i]}
+                  resizable={i !== 5}
                   className={`px-3 font-medium ${["w-[24%]", "w-[17%]", "w-[23%]", "w-[13%]", "w-[13%]", "w-[10%]"][i]}`}
                 >
                   {title}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {loading ? (
               <TableStateRow
                 colSpan={6}
@@ -104,24 +107,27 @@ export function LeaveList({
               </TableStateRow>
             ) : (
               rows.map((row) => (
-                <tr
+                <TableRow
                   key={row._id}
                   className={`h-[42px] border-t hover:bg-subtle/50 ${ROW_CLICK_CLASS}`}
                   onClick={onRowActivate(() => onDetails(row))}
                 >
-                  <td className="px-3 py-1">{person(row)}</td>
-                  <td className="px-3 py-1 break-words">
+                  <TableCell className="px-3 py-1">
+                    <button type="button" className="max-w-full truncate text-left font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" title={row.employeeName} onClick={() => onDetails(row)}>{row.employeeName}</button>
+                    <p className="truncate text-xs text-muted-foreground" title={row.departmentName ?? "Departman belirtilmemiş"}>{row.departmentName ?? "Departman belirtilmemiş"}</p>
+                  </TableCell>
+                  <TableCell className="truncate px-3 py-1" title={leaveTypes[row.leaveType]}>
                     {leaveTypes[row.leaveType]}
-                  </td>
-                  <td className="px-3 py-1 tabular-nums">{dates(row)}</td>
-                  <td className="px-3 py-1 tabular-nums">{duration(row)}</td>
-                  <td className="px-3 py-1">{badge(row)}</td>
-                  <td className="px-3 py-0 text-right">{actions(row)}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="truncate px-3 py-1 tabular-nums" title={dates(row)}>{dates(row)}</TableCell>
+                  <TableCell className="truncate px-3 py-1 tabular-nums" title={duration(row)}>{duration(row)}</TableCell>
+                  <TableCell className="px-3 py-1">{badge(row)}</TableCell>
+                  <TableCell className="px-3 py-0 text-right">{actions(row)}</TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       }
       mobile={
         loading ? (

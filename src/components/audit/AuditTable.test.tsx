@@ -10,9 +10,10 @@ describe("Denetim tablosu durumları", () => {
     for (const loading of [false, true]) {
       const html = renderToStaticMarkup(<AuditTable rows={[]} allProjects={allProjects} loading={loading} onSelect={vi.fn()} />);
       expect(html).toContain("<thead");
+      expect(html.match(/role="separator"/g)).toHaveLength(allProjects ? 6 : 5);
       expect(html).toContain("Zaman (TR)");
       expect(html).toContain(`colSpan="${allProjects ? 7 : 6}"`);
-      expect(html).toMatch(loading ? /<tbody>.*aria-busy="true"/s : /<tbody>.*Henüz denetim kaydı yok/s);
+      expect(html).toMatch(loading ? /<tbody[^>]*>.*aria-busy="true"/s : /<tbody[^>]*>.*Henüz denetim kaydı yok/s);
     }
   });
   it("ilk sorgu yüklenirken tabloyu gösterir", () => {

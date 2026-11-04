@@ -45,9 +45,9 @@ export function PDKSExportColumns({ records, preferences, canSeePay, disabled, o
     </label>}
     <h3 className="text-sm font-medium">Önizleme (ilk 5 satır)</h3>
     <div className="max-w-full overflow-x-auto rounded-md border">
-      <Table aria-label="Dışa aktarma önizlemesi">
-        <TableHeader><TableRow>{selected.map(c => <TableHead scope="col" key={c.key} className="whitespace-nowrap">{c.label}</TableHead>)}</TableRow></TableHeader>
-        <TableBody>{records.slice(0, 5).map((row, index) => <TableRow key={`${row.id}-${index}`}>{selected.map(c => <TableCell key={c.key} className="whitespace-nowrap">{c.value(row)}</TableCell>)}</TableRow>)}</TableBody>
+      <Table resizeKey="pdks-export-preview" aria-label="Dışa aktarma önizlemesi">
+        <TableHeader><TableRow>{selected.map(c => <TableHead scope="col" columnId={c.key} resizeLabel={c.label} key={c.key} className="whitespace-nowrap">{c.label}</TableHead>)}</TableRow></TableHeader>
+        <TableBody>{records.slice(0, 5).map((row, index) => <TableRow key={`${row.id}-${index}`}>{selected.map(c => <TableCell key={c.key} className="truncate" title={String(c.value(row) ?? "—")}>{c.value(row)}</TableCell>)}</TableRow>)}</TableBody>
       </Table>
     </div>
   </section>;

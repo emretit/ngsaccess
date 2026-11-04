@@ -70,16 +70,16 @@ export function LeaveRequestsPanel({
   return (
     <section className="space-y-4" aria-label="İzin talepleri">
         <div className="overflow-x-auto">
-          <Table>
+          <Table resizeKey="leave-requests">
             <TableHeader>
               <TableRow>
-                <TableHead>Çalışan</TableHead>
-                <TableHead>Tür</TableHead>
-                <TableHead>Tarih aralığı</TableHead>
-                <TableHead>Gün</TableHead>
-                <TableHead>Çalışan notu</TableHead>
-                <TableHead>Talep zamanı</TableHead>
-                <TableHead>İşlemler</TableHead>
+                <TableHead columnId="employee">Çalışan</TableHead>
+                <TableHead columnId="type">Tür</TableHead>
+                <TableHead columnId="dates">Tarih aralığı</TableHead>
+                <TableHead columnId="days">Gün</TableHead>
+                <TableHead columnId="notes">Çalışan notu</TableHead>
+                <TableHead columnId="requested-at">Talep zamanı</TableHead>
+                <TableHead columnId="actions" resizable={false}>İşlemler</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -89,21 +89,21 @@ export function LeaveRequestsPanel({
                 <TableStateRow colSpan={7} state="empty" title="Bekleyen izin talebi yok." />
               ) : result.page.map((row) => (
                 <TableRow key={row._id}>
-                  <TableCell>
+                  <TableCell className="truncate" title={row.employeeName}>
                     {row.employeeName}
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="block truncate text-xs text-muted-foreground" title={row.departmentName ?? undefined}>
                       {row.departmentName}
                     </span>
                   </TableCell>
-                  <TableCell>{leaveTypes[row.leaveType]}</TableCell>
-                  <TableCell>
+                  <TableCell className="truncate" title={leaveTypes[row.leaveType]}>{leaveTypes[row.leaveType]}</TableCell>
+                  <TableCell className="truncate" title={`${dateLabel(row.startDate)} – ${dateLabel(row.endDate)}`}>
                     {dateLabel(row.startDate)} – {dateLabel(row.endDate)}
                   </TableCell>
                   <TableCell>{row.calendarDays ?? "—"}</TableCell>
-                  <TableCell className="max-w-xs whitespace-pre-wrap break-words">
+                  <TableCell className="max-w-full truncate" title={row.notes || "—"}>
                     {row.notes || "—"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="truncate" title={new Date(row.createdAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}>
                     {new Date(row.createdAt).toLocaleString("tr-TR", {
                       timeZone: "Europe/Istanbul",
                     })}

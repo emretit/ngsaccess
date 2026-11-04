@@ -321,7 +321,7 @@ export default function EmployeeTable({
         </div>
       )}
       <div className="min-w-0 overflow-x-auto rounded-md border">
-        <Table className="w-full table-fixed text-xs">
+        <Table resizeKey="employees" className="w-full table-fixed text-xs">
           <TableHeader>
             <TableRow className="h-9 bg-muted/50">
               <EmployeeSelectAll
@@ -336,7 +336,7 @@ export default function EmployeeTable({
                 checked={employeeSelectionState(employees, selectedEmployees)}
                 onSelectAll={handleSelectAll}
               />
-              {column("name", "Ad soyad")}
+              {column("name", "Ad soyad", "min-[760px]:w-[240px]")}
               {column("email", "E-posta", "hidden min-[1100px]:table-cell")}
               {showCompany &&
                 column("company", "Şirket", "hidden min-[1100px]:table-cell")}
@@ -349,12 +349,15 @@ export default function EmployeeTable({
               {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
               {column("card", "Kart no", "hidden min-[760px]:table-cell")}
               {canSeeBiometrics && (
-                <TableHead className="hidden w-[96px] min-[760px]:table-cell">
+                <TableHead
+                  columnId="biometrics"
+                  className="hidden w-[96px] min-[760px]:table-cell"
+                >
                   Biyometrik
                 </TableHead>
               )}
               {column("status", "Durum", "w-[180px]")}
-              <TableHead className="w-11">
+              <TableHead columnId="actions" resizable={false} className="w-11">
                 <span className="sr-only">İşlemler</span>
               </TableHead>
             </TableRow>

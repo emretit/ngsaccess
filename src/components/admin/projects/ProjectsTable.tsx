@@ -51,14 +51,14 @@ export function ProjectsTable({
     `${project.memberCount}${project.memberCountCapped ? "+" : ""}`;
   return (
     <ResponsiveResults label="Projeler" desktop={
-        <Table className="table-fixed">
+        <Table resizeKey="admin-projects" className="table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[32%]">Ad</TableHead>
-              <TableHead>Durum</TableHead>
-              <TableHead>Üyeler</TableHead>
-              <TableHead className="w-[20%]">Oluşturulma</TableHead>
-              <TableHead className="w-14">
+              <TableHead columnId="name" className="w-[32%]">Ad</TableHead>
+              <TableHead columnId="status">Durum</TableHead>
+              <TableHead columnId="members">Üyeler</TableHead>
+              <TableHead columnId="created" className="w-[20%]">Oluşturulma</TableHead>
+              <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-14">
                 <span className="sr-only">İşlemler</span>
               </TableHead>
             </TableRow>
@@ -73,7 +73,8 @@ export function ProjectsTable({
               >
                 <TableCell>
                   <button
-                    className="text-left font-medium break-words"
+                    className="block max-w-full truncate text-left font-medium"
+                    title={project.name}
                     onClick={() => onEdit(project)}
                   >
                     {project.name}
@@ -83,7 +84,7 @@ export function ProjectsTable({
                 <TableCell className="tabular-nums">
                   {members(project)}
                 </TableCell>
-                <TableCell className="tabular-nums">
+                <TableCell className="truncate tabular-nums" title={adminDate(project.createdAt)}>
                   {adminDate(project.createdAt)}
                 </TableCell>
                 <TableCell className="px-1">{actions(project)}</TableCell>

@@ -6,7 +6,7 @@ import type { Employee } from "@/types/employee";
 import type { Id } from "../../../convex/_generated/dataModel";
 import EmployeeTable from "./EmployeeTable";
 const mocks = vi.hoisted(() => ({ permissions: null as string[] | null, states: [] as unknown[], cursor: 0, selected: [] as string[], items: [] as { children?: ReactNode; onSelect?: () => void }[], sync: vi.fn(), confirm: undefined as (() => void) | undefined, bulkSend: undefined as (() => void) | undefined }));
-vi.mock("react", async original => ({ ...await original<typeof import("react")>(), useState: (initial: unknown) => { const i = mocks.cursor++; if (!(i in mocks.states)) mocks.states[i] = initial; return [mocks.states[i], (next: unknown) => { mocks.states[i] = next; }]; } }));
+vi.mock("react", async original => ({ ...await original<typeof import("react")>(), useState: (initial: unknown) => { const i = mocks.cursor++; if (!(i in mocks.states)) mocks.states[i] = typeof initial === "function" ? initial() : initial; return [mocks.states[i], (next: unknown) => { mocks.states[i] = next; }]; } }));
 vi.mock("convex/react", () => ({ useQuery: () => [], useAction: () => mocks.sync, useMutation: () => vi.fn() }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p", isAdmin: true }) }));
 vi.mock("@/hooks/useAsyncAction", () => ({ useAsyncAction: (run: unknown) => ({ run, pending: false }) }));
@@ -41,7 +41,7 @@ it("02-O4/D6: checkboxes retain shared neutral border and expanded target withou
   const html = render();
   expect(html.match(/border-input after:absolute after:-inset-1.5/g)).toHaveLength(2);
   expect(html).not.toContain("data-[state=indeterminate]:after:inset");
-  expect(html).toContain('w-11 px-2"');
+  expect(html).toMatch(/<th[^>]*data-column-id="select"[^>]*class="[^"]*\bw-11 px-2\b[^"]*"/);
 });
 
 it("02-O2: bulk send also waits for confirmation", async () => {

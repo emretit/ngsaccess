@@ -292,7 +292,7 @@ describe("bounded list presentation", () => {
     expect(html).toContain("29.09.2026");
     expect(html).toContain("Personel bulunamadı");
     expect(html).toContain("Beklemede");
-    expect(html).not.toContain("checkbox");
+    expect(html).not.toMatch(/role="checkbox"|type="checkbox"/);
   });
   it("explains hidden notes without exposing their contents", () => {
     const html = renderToStaticMarkup(

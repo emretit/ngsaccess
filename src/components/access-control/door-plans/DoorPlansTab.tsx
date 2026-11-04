@@ -128,10 +128,10 @@ export function DoorPlansTab() {
           </Button>
         </div>
       )}
-      <Table className="block w-full md:table">
+      <Table resizeKey="door-plans" className="block w-full md:table">
         <TableHeader className="block md:table-header-group">
           <TableRow className="block md:table-row">
-            <TableHead className="block h-auto px-0 md:table-cell md:h-9 md:px-4">
+            <TableHead columnId="select" resizable={false} resizeLabel="Kapı seçimi" className="block h-auto px-0 md:table-cell md:h-9 md:px-4">
               <label className="flex items-center gap-2 min-h-11 md:min-h-0">
                 <input
                   className="size-5"
@@ -156,8 +156,8 @@ export function DoorPlansTab() {
                 <span className="md:hidden">Tüm kapıları seç</span>
               </label>
             </TableHead>
-            {["Kapı", "Plan", "Gönderim"].map((label) => (
-              <TableHead className="hidden md:table-cell" key={label}>
+            {[["door", "Kapı"], ["plan", "Plan"], ["delivery", "Gönderim"]].map(([id, label]) => (
+              <TableHead columnId={id} className="hidden md:table-cell" key={label}>
                 {label}
               </TableHead>
             ))}
@@ -200,14 +200,15 @@ export function DoorPlansTab() {
               <TableCell>
                 <button
                   type="button"
-                  className="min-h-11 md:min-h-0 text-left font-medium rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title={door.doorName}
+                  className="min-h-11 md:min-h-0 md:block md:max-w-full md:truncate text-left font-medium rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => setSelected({ projectId, door })}
                   aria-label={`${door.doorName} kapı planlarını düzenle`}
                 >
                   {door.doorName}
                 </button>
                 <p className="text-xs text-muted-foreground">
-                  {door.deviceName}{" "}
+                  <span className="md:inline-block md:max-w-full md:truncate md:align-middle" title={door.deviceName}>{door.deviceName}</span>{" "}
                   {!door.deviceOnline && (
                     <StatusBadge tone="warning">Çevrimdışı</StatusBadge>
                   )}
@@ -217,7 +218,7 @@ export function DoorPlansTab() {
                 className="order-3 text-sm"
                 onClick={(event) => event.stopPropagation()}
               >
-                <p className="line-clamp-1">
+                <p className="line-clamp-1 md:line-clamp-none md:truncate" title={door.hikDoorStatusPlan?.enabled ? statusSummary(door.hikDoorStatusPlan) : door.hikVerifyPlan?.enabled ? "Doğrulama planı etkin" : door.hikDoorHolidayPlan?.enabled ? `${door.hikDoorHolidayPlan.year} tatil planı etkin` : "Plan etkin değil"}>
                   {door.hikDoorStatusPlan?.enabled
                     ? door.hikDoorStatusPlan.weekly
                       ? `Haftalık · ${door.hikDoorStatusPlan.weekly.reduce((n, day) => n + day.segments.length, 0)} aralık`

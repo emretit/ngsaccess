@@ -27,7 +27,7 @@ describe("settings user directory", () => {
     const user = { _id: 'u', displayName: 'u@example.com', email: 'u@example.com', role: 'viewer', projects: [{ _id: 'p', name: 'Merkez', isActive: true, role: 'viewer' }], isSelf: false, pendingSetup: false, disabledAt: undefined, accessExpiresAt: undefined, accessExpired: false, setupExpiresAt: undefined } as User;
     const html = renderToStaticMarkup(<UserTable users={[user]} onEditUser={vi.fn()} onDeleteUser={vi.fn()} />);
     expect(html.match(/>u@example.com</g)).toHaveLength(2);
-    expect(html.match(/Merkez/g)).toHaveLength(2);
+    expect(html.match(/>Merkez</g)).toHaveLength(2);
     expect(html).not.toContain('Yetkili proje kapsamı');
   });
   it.each(["project_admin", "super_admin"])("D8 preserves in-flight search text after a role change for %s", role => {

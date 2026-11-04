@@ -120,10 +120,10 @@ export function DeviceList({
         tabIndex={0}
         className="min-w-0 max-w-full overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <Table density="compact" className="w-full table-fixed">
+        <Table resizeKey={showProject ? "devices-all-projects" : "devices"} density="compact" className="w-full table-fixed">
           <TableHeader className="bg-subtle">
             <TableRow>
-              <TableHead className="w-9 px-2 md:w-10 md:px-3">
+              <TableHead columnId="select" resizable={false} resizeLabel="Cihaz seçimi" className="w-9 px-2 md:w-10 md:px-3">
                 <ListSelectAll
                   label="Görünen tüm cihazları seç"
                   checked={checked}
@@ -132,24 +132,24 @@ export function DeviceList({
                 />
               </TableHead>
               {showProject && (
-                <TableHead className="hidden lg:table-cell">Proje</TableHead>
+                <TableHead columnId="project" className="hidden lg:table-cell">Proje</TableHead>
               )}
-              <TableHead className="px-2 md:px-4">Cihaz adı</TableHead>
-              <TableHead className="hidden md:table-cell w-[180px]">
+              <TableHead columnId="name" className="px-2 md:w-[220px] md:px-4">Cihaz adı</TableHead>
+              <TableHead columnId="model" className="hidden md:table-cell w-[180px]">
                 Marka / model
               </TableHead>
-              <TableHead className="hidden xl:table-cell w-[170px]">
+              <TableHead columnId="serial" className="hidden xl:table-cell w-[170px]">
                 Seri no / UUID
               </TableHead>
               {!(hideLocation || hideZoneColumn) && (
-                <TableHead className="hidden lg:table-cell w-[140px]">
+                <TableHead columnId="zone" className="hidden lg:table-cell w-[140px]">
                   Bölge
                 </TableHead>
               )}
-              <TableHead className="w-[112px] px-1 md:w-[132px] md:px-3">
+              <TableHead columnId="connection" className="w-[112px] px-1 md:w-[132px] md:px-3">
                 Bağlantı
               </TableHead>
-              <TableHead className="w-11 px-0 md:px-1">
+              <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-11 px-0 md:px-1">
                 <span className="sr-only">İşlemler</span>
               </TableHead>
             </TableRow>

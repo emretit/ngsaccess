@@ -23,12 +23,12 @@ export default function VisitorTable({ visitors, onOpen, loading = false, emptyS
       </li>)}
     </ul>} desktop={
 
-      <Table density="compact" className="w-full table-fixed"><TableHeader><TableRow>
-        <TableHead className="w-[20%]">Ziyaretçi</TableHead><TableHead className="w-[15%]">Ziyaret edilen</TableHead><TableHead className="w-[16%]">Erişim bölgesi</TableHead><TableHead className="w-[16%]">Geçerlilik bitişi</TableHead><TableHead className="w-[17%]">Erişim</TableHead><TableHead>Son konum</TableHead><TableHead className="w-14"><span className="sr-only">İşlemler</span></TableHead>
+      <Table resizeKey="visitors" density="compact" className="w-full table-fixed"><TableHeader><TableRow>
+        <TableHead columnId="name" className="w-[20%]">Ziyaretçi</TableHead><TableHead columnId="host" className="w-[15%]">Ziyaret edilen</TableHead><TableHead columnId="access-region" className="w-[16%]">Erişim bölgesi</TableHead><TableHead columnId="valid-until" className="w-[16%]">Geçerlilik bitişi</TableHead><TableHead columnId="access" className="w-[17%]">Erişim</TableHead><TableHead columnId="presence">Son konum</TableHead><TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-14"><span className="sr-only">İşlemler</span></TableHead>
       </TableRow></TableHeader><TableBody>{loading ? <TableStateRow colSpan={7} state="loading" label="Ziyaretçiler yükleniyor" /> : !visitors.length ? <TableStateRow colSpan={7} state="custom">{emptyState}</TableStateRow> : visitors.map(visitor => <TableRow key={visitor._id} className={ROW_CLICK_CLASS} onClick={onRowActivate(() => onOpen(visitor))}>
-        <TableCell className="break-words">{name(visitor)}</TableCell><TableCell className="truncate" title={visitor.hostName ?? undefined}>{visitor.hostName ?? "—"}</TableCell>
-        <TableCell className="truncate" title={visitor.presetRuleName ?? undefined}>{visitor.presetRuleName ?? "—"}</TableCell><TableCell className="tabular-nums whitespace-normal">{formatVisitorTime(visitor.visitEnd)}</TableCell>
-        <TableCell className="[&_span]:whitespace-normal">{badge(visitor)}</TableCell><TableCell>{visitor.presence ? visitorPresenceLabels[visitor.presence] : "—"}</TableCell><TableCell>{menu(visitor)}</TableCell>
+        <TableCell className="truncate"><button type="button" className="max-w-full truncate text-left font-medium focus-visible:outline-primary" title={`${visitor.firstName} ${visitor.lastName}`} onClick={() => onOpen(visitor)}>{visitor.firstName} {visitor.lastName}</button></TableCell><TableCell className="truncate" title={visitor.hostName ?? undefined}>{visitor.hostName ?? "—"}</TableCell>
+        <TableCell className="truncate" title={visitor.presetRuleName ?? undefined}>{visitor.presetRuleName ?? "—"}</TableCell><TableCell className="truncate tabular-nums" title={formatVisitorTime(visitor.visitEnd)}>{formatVisitorTime(visitor.visitEnd)}</TableCell>
+        <TableCell className="[&_span]:whitespace-normal">{badge(visitor)}</TableCell><TableCell className="truncate" title={visitor.presence ? visitorPresenceLabels[visitor.presence] : "—"}>{visitor.presence ? visitorPresenceLabels[visitor.presence] : "—"}</TableCell><TableCell>{menu(visitor)}</TableCell>
       </TableRow>)}</TableBody></Table>
     } />;
 }

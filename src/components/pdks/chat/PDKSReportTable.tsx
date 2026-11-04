@@ -8,24 +8,24 @@ interface PDKSReportTableProps {
 
 export function PDKSReportTable({ data }: PDKSReportTableProps) {
   return (
-    <Table>
+    <Table resizeKey="pdks-chat-report">
       <TableHeader>
         <TableRow>
-          <TableHead>Çalışan</TableHead>
-          <TableHead>Departman</TableHead>
-          <TableHead>Giriş Saati</TableHead>
-          <TableHead>Cihaz</TableHead>
-          <TableHead>Konum</TableHead>
+          <TableHead columnId="name" className="w-[200px]">Çalışan</TableHead>
+          <TableHead columnId="department">Departman</TableHead>
+          <TableHead columnId="check-in">Giriş Saati</TableHead>
+          <TableHead columnId="device">Cihaz</TableHead>
+          <TableHead columnId="location">Konum</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {data.map((item, index) => (
           <TableRow key={`${item.name}-${index}`}>
-            <TableCell className="font-medium">{item.name}</TableCell>
-            <TableCell>{item.department}</TableCell>
-            <TableCell>{item.check_in}</TableCell>
-            <TableCell>{item.device}</TableCell>
-            <TableCell>{item.location}</TableCell>
+            <TableCell className="truncate font-medium" title={item.name}>{item.name}</TableCell>
+            <TableCell className="truncate" title={item.department}>{item.department}</TableCell>
+            <TableCell className="truncate" title={item.check_in}>{item.check_in}</TableCell>
+            <TableCell className="truncate" title={item.device}>{item.device}</TableCell>
+            <TableCell className="truncate" title={item.location}>{item.location}</TableCell>
           </TableRow>
         ))}
       </TableBody>

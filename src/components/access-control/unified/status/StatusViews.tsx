@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { TableStateRow } from "@/components/shared/TableStateRow";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -59,18 +60,19 @@ export function GrantRows({
   loading?: boolean;
   emptyTitle?: string;
 }) {
-  const cells = (row: GrantRow) => [
+  const cells = (row: GrantRow, desktop = false) => [
     <Button
       data-employee-trigger
       variant="link"
-      className="min-h-11 h-auto p-0 whitespace-normal text-left break-words hover:no-underline"
+      title={desktop ? row.employeeName : undefined}
+      className={`min-h-11 h-auto p-0 text-left hover:no-underline ${desktop ? "block max-w-full truncate" : "whitespace-normal break-words"}`}
       onClick={(event) => onEmployee(row, event.currentTarget)}
     >
       {row.employeeName}
     </Button>,
     <span className="space-y-1 block">
-      {!hideDevice && <span className="block">{row.deviceName}</span>}
-      <span className="block text-xs text-muted-foreground">{row.brand === "hikvision"
+      {!hideDevice && <span className={desktop ? "block truncate" : "block"} title={desktop ? row.deviceName : undefined}>{row.deviceName}</span>}
+      <span className={`block text-xs text-muted-foreground ${desktop ? "truncate" : ""}`} title={desktop ? (row.brand === "hikvision" ? `Tüm kapılar (cihaz)${row.doorNames.length ? ` · ${row.doorNames.join(", ")}` : ""}` : row.doorNames.join(", ") || "—") : undefined}>{row.brand === "hikvision"
         ? `Tüm kapılar (cihaz)${row.doorNames.length ? ` · ${row.doorNames.join(", ")}` : ""}`
         : row.doorNames.join(", ") || "—"}</span>
     </span>,
@@ -87,42 +89,42 @@ export function GrantRows({
   return (
     <>
       <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr>
-              {canManage && <th className="p-2">Seç</th>}
-              {columns.map((c) => (
-                <th key={c} className="p-2 text-left">
+        <Table resizeKey={hideDevice ? "device-access-status" : "access-status"} className="w-full text-sm">
+          <TableHeader>
+            <TableRow>
+              {canManage && <TableHead columnId="select" resizable={false} className="p-2">Seç</TableHead>}
+              {columns.map((c, index) => (
+                <TableHead columnId={["person", "device-door", "status"][index]} key={c} className="p-2 text-left">
                   {hideDevice && c === "Cihaz/kapı" ? "Kapı" : c}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.length === 0 && (loading ? <TableStateRow colSpan={3 + (canManage ? 1 : 0)} state="loading" label="Yükleniyor…" /> : <TableStateRow colSpan={3 + (canManage ? 1 : 0)} state="empty" title={emptyTitle} />)}
             {rows.map((row) => (
-              <tr
+              <TableRow
                 key={pairKey(row)}
                 className={`border-t ${ROW_CLICK_CLASS}`}
                 onClick={onRowActivate((event) => onEmployee(row, event.currentTarget.querySelector<HTMLButtonElement>("[data-employee-trigger]") ?? undefined))}
               >
                 {canManage && (
-                  <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="p-2" onClick={(e) => e.stopPropagation()}>
                     {checkbox(row)}
-                  </td>
+                  </TableCell>
                 )}
-                {cells(row).map((cell, i) => (
-                  <td
+                {cells(row, true).map((cell, i) => (
+                  <TableCell
                     key={hideDevice && i === 1 ? "Kapı" : columns[i]}
-                    className="p-2 align-top break-words max-w-48"
+                    className="p-2 align-top break-words max-w-full"
                   >
                     {cell}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
       <div className="lg:hidden space-y-3">
         {loading ? <p role="status">Yükleniyor…</p> : rows.length === 0 ? <EmptyState compact title={emptyTitle} /> : null}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Info, CheckCircle2, XCircle, RefreshCw, Radio, Search, ChevronDown } from "lucide-react";
@@ -356,16 +357,17 @@ export function IdeProvisioningCard() {
               )}
               UUID {result.uuid} · level {result.level} · {result.rebooted ? "reboot edildi" : "reboot edilmedi"}
             </div>
-            <table className="w-full">
-              <tbody>
+            <Table resizeKey="admin-ide-readback" className="w-full">
+              <TableHeader><TableRow><TableHead columnId="setting">Ayar</TableHead><TableHead columnId="value">Değer</TableHead></TableRow></TableHeader>
+              <TableBody>
                 {READBACK_KEYS.map((k) => (
-                  <tr key={k} className="border-t border-border/50">
-                    <td className="py-1 pr-2 font-mono text-muted-foreground">{k}</td>
-                    <td className="py-1 font-mono">{String(result.readback[k] ?? "—")}</td>
-                  </tr>
+                  <TableRow key={k} className="border-t border-border/50">
+                    <TableCell className="h-auto px-0 py-1 pr-2 truncate font-mono text-muted-foreground" title={k}>{k}</TableCell>
+                    <TableCell className="h-auto px-0 py-1 truncate font-mono" title={String(result.readback[k] ?? "—")}>{String(result.readback[k] ?? "—")}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </CardContent>
