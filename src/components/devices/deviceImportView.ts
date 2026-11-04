@@ -23,6 +23,6 @@ export function historyScopeArgs(
 export function historyResultText(result: DeviceHistoryResult) {
   if (!result.ok && !result.partial) return null;
   return !result.ok && result.partial
-    ? `${result.scanned} kayıt tarandı, kalanı arka planda sürüyor. Birkaç dakika sonra Geçiş Kayıtları'na bakın.`
+    ? `${result.scanned} kayıt tarandı, kalanı arka planda sürüyor. Birkaç dakika sonra Canlı İzleme'ye bakın.`
     : `${result.scanned} kayıt tarandı · ${result.inserted} eklendi · ${result.skipped} zaten vardı / atlandı`;
 }
