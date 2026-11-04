@@ -3,9 +3,10 @@ import { AccessDenied } from "@/components/shared/AccessDenied";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { Button } from "@/components/ui/button";
 import { ConvexError } from "convex/values";
+import { cn } from "@/lib/utils";
 /** Activity queries distinguish authorization failures from unavailable data. */
 export class EmployeeActivityBoundary extends Component<
-  { children: ReactNode; employeeId: string; projectId?: string; title: string; description: string },
+  { children: ReactNode; employeeId: string; projectId?: string; title: string; description: string; className?: string; errorClassName?: string },
   { error: unknown; attempt: number }
 > {
   state: { error: unknown; attempt: number } = { error: null, attempt: 0 };
@@ -31,7 +32,7 @@ export class EmployeeActivityBoundary extends Component<
           />
         );
       return (
-        <section className="space-y-3 border-t pt-5">
+        <section className={cn("space-y-3 border-t pt-5", this.props.errorClassName)}>
           <h3 className="text-base font-semibold">{this.props.title}</h3>
           <ErrorState compact description={this.props.description} />
           <div className="flex justify-center">
@@ -51,6 +52,6 @@ export class EmployeeActivityBoundary extends Component<
         </section>
       );
     }
-    return <div key={this.state.attempt}>{this.props.children}</div>;
+    return <div key={this.state.attempt} className={this.props.className}>{this.props.children}</div>;
   }
 }

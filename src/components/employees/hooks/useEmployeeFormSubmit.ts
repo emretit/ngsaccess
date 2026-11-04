@@ -135,7 +135,8 @@ export const useEmployeeFormSubmit = (
       append("Personel kaydedildi.");
       if (!savedId) return;
       setSavedResult({ employeeId: savedId });
-      if (!editingId) {
+      if (!editingId && !sharedPayload.email) append("E-posta girilmediği için mobil kurulum daveti gönderilmedi.");
+      else if (!editingId) {
         try {
           const result = await sendSetupEmail({
             employeeId: savedId,

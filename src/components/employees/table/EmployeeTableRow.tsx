@@ -140,6 +140,7 @@ export function EmployeeTableRow({
             {canManage && (
               <>
                 <DropdownMenuItem
+                  disabled={!employee.email?.trim()}
                   onSelect={() => handlePasswordResetClick(employee)}
                 >
                   Mobil giriş bağlantısı gönder

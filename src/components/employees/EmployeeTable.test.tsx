@@ -5,14 +5,14 @@ import { beforeEach, expect, it, vi } from "vitest";
 import type { Employee } from "@/types/employee";
 import type { Id } from "../../../convex/_generated/dataModel";
 import EmployeeTable from "./EmployeeTable";
-const mocks = vi.hoisted(() => ({ permissions: null as string[] | null, states: [] as unknown[], cursor: 0, selected: [] as string[], items: [] as { children?: ReactNode; onSelect?: () => void }[], sync: vi.fn(), confirm: undefined as (() => void) | undefined, bulkSend: undefined as (() => void) | undefined }));
+const mocks = vi.hoisted(() => ({ permissions: null as string[] | null, states: [] as unknown[], cursor: 0, selected: [] as string[], items: [] as { children?: ReactNode; onSelect?: () => void; disabled?: boolean }[], sync: vi.fn(), confirm: undefined as (() => void) | undefined, bulkSend: undefined as (() => void) | undefined }));
 vi.mock("react", async original => ({ ...await original<typeof import("react")>(), useState: (initial: unknown) => { const i = mocks.cursor++; if (!(i in mocks.states)) mocks.states[i] = typeof initial === "function" ? initial() : initial; return [mocks.states[i], (next: unknown) => { mocks.states[i] = next; }]; } }));
 vi.mock("convex/react", () => ({ useQuery: () => [], useAction: () => mocks.sync, useMutation: () => vi.fn() }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p", isAdmin: true }) }));
 vi.mock("@/hooks/useAsyncAction", () => ({ useAsyncAction: (run: unknown) => ({ run, pending: false }) }));
 vi.mock("@/hooks/useEmployeeTable", () => ({ useEmployeeTable: (employees: Employee[]) => ({ sortedEmployees: employees, selectedEmployees: mocks.selected, selectedDepartment: "", handleSelectAll: vi.fn(), handleSelectEmployee: vi.fn(), clearSelection: vi.fn() }) }));
 vi.mock("@/components/shared/RowActions", () => ({ RowActions: ({ children }: { children?: ReactNode }) => <div>{children}</div> }));
-vi.mock("@/components/ui/dropdown-menu", () => ({ DropdownMenuItem: (props: { children?: ReactNode; onSelect?: () => void }) => { mocks.items.push(props); return <div>{props.children}</div>; } }));
+vi.mock("@/components/ui/dropdown-menu", () => ({ DropdownMenuItem: (props: { children?: ReactNode; onSelect?: () => void; disabled?: boolean }) => { mocks.items.push(props); return <div>{props.children}</div>; } }));
 vi.mock("./EmployeeDeleteDialog", () => ({ EmployeeDeleteDialog: () => null }));
 vi.mock("./EmployeePasswordResetDialog", () => ({ EmployeePasswordResetDialog: () => null }));
 vi.mock("./EmployeeBulkActions", () => ({ EmployeeBulkActions: ({ onSyncToDevices }: { onSyncToDevices: () => void }) => { mocks.bulkSend = onSyncToDevices; return <div>Toplu işlemler</div>; } }));
@@ -94,4 +94,12 @@ it("keeps employee headers while loading", () => {
   expect(html).toContain("<tbody");
   expect(html).toContain('aria-busy="true"');
   expect(html).toContain("Personel bilgileri yükleniyor…");
+});
+
+it("P01: e-postasız kişide mobil giriş bağlantısı pasif", () => {
+  const invite = () => mocks.items.find(item => item.children === "Mobil giriş bağlantısı gönder");
+  render();
+  expect(invite()?.disabled).toBe(false);
+  render([{ ...employee, email: "" }]);
+  expect(invite()?.disabled).toBe(true);
 });

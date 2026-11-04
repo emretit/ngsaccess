@@ -20,8 +20,10 @@ it("02-D7: focuses first name only for a new employee", () => {
 });
 it("emp-drawer #6/#15: mode-specific email help, TC hint, both tied to inputs", () => {
   const fresh = render(false);
-  expect(fresh).toContain("Mobil giriş kurulum bağlantısı bu adrese gönderilir.");
+  expect(fresh).toContain("Mobil giriş kurulum bağlantısı bu adrese gönderilir. Boş bırakılırsa gönderilmez.");
   expect(fresh).toMatch(/id="employee-email"[^>]*aria-describedby="employee-email-hint"/);
+  expect(fresh).toMatch(/<label[^>]*for="employee-email"[^>]*>E-posta<\/label>/);
+  expect(fresh).not.toMatch(/<input[^>]*id="employee-email"[^>]*required=""/);
   expect(fresh).toMatch(/id="employee-tcNo"[^>]*inputMode="numeric"[^>]*aria-describedby="employee-tcNo-hint"|id="employee-tcNo"[^>]*aria-describedby="employee-tcNo-hint"[^>]*inputMode="numeric"/);
   const edit = renderToStaticMarkup(<MemoryRouter><EmployeeFormFields canViewPay formData={{ ...formData, monthlySalary: 1000, notes: "x" }} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} isEditing /></MemoryRouter>);
   expect(edit).not.toContain("bu adrese gönderilir");
@@ -92,10 +94,13 @@ it("K-01: erişim kuralı seçimi yetki yoksa pasiftir ve nedeni açıklanır", 
   expect(render(false)).not.toMatch(/<select[^>]*id="employee-accessRuleId"[^>]*disabled/);
 });
 
-it("K-02: düzenlemede proje alanı pasiftir ve güvenli yeniden kayıt yolunu açıklar", () => {
-  const html = renderToStaticMarkup(<MemoryRouter><EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} isEditing /></MemoryRouter>);
-  expect(html).toMatch(/<input[^>]*id="employee-projectId"[^>]*disabled=""/);
-  expect(html).toContain("Kişi başka projeye taşınamaz. Yeni projede yeni kayıt açın, eski kaydı işten çıkarın.");
+it("proje alanı yalnız proje adı verilince (super_admin) iki modda da pasif görünür", () => {
+  const props = { formData, setFormData: () => {}, companies: [], departments: [], accessRules: [], positions: [] };
+  const edit = renderToStaticMarkup(<MemoryRouter><EmployeeFormFields {...props} isEditing projectName="Anka" /></MemoryRouter>);
+  expect(edit).toMatch(/<input[^>]*id="employee-projectId"[^>]*disabled=""[^>]*value="Anka"|<input[^>]*id="employee-projectId"[^>]*value="Anka"[^>]*disabled=""/);
+  expect(edit).toContain("Başka projeye taşı");
+  expect(renderToStaticMarkup(<EmployeeFormFields {...props} projectName="Anka" />)).toContain("Kişi aktif projeye kaydedilir.");
+  expect(renderToStaticMarkup(<MemoryRouter><EmployeeFormFields {...props} isEditing /></MemoryRouter>)).not.toContain('id="employee-projectId"');
   expect(render(false)).not.toContain('id="employee-projectId"');
 });
 

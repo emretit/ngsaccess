@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { assertDepartmentEmpty, assertSameProject, validatePay, employeeDependentTables, EMPLOYEE_BULK_DELETE_LIMIT, assertEmployeeBulkDeleteLimit } from "./employeeUx";
+import { assertDepartmentEmpty, assertSameProject, validatePay, validateEmployeeText, employeeDependentTables, EMPLOYEE_BULK_DELETE_LIMIT, assertEmployeeBulkDeleteLimit } from "./employeeUx";
+describe("personel metin kuralları", () => {
+  it("geçerli kaydı ve boş e-postayı/TC'yi kabul eder", () => {
+    expect(() => validateEmployeeText({ firstName: "Ada", lastName: "Test", email: "ada@example.test", tcNo: "10000000146", cardNumber: "007" })).not.toThrow();
+    expect(() => validateEmployeeText({ firstName: "Ada", lastName: "Test", email: "", tcNo: null, cardNumber: "1" })).not.toThrow();
+  });
+  it("verilmeyen alanı denetlemez", () => {
+    expect(() => validateEmployeeText({})).not.toThrow();
+  });
+  it("boş ad/soyad/kartı ve bozuk e-posta/TC'yi reddeder", () => {
+    expect(() => validateEmployeeText({ firstName: " " })).toThrow("Ad alanı zorunludur");
+    expect(() => validateEmployeeText({ lastName: "" })).toThrow("Soyad alanı zorunludur");
+    expect(() => validateEmployeeText({ cardNumber: "  " })).toThrow("Kart numarası zorunludur");
+    expect(() => validateEmployeeText({ email: "ada" })).toThrow("e-posta");
+    for (const tcNo of ["123", "01234567890", "1234567890a"]) expect(() => validateEmployeeText({ tcNo })).toThrow("TC Kimlik No");
+  });
+});
 describe("personel yazma kuralları", () => {
   it("tekli ve toplu silmenin ortak bağımlılık politikası mobil oturumları ve atamaları içerir", () => {
     expect(employeeDependentTables).toEqual(["employeeAuth", "employeeSessions", "shiftAssignments"]);

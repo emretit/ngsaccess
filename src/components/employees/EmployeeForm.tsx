@@ -20,7 +20,27 @@ import { usePhotoUpload } from "./hooks/usePhotoUpload";
 import { employeeFormSchema } from "./hooks/useEmployeeFormSchema";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { cn } from "@/lib/utils";
+
+/** Pasifleştirme parmak izi şablonlarını siler (KVKK); sayı yalnız biyometri yetkilisine bilinir, sıfırsa onay gerekmez. */
+export function deactivationEffects(fingerprintCount: number | undefined): string[] | undefined {
+  if (fingerprintCount === 0) return undefined;
+  return [
+    fingerprintCount === undefined
+      ? "Kayıtlı parmak izleri varsa sistemden ve tüm cihazlardan kalıcı silinir."
+      : `${fingerprintCount} parmak izi sistemden ve tüm cihazlardan kalıcı silinir.`,
+    "Kişiyi tekrar aktif yapmak parmak izlerini geri getirmez; yeniden kayıt gerekir.",
+  ];
+}
+
+/** onlyChangedFields ile aynı ölçüt: taslak açılırken de pasifse isActive gönderilmez, onay da açılmaz. */
+export function sendsDeactivation(isActive: boolean | undefined, baseline: string | undefined): boolean {
+  if (isActive) return false;
+  if (!baseline) return true;
+  const parsed: unknown = JSON.parse(baseline);
+  return typeof parsed !== "object" || parsed === null || !("isActive" in parsed) || parsed.isActive !== false;
+}
 
 interface EmployeeFormProps {
   employee?: Employee | null;
@@ -49,7 +69,7 @@ export default function EmployeeForm({
   onDirtyChange,
   onPendingChange,
 }: EmployeeFormProps) {
-  const { projectId } = useActiveProjectScope();
+  const { projectId, activeProject, isSuperAdmin } = useActiveProjectScope();
   const { can } = usePermissions();
   const rules: FunctionReturnType<typeof api.accessRules.listMemberships> | undefined = useQuery(
     api.accessRules.listMemberships,
@@ -110,6 +130,16 @@ export default function EmployeeForm({
     api.employees.getById,
     employee ? { employeeId: employee._id } : "skip",
   );
+  const fingerprints = useQuery(
+    api.fingerprintEnrollment.listForEmployee,
+    employee && can("biometrics.manage") ? { employeeId: employee._id } : "skip",
+  );
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const wasActive = (currentEmployee ?? employee)?.isActive !== false;
+  const deactivation = employee && wasActive && sendsDeactivation(formData.isActive, initialData)
+    ? deactivationEffects(fingerprints?.templates.length)
+    : undefined;
+  const save = () => handleSubmit(formData, employee ? initialData : undefined);
   const onPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFileChange(
       e,
@@ -140,7 +170,8 @@ export default function EmployeeForm({
       return;
     }
     setFieldErrors({});
-    handleSubmit(formData, employee ? initialData : undefined);
+    if (deactivation) setConfirmDeactivate(true);
+    else void save();
   };
 
   if (employee && currentEmployee === null && embedded) return null;
@@ -159,6 +190,17 @@ export default function EmployeeForm({
       noValidate
     >
       {reloadGuard.dialog}
+      {deactivation && (
+        <ConfirmDestructive
+          open={confirmDeactivate}
+          onOpenChange={setConfirmDeactivate}
+          title="Kişiyi pasif yap"
+          objectName={`${formData.firstName} ${formData.lastName}`.trim()}
+          effects={deactivation}
+          confirmLabel="Pasif yap ve kaydet"
+          onConfirm={async () => { void save(); }}
+        />
+      )}
       {remoteChanged && (
         <div role="status" className="mb-3 text-sm">
           <p>Bu kayıt siz düzenlerken değişti. Kaydederseniz yalnız sizin değiştirdiğiniz alanlar yazılır.</p>
@@ -191,6 +233,7 @@ export default function EmployeeForm({
               isEditing={!!employee}
               originalDepartmentId={employee?.departmentId ?? null}
               memberships={memberships}
+              projectName={isSuperAdmin ? activeProject?.name : undefined}
               formData={formData}
               setFormData={setFormData}
               companies={companies}
@@ -249,12 +292,15 @@ export default function EmployeeForm({
           </div>
           {!employee && <p className="text-xs text-muted-foreground">Rıza ve parmak izi işlemleri kişinin ayrıntılarında.</p>}
         </div>
-      ) : (!embedded || dirty || isLoading || uploading) && (
+      ) : (
+        // Eklemeyle aynı: çubuk düzenlemede de hep görünür; değişiklik yokken kaydet/geri al pasif.
         <FormActions
           isLoading={isLoading || optionsLoading || uploading}
           busyLabel={isLoading ? "Kaydediliyor" : uploading ? "Fotoğraf yükleniyor" : "Yükleniyor"}
           onClose={onClose}
           cancelLabel={embedded ? "Değişiklikleri geri al" : undefined}
+          submitDisabled={embedded && !dirty}
+          cancelDisabled={embedded && !dirty}
           className={embedded ? "-mx-5 -bottom-4 mt-4" : undefined}
         />
       )}

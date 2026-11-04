@@ -34,6 +34,8 @@ interface Props {
   isEditing?: boolean;
   originalDepartmentId?: EmployeeFormData["departmentId"];
   memberships?: { _id: string; name: string; isActive?: boolean }[];
+  /** Yalnız super_admin'e verilir; proje başına ayrı hesap olduğundan diğer kullanıcılar proje alanını görmez. */
+  projectName?: string;
   /** Verilirse pozisyon listesinde ekle/düzenle/sil çıkar. */
   positionActions?: PositionActions;
 }
@@ -57,6 +59,7 @@ export default function EmployeeFormFields({
   isEditing = false,
   originalDepartmentId = null,
   memberships,
+  projectName,
   positionActions,
 }: Props) {
   const { can } = usePermissions();
@@ -104,7 +107,7 @@ export default function EmployeeFormFields({
         name={key}
         autoFocus={key === "firstName" && autoFocusFirstName}
         type={type}
-        required={["firstName", "lastName", "email", "cardNumber"].includes(
+        required={["firstName", "lastName", "cardNumber"].includes(
           key,
         )}
         value={formData[key] ?? ""}
@@ -212,23 +215,23 @@ export default function EmployeeFormFields({
           </div>
           {input(
             "email",
-            "E-posta *",
+            "E-posta",
             "email",
             isEditing
               ? "Kaydetmek bağlantı göndermez. Gerekirse: satır menüsü → Mobil giriş bağlantısı gönder."
-              : "Mobil giriş kurulum bağlantısı bu adrese gönderilir.",
+              : "Mobil giriş kurulum bağlantısı bu adrese gönderilir. Boş bırakılırsa gönderilmez.",
           )}
         </>,
       )}
       {section(
         "Organizasyon",
         <>
-          {isEditing && (
+          {projectName && (
             <div>
               <Label htmlFor="employee-projectId">Proje</Label>
-              <Input id="employee-projectId" value="Mevcut proje" disabled aria-describedby="employee-projectId-hint" />
+              <Input id="employee-projectId" value={projectName} disabled aria-describedby="employee-projectId-hint" />
               <p id="employee-projectId-hint" className="mt-1 text-xs text-muted-foreground">
-                Kişi başka projeye taşınamaz. Yeni projede yeni kayıt açın, eski kaydı işten çıkarın.
+                {isEditing ? "Proje burada değiştirilmez; taşımak için \"Başka projeye taşı\" düğmesini kullanın." : "Kişi aktif projeye kaydedilir."}
               </p>
             </div>
           )}

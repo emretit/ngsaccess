@@ -22,7 +22,8 @@ export function validateEmployeeImportRow(row: EmployeeImportRow): string[] {
   if (row.lastName.length > 256) errors.push("Soyad en fazla 256 karakter olabilir");
   if (!row.firstName.trim()) errors.push("Ad zorunludur");
   if (!row.lastName.trim()) errors.push("Soyad zorunludur");
-  if (!row.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) errors.push("Geçerli e-posta zorunludur");
+  // E-posta isteğe bağlı (personel formuyla aynı); doluysa biçim denetlenir.
+  if (row.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) errors.push("E-posta geçersiz");
   if (!row.cardNumber.trim() || row.cardNumber.length > 128) errors.push("Geçerli kart numarası zorunludur");
   if (row.tcNo && !isValidTurkishIdentityNumber(row.tcNo)) errors.push("T.C. Kimlik No geçersiz");
   return errors;

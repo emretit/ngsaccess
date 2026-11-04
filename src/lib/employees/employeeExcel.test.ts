@@ -50,7 +50,8 @@ describe("employee Excel helpers", () => {
     const headers = Array.isArray(values) ? values.map(String).join(" ").toLocaleLowerCase("tr-TR") : "";
     expect(headers).toContain("T.C. Kimlik No".toLocaleLowerCase("tr-TR"));
     expect(headers).toContain("Aktif (Evet/Hayır)".toLocaleLowerCase("tr-TR"));
-    expect(headers).toContain("E-posta*".toLocaleLowerCase("tr-TR"));
+    expect(headers).toContain("E-posta".toLocaleLowerCase("tr-TR"));
+    expect(headers).not.toContain("E-posta*".toLocaleLowerCase("tr-TR"));
     expect(headers).toContain("Kart No*".toLocaleLowerCase("tr-TR"));
     expect(sheet?.getRow(3).getCell(6).text).toBe("AYSE-001");
     const parsed = await parseEmployeesXlsx(await asFile(workbook));

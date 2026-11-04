@@ -9,7 +9,7 @@ import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
 import { employeeCompanyForDepartment, employeeRelationsToValidate, validateEmployeeRelations } from "./lib/peopleRelations";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
-import { assertSameProject, validatePay, employeeDependentTables, assertEmployeeBulkDeleteLimit } from "./lib/employeeUx";
+import { assertSameProject, validatePay, validateEmployeeText, employeeDependentTables, assertEmployeeBulkDeleteLimit } from "./lib/employeeUx";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -240,6 +240,7 @@ export const create = authedMutation({
       }
     }
 
+    validateEmployeeText(args);
     for (const field of ["cardNumber", "email", "tcNo"] as const) {
       const value = field === "email" ? normalizeEmployeeEmail(args.email) : args[field];
       if (!value) continue;
@@ -347,6 +348,10 @@ export const update = authedMutation({
     }
 
     if (updates.email !== undefined) updates.email = normalizeEmployeeEmail(updates.email) ?? "";
+    // Yalnız değişen metinler denetlenir: aktarılmış/eski kayıtların dokunulmayan alanı başka düzenlemeyi engellemez.
+    const changedText = <K extends "firstName" | "lastName" | "email" | "tcNo" | "cardNumber">(key: K) =>
+      updates[key] !== emp[key] ? updates[key] : undefined;
+    validateEmployeeText({ firstName: changedText("firstName"), lastName: changedText("lastName"), email: changedText("email"), tcNo: changedText("tcNo"), cardNumber: changedText("cardNumber") });
 
     // Sadece DEĞİŞEN alanlar için duplicate kontrol — mevcut çoğaltma kayıtlar
     // başka alanları güncellenirken (örn. pozisyon) bozulmadan saklanır.
@@ -376,6 +381,14 @@ export const update = authedMutation({
     await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, updatedAt: new Date().toISOString() });
     if (emp.photoStorageId && (updates.photoStorageId !== undefined || updates.photoUrl === null)) {
       await deleteUnusedEmployeePhoto(ctx, emp.photoStorageId);
+    }
+
+    // E-posta değişti/silindi: eski adrese giden kurulum bağlantısı artık parola koyamasın.
+    if (updates.email !== undefined && updates.email !== (normalizeEmployeeEmail(emp.email) ?? "")) {
+      const auth = await ctx.db.query("employeeAuth").withIndex("by_employee", q => q.eq("employeeId", employeeId)).first();
+      if (auth) await ctx.db.patch(auth._id, {
+        email: updates.email || undefined, setupToken: undefined, tokenExpiresAt: undefined, updatedAt: new Date().toISOString(),
+      });
     }
 
     if (accessStartChanged) await writeAudit(ctx, {

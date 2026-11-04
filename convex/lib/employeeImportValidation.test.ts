@@ -6,6 +6,8 @@ const valid = { rowNumber: 2, firstName: "Ada", lastName: "Yılmaz", email: "ada
 describe("employee import validation", () => {
   it("rejects empty required fields and malformed identity numbers", () => {
     expect(validateEmployeeImportRow({ ...valid, firstName: " ", lastName: "", tcNo: "12" })).toEqual(expect.arrayContaining(["Ad zorunludur", "Soyad zorunludur", "T.C. Kimlik No geçersiz"]));
+    expect(validateEmployeeImportRow({ ...valid, email: "" })).toEqual([]);
+    expect(validateEmployeeImportRow({ ...valid, email: "ada" })).toEqual(["E-posta geçersiz"]);
   });
   it("detects file duplicates across identifiers", () => {
     expect(findDuplicateImportRows([valid, { ...valid, rowNumber: 3, email: "ADA@example.com", cardNumber: "A-2" }]).get(3)).toContain("E-posta");

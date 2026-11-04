@@ -9,6 +9,7 @@ import type { EmployeeSaveResult } from "./hooks/useEmployeeFormSubmit";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import EmployeeForm from "./EmployeeForm";
 import EmployeeDetails from "./EmployeeDetails";
+import { EmployeeActivityBoundary } from "./EmployeeActivityBoundary";
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -102,18 +103,22 @@ export default function SlideOverPanel({
               )}
             />
           ) : (
-            <EmployeeForm
-              key="new"
-              employee={null}
-              onClose={close}
-              onSave={(payload) => {
-                setDirty(false);
-                onSave(payload);
-              }}
-              onContinue={onContinue ? (payload) => { setDirty(false); onContinue(payload); } : undefined}
-              onDirtyChange={setDirty}
-              onPendingChange={setPending}
-            />
+            // Düzenlemeyle aynı koruma: yerel sorgu hatası formu kaldırsa da taslak "Yeniden dene"de geri gelir.
+            <EmployeeActivityBoundary employeeId="new" projectId={projectId} title="Personel formu" description="Form yüklenemedi." className="h-full" errorClassName="border-t-0 px-5">
+              <EmployeeForm
+                key="new"
+                draft={draft}
+                employee={null}
+                onClose={close}
+                onSave={(payload) => {
+                  setDirty(false);
+                  onSave(payload);
+                }}
+                onContinue={onContinue ? (payload) => { setDirty(false); onContinue(payload); } : undefined}
+                onDirtyChange={setDirty}
+                onPendingChange={setPending}
+              />
+            </EmployeeActivityBoundary>
           )}
         </div>
       </DetailSheet>

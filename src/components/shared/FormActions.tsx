@@ -12,12 +12,13 @@ interface FormActionsProps {
   className?: string;
   submitLabel?: string;
   submitDisabled?: boolean;
+  cancelDisabled?: boolean;
   layout?: "sticky" | "dialog";
   extraActions?: ReactNode;
   form?: string;
 }
 
-export function FormActions({ isLoading, busyLabel = "Kaydediliyor", onClose, cancelLabel = "Vazgeç", className, submitLabel = "Kaydet", submitDisabled = false, layout = "sticky", extraActions, form }: FormActionsProps) {
+export function FormActions({ isLoading, busyLabel = "Kaydediliyor", onClose, cancelLabel = "Vazgeç", className, submitLabel = "Kaydet", submitDisabled = false, cancelDisabled = false, layout = "sticky", extraActions, form }: FormActionsProps) {
   const Container = layout === "dialog" ? DialogFooter : "div";
   return (
     <Container className={cn(layout === "sticky" && "sticky bottom-0 flex justify-end gap-3 border-t bg-background px-5 py-3", className)}>
@@ -25,7 +26,7 @@ export function FormActions({ isLoading, busyLabel = "Kaydediliyor", onClose, ca
       <Button
         className="max-sm:min-h-11"
         variant="outline"
-        disabled={isLoading}
+        disabled={isLoading || cancelDisabled}
         onClick={onClose}
         type="button"
       >

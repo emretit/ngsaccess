@@ -1,12 +1,14 @@
 import { z } from "zod";
 
 const TC_REGEX = /^[1-9]\d{10}$/;
+const EMAIL_SCHEMA = z.email();
 
 export const employeeFormSchema = z
   .object({
     firstName: z.string().trim().min(1, "Ad alanı zorunludur"),
     lastName: z.string().trim().min(1, "Soyad alanı zorunludur"),
-    email: z.string().trim().email("Geçerli bir e-posta adresi girin"),
+    // İsteğe bağlı: cihazdan aktarılan kişiler e-postasız gelir; doluysa biçim denetlenir.
+    email: z.string().trim().refine(value => !value || EMAIL_SCHEMA.safeParse(value).success, "Geçerli bir e-posta adresi girin"),
     tcNo: z.string().optional(),
     cardNumber: z.string().trim().min(1, "Kart numarası zorunludur"),
     hourlyRate: z

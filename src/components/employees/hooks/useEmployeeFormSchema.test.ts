@@ -4,6 +4,12 @@ const required = { firstName: "Ada", lastName: "Test", email: "ada@example.test"
 it.each([undefined, "", "2026-11-01", "2028-02-29"])("accepts an optional calendar date %s", accessStartsAt => {
   expect(employeeFormSchema.safeParse({ ...required, accessStartsAt }).success).toBe(true);
 });
+it.each(["", "  ", "ada@example.test"])("accepts an optional email %j", email => {
+  expect(employeeFormSchema.safeParse({ ...required, email }).success).toBe(true);
+});
+it.each(["ada", "ada@", "a b@example.test"])("rejects a malformed email %j", email => {
+  expect(employeeFormSchema.safeParse({ ...required, email }).success).toBe(false);
+});
 it.each(["2026-02-30", "2026-13-01", "invalid", "2026-1-01"])("rejects invalid form calendar date %s", accessStartsAt => {
   expect(employeeFormSchema.safeParse({ ...required, accessStartsAt }).success).toBe(false);
 });
