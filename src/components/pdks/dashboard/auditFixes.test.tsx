@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PDKSImportDialog } from "./PDKSImportDialog";
-import { PDKSSavedViews } from "./PDKSSavedViews";
 import { PDKSFilterBar, type FilterValues } from "./PDKSFilterBar";
 import { PDKSDateNavigator } from "./PDKSDateNavigator";
 import { PDKSHeatmapView } from "./PDKSHeatmapView";
@@ -10,7 +9,7 @@ import { restorePdksFocus } from "../lib/focus";
 import { ManualPdksEditDialog } from "../ManualPdksEditDialog";
 import { currentPeriodRange, pdksToday } from "../lib/calendar";
 
-const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, actions: [] as { label: string; invoke: () => void }[], remove: vi.fn(), apply: vi.fn() }));
+const state = vi.hoisted(() => ({ values: [] as unknown[], cursor: 0, actions: [] as { label: string; invoke: () => void }[] }));
 vi.mock("react", async importOriginal => {
   const actual = await importOriginal<typeof import("react")>();
   return { ...actual, useState: <T,>(initial: T) => {
@@ -19,7 +18,6 @@ vi.mock("react", async importOriginal => {
     return [state.values[index], (next: T | ((old: T) => T)) => { state.values[index] = typeof next === "function" ? (next as (old: T) => T)(state.values[index] as T) : next; }];
   } };
 });
-vi.mock("@/hooks/usePdksSavedViews", () => ({ usePdksSavedViews: () => ({ views: [{ id: "saved", name: "Geç kalanlar" }], save: vi.fn(), remove: state.remove, apply: state.apply }) }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "p", activeProject: { name: "Merkez" } }) }));
 vi.mock("@/hooks/usePdksFilterOptions", () => ({ usePdksFilterOptions: () => ({ departments: [], companies: [], positions: [], shifts: [] }) }));
 vi.mock("@/components/ui/dialog", () => {
@@ -59,30 +57,9 @@ vi.mock("convex/react", () => ({ useMutation: () => vi.fn(), useAction: () => vi
 vi.mock("@/components/shared/UnsavedChangesDialog", () => ({ useUnsavedChangesGuard: () => ({ requestClose: vi.fn() }) }));
 const values: FilterValues = { reportType: "weekly", dateRange: { from: undefined, to: undefined }, statusFilter: "all", person: "" };
 const render = (node: ReactNode) => { state.cursor = 0; state.actions = []; return renderToStaticMarkup(node); };
-beforeEach(() => { state.values = []; state.remove.mockReset(); state.apply.mockReset(); });
+beforeEach(() => { state.values = []; });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 describe("08 UI denetim düzeltmeleri", () => {
-  it("O7: menü seçimi görünümü uygular, silme önce onay ister, iptal silmez", async () => {
-    const onApply = vi.fn(); state.apply.mockReturnValue(values);
-    const component = <PDKSSavedViews filters={values} onApply={onApply} />;
-    expect(render(component)).toContain('aria-label="Kayıtlı görünümler"');
-    state.actions.find(a => a.label === "Geç kalanlar")?.invoke();
-    expect(onApply).toHaveBeenCalledWith(values);
-    state.actions.find(a => a.label === "Geç kalanlar görünümünü sil")?.invoke();
-    expect(state.remove).not.toHaveBeenCalled();
-    expect(render(component)).toContain("Görünüm silinsin mi?");
-    state.actions.find(a => a.label === "Vazgeç")?.invoke(); render(component);
-    expect(state.remove).not.toHaveBeenCalled();
-    state.actions.find(a => a.label === "Geç kalanlar görünümünü sil")?.invoke(); render(component);
-    state.remove.mockRejectedValueOnce(new Error("Görünüm silinemedi"));
-    await state.actions.find(a => a.label === "Sil")?.invoke();
-    expect(state.remove).toHaveBeenCalledWith("saved");
-    expect(render(component)).toContain("Görünüm silinsin mi?");
-    state.remove.mockResolvedValueOnce(undefined);
-    await state.actions.find(a => a.label === "Sil")?.invoke();
-    expect(state.remove).toHaveBeenCalledTimes(2);
-    expect(render(component)).not.toContain("Görünüm silinsin mi?");
-  });
   it("D5/D11: durum filtre çubuğundadır; mobil filtre düğmesi paneli açar", () => {
     const component = <PDKSFilterBar values={values} onChange={vi.fn()} />;
     const html = render(component);

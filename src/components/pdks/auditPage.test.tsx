@@ -29,7 +29,6 @@ vi.mock("@/components/pdks/dashboard/PDKSEmployeeDetailDrawer", () => ({ PDKSEmp
 vi.mock("@/components/pdks/dashboard/PDKSImportDialog", () => ({ PDKSImportDialog: () => null }));
 vi.mock("@/components/pdks/dashboard/PDKSSmartPresets", () => ({ PDKSSmartPresets: () => null }));
 vi.mock("@/components/pdks/dashboard/PDKSOvertimeAlert", () => ({ PDKSOvertimeAlert: () => null }));
-vi.mock("@/components/pdks/dashboard/PDKSSavedViews", () => ({ PDKSSavedViews: () => null }));
 vi.mock("@/components/pdks/PDKSAiChat", () => ({ PDKSAiChat: () => null }));
 describe("PDKS sayfa davranışları", () => {
   it("D3/D4/D11: pasif günler özette görünür; işe başlamadan önceki gün sayılmaz; Analiz ve düzeltme talebi yok", () => {
