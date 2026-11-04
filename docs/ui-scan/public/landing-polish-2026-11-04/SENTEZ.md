@@ -61,7 +61,8 @@ FAQ'de ilk açık soru "Mevcut kart okuyucularımı kullanabilir miyim?" · güv
 
 ## Audit turu 2 (2026-11-04, f72382bf)
 - [x] Fable `audit2-fable.md` (MUST 0 / SHOULD 3 / NIT 7) · Astra `audit2-astra.md` (MUST 1 / SHOULD 3 / NIT 1)
-- [ ] M1 Canlı İzleme görselinde "Biyometrik · PDKS dışı" etiketi (pazarlama yasağı) → canli kırpımı yeniden üret
-- [ ] S1 601-1100 px mobil kaynaklı görseller dev → max-width + ortala · S2 320 px iletişim 1 px taşma · S3 320 px h1 4 satır
-- [ ] S4 320 px canlı kart üst şeridi 2 satır · S5 mobil menü Kapat opacity geçişi · NIT: lead 60ch, SSS ilk soru cihaz, menü ayırıcı, footer
-- [ ] Kapılar + Lighthouse (güncel üretim build'i)
+- [x] M1 Canlı İzleme görselinde "Biyometrik · PDKS dışı" etiketi (pazarlama yasağı) → canli kırpımı yeniden üret
+- [x] S1 601-1100 px mobil kaynaklı görseller dev → max-width + ortala · S2 320 px iletişim 1 px taşma · S3 320 px h1 4 satır
+- [x] S4 320 px canlı kart üst şeridi 2 satır · S5 mobil menü Kapat opacity geçişi · NIT: lead 60ch, SSS ilk soru cihaz, menü ayırıcı, footer
+- [x] 87b9eea1: tsc 0, eslint 0, tam vitest 5573/5573, font kayma taraması 139/141 (456 ve 1088 px dar pencereler önceden de var), Lighthouse mobil 86-88 / CLS 0 / a11y 100 (eski canlı 82cf883c aynı makinede 85-87)
+- [ ] Push + Netlify yayını (Emre)
