@@ -3,12 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/models/attendance.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:ngsplusapp/widgets/history/history_calendar.dart';
 import 'package:ngsplusapp/widgets/history/history_record_tile.dart';
 import 'package:ngsplusapp/widgets/history/history_records_list.dart';
-import 'package:table_calendar/table_calendar.dart';
 
 Widget host(Widget child, {double textScale = 1}) => MaterialApp(
+  theme: AppTheme.lightTheme,
   locale: const Locale('en'),
   supportedLocales: AppLocalizations.supportedLocales,
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -57,14 +58,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final calendar = tester.widget<TableCalendar<int>>(
-        find.byType(TableCalendar<int>),
+      // Day targets retain calendar components and full date/count semantics.
+      expect(
+        find.byKey(const ValueKey('history-day-2026-10-12')),
+        findsOneWidget,
       );
-      // TableCalendar emits UTC midnight, while domain calendar components can
-      // originate in Istanbul or in a local DateTime.
-      expect(calendar.eventLoader?.call(DateTime.utc(2026, 10, 12)), [3]);
-      expect(calendar.eventLoader?.call(DateTime(2026, 10, 12)), [3]);
-      expect(calendar.eventLoader?.call(DateTime.utc(2026, 9, 30)), isEmpty);
+      expect(
+        find.byKey(const ValueKey('history-day-2026-09-30')),
+        findsNothing,
+      );
       expect(
         find.bySemanticsLabel(RegExp(r'October 12, 2026[\s\S]*3 records')),
         findsOneWidget,
@@ -105,7 +107,7 @@ void main() {
     expect(find.text('Access denied · In'), findsOneWidget);
     expect(find.byIcon(Icons.block_rounded), findsOneWidget);
     expect(find.text('Unknown direction'), findsOneWidget);
-    expect(find.text('Checked In'), findsNothing);
+    expect(find.text('Entry record'), findsNothing);
     expect(find.text('Out'), findsNothing);
     expect(find.byIcon(Icons.logout_rounded), findsNothing);
   });
@@ -178,7 +180,7 @@ void main() {
       );
       expect(find.text('Connection unavailable'), findsOneWidget);
       expect(find.text('No records found'), findsNothing);
-      expect(find.text('Try Again'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
     },
   );
 

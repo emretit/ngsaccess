@@ -13,6 +13,7 @@ import 'package:ngsplusapp/router/app_router.dart';
 import 'package:ngsplusapp/screens/splash_screen.dart';
 import 'package:ngsplusapp/services/session_store.dart';
 import 'package:ngsplusapp/widgets/app_bottom_navigation.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 
 import '../auth_fakes.dart';
 
@@ -108,6 +109,7 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp.router(
+        theme: AppTheme.lightTheme,
         locale: const Locale('en'),
         routerConfig: router,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -382,7 +384,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Increment'));
       await tester.pump();
-      await tester.tap(find.text('QR Actions'));
+      await tester.tap(find.byKey(const ValueKey('app_nav_button_2')));
       await tester.pumpAndSettle();
       expect(find.text('QR active'), findsOneWidget);
       await tester.tap(find.text('History'));
@@ -395,31 +397,30 @@ void main() {
     },
   );
 
-  testWidgets(
-    'keyboard hides floating navigation without losing branch state',
-    (tester) async {
-      initialize();
-      await auth.signIn('fixture@example.test', 'fixture-password');
-      await mount(tester, '/history');
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Increment'));
-      await tester.pump();
-      tester.view.viewInsets = const FakeViewPadding(bottom: 280);
-      addTearDown(tester.view.resetViewInsets);
-      await tester.pumpAndSettle();
-      expect(find.byType(AppBottomNavigation), findsNothing);
-      expect(location().path, AppRoute.history);
-      expect(find.text('History:1'), findsOneWidget);
-      tester.view.resetViewInsets();
-      await tester.pumpAndSettle();
-      expect(find.byType(AppBottomNavigation), findsOneWidget);
-      expect(find.text('History:1'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('keyboard hides navigation without losing branch state', (
+    tester,
+  ) async {
+    initialize();
+    await auth.signIn('fixture@example.test', 'fixture-password');
+    await mount(tester, '/history');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Increment'));
+    await tester.pump();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    expect(find.byType(AppBottomNavigation), findsNothing);
+    expect(location().path, AppRoute.history);
+    expect(find.text('History:1'), findsOneWidget);
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    expect(find.byType(AppBottomNavigation), findsOneWidget);
+    expect(find.text('History:1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
-    'floating bar never covers nested screen FAB or final scroll action',
+    'navigation never covers nested screen FAB or final scroll action',
     (tester) async {
       initialize();
       await auth.signIn('fixture@example.test', 'fixture-password');

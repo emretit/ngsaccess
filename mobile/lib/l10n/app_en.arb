@@ -1,52 +1,30 @@
 {
   "@@locale": "en",
   "appName": "NGS Plus",
-  "appTagline": "Attendance Tracking System",
-  "pdksTitle": "Time & Attendance",
-  "pdksSubtitle": "Personnel Attendance Control System",
   "commonOk": "OK",
   "commonCancel": "Cancel",
   "commonClose": "Close",
-  "commonRetry": "Try Again",
-  "commonError": "Error",
-  "commonSuccess": "Success",
-  "commonAdd": "Add",
-  "comingSoon": "Coming soon.",
+  "commonRetry": "Try again",
   "navHome": "Home",
   "navHistory": "History",
   "navVisitor": "Visitor",
   "navProfile": "Profile",
   "loginWelcomeTitle": "Welcome back!",
-  "loginTitle": "Sign In",
+  "pdksSubtitle": "Personnel Attendance Control System",
   "loginPrompt": "Enter your credentials to sign in to the time & attendance system",
+  "loginTitle": "Sign in",
   "loginEmailLabel": "Email",
   "loginPasswordLabel": "Password",
   "loginEmailRequired": "Please enter your email address",
   "loginEmailInvalid": "Please enter a valid email address",
   "loginPasswordRequired": "Please enter your password",
   "loginPasswordTooShort": "Password must be at least 6 characters",
-  "loginRememberMe": "Remember Me",
-  "loginForgotPassword": "Forgot password",
-  "forgotPasswordTitle": "Reset Password",
-  "forgotPasswordHeadline": "Forgot your password?",
-  "forgotPasswordPrompt": "Enter your email address and we'll send you a reset link.",
-  "forgotPasswordSendButton": "Send Reset Link",
-  "forgotPasswordBackToLogin": "Back to sign in",
-  "forgotPasswordSuccessTitle": "Email Sent!",
-  "forgotPasswordSuccessBody": "A password reset link has been sent to {email}. Please check your inbox.",
-  "@forgotPasswordSuccessBody": {
-    "placeholders": {
-      "email": {
-        "type": "String"
-      }
-    }
-  },
-  "forgotPasswordSuccessButton": "Back to Sign In",
+  "loginForgotPassword": "Password help",
   "homeGreetingMorning": "Good morning",
   "homeGreetingDay": "Good day",
   "homeGreetingEvening": "Good evening",
   "homeGreetingFallback": "User",
-  "homeGreetingLine": "{greeting}, {name}!",
+  "homeGreetingLine": "{greeting}, {name}",
   "@homeGreetingLine": {
     "placeholders": {
       "greeting": {
@@ -57,188 +35,94 @@
       }
     }
   },
-  "homeAttendanceStatus": "Attendance Status",
-  "homeScanCheckIn": "Scan QR - Check In",
-  "homeScanCheckOut": "Scan QR - Check Out",
   "homeStatusInside": "Inside",
-  "homeStatusOut": "Checked Out",
-  "homeStatusNone": "Not Yet",
-  "homeAttendanceEntryRow": "Last In",
-  "homeAttendanceExitRow": "Last Out",
-  "homeExtraMovements": "{count, plural, one{+1 movement} other{+{count} movements}}",
-  "@homeExtraMovements": {
+  "homeStatusOut": "Outside",
+  "homeStatusNone": "No records today",
+  "homeAttendanceEntryRow": "Last entry",
+  "homeAttendanceExitRow": "Last exit",
+  "homeExtraEntries": "{count, plural, one{+1 more entry} other{+{count} more entries}}",
+  "@homeExtraEntries": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     },
-    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
+    "description": "Additional entries today beyond the last entry shown."
   },
-  "homeScanCheckInAgain": "Scan QR - Check In Again",
-  "homeAttendanceTimeEmpty": "—",
-  "homeMonthSummary": "This Month's Summary",
-  "homeStatTotalDays": "Total Days",
-  "homeStatDaysPresent": "Days Present",
-  "homeStatTimesLate": "Times Late",
-  "homeProgressLabel": "{present} / {total} days attended",
-  "@homeProgressLabel": {
+  "homeExtraExits": "{count, plural, one{+1 more exit} other{+{count} more exits}}",
+  "@homeExtraExits": {
     "placeholders": {
-      "present": {
-        "type": "int"
-      },
-      "total": {
+      "count": {
         "type": "int"
       }
-    }
+    },
+    "description": "Additional exits today beyond the last exit shown."
   },
-  "homeQuoteOfTheDay": "💫 Quote of the Day",
-  "homeQuote1": "Success is where preparation meets opportunity.",
-  "homeQuote2": "Every new day is a new beginning.",
-  "homeQuote3": "Discipline is the bridge to freedom.",
-  "homeQuote4": "Small steps create big changes.",
-  "homeQuote5": "Today is the tomorrow you thought about yesterday.",
-  "homeQuote6": "Time is the most valuable treasure — use it wisely.",
-  "homeQuote7": "Good habits are the key to success.",
-  "homeQuote8": "Every day is an opportunity to improve yourself.",
+  "homeAttendanceTimeEmpty": "—",
   "profileTitle": "Profile",
+  "profileAccountSection": "Account",
+  "profilePreferencesSection": "Preferences",
+  "profileSupportSection": "Support",
   "profileEditButton": "Personal details",
   "profileEditDialogBody": "Your organization manages your first name, last name and email address. Contact your personnel or system administrator for corrections. These fields are read-only in this app.",
   "profileNotifications": "Notifications",
   "profileNotificationsSubtitle": "Updates and usage information",
-  "profileSecurity": "Security",
-  "profileSecuritySubtitle": "Password change and recovery",
   "profileTheme": "Theme",
-  "profileThemeDark": "Dark theme active",
-  "profileThemeLight": "Light theme active",
-  "profileThemeSystem": "Follow system",
   "profileThemeModeLight": "Light theme",
   "profileThemeModeDark": "Dark theme",
   "profileThemeModeSystem": "Follow system",
   "profileLanguage": "Language",
   "profileLanguageValueTr": "Turkish",
   "profileLanguageValueEn": "English",
-  "profilePreferredDoor": "Quick Access Door",
+  "profilePreferredDoor": "Quick access door",
   "profilePreferredDoorEmpty": "Not selected",
-  "homeQuickActions": "Quick Actions",
   "quickActionUnlock": "Open Door",
-  "quickActionVisitor": "Visitor",
-  "quickActionHistory": "History",
   "quickActionProfile": "Profile",
   "unlockNoDeviceSelected": "Pick a quick-access door from Profile first",
-  "unlockGranted": "Access Granted",
   "unlockDenied": "Access Denied",
-  "selectDeviceTitle": "Select Door",
-  "selectDeviceSearch": "Search...",
+  "selectDeviceTitle": "Choose a door",
+  "selectDeviceSearch": "Search doors",
   "selectDeviceEmpty": "No accessible doors yet",
   "selectDeviceNoMatch": "No matching doors",
   "profileHelp": "Help & Support",
   "profileHelpSubtitle": "FAQ and support",
   "profileAboutApp": "About the App",
-  "profileAppVersion": "Version",
   "profilePrivacy": "Privacy information",
   "profilePrivacySubtitle": "App data and who to contact",
   "profileLogout": "Sign Out",
-  "profileLogoutSubtitle": "Sign out of your account",
   "profileLogoutConfirmTitle": "Sign Out",
   "profileLogoutConfirmBody": "Are you sure you want to sign out of your account?",
-  "profileSettings": "Settings",
-  "profileSettingsBody": "Set your theme, language and quick access target from Profile.",
-  "profileNotificationsDialogTitle": "Notification Settings",
   "profileNotificationsDialogBody": "Push delivery and notification preference management are not available in this version. Open the app and refresh to view current access and event information. Contact your organization’s administrator about missing or incorrect records.",
-  "profileSecurityDialogTitle": "Security Settings",
   "profileSecurityDialogBody": "If you know your current password, choose a new one using the form below. Changing your password ends all mobile sessions. If you forgot it, ask your organization’s administrator for a new setup link. Sign out before leaving a shared device.",
-  "profileThemeDialogTitle": "Theme Settings",
-  "profileThemeDialogBody": "Choose the light, dark or system theme.",
-  "profileLanguageDialogTitle": "Language Settings",
-  "profileLanguageDialogBody": "The language preference is stored on this device and retained after sign-out.",
   "profileHelpDialogTitle": "Help & Support",
   "profileHelpDialogBody": "Door selection\nChoose an accessible target from Profile > Quick Access Door. You can clear the selection or refresh the list. If the list is empty, ask your administrator to check your access permissions.\n\nUsing QR codes\nCamera permission is needed only for scanning. If permission is denied, check camera access in device settings. Show your personal QR code to a supported reader and refresh it when expired. Scanning an identity label alone does not create a passage record.\n\nRecords and access issues\nCheck your connection and refresh the relevant screen. A door command, a physical passage and an official attendance result are different events. Contact your personnel or system administrator about missing or incorrect records.\n\nSupport details\nGive your administrator the app version (About the App), the time of the issue and the displayed error. Do not share passwords, session information or your personal QR code.",
   "profilePrivacyDialogTitle": "Privacy information",
   "profilePrivacyDialogBody": "App data information — 19 October 2026\n\nNGS Plus retrieves and displays your organization’s employee details, accessible devices and your access events from the service. Personal QR codes are obtained from the service; the camera is used for scanning. A door request sends the selected target to the service. Theme, language and scoped target preferences are stored on this device.\n\nYour organization manages employee details, access permissions and event records. Contact your personnel or data administrator about processing purposes, retention periods, legal basis and personal data requests.\n\nThis explanation describes app data use and does not replace your organization’s approved privacy policy. A published organization policy link is not configured in this version.",
   "profileAboutDialogTitle": "About NGS Plus",
   "profileAboutLine1": "NGS Plus Attendance Tracking System",
-  "profileAboutLine2": "Installed app version",
-  "profileAboutLine3": "Contact your organization’s administrator for support.",
   "profileAboutLine4": "Employee access and event information application.",
   "profileFallbackEmail": "Email unavailable",
   "historyTitle": "History",
   "historyTabAll": "Records",
   "historyTabThisMonth": "Calendar",
   "historyTabStats": "Overview",
-  "historyLoading": "Loading data...",
-  "historyErrorTitle": "An Error Occurred",
-  "historyErrorBody": "Failed to load data: {error}",
-  "@historyErrorBody": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "historyLoading": "Loading records",
+  "historyErrorTitle": "Records could not be loaded",
   "historyEmpty": "No records found",
-  "historyEmptyHint": "Pull down to refresh data",
-  "historyColorLegend": "Color Legend",
-  "historyLegendEarly": "Early Check-in",
-  "historyLegendEarlyDesc": "Days checked in before 09:00",
-  "historyLegendNormal": "Normal Check-in",
-  "historyLegendNormalDesc": "Days checked in between 09:00 - 09:30",
-  "historyLegendLate": "Late Check-in",
-  "historyLegendLateDesc": "Days checked in after 09:30",
-  "historyLegendNone": "No Attendance",
-  "historyLegendNoneDesc": "Days with no check-in/out records",
-  "historyCalendarHint": "Tap days to see details. Green dots indicate additional attendance records.",
-  "historyMonthSummary": "This Month's Summary",
-  "historyTotalCheckIns": "Total Check-ins",
-  "historyTotalCheckOuts": "Total Check-outs",
-  "historyActiveDays": "Days with entry",
-  "historyGeneralStats": "General Statistics",
-  "historyThisWeek": "This Week",
-  "historyWeeklySummary": "Weekly Summary",
-  "historyWeeklyTotalRecords": "{count, plural, one{1 record this week} other{{count} records this week}}",
-  "@historyWeeklyTotalRecords": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    },
-    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
-  },
-  "historyWeeklyCheckIn": "Check-ins: {count}",
-  "@historyWeeklyCheckIn": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "historyWeeklyCheckOut": "Check-outs: {count}",
-  "@historyWeeklyCheckOut": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "historyDeviceStats": "Device Statistics",
-  "historyCheckInRecord": "Checked In",
-  "historyCheckOutRecord": "Checked Out",
-  "historyBadgeIn": "IN",
-  "historyBadgeOut": "OUT",
-  "historyUnknownDevice": "Unknown Device",
-  "historyUnknownLocation": "Unknown Location",
-  "historyDetailCheckIn": "Check-in Details",
-  "historyDetailCheckOut": "Check-out Details",
+  "historyEmptyHint": "Your new access records will appear here.",
+  "historyMonthSummary": "This month’s summary",
+  "historyActiveDays": "Entry days",
+  "historyThisWeek": "This week",
+  "historyWeeklySummary": "Weekly summary",
+  "historyUnknownDevice": "Door unavailable",
+  "historyRecordDetailTitle": "Record details",
   "historyDetailDate": "Date",
   "historyDetailTime": "Time",
   "historyDetailLocation": "Location",
-  "historyDetailQrCode": "QR Code",
   "historyFilterTitle": "Filter",
   "historyFilterDate": "Date",
-  "historyFilterDateNone": "No date selected",
-  "historyFilterDevice": "Device",
-  "historyFilterDeviceNone": "No device selected",
-  "historyFilterClear": "Clear Filters",
-  "historyFilterDeviceSelectTitle": "Select Device",
+  "historyFilterDevice": "Door",
+  "historyFilterClear": "Clear filters",
   "historyDayRecordCount": "{count, plural, one{1 record} other{{count} records}}",
   "@historyDayRecordCount": {
     "placeholders": {
@@ -253,117 +137,22 @@
   "qrTabTitle": "QR Actions",
   "qrTabMyQr": "My QR",
   "qrTabScan": "Scan",
-  "qrInvalidResponse": "Invalid response",
-  "qrTokenMissing": "Token missing",
   "qrRefresh": "Refresh",
   "qrTryAgain": "Try again",
   "qrFrameHint": "Place the QR code inside the frame",
-  "qrTokenHint": "Show this QR code to the door device. Code is valid for 10 seconds; tap refresh when expired.",
-  "qrProcessError": "An error occurred while processing the QR code: {error}",
-  "@qrProcessError": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
-  "qrUserCodeTitle": "User QR Code",
-  "qrUserCodeBody": "User: {name}\nEmail: {email}\nDate: {date}",
-  "@qrUserCodeBody": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      },
-      "email": {
-        "type": "String"
-      },
-      "date": {
-        "type": "String"
-      }
-    }
-  },
   "qrInvalidCode": "Invalid QR code",
-  "qrAccessGranted": "Access Granted",
-  "qrUnknownError": "An error occurred",
-  "qrDeviceLine": "Device: {name}",
-  "@qrDeviceLine": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "qrLocationLine": "Location: {location}",
-  "@qrLocationLine": {
-    "placeholders": {
-      "location": {
-        "type": "String"
-      }
-    }
-  },
-  "qrTimeLine": "Time: {time}",
-  "@qrTimeLine": {
-    "placeholders": {
-      "time": {
-        "type": "String"
-      }
-    }
-  },
   "visitorTitle": "Visitors",
   "visitorStatTotal": "Total",
-  "visitorStatInside": "Inside",
-  "visitorStatExpected": "Expected",
-  "visitorEmpty": "No visitor records yet",
-  "visitorEmptyHint": "Use Add in the top-right corner to create an invitation.",
-  "visitorStatusExpected": "Expected",
-  "visitorStatusInside": "Inside",
-  "visitorStatusOut": "Left",
-  "visitorContactPerson": "Contact: {name}",
-  "@visitorContactPerson": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "visitorCheckOut": "Check Out",
-  "visitorCheckIn": "Check In",
-  "visitorCheckedInToast": "{name} checked in",
-  "@visitorCheckedInToast": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "visitorCheckedOutToast": "{name} checked out",
-  "@visitorCheckedOutToast": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "visitorEmpty": "No invitations yet",
+  "visitorEmptyHint": "Use Invite a visitor to create an invitation.",
   "visitorFilterTitle": "Filter",
-  "visitorFilterBody": "Filtering options will go here.",
-  "visitorAddTitle": "New Visitor",
-  "visitorFieldName": "Full Name",
-  "visitorFieldCompany": "Company",
+  "visitorAddTitle": "Invite a visitor",
   "visitorFieldPurpose": "Visit Purpose",
-  "visitorFieldContact": "Contact Person",
-  "visitorAddedToast": "Visitor added",
-  "visitorAddButton": "Add Visitor",
+  "visitorAddButton": "Invite a visitor",
   "errorNetwork": "No internet connection. Please check your connection.",
-  "errorTimeout": "The server did not respond. Please try again later.",
-  "errorServer": "Server error ({code}). Please try again shortly.",
-  "@errorServer": {
-    "placeholders": {
-      "code": {
-        "type": "int"
-      }
-    }
-  },
-  "errorEmploymentEnded": "Your employment has ended. Your mobile access has been disabled.",
+  "errorTimeout": "The operation did not finish in time. Try again.",
+  "errorServer": "The operation could not be completed. Try again shortly.",
+  "errorEmploymentEnded": "Your mobile access is disabled. Contact your organisation’s administrator.",
   "errorAuthExpired": "Your session has ended. Please sign in again.",
   "errorUnknown": "An unexpected error occurred. Please try again.",
   "errorBusinessInvalidCredentials": "Invalid email or password",
@@ -383,20 +172,17 @@
   "selectDeviceClear": "Clear selection",
   "selectDeviceInvalidated": "The previous target is no longer available. Choose a new target.",
   "historyLoadMore": "Load more",
-  "historyAccessDenied": "Access denied",
   "historyUnknownDirection": "Unknown direction",
   "historyUnknownAccess": "Unknown access result",
   "historyStaleData": "Showing previous data; refresh failed.",
   "historySummaryUnavailable": "Period summary unavailable.",
-  "historyRawEvents": "Raw access events; not an official attendance result.",
+  "historyRawEvents": "These are access records. Official attendance and working time results may differ.",
   "homeDataLoading": "Loading data",
-  "homeDataUnavailable": "Data unavailable",
+  "homeDataUnavailable": "Today’s status could not be loaded",
   "homeDataStale": "Showing previous data",
   "homeDataRefreshing": "Refreshing data",
   "homeRetry": "Try again",
   "homeStatusUnknown": "Status unknown",
-  "homeSelfCheckIn": "Manual check-in",
-  "homeSelfCheckInRecorded": "Manual check-in recorded",
   "homeCommandPending": "Command submitted; physical passage is not confirmed.",
   "@profileVersionBuild": {
     "description": "Version and build from installed package metadata, never translated.",
@@ -418,15 +204,16 @@
   "qrExpiredHint": "Code expired.",
   "qrRefreshFailed": "Unable to refresh QR.",
   "qrStatusUnavailable": "Unable to verify code status. Check again.",
-  "qrReaderHint": "Show this code to a supported reader. Time is based on server expiry. An operation record does not confirm a door opening or physical passage.",
+  "qrReaderHint": "Show the code to the reader",
   "qrSwitchCamera": "Switch camera",
   "qrFlashlight": "Flashlight",
   "qrCameraPermissionRequired": "Camera permission is required to scan QR codes.",
   "qrOpenSettings": "Open settings",
+  "qrGrantCameraPermission": "Allow camera access",
   "qrCameraControlUnavailable": "Camera control unavailable.",
-  "qrDeviceIdentityOnly": "This is a device identity label, not access authorization or proof of presence. Use My QR at a supported reader.",
+  "qrDeviceIdentityOnly": "This code identifies a device; it does not open a door or record access. Show the code in My QR to a compatible reader.",
   "qrEmployeeIdentityOnly": "This is an employee identity code. It does not verify identity or create an operation record.",
-  "qrChallengeUnsupported": "This reader’s secure operation flow is not supported yet. Use My QR at a supported reader.",
+  "qrChallengeUnsupported": "Scanning is not available with this reader. Show the code in My QR to a compatible reader.",
   "qrScanExpired": "QR code expired.",
   "qrInvalidDate": "QR code date is invalid.",
   "qrUnsupportedVersion": "This QR version is unsupported.",
@@ -441,19 +228,21 @@
   "loginRememberEmail": "Remember my email",
   "passwordHelpTitle": "Password help",
   "passwordHelpAdminTitle": "Contact your administrator",
-  "passwordHelpAdminBody": "Your organization’s administrator manages mobile password setup. Ask them to send a new setup link to your registered email address. Open that link to choose a new password, then return here to sign in.",
+  "passwordHelpAdminBody": "Ask your organisation’s administrator to send a password setup link to your registered email. Set your password, then sign in.",
   "passwordHelpNoEmail": "This screen does not send email or change your password.",
   "passwordHelpRequest": "Hello, I need to set or reset my NGS Plus mobile password. Please send a new password setup link to the email address registered in my employee account.",
-  "passwordHelpCopy": "Copy request for administrator",
+  "passwordHelpCopy": "Copy request",
   "passwordHelpCopied": "Request copied. Share it with your administrator.",
   "passwordHelpCopyFailed": "Could not copy. You can select the request text below.",
   "loginShowPassword": "Show password",
   "loginHidePassword": "Hide password",
   "startupTitle": "Starting NGS Plus",
+  "startupBandTitle": "Starting",
+  "startupFailureTitle": "Unable to start",
   "startupUnavailable": "Could not verify your session. Check your connection and try again.",
   "startupRetry": "Try again",
   "startupUseLogin": "Return to sign in",
-  "homeUpdatedAt": "Updated: {time}",
+  "homeUpdatedAt": "Last updated {time}",
   "@homeUpdatedAt": {
     "placeholders": {
       "time": {
@@ -471,11 +260,20 @@
   "visitorPhone": "Phone",
   "visitorStart": "Visit starts",
   "visitorEnd": "Visit ends",
-  "visitorSave": "Save",
+  "visitorSave": "Save invitation",
   "visitorEdit": "Edit",
+  "visitorEditTitle": "Edit invitation",
+  "visitorStartDate": "Start date",
+  "visitorEndDate": "End date",
+  "visitorStartTime": "Start time",
+  "visitorEndTime": "End time",
+  "visitorNotFound": "Invitation not found",
+  "visitorErrorEndBeforeStart": "End must be after start.",
+  "visitorErrorMaxDuration": "A visit can last at most 31 days.",
+  "visitorErrorEndInPast": "End cannot be in the past.",
+  "visitorErrorNoticeRequired": "Accept the privacy notice to continue.",
   "visitorCancelInvitation": "Cancel invitation",
   "visitorCancelConfirm": "Cancel this invitation?",
-  "visitorPreRegistered": "Awaiting operator activation",
   "visitorAccessActive": "Access active",
   "visitorAccessEnded": "Access ended",
   "visitorExpired": "Expired",
@@ -483,13 +281,13 @@
   "visitorPresenceInside": "Last recorded inside",
   "visitorPresenceOutside": "Last recorded outside",
   "visitorOperatorRequired": "Contact an authorized operator to revoke active access.",
-  "visitorSaved": "Invitation record saved; operator activation is required.",
+  "visitorSaved": "Invitation saved. Approval is required.",
   "visitorCancelled": "Invitation cancelled.",
   "visitorLoadMore": "Load more",
   "visitorNotice": "Project visitor notice",
   "visitorNoticeReviewed": "I have reviewed the current notice.",
-  "visitorInvalidForm": "Check the required fields and visit dates.",
-  "visitorStale": "Could not refresh; showing previous records.",
+  "fieldRequired": "This field is required.",
+  "visitorStale": "Invitations could not be refreshed. Previously loaded invitations are shown.",
   "visitorRefresh": "Refresh",
   "profileChangePassword": "Change password",
   "profileCurrentPassword": "Current password",
@@ -501,10 +299,10 @@
   "profilePasswordChanged": "Password changed. Sign in with your new password.",
   "errorRateLimited": "Too many attempts. Wait a while and try again.",
   "errorSessionStorageFailed": "Your session could not be stored securely. Please sign in again.",
-  "errorProtocol": "The server response could not be verified. Please try again.",
+  "errorProtocol": "The operation could not be completed. Try again.",
   "errorPasswordPolicy": "Use a new password of at least 8 characters with an uppercase letter, a lowercase letter and a digit, at most 72 UTF-8 bytes, different from the current password.",
   "homeChooseDoor": "Choose a door",
-  "homeDoorUnavailable": "The selected door is no longer available. Choose a new door from Profile.",
+  "homeDoorUnavailable": "The selected door is unavailable. Choose another door.",
   "homeNoOpenableDoor": "No door on this device is available to open.",
   "startupContactAdministrator": "If the problem continues, contact your organization’s system administrator.",
   "selectDeviceInactive": "Target inactive",
@@ -518,9 +316,9 @@
   "visitorSearch": "Search invitations",
   "visitorAllStatuses": "All access states",
   "visitorSummaryTitle": "All invitations",
-  "visitorSummaryLimited": "These totals are lower bounds; the summary read limit was reached.",
+  "visitorSummaryLimited": "Some invitations could not be included; the actual total may be higher.",
   "visitorSummaryError": "Summary could not be refreshed.",
-  "visitorSyncTitle": "Device synchronization",
+  "visitorSyncTitle": "Device status",
   "visitorSyncPending": "Device update pending",
   "visitorSyncApplied": "Device acknowledged the update",
   "visitorSyncFailed": "Device update failed; contact an operator.",
@@ -538,30 +336,32 @@
   "historyInfoTitle": "About these records",
   "historyTimeZone": "Türkiye time · UTC+3",
   "historyAllDates": "All dates",
-  "historyAllDevices": "All devices",
+  "historyAllDevices": "All doors",
   "historyApplyFilters": "Apply filters",
   "historyShowAllRecords": "Show all records",
   "historyFilteredEmptyHint": "No records match the selected date or device.",
-  "historyCalendarLegend": "Outline: today · Fill: selected day · Dot: records",
+  "historyCalendarLegend": "Days with a dot have records.",
   "historySelectDayHint": "Select a day to see its records.",
   "historyNoActivity": "No access events in this period",
-  "historyNoActivityHint": "The summary will appear as events are recorded. This is not an absence calculation.",
+  "historyNoActivityHint": "New records will appear here. No records does not mean an absence.",
   "historyDeniedCount": "Denied",
   "historyUnknownCount": "Unknown",
-  "historyLoadedDevices": "Device options come from the loaded records.",
-  "historyNoDeviceOptions": "No devices found in the loaded records.",
+  "historyLoadedDevices": "Doors appearing in this list of records are shown.",
+  "historyNoDeviceOptions": "No door options are available for these records.",
   "historyTabThisMonthPeriod": "This month",
   "visitorPeopleSection": "Personal details",
   "visitorVisitSection": "Visit details",
   "visitorActivationHint": "An authorized operator must activate access after the invitation is saved.",
+  "visitorMetricPending": "Pending",
   "visitorPendingShort": "Awaiting activation",
   "visitorInvitationsTitle": "Invitations",
   "visitorFilteredEmptyHint": "No invitations match the search or access status.",
   "visitorClearFilters": "Clear filters",
   "visitorNoticeUnavailable": "The privacy notice could not be loaded. Try again before saving.",
-  "profileProject": "Company / project",
+  "profileProject": "Organisation and project",
   "profileProjectUnavailable": "Project information is currently unavailable",
   "doorOperationRecoveryTitle": "Review door request",
+  "doorOperationNothingToCheck": "There is no door operation to check.",
   "doorOperationRecoveryHint": "The previous request is checked first. Retrying uses the same request and original door. A command result does not confirm physical passage.",
   "visitorRecoveryChecking": "Checking the previous visitor request…",
   "visitorRecoveryUnresolved": "The previous request is still unconfirmed. Re-enter the same visitor details to retry the same request. No new request will be created.",
@@ -570,7 +370,7 @@
   "visitorRecoveryStorageError": "The visitor request could not be safely saved or read. Check its status again before continuing.",
   "errorRequestProjectMissing": "Your employee project could not be found.",
   "errorRequestNoteTooLong": "Notes must be at most 500 characters.",
-  "errorRequestDateInvalid": "Enter a valid date (YYYY-MM-DD).",
+  "errorRequestDateInvalid": "Choose a valid date.",
   "errorRequestRangeInvalid": "The end date cannot precede the start date.",
   "errorRequestStartTooOld": "Leave may start at most 30 days in the past.",
   "errorRequestRangeTooLong": "Leave can cover at most 60 days.",
@@ -582,18 +382,17 @@
   "errorCorrectionDateOutOfRange": "Choose today or a date within the past 30 days.",
   "errorCorrectionReasonLength": "The reason must contain 5–300 characters.",
   "errorCorrectionTimesMismatch": "Provide only the times required by the correction type.",
-  "errorCorrectionTimeInvalid": "Enter a valid time (HH:mm).",
+  "errorCorrectionTimeInvalid": "Choose a valid time.",
   "errorCorrectionPendingExists": "You already have a pending correction for this date.",
   "requestsTitle": "My requests",
   "requestsLeave": "Leave",
-  "requestsCorrection": "Attendance correction",
+  "requestsCorrection": "Record correction",
   "requestsNew": "New request",
   "requestsEmpty": "You have no requests yet.",
   "requestsRetry": "Retry",
-  "requestsWithdraw": "Withdraw",
+  "requestsWithdraw": "Withdraw request",
   "requestsWithdrawConfirm": "Withdraw this request?",
   "requestsCancel": "Cancel",
-  "requestsSubmit": "Submit",
   "requestsUncertain": "The request may have been submitted; check the list.",
   "requestsAdmin": "Administrator record",
   "requestsPending": "Pending",
@@ -630,5 +429,40 @@
   "errorVisitorInvalid": "Visitor details or the list page are invalid. Check the details and dates; refresh the list if needed.",
   "errorVisitorLocked": "This invitation can no longer be edited. Refresh the invitation or contact the operator.",
   "errorVisitorNoticeChanged": "The visitor privacy notice has changed. Refresh the invitation form, read the updated notice and confirm again.",
-  "errorRequestConflict": "This request was already saved with different visitor details. Refresh the visitor list and check the existing invitation."
+  "errorRequestConflict": "This request was already saved with different visitor details. Refresh the visitor list and check the existing invitation.",
+  "navQr": "QR",
+  "homeToday": "Today",
+  "homeFirstEntry": "First entry",
+  "loginSigningIn": "Signing in",
+  "fieldSelectDate": "Choose a date",
+  "fieldSelectTime": "Choose a time",
+  "fieldSelectOption": "Choose an option",
+  "requestsLeaveFormTitle": "Leave request",
+  "requestsCorrectionFormTitle": "Record correction request",
+  "requestsLeaveSubmit": "Send leave request",
+  "requestsLeaveSubmitting": "Sending leave request",
+  "requestsLeaveSubmitted": "Leave request sent",
+  "requestsCorrectionSubmit": "Send correction request",
+  "requestsCorrectionSubmitting": "Sending correction request",
+  "requestsCorrectionSubmitted": "Correction request sent",
+  "requestsWithdrawnToast": "Request withdrawn",
+  "requestsTimeZoneHint": "Enter times in Turkey time.",
+  "visitorSaving": "Saving invitation",
+  "visitorLoadFailed": "Invitations could not be loaded. Try again.",
+  "visitorNoMatchTitle": "No matching invitations",
+  "commonLoading": "Loading",
+  "fieldNoOptions": "No options available",
+  "metricNoRecord": "No record",
+  "fieldClear": "Clear",
+  "historyWeeklyTotalRecords": "{count, plural, one{1 record this week} other{{count} records this week}}",
+  "@historyWeeklyTotalRecords": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    },
+    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
+  },
+  "unlockGranted": "Access Granted",
+  "visitorPreRegistered": "Awaiting operator activation"
 }

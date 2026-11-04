@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
 import '../widgets/brand_mark.dart';
+import '../widgets/ui/ui.dart';
 
 /// Presentation only: the root owns startup, the router owns navigation.
 class SplashScreen extends StatelessWidget {
@@ -21,58 +22,63 @@ class SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const BrandMark(size: 112),
-                  const SizedBox(height: 24),
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      l10n.startupTitle,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
+    return AppScaffold(
+      brandedSystemBar: true,
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppBrandBand(
+              title: isFailure
+                  ? l10n.startupFailureTitle
+                  : l10n.startupBandTitle,
+              brandLabel: l10n.appName,
+              brandMark: const BrandMark.band(),
+              consumeTopInset: false,
+            ),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!isFailure) ...[
+                        Text(l10n.startupTitle),
+                        const SizedBox(height: 24),
+                        Center(
+                          child: CircularProgressIndicator(
+                            semanticsLabel: l10n.commonLoading,
+                          ),
+                        ),
+                      ] else ...[
+                        AppDataNotice(
+                          message: message ?? l10n.startupUnavailable,
+                          tone: AppStatusTone.danger,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(l10n.startupContactAdministrator),
+                        const SizedBox(height: 24),
+                        if (onRetry != null)
+                          AppPrimaryButton(
+                            label: l10n.startupRetry,
+                            onPressed: onRetry,
+                          ),
+                        const SizedBox(height: 12),
+                        if (onUseLogin != null)
+                          AppSecondaryButton(
+                            expanded: true,
+                            label: l10n.startupUseLogin,
+                            onPressed: onUseLogin,
+                          ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  if (!isFailure)
-                    CircularProgressIndicator(semanticsLabel: l10n.startupTitle)
-                  else ...[
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        message ?? l10n.startupUnavailable,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l10n.startupContactAdministrator,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    if (onRetry != null)
-                      FilledButton(
-                        onPressed: onRetry,
-                        child: Text(l10n.startupRetry),
-                      ),
-                    if (onUseLogin != null)
-                      TextButton(
-                        onPressed: onUseLogin,
-                        child: Text(l10n.startupUseLogin),
-                      ),
-                  ],
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

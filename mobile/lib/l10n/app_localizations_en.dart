@@ -12,15 +12,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appName => 'NGS Plus';
 
   @override
-  String get appTagline => 'Attendance Tracking System';
-
-  @override
-  String get pdksTitle => 'Time & Attendance';
-
-  @override
-  String get pdksSubtitle => 'Personnel Attendance Control System';
-
-  @override
   String get commonOk => 'OK';
 
   @override
@@ -30,19 +21,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonClose => 'Close';
 
   @override
-  String get commonRetry => 'Try Again';
-
-  @override
-  String get commonError => 'Error';
-
-  @override
-  String get commonSuccess => 'Success';
-
-  @override
-  String get commonAdd => 'Add';
-
-  @override
-  String get comingSoon => 'Coming soon.';
+  String get commonRetry => 'Try again';
 
   @override
   String get navHome => 'Home';
@@ -60,11 +39,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginWelcomeTitle => 'Welcome back!';
 
   @override
-  String get loginTitle => 'Sign In';
+  String get pdksSubtitle => 'Personnel Attendance Control System';
 
   @override
   String get loginPrompt =>
       'Enter your credentials to sign in to the time & attendance system';
+
+  @override
+  String get loginTitle => 'Sign in';
 
   @override
   String get loginEmailLabel => 'Email';
@@ -85,37 +67,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginPasswordTooShort => 'Password must be at least 6 characters';
 
   @override
-  String get loginRememberMe => 'Remember Me';
-
-  @override
-  String get loginForgotPassword => 'Forgot password';
-
-  @override
-  String get forgotPasswordTitle => 'Reset Password';
-
-  @override
-  String get forgotPasswordHeadline => 'Forgot your password?';
-
-  @override
-  String get forgotPasswordPrompt =>
-      'Enter your email address and we\'ll send you a reset link.';
-
-  @override
-  String get forgotPasswordSendButton => 'Send Reset Link';
-
-  @override
-  String get forgotPasswordBackToLogin => 'Back to sign in';
-
-  @override
-  String get forgotPasswordSuccessTitle => 'Email Sent!';
-
-  @override
-  String forgotPasswordSuccessBody(String email) {
-    return 'A password reset link has been sent to $email. Please check your inbox.';
-  }
-
-  @override
-  String get forgotPasswordSuccessButton => 'Back to Sign In';
+  String get loginForgotPassword => 'Password help';
 
   @override
   String get homeGreetingMorning => 'Good morning';
@@ -131,97 +83,60 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String homeGreetingLine(String greeting, String name) {
-    return '$greeting, $name!';
+    return '$greeting, $name';
   }
-
-  @override
-  String get homeAttendanceStatus => 'Attendance Status';
-
-  @override
-  String get homeScanCheckIn => 'Scan QR - Check In';
-
-  @override
-  String get homeScanCheckOut => 'Scan QR - Check Out';
 
   @override
   String get homeStatusInside => 'Inside';
 
   @override
-  String get homeStatusOut => 'Checked Out';
+  String get homeStatusOut => 'Outside';
 
   @override
-  String get homeStatusNone => 'Not Yet';
+  String get homeStatusNone => 'No records today';
 
   @override
-  String get homeAttendanceEntryRow => 'Last In';
+  String get homeAttendanceEntryRow => 'Last entry';
 
   @override
-  String get homeAttendanceExitRow => 'Last Out';
+  String get homeAttendanceExitRow => 'Last exit';
 
   @override
-  String homeExtraMovements(int count) {
+  String homeExtraEntries(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '+$count movements',
-      one: '+1 movement',
+      other: '+$count more entries',
+      one: '+1 more entry',
     );
     return '$_temp0';
   }
 
   @override
-  String get homeScanCheckInAgain => 'Scan QR - Check In Again';
+  String homeExtraExits(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '+$count more exits',
+      one: '+1 more exit',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get homeAttendanceTimeEmpty => '—';
 
   @override
-  String get homeMonthSummary => 'This Month\'s Summary';
-
-  @override
-  String get homeStatTotalDays => 'Total Days';
-
-  @override
-  String get homeStatDaysPresent => 'Days Present';
-
-  @override
-  String get homeStatTimesLate => 'Times Late';
-
-  @override
-  String homeProgressLabel(int present, int total) {
-    return '$present / $total days attended';
-  }
-
-  @override
-  String get homeQuoteOfTheDay => '💫 Quote of the Day';
-
-  @override
-  String get homeQuote1 => 'Success is where preparation meets opportunity.';
-
-  @override
-  String get homeQuote2 => 'Every new day is a new beginning.';
-
-  @override
-  String get homeQuote3 => 'Discipline is the bridge to freedom.';
-
-  @override
-  String get homeQuote4 => 'Small steps create big changes.';
-
-  @override
-  String get homeQuote5 => 'Today is the tomorrow you thought about yesterday.';
-
-  @override
-  String get homeQuote6 =>
-      'Time is the most valuable treasure — use it wisely.';
-
-  @override
-  String get homeQuote7 => 'Good habits are the key to success.';
-
-  @override
-  String get homeQuote8 => 'Every day is an opportunity to improve yourself.';
-
-  @override
   String get profileTitle => 'Profile';
+
+  @override
+  String get profileAccountSection => 'Account';
+
+  @override
+  String get profilePreferencesSection => 'Preferences';
+
+  @override
+  String get profileSupportSection => 'Support';
 
   @override
   String get profileEditButton => 'Personal details';
@@ -237,22 +152,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileNotificationsSubtitle => 'Updates and usage information';
 
   @override
-  String get profileSecurity => 'Security';
-
-  @override
-  String get profileSecuritySubtitle => 'Password change and recovery';
-
-  @override
   String get profileTheme => 'Theme';
-
-  @override
-  String get profileThemeDark => 'Dark theme active';
-
-  @override
-  String get profileThemeLight => 'Light theme active';
-
-  @override
-  String get profileThemeSystem => 'Follow system';
 
   @override
   String get profileThemeModeLight => 'Light theme';
@@ -273,22 +173,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileLanguageValueEn => 'English';
 
   @override
-  String get profilePreferredDoor => 'Quick Access Door';
+  String get profilePreferredDoor => 'Quick access door';
 
   @override
   String get profilePreferredDoorEmpty => 'Not selected';
 
   @override
-  String get homeQuickActions => 'Quick Actions';
-
-  @override
   String get quickActionUnlock => 'Open Door';
-
-  @override
-  String get quickActionVisitor => 'Visitor';
-
-  @override
-  String get quickActionHistory => 'History';
 
   @override
   String get quickActionProfile => 'Profile';
@@ -298,16 +189,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pick a quick-access door from Profile first';
 
   @override
-  String get unlockGranted => 'Access Granted';
-
-  @override
   String get unlockDenied => 'Access Denied';
 
   @override
-  String get selectDeviceTitle => 'Select Door';
+  String get selectDeviceTitle => 'Choose a door';
 
   @override
-  String get selectDeviceSearch => 'Search...';
+  String get selectDeviceSearch => 'Search doors';
 
   @override
   String get selectDeviceEmpty => 'No accessible doors yet';
@@ -325,9 +213,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileAboutApp => 'About the App';
 
   @override
-  String get profileAppVersion => 'Version';
-
-  @override
   String get profilePrivacy => 'Privacy information';
 
   @override
@@ -337,9 +222,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileLogout => 'Sign Out';
 
   @override
-  String get profileLogoutSubtitle => 'Sign out of your account';
-
-  @override
   String get profileLogoutConfirmTitle => 'Sign Out';
 
   @override
@@ -347,39 +229,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Are you sure you want to sign out of your account?';
 
   @override
-  String get profileSettings => 'Settings';
-
-  @override
-  String get profileSettingsBody =>
-      'Set your theme, language and quick access target from Profile.';
-
-  @override
-  String get profileNotificationsDialogTitle => 'Notification Settings';
-
-  @override
   String get profileNotificationsDialogBody =>
       'Push delivery and notification preference management are not available in this version. Open the app and refresh to view current access and event information. Contact your organization’s administrator about missing or incorrect records.';
 
   @override
-  String get profileSecurityDialogTitle => 'Security Settings';
-
-  @override
   String get profileSecurityDialogBody =>
       'If you know your current password, choose a new one using the form below. Changing your password ends all mobile sessions. If you forgot it, ask your organization’s administrator for a new setup link. Sign out before leaving a shared device.';
-
-  @override
-  String get profileThemeDialogTitle => 'Theme Settings';
-
-  @override
-  String get profileThemeDialogBody =>
-      'Choose the light, dark or system theme.';
-
-  @override
-  String get profileLanguageDialogTitle => 'Language Settings';
-
-  @override
-  String get profileLanguageDialogBody =>
-      'The language preference is stored on this device and retained after sign-out.';
 
   @override
   String get profileHelpDialogTitle => 'Help & Support';
@@ -402,13 +257,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileAboutLine1 => 'NGS Plus Attendance Tracking System';
 
   @override
-  String get profileAboutLine2 => 'Installed app version';
-
-  @override
-  String get profileAboutLine3 =>
-      'Contact your organization’s administrator for support.';
-
-  @override
   String get profileAboutLine4 =>
       'Employee access and event information application.';
 
@@ -428,121 +276,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyTabStats => 'Overview';
 
   @override
-  String get historyLoading => 'Loading data...';
+  String get historyLoading => 'Loading records';
 
   @override
-  String get historyErrorTitle => 'An Error Occurred';
-
-  @override
-  String historyErrorBody(String error) {
-    return 'Failed to load data: $error';
-  }
+  String get historyErrorTitle => 'Records could not be loaded';
 
   @override
   String get historyEmpty => 'No records found';
 
   @override
-  String get historyEmptyHint => 'Pull down to refresh data';
+  String get historyEmptyHint => 'Your new access records will appear here.';
 
   @override
-  String get historyColorLegend => 'Color Legend';
+  String get historyMonthSummary => 'This month’s summary';
 
   @override
-  String get historyLegendEarly => 'Early Check-in';
+  String get historyActiveDays => 'Entry days';
 
   @override
-  String get historyLegendEarlyDesc => 'Days checked in before 09:00';
+  String get historyThisWeek => 'This week';
 
   @override
-  String get historyLegendNormal => 'Normal Check-in';
+  String get historyWeeklySummary => 'Weekly summary';
 
   @override
-  String get historyLegendNormalDesc => 'Days checked in between 09:00 - 09:30';
+  String get historyUnknownDevice => 'Door unavailable';
 
   @override
-  String get historyLegendLate => 'Late Check-in';
-
-  @override
-  String get historyLegendLateDesc => 'Days checked in after 09:30';
-
-  @override
-  String get historyLegendNone => 'No Attendance';
-
-  @override
-  String get historyLegendNoneDesc => 'Days with no check-in/out records';
-
-  @override
-  String get historyCalendarHint =>
-      'Tap days to see details. Green dots indicate additional attendance records.';
-
-  @override
-  String get historyMonthSummary => 'This Month\'s Summary';
-
-  @override
-  String get historyTotalCheckIns => 'Total Check-ins';
-
-  @override
-  String get historyTotalCheckOuts => 'Total Check-outs';
-
-  @override
-  String get historyActiveDays => 'Days with entry';
-
-  @override
-  String get historyGeneralStats => 'General Statistics';
-
-  @override
-  String get historyThisWeek => 'This Week';
-
-  @override
-  String get historyWeeklySummary => 'Weekly Summary';
-
-  @override
-  String historyWeeklyTotalRecords(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count records this week',
-      one: '1 record this week',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String historyWeeklyCheckIn(int count) {
-    return 'Check-ins: $count';
-  }
-
-  @override
-  String historyWeeklyCheckOut(int count) {
-    return 'Check-outs: $count';
-  }
-
-  @override
-  String get historyDeviceStats => 'Device Statistics';
-
-  @override
-  String get historyCheckInRecord => 'Checked In';
-
-  @override
-  String get historyCheckOutRecord => 'Checked Out';
-
-  @override
-  String get historyBadgeIn => 'IN';
-
-  @override
-  String get historyBadgeOut => 'OUT';
-
-  @override
-  String get historyUnknownDevice => 'Unknown Device';
-
-  @override
-  String get historyUnknownLocation => 'Unknown Location';
-
-  @override
-  String get historyDetailCheckIn => 'Check-in Details';
-
-  @override
-  String get historyDetailCheckOut => 'Check-out Details';
+  String get historyRecordDetailTitle => 'Record details';
 
   @override
   String get historyDetailDate => 'Date';
@@ -554,28 +315,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyDetailLocation => 'Location';
 
   @override
-  String get historyDetailQrCode => 'QR Code';
-
-  @override
   String get historyFilterTitle => 'Filter';
 
   @override
   String get historyFilterDate => 'Date';
 
   @override
-  String get historyFilterDateNone => 'No date selected';
+  String get historyFilterDevice => 'Door';
 
   @override
-  String get historyFilterDevice => 'Device';
-
-  @override
-  String get historyFilterDeviceNone => 'No device selected';
-
-  @override
-  String get historyFilterClear => 'Clear Filters';
-
-  @override
-  String get historyFilterDeviceSelectTitle => 'Select Device';
+  String get historyFilterClear => 'Clear filters';
 
   @override
   String historyDayRecordCount(int count) {
@@ -604,12 +353,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrTabScan => 'Scan';
 
   @override
-  String get qrInvalidResponse => 'Invalid response';
-
-  @override
-  String get qrTokenMissing => 'Token missing';
-
-  @override
   String get qrRefresh => 'Refresh';
 
   @override
@@ -619,45 +362,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrFrameHint => 'Place the QR code inside the frame';
 
   @override
-  String get qrTokenHint =>
-      'Show this QR code to the door device. Code is valid for 10 seconds; tap refresh when expired.';
-
-  @override
-  String qrProcessError(String error) {
-    return 'An error occurred while processing the QR code: $error';
-  }
-
-  @override
-  String get qrUserCodeTitle => 'User QR Code';
-
-  @override
-  String qrUserCodeBody(String name, String email, String date) {
-    return 'User: $name\nEmail: $email\nDate: $date';
-  }
-
-  @override
   String get qrInvalidCode => 'Invalid QR code';
-
-  @override
-  String get qrAccessGranted => 'Access Granted';
-
-  @override
-  String get qrUnknownError => 'An error occurred';
-
-  @override
-  String qrDeviceLine(String name) {
-    return 'Device: $name';
-  }
-
-  @override
-  String qrLocationLine(String location) {
-    return 'Location: $location';
-  }
-
-  @override
-  String qrTimeLine(String time) {
-    return 'Time: $time';
-  }
 
   @override
   String get visitorTitle => 'Visitors';
@@ -666,91 +371,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitorStatTotal => 'Total';
 
   @override
-  String get visitorStatInside => 'Inside';
-
-  @override
-  String get visitorStatExpected => 'Expected';
-
-  @override
-  String get visitorEmpty => 'No visitor records yet';
+  String get visitorEmpty => 'No invitations yet';
 
   @override
   String get visitorEmptyHint =>
-      'Use Add in the top-right corner to create an invitation.';
-
-  @override
-  String get visitorStatusExpected => 'Expected';
-
-  @override
-  String get visitorStatusInside => 'Inside';
-
-  @override
-  String get visitorStatusOut => 'Left';
-
-  @override
-  String visitorContactPerson(String name) {
-    return 'Contact: $name';
-  }
-
-  @override
-  String get visitorCheckOut => 'Check Out';
-
-  @override
-  String get visitorCheckIn => 'Check In';
-
-  @override
-  String visitorCheckedInToast(String name) {
-    return '$name checked in';
-  }
-
-  @override
-  String visitorCheckedOutToast(String name) {
-    return '$name checked out';
-  }
+      'Use Invite a visitor to create an invitation.';
 
   @override
   String get visitorFilterTitle => 'Filter';
 
   @override
-  String get visitorFilterBody => 'Filtering options will go here.';
-
-  @override
-  String get visitorAddTitle => 'New Visitor';
-
-  @override
-  String get visitorFieldName => 'Full Name';
-
-  @override
-  String get visitorFieldCompany => 'Company';
+  String get visitorAddTitle => 'Invite a visitor';
 
   @override
   String get visitorFieldPurpose => 'Visit Purpose';
 
   @override
-  String get visitorFieldContact => 'Contact Person';
-
-  @override
-  String get visitorAddedToast => 'Visitor added';
-
-  @override
-  String get visitorAddButton => 'Add Visitor';
+  String get visitorAddButton => 'Invite a visitor';
 
   @override
   String get errorNetwork =>
       'No internet connection. Please check your connection.';
 
   @override
-  String get errorTimeout =>
-      'The server did not respond. Please try again later.';
+  String get errorTimeout => 'The operation did not finish in time. Try again.';
 
   @override
-  String errorServer(int code) {
-    return 'Server error ($code). Please try again shortly.';
-  }
+  String get errorServer =>
+      'The operation could not be completed. Try again shortly.';
 
   @override
   String get errorEmploymentEnded =>
-      'Your employment has ended. Your mobile access has been disabled.';
+      'Your mobile access is disabled. Contact your organisation’s administrator.';
 
   @override
   String get errorAuthExpired =>
@@ -820,9 +472,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyLoadMore => 'Load more';
 
   @override
-  String get historyAccessDenied => 'Access denied';
-
-  @override
   String get historyUnknownDirection => 'Unknown direction';
 
   @override
@@ -836,13 +485,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyRawEvents =>
-      'Raw access events; not an official attendance result.';
+      'These are access records. Official attendance and working time results may differ.';
 
   @override
   String get homeDataLoading => 'Loading data';
 
   @override
-  String get homeDataUnavailable => 'Data unavailable';
+  String get homeDataUnavailable => 'Today’s status could not be loaded';
 
   @override
   String get homeDataStale => 'Showing previous data';
@@ -855,12 +504,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeStatusUnknown => 'Status unknown';
-
-  @override
-  String get homeSelfCheckIn => 'Manual check-in';
-
-  @override
-  String get homeSelfCheckInRecorded => 'Manual check-in recorded';
 
   @override
   String get homeCommandPending =>
@@ -897,8 +540,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unable to verify code status. Check again.';
 
   @override
-  String get qrReaderHint =>
-      'Show this code to a supported reader. Time is based on server expiry. An operation record does not confirm a door opening or physical passage.';
+  String get qrReaderHint => 'Show the code to the reader';
 
   @override
   String get qrSwitchCamera => 'Switch camera';
@@ -914,11 +556,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get qrOpenSettings => 'Open settings';
 
   @override
+  String get qrGrantCameraPermission => 'Allow camera access';
+
+  @override
   String get qrCameraControlUnavailable => 'Camera control unavailable.';
 
   @override
   String get qrDeviceIdentityOnly =>
-      'This is a device identity label, not access authorization or proof of presence. Use My QR at a supported reader.';
+      'This code identifies a device; it does not open a door or record access. Show the code in My QR to a compatible reader.';
 
   @override
   String get qrEmployeeIdentityOnly =>
@@ -926,7 +571,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get qrChallengeUnsupported =>
-      'This reader’s secure operation flow is not supported yet. Use My QR at a supported reader.';
+      'Scanning is not available with this reader. Show the code in My QR to a compatible reader.';
 
   @override
   String get qrScanExpired => 'QR code expired.';
@@ -953,7 +598,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get passwordHelpAdminBody =>
-      'Your organization’s administrator manages mobile password setup. Ask them to send a new setup link to your registered email address. Open that link to choose a new password, then return here to sign in.';
+      'Ask your organisation’s administrator to send a password setup link to your registered email. Set your password, then sign in.';
 
   @override
   String get passwordHelpNoEmail =>
@@ -964,7 +609,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Hello, I need to set or reset my NGS Plus mobile password. Please send a new password setup link to the email address registered in my employee account.';
 
   @override
-  String get passwordHelpCopy => 'Copy request for administrator';
+  String get passwordHelpCopy => 'Copy request';
 
   @override
   String get passwordHelpCopied =>
@@ -984,6 +629,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get startupTitle => 'Starting NGS Plus';
 
   @override
+  String get startupBandTitle => 'Starting';
+
+  @override
+  String get startupFailureTitle => 'Unable to start';
+
+  @override
   String get startupUnavailable =>
       'Could not verify your session. Check your connection and try again.';
 
@@ -995,7 +646,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String homeUpdatedAt(String time) {
-    return 'Updated: $time';
+    return 'Last updated $time';
   }
 
   @override
@@ -1031,19 +682,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitorEnd => 'Visit ends';
 
   @override
-  String get visitorSave => 'Save';
+  String get visitorSave => 'Save invitation';
 
   @override
   String get visitorEdit => 'Edit';
+
+  @override
+  String get visitorEditTitle => 'Edit invitation';
+
+  @override
+  String get visitorStartDate => 'Start date';
+
+  @override
+  String get visitorEndDate => 'End date';
+
+  @override
+  String get visitorStartTime => 'Start time';
+
+  @override
+  String get visitorEndTime => 'End time';
+
+  @override
+  String get visitorNotFound => 'Invitation not found';
+
+  @override
+  String get visitorErrorEndBeforeStart => 'End must be after start.';
+
+  @override
+  String get visitorErrorMaxDuration => 'A visit can last at most 31 days.';
+
+  @override
+  String get visitorErrorEndInPast => 'End cannot be in the past.';
+
+  @override
+  String get visitorErrorNoticeRequired =>
+      'Accept the privacy notice to continue.';
 
   @override
   String get visitorCancelInvitation => 'Cancel invitation';
 
   @override
   String get visitorCancelConfirm => 'Cancel this invitation?';
-
-  @override
-  String get visitorPreRegistered => 'Awaiting operator activation';
 
   @override
   String get visitorAccessActive => 'Access active';
@@ -1068,8 +747,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Contact an authorized operator to revoke active access.';
 
   @override
-  String get visitorSaved =>
-      'Invitation record saved; operator activation is required.';
+  String get visitorSaved => 'Invitation saved. Approval is required.';
 
   @override
   String get visitorCancelled => 'Invitation cancelled.';
@@ -1084,10 +762,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitorNoticeReviewed => 'I have reviewed the current notice.';
 
   @override
-  String get visitorInvalidForm => 'Check the required fields and visit dates.';
+  String get fieldRequired => 'This field is required.';
 
   @override
-  String get visitorStale => 'Could not refresh; showing previous records.';
+  String get visitorStale =>
+      'Invitations could not be refreshed. Previously loaded invitations are shown.';
 
   @override
   String get visitorRefresh => 'Refresh';
@@ -1129,7 +808,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorProtocol =>
-      'The server response could not be verified. Please try again.';
+      'The operation could not be completed. Try again.';
 
   @override
   String get errorPasswordPolicy =>
@@ -1140,7 +819,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeDoorUnavailable =>
-      'The selected door is no longer available. Choose a new door from Profile.';
+      'The selected door is unavailable. Choose another door.';
 
   @override
   String get homeNoOpenableDoor =>
@@ -1188,13 +867,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get visitorSummaryLimited =>
-      'These totals are lower bounds; the summary read limit was reached.';
+      'Some invitations could not be included; the actual total may be higher.';
 
   @override
   String get visitorSummaryError => 'Summary could not be refreshed.';
 
   @override
-  String get visitorSyncTitle => 'Device synchronization';
+  String get visitorSyncTitle => 'Device status';
 
   @override
   String get visitorSyncPending => 'Device update pending';
@@ -1253,7 +932,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyAllDates => 'All dates';
 
   @override
-  String get historyAllDevices => 'All devices';
+  String get historyAllDevices => 'All doors';
 
   @override
   String get historyApplyFilters => 'Apply filters';
@@ -1266,8 +945,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'No records match the selected date or device.';
 
   @override
-  String get historyCalendarLegend =>
-      'Outline: today · Fill: selected day · Dot: records';
+  String get historyCalendarLegend => 'Days with a dot have records.';
 
   @override
   String get historySelectDayHint => 'Select a day to see its records.';
@@ -1277,7 +955,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyNoActivityHint =>
-      'The summary will appear as events are recorded. This is not an absence calculation.';
+      'New records will appear here. No records does not mean an absence.';
 
   @override
   String get historyDeniedCount => 'Denied';
@@ -1287,11 +965,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyLoadedDevices =>
-      'Device options come from the loaded records.';
+      'Doors appearing in this list of records are shown.';
 
   @override
   String get historyNoDeviceOptions =>
-      'No devices found in the loaded records.';
+      'No door options are available for these records.';
 
   @override
   String get historyTabThisMonthPeriod => 'This month';
@@ -1305,6 +983,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get visitorActivationHint =>
       'An authorized operator must activate access after the invitation is saved.';
+
+  @override
+  String get visitorMetricPending => 'Pending';
 
   @override
   String get visitorPendingShort => 'Awaiting activation';
@@ -1324,7 +1005,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The privacy notice could not be loaded. Try again before saving.';
 
   @override
-  String get profileProject => 'Company / project';
+  String get profileProject => 'Organisation and project';
 
   @override
   String get profileProjectUnavailable =>
@@ -1332,6 +1013,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get doorOperationRecoveryTitle => 'Review door request';
+
+  @override
+  String get doorOperationNothingToCheck =>
+      'There is no door operation to check.';
 
   @override
   String get doorOperationRecoveryHint =>
@@ -1363,7 +1048,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorRequestNoteTooLong => 'Notes must be at most 500 characters.';
 
   @override
-  String get errorRequestDateInvalid => 'Enter a valid date (YYYY-MM-DD).';
+  String get errorRequestDateInvalid => 'Choose a valid date.';
 
   @override
   String get errorRequestRangeInvalid =>
@@ -1408,7 +1093,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Provide only the times required by the correction type.';
 
   @override
-  String get errorCorrectionTimeInvalid => 'Enter a valid time (HH:mm).';
+  String get errorCorrectionTimeInvalid => 'Choose a valid time.';
 
   @override
   String get errorCorrectionPendingExists =>
@@ -1421,7 +1106,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get requestsLeave => 'Leave';
 
   @override
-  String get requestsCorrection => 'Attendance correction';
+  String get requestsCorrection => 'Record correction';
 
   @override
   String get requestsNew => 'New request';
@@ -1433,16 +1118,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get requestsRetry => 'Retry';
 
   @override
-  String get requestsWithdraw => 'Withdraw';
+  String get requestsWithdraw => 'Withdraw request';
 
   @override
   String get requestsWithdrawConfirm => 'Withdraw this request?';
 
   @override
   String get requestsCancel => 'Cancel';
-
-  @override
-  String get requestsSubmit => 'Submit';
 
   @override
   String get requestsUncertain =>
@@ -1564,4 +1246,93 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errorRequestConflict =>
       'This request was already saved with different visitor details. Refresh the visitor list and check the existing invitation.';
+
+  @override
+  String get navQr => 'QR';
+
+  @override
+  String get homeToday => 'Today';
+
+  @override
+  String get homeFirstEntry => 'First entry';
+
+  @override
+  String get loginSigningIn => 'Signing in';
+
+  @override
+  String get fieldSelectDate => 'Choose a date';
+
+  @override
+  String get fieldSelectTime => 'Choose a time';
+
+  @override
+  String get fieldSelectOption => 'Choose an option';
+
+  @override
+  String get requestsLeaveFormTitle => 'Leave request';
+
+  @override
+  String get requestsCorrectionFormTitle => 'Record correction request';
+
+  @override
+  String get requestsLeaveSubmit => 'Send leave request';
+
+  @override
+  String get requestsLeaveSubmitting => 'Sending leave request';
+
+  @override
+  String get requestsLeaveSubmitted => 'Leave request sent';
+
+  @override
+  String get requestsCorrectionSubmit => 'Send correction request';
+
+  @override
+  String get requestsCorrectionSubmitting => 'Sending correction request';
+
+  @override
+  String get requestsCorrectionSubmitted => 'Correction request sent';
+
+  @override
+  String get requestsWithdrawnToast => 'Request withdrawn';
+
+  @override
+  String get requestsTimeZoneHint => 'Enter times in Turkey time.';
+
+  @override
+  String get visitorSaving => 'Saving invitation';
+
+  @override
+  String get visitorLoadFailed => 'Invitations could not be loaded. Try again.';
+
+  @override
+  String get visitorNoMatchTitle => 'No matching invitations';
+
+  @override
+  String get commonLoading => 'Loading';
+
+  @override
+  String get fieldNoOptions => 'No options available';
+
+  @override
+  String get metricNoRecord => 'No record';
+
+  @override
+  String get fieldClear => 'Clear';
+
+  @override
+  String historyWeeklyTotalRecords(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count records this week',
+      one: '1 record this week',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get unlockGranted => 'Access Granted';
+
+  @override
+  String get visitorPreRegistered => 'Awaiting operator activation';
 }

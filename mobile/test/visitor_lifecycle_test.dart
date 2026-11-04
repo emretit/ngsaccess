@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/models/visitor.dart';
@@ -38,8 +39,9 @@ void main() {
       await tester.pumpWidget(
         ChangeNotifierProvider<VisitorProvider>.value(
           value: state,
-          child: const MaterialApp(
-            locale: Locale('en'),
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            locale: const Locale('en'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(body: VisitorDetail(visitorId: 'own')),
@@ -84,6 +86,7 @@ void main() {
         ChangeNotifierProvider<VisitorProvider>.value(
           value: state,
           child: MaterialApp.router(
+            theme: AppTheme.lightTheme,
             routerConfig: router,
             locale: const Locale('en'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,

@@ -1,0 +1,384 @@
+{
+  "viewport": [
+    390,
+    844
+  ],
+  "deviceScaleFactor": 2,
+  "newViews": [
+    {
+      "group": "Açılış",
+      "name": "startup-loading",
+      "label": "Yükleniyor",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Açılış",
+      "name": "startup-error",
+      "label": "Başlatma hatası",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Giriş",
+      "name": "login-empty",
+      "label": "Boş form",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Giriş",
+      "name": "login-error",
+      "label": "Erişim kapatıldı",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Giriş",
+      "name": "login-loading",
+      "label": "Giriş yapılıyor",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Giriş",
+      "name": "login-empty-dark",
+      "label": "Boş form",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Giriş",
+      "name": "login-error-dark",
+      "label": "Erişim kapatıldı",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Giriş",
+      "name": "login-loading-dark",
+      "label": "Giriş yapılıyor",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Şifre yardımı",
+      "name": "password-help",
+      "label": "Yöneticiye talep",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Ana Sayfa",
+      "name": "home-loading",
+      "label": "İlk yükleme",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Ana Sayfa",
+      "name": "home-error",
+      "label": "Durum alınamadı",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Ana Sayfa",
+      "name": "home-empty",
+      "label": "Bugün kayıt yok",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "QR",
+      "name": "qr-scan",
+      "label": "Tara · kamera",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "QR",
+      "name": "qr-permission",
+      "label": "Tara · izin yok",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "QR",
+      "name": "qr-expired",
+      "label": "Kodun süresi doldu",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Kapı işlemleri",
+      "name": "device-filled",
+      "label": "Seçili kapı",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Kapı işlemleri",
+      "name": "device-empty",
+      "label": "Kapı bulunmuyor",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Kapı işlemleri",
+      "name": "door-recovery",
+      "label": "Belirsiz işlemi kurtar",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Geçmiş",
+      "name": "history-calendar",
+      "label": "Takvim",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Geçmiş",
+      "name": "history-summary",
+      "label": "Özet",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Geçmiş",
+      "name": "history-empty",
+      "label": "Kayıt yok",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Geçmiş",
+      "name": "history-filter",
+      "label": "Filtre sheet",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Geçmiş",
+      "name": "history-detail",
+      "label": "Kayıt ayrıntısı",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Talepler",
+      "name": "requests-leave",
+      "label": "İzin talepleri",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Talepler",
+      "name": "requests-correction",
+      "label": "Düzeltme talepleri",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Talepler",
+      "name": "requests-empty",
+      "label": "Talep yok",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Talep formları",
+      "name": "leave-filled",
+      "label": "İzin formu · dolu",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Talep formları",
+      "name": "leave-error",
+      "label": "İzin formu · alan hatası",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Talepler",
+      "name": "requests-leave-dark",
+      "label": "İzin talepleri",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Talepler",
+      "name": "requests-correction-dark",
+      "label": "Düzeltme talepleri",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Talepler",
+      "name": "requests-empty-dark",
+      "label": "Talep yok",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Talep formları",
+      "name": "leave-filled-dark",
+      "label": "İzin formu · dolu",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Talep formları",
+      "name": "leave-error-dark",
+      "label": "İzin formu · alan hatası",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Talep formları",
+      "name": "correction-filled",
+      "label": "Düzeltme formu",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Talep formları",
+      "name": "request-withdraw",
+      "label": "Geri çekme onayı",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Ziyaretçiler",
+      "name": "visitors-filled",
+      "label": "Davet listesi",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Ziyaretçiler",
+      "name": "visitors-empty",
+      "label": "Davet yok",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Ziyaretçiler",
+      "name": "visitors-error",
+      "label": "Yükleme hatası",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Ziyaretçi formu",
+      "name": "visitor-form-filled",
+      "label": "Ziyaretçi formu · dolu",
+      "dark": false,
+      "notes": "Formun devamı dikey kaydırılır; kaydetme eylemi sabittir."
+    },
+    {
+      "group": "Ziyaretçi formu",
+      "name": "visitor-form-keyboard",
+      "label": "Klavye ve sabit eylem",
+      "dark": false,
+      "notes": "Klavye görünümü Notlar alanına kaydırılmıştır."
+    },
+    {
+      "group": "Ziyaretçiler",
+      "name": "visitors-filled-dark",
+      "label": "Davet listesi",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Ziyaretçiler",
+      "name": "visitors-empty-dark",
+      "label": "Davet yok",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Ziyaretçiler",
+      "name": "visitors-error-dark",
+      "label": "Yükleme hatası",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Ziyaretçi formu",
+      "name": "visitor-form-filled-dark",
+      "label": "Ziyaretçi formu · dolu",
+      "dark": true,
+      "notes": "Formun devamı dikey kaydırılır; kaydetme eylemi sabittir."
+    },
+    {
+      "group": "Ziyaretçi formu",
+      "name": "visitor-form-keyboard-dark",
+      "label": "Klavye ve sabit eylem",
+      "dark": true,
+      "notes": "Klavye görünümü Notlar alanına kaydırılmıştır."
+    },
+    {
+      "group": "Ziyaretçi ayrıntısı",
+      "name": "visitor-detail",
+      "label": "Ayrıntı sheet",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Ziyaretçi ayrıntısı",
+      "name": "visitor-cancel",
+      "label": "İptal onayı",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Profil",
+      "name": "profile-main",
+      "label": "Profil",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Profil",
+      "name": "profile-theme",
+      "label": "Tema seçici",
+      "dark": false,
+      "notes": ""
+    },
+    {
+      "group": "Profil",
+      "name": "profile-main-dark",
+      "label": "Profil",
+      "dark": true,
+      "notes": ""
+    },
+    {
+      "group": "Profil",
+      "name": "profile-theme-dark",
+      "label": "Tema seçici",
+      "dark": true,
+      "notes": ""
+    }
+  ],
+  "existingReferences": [
+    {
+      "name": "home",
+      "sha256": "55d159a76e3f9814b3e3fc5b72350e269dc4df8ea0342b65ed90a2b300f01675"
+    },
+    {
+      "name": "history",
+      "sha256": "c389b7291a90ea167e31b3a652c951a76e103f105c6b56a745e0a76ea989ddea"
+    },
+    {
+      "name": "qr",
+      "sha256": "23761ac563c852ed92de032ceb99d3e21af8af12c2e986427525f6c30279246d"
+    },
+    {
+      "name": "home-dark",
+      "sha256": "8b6dd7bbf2b9da1f43d2dfda0a989e0702de776c7141e3aa1d6753542e24d07e"
+    }
+  ]
+}

@@ -1,14 +1,17 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:ngsplusapp/core/attendance_date.dart';
 import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/providers/auth_provider.dart';
 import 'package:ngsplusapp/providers/request_provider.dart';
 import 'package:ngsplusapp/screens/requests/requests_screen.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
+import 'package:provider/provider.dart';
+
 import '../auth_fakes.dart';
 import '../providers/request_provider_test.dart'
     show RequestFakeRepository, testLeave, testCorrection;
@@ -39,6 +42,7 @@ void main() {
       ChangeNotifierProvider<RequestProvider>.value(
         value: p,
         child: MaterialApp(
+          theme: AppTheme.lightTheme,
           locale: const Locale('tr'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -61,7 +65,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Yeni talep'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Gönder'));
+        await tester.tap(find.byKey(const Key('request-submit')));
         await tester.pumpAndSettle();
         expect(repo.submits, 1);
         expect(repo.reads, 2);
@@ -79,9 +83,16 @@ void main() {
         repo.withdrawFailure = failure;
         await mount(tester);
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(TextButton, 'Geri çek'));
+        await tester.tap(
+          find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+        );
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(FilledButton, 'Geri çek'));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AppDialog),
+            matching: find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(repo.withdrawals, 1);
         expect(repo.reads, 2);
@@ -100,12 +111,19 @@ void main() {
       await mount(tester);
       await tester.pumpAndSettle();
       final staleAction = tester
-          .widget<TextButton>(find.widgetWithText(TextButton, 'Geri çek'))
+          .widget<OutlinedButton>(
+            find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+          )
           .onPressed;
-      await tester.tap(find.widgetWithText(TextButton, 'Geri çek'));
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Talebi geri çek'));
       await tester.pumpAndSettle();
       repo.listGate = Completer();
-      await tester.tap(find.widgetWithText(FilledButton, 'Geri çek'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       expect(p.busy, true);
@@ -113,7 +131,12 @@ void main() {
       staleAction?.call();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.widgetWithText(FilledButton, 'Geri çek'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       expect(p.commandError, isNull);
@@ -128,44 +151,39 @@ void main() {
     },
   );
   testWidgets(
-    'leave end picker starts at selected start and advancing start raises the end',
+    'leave range picker preserves ordered dates and last-30-day lower bound',
     (tester) async {
       await mount(tester, child: const RequestFormScreen(isLeave: true));
       await tester.pumpAndSettle();
       final today = AttendanceDate.parseDay(
         AttendanceDate.instantKey(DateTime.now()),
       );
-      final target = today.add(const Duration(days: 3));
-      await tester.tap(find.textContaining('Başlangıç tarihi: '));
+      await tester.tap(find.byType(AppDateRangeField));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.edit_outlined));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.descendant(
-          of: find.byType(DatePickerDialog),
-          matching: find.byType(TextField),
-        ),
-        DateFormat.yMd('tr').format(target),
-      );
-      await tester.tap(find.text('Tamam'));
-      await tester.pumpAndSettle();
-      expect(
-        find.text('Bitiş tarihi: ${AttendanceDate.calendarKey(target)}'),
-        findsOneWidget,
-      );
-      await tester.tap(find.textContaining('Bitiş tarihi: '));
-      await tester.pumpAndSettle();
-      final picker = tester.widget<DatePickerDialog>(
-        find.byType(DatePickerDialog),
+      final picker = tester.widget<DateRangePickerDialog>(
+        find.byType(DateRangePickerDialog),
       );
       expect(
         AttendanceDate.calendarKey(picker.firstDate),
-        AttendanceDate.calendarKey(target),
+        AttendanceDate.calendarKey(today.subtract(const Duration(days: 30))),
       );
-      expect(
-        AttendanceDate.calendarKey(picker.initialDate ?? today),
-        AttendanceDate.calendarKey(target),
+      expect(picker.initialDateRange?.start, picker.initialDateRange?.end);
+      expect(picker.lastDate, DateTime(today.year + 10, 12, 31));
+      await tester.tap(find.byTooltip('Kapat'));
+      await tester.pumpAndSettle();
+      final field = tester.widget<AppDateRangeField>(
+        find.byType(AppDateRangeField),
       );
+      final target = today.add(const Duration(days: 3));
+      field.onChanged?.call(
+        DateTimeRange(start: target, end: target.add(const Duration(days: 1))),
+      );
+      await tester.pumpAndSettle();
+      final updated = tester.widget<AppDateRangeField>(
+        find.byType(AppDateRangeField),
+      );
+      expect(updated.value?.start, target);
+      expect(updated.value?.end, target.add(const Duration(days: 1)));
     },
   );
   testWidgets('pull to refresh performs one refresh without polling', (
@@ -183,7 +201,7 @@ void main() {
   testWidgets('loading, empty, localized error and retry', (tester) async {
     repo.listGate = Completer();
     await mount(tester);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(AppSkeleton), findsOneWidget);
     repo.listGate?.complete([]);
     await tester.pumpAndSettle();
     expect(find.text('Henüz talebiniz yok.'), findsOneWidget);
@@ -215,26 +233,47 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Bekliyor'), findsOneWidget);
       expect(find.text('Reddedildi'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Bilinmiyor'),
+        150,
+        scrollable: find.byType(Scrollable).last,
+      );
       expect(find.text('Bilinmiyor'), findsOneWidget);
       expect(find.text('Diğer'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Yönetici kaydı'),
+        -150,
+        scrollable: find.byType(Scrollable).last,
+      );
       expect(find.text('Yönetici kaydı'), findsOneWidget);
       expect(find.textContaining('Uygun değil'), findsOneWidget);
-      expect(find.widgetWithText(TextButton, 'Geri çek'), findsOneWidget);
-      await tester.tap(find.widgetWithText(TextButton, 'Geri çek'));
+      expect(
+        find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Talebi geri çek'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Vazgeç'));
       await tester.pumpAndSettle();
       expect(repo.withdrawals, 0);
-      await tester.tap(find.widgetWithText(TextButton, 'Geri çek'));
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Talebi geri çek'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Geri çek'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(repo.withdrawals, 1);
       expect(find.text('Henüz talebiniz yok.'), findsOneWidget);
-      await tester.tap(find.text('PDKS düzeltme'));
+      await tester.tap(find.text('Kayıt düzeltme'));
       await tester.pumpAndSettle();
       expect(find.text('Geri çekildi'), findsOneWidget);
-      expect(find.widgetWithText(TextButton, 'Geri çek'), findsNothing);
+      expect(
+        find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+        findsNothing,
+      );
     },
   );
   testWidgets('pending correction can be withdrawn and refreshes', (
@@ -243,11 +282,16 @@ void main() {
     repo.corrections = [testCorrection()];
     await mount(tester);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('PDKS düzeltme'));
+    await tester.tap(find.text('Kayıt düzeltme'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Geri çek'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Talebi geri çek'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Geri çek'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AppDialog),
+        matching: find.widgetWithText(OutlinedButton, 'Talebi geri çek'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(repo.withdrawals, 1);
     expect(find.text('Henüz talebiniz yok.'), findsOneWidget);
@@ -262,7 +306,7 @@ void main() {
     expect(find.byType(RequestFormScreen), findsOneWidget);
     expect(find.text('Yıllık izin'), findsOneWidget);
     repo.gate = Completer();
-    await tester.tap(find.text('Gönder'));
+    await tester.tap(find.byKey(const Key('request-submit')));
     await tester.pump();
     expect(
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
@@ -278,24 +322,24 @@ void main() {
     'correction form validates reason and missing time without sending',
     (tester) async {
       await mount(tester, child: const RequestFormScreen(isLeave: false));
-      await tester.tap(find.text('Gönder'));
+      await tester.tap(find.byKey(const Key('request-submit')));
       await tester.pumpAndSettle();
       expect(find.text('Gerekçe 5–300 karakter olmalı'), findsOneWidget);
       expect(repo.submits, 0);
       await tester.enterText(find.byType(TextField), 'Gerekçe yeterli');
-      await tester.tap(find.text('Gönder'));
+      await tester.tap(find.byKey(const Key('request-submit')));
       await tester.pumpAndSettle();
       expect(
         find.text('Düzeltme türüne uygun giriş ve çıkış saatlerini belirtin'),
         findsOneWidget,
       );
       expect(repo.submits, 0);
-      await tester.tap(find.text('Giriş: HH:mm'));
+      await tester.tap(find.byKey(const Key('request-check-in-time')));
       await tester.pumpAndSettle();
       expect(find.byType(TimePickerDialog), findsOneWidget);
       await tester.tap(find.text('Tamam'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Gönder'));
+      await tester.tap(find.byKey(const Key('request-submit')));
       await tester.pumpAndSettle();
       expect(repo.submits, 1);
     },
@@ -308,7 +352,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Yeni talep'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Gönder'));
+      await tester.tap(find.byKey(const Key('request-submit')));
       await tester.pumpAndSettle();
       expect(repo.submits, 1);
       expect(repo.reads, 2);
@@ -323,7 +367,7 @@ void main() {
     'correction date picker restricts dates to Istanbul last 30 days',
     (tester) async {
       await mount(tester, child: const RequestFormScreen(isLeave: false));
-      await tester.tap(find.textContaining('Tarih: '));
+      await tester.tap(find.byType(AppDateField));
       await tester.pumpAndSettle();
       final picker = tester.widget<DatePickerDialog>(
         find.byType(DatePickerDialog),

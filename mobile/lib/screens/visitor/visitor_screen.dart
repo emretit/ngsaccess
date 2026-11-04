@@ -7,6 +7,7 @@ import '../../core/error_localizer.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/visitor_provider.dart';
 import '../../models/visitor.dart';
+import '../../widgets/ui/ui.dart';
 import '../../widgets/visitor/visitor_cards.dart';
 import '../../widgets/visitor/visitor_detail.dart';
 import '../../widgets/visitor/visitor_labels.dart';
@@ -18,15 +19,18 @@ class VisitorScreen extends StatefulWidget {
   State<VisitorScreen> createState() => _VisitorScreenState();
 }
 
+// A non-null value represents the unfiltered selection in AppSelectField.
 typedef _StatusFilter = ({VisitorAccessStatus? status});
 
 class _VisitorScreenState extends State<VisitorScreen> {
   Timer? _searchDebounce;
-  int _searchRevision = 0;
+  final _search = TextEditingController();
+  int? _searchEpoch;
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _search.dispose();
     super.dispose();
   }
 
@@ -44,89 +48,14 @@ class _VisitorScreenState extends State<VisitorScreen> {
 
   void _clearFilters(VisitorProvider state) {
     _searchDebounce?.cancel();
-    setState(() => _searchRevision++);
+    _search.clear();
     state.setFilters(search: '', resetStatus: true);
-  }
-
-  Future<void> _filter(VisitorProvider state) async {
-    final epoch = state.sessionEpoch;
-    final selected = await showModalBottomSheet<_StatusFilter>(
-      context: context,
-      useRootNavigator: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .85,
-      ),
-      builder: (context) {
-        final l10n = AppLocalizations.of(context);
-        return SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.visitorFilterTitle,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: l10n.commonClose,
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-                for (final status in <VisitorAccessStatus?>[
-                  null,
-                  ...VisitorAccessStatus.values,
-                ])
-                  Semantics(
-                    selected: state.status == status,
-                    child: ListTile(
-                      title: Text(
-                        status == null
-                            ? l10n.visitorAllStatuses
-                            : visitorStatusLabel(l10n, status),
-                      ),
-                      selected: state.status == status,
-                      trailing: state.status == status
-                          ? const Icon(Icons.check_rounded)
-                          : null,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      onTap: () => Navigator.of(
-                        context,
-                      ).pop<_StatusFilter>((status: status)),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    if (!mounted || selected == null || state.sessionEpoch != epoch) return;
-    state.setFilters(
-      status: selected.status,
-      resetStatus: selected.status == null,
-    );
   }
 
   Future<void> _openDetail(VisitorProvider state, Visitor visitor) async {
     unawaited(state.openDetail(visitor.id));
-    await showModalBottomSheet<void>(
+    await showAppSheet<void>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
       builder: (_) => ChangeNotifierProvider<VisitorProvider>.value(
         value: state,
         child: VisitorDetail(visitorId: visitor.id),
@@ -137,234 +66,251 @@ class _VisitorScreenState extends State<VisitorScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final colors = Theme.of(context).colorScheme;
-    final largeText = MediaQuery.textScalerOf(context).scale(14) > 19;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          l10n.visitorTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        centerTitle: false,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16, left: 8),
-            child: largeText
-                ? IconButton.filled(
+    return AppScaffold(
+      consumeBottomInset: false,
+      header: AppPageHeader(title: l10n.visitorTitle),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Tooltip(
+                  message: l10n.visitorAddButton,
+                  child: AppPrimaryButton(
                     key: const Key('visitor-add'),
-                    tooltip: l10n.visitorAddButton,
-                    icon: const Icon(Icons.add_rounded),
+                    label: l10n.visitorAddButton,
+                    icon: Icons.add,
                     onPressed: _addVisitor,
-                  )
-                : Tooltip(
-                    message: l10n.visitorAddButton,
-                    child: FilledButton.icon(
-                      key: const Key('visitor-add'),
-                      onPressed: _addVisitor,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(48, 44),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: Text(l10n.commonAdd),
-                    ),
                   ),
-          ),
-        ],
-      ),
-      body: Consumer<VisitorProvider>(
-        builder: (context, state, _) {
-          final filtered =
-              state.search.trim().isNotEmpty || state.status != null;
-          final status = state.status;
-          final summary = state.summary;
-          return RefreshIndicator(
-            onRefresh: state.refresh,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        key: ValueKey((
-                          'visitor-search',
-                          state.sessionEpoch,
-                          _searchRevision,
-                        )),
-                        maxLength: 80,
-                        decoration: InputDecoration(
-                          labelText: l10n.visitorSearch,
-                          floatingLabelBehavior: FloatingLabelBehavior.never,
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          counterText: '',
-                          filled: true,
-                          fillColor: colors.surface,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 14,
+                ),
+              ),
+              Expanded(
+                child: Consumer<VisitorProvider>(
+                  builder: (context, state, _) {
+                    if (_searchEpoch != state.sessionEpoch) {
+                      _searchDebounce?.cancel();
+                      _searchEpoch = state.sessionEpoch;
+                      final epoch = state.sessionEpoch;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted &&
+                            state.sessionEpoch == epoch &&
+                            _searchEpoch == epoch) {
+                          _search.text = state.search;
+                        }
+                      });
+                    }
+                    final filterEpoch = state.sessionEpoch;
+                    final filtered =
+                        state.search.trim().isNotEmpty || state.status != null;
+                    final summary = state.summary;
+                    final header = Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (summary != null &&
+                            (summary.total > 0 || summary.overflow)) ...[
+                          VisitorSummaryCard(summary: summary),
+                          const SizedBox(height: 24),
+                        ] else if (state.summaryLoading) ...[
+                          AppSkeleton(
+                            semanticLabel: l10n.homeDataLoading,
+                            kind: AppSkeletonKind.metrics,
+                            itemCount: 1,
                           ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
+                          const SizedBox(height: 24),
+                        ],
+                        if (state.summaryError != null) ...[
+                          AppDataNotice(
+                            message: l10n.visitorSummaryError,
+                            tone: AppStatusTone.warning,
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: colors.outlineVariant.withValues(
-                                alpha: .6,
+                          const SizedBox(height: 16),
+                        ],
+                        AppTextField(
+                          key: ValueKey(('visitor-search', state.sessionEpoch)),
+                          label: l10n.visitorSearch,
+                          controller: _search,
+                          maxLength: 80,
+                          showCounter: false,
+                          textInputAction: TextInputAction.search,
+                          suffix: const Icon(Icons.search),
+                          onChanged: (value) {
+                            _searchDebounce?.cancel();
+                            final epoch = state.sessionEpoch;
+                            _searchDebounce = Timer(
+                              const Duration(milliseconds: 300),
+                              () {
+                                if (mounted && state.sessionEpoch == epoch) {
+                                  state.setFilters(search: value);
+                                }
+                              },
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        AppSelectField<_StatusFilter>(
+                          label: l10n.visitorFilterTitle,
+                          value: (status: state.status),
+                          options: [
+                            AppSelectOption(
+                              value: (status: null),
+                              label: l10n.visitorAllStatuses,
+                            ),
+                            for (final status in VisitorAccessStatus.values)
+                              AppSelectOption(
+                                value: (status: status),
+                                label: visitorStatusLabel(l10n, status),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null ||
+                                state.sessionEpoch != filterEpoch) {
+                              return;
+                            }
+                            state.setFilters(
+                              status: value.status,
+                              resetStatus: value.status == null,
+                            );
+                          },
+                        ),
+                        if (filtered)
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton(
+                              onPressed: () => _clearFilters(state),
+                              child: Text(l10n.visitorClearFilters),
+                            ),
+                          ),
+                        const SizedBox(height: 24),
+                        if (state.error case final error?) ...[
+                          AppDataNotice(
+                            title: state.loaded
+                                ? l10n.visitorStale
+                                : l10n.visitorLoadFailed,
+                            message: localizeAppError(context, error),
+                            tone: state.loaded
+                                ? AppStatusTone.warning
+                                : AppStatusTone.danger,
+                            actionLabel: l10n.commonRetry,
+                            onAction: state.loading ? null : state.refresh,
+                            busy: state.loading,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        if (state.loading && state.visitors.isEmpty)
+                          AppSkeleton(
+                            semanticLabel: l10n.homeDataLoading,
+                            itemCount: 3,
+                          ),
+                        if (state.loaded &&
+                            !state.loading &&
+                            state.visitors.isEmpty &&
+                            !state.hasMore &&
+                            state.error == null)
+                          AppEmptyState(
+                            title: filtered
+                                ? l10n.visitorNoMatchTitle
+                                : l10n.visitorEmpty,
+                            message: filtered
+                                ? l10n.visitorFilteredEmptyHint
+                                : l10n.visitorEmptyHint,
+                            icon: Icons.people_outline,
+                            actionLabel: filtered
+                                ? l10n.visitorClearFilters
+                                : null,
+                            onAction: filtered
+                                ? () => _clearFilters(state)
+                                : null,
+                          ),
+                        if (state.visitors.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                l10n.visitorInvitationsTitle,
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ),
                           ),
-                        ),
-                        onChanged: (value) {
-                          _searchDebounce?.cancel();
-                          final epoch = state.sessionEpoch;
-                          _searchDebounce = Timer(
-                            const Duration(milliseconds: 300),
-                            () {
-                              if (mounted && state.sessionEpoch == epoch) {
-                                state.setFilters(search: value);
-                              }
-                            },
+                      ],
+                    );
+                    return RefreshIndicator(
+                      onRefresh: state.refresh,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: state.visitors.length + 2,
+                        itemBuilder: (context, index) {
+                          if (index == 0) return header;
+                          if (index > state.visitors.length) {
+                            if (state.loading && state.visitors.isNotEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 16),
+                                child: LinearProgressIndicator(
+                                  semanticsLabel: l10n.homeDataLoading,
+                                ),
+                              );
+                            }
+                            return state.hasMore
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 16),
+                                    child: AppSecondaryButton(
+                                      label: l10n.visitorLoadMore,
+                                      busy: state.loading,
+                                      onPressed: () =>
+                                          state.refresh(more: true),
+                                    ),
+                                  )
+                                : const SizedBox.shrink();
+                          }
+                          final first = index == 1;
+                          final last = index == state.visitors.length;
+                          final visitor = state.visitors[index - 1];
+                          // Individual lazy rows share one continuous neutral group.
+                          final side = BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          );
+                          return Container(
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              borderRadius: BorderRadius.vertical(
+                                top: first
+                                    ? const Radius.circular(16)
+                                    : Radius.zero,
+                                bottom: last
+                                    ? const Radius.circular(16)
+                                    : Radius.zero,
+                              ),
+                              border: Border(
+                                left: side,
+                                right: side,
+                                bottom: side,
+                                top: first
+                                    ? side
+                                    : BorderSide(
+                                        color: side.color,
+                                        style: BorderStyle.none,
+                                      ),
+                              ),
+                            ),
+                            child: VisitorRecordCard(
+                              visitor: visitor,
+                              onTap: () => _openDetail(state, visitor),
+                            ),
                           );
                         },
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Badge(
-                      isLabelVisible: status != null,
-                      smallSize: 7,
-                      child: IconButton.outlined(
-                        tooltip: l10n.visitorFilterTitle,
-                        icon: const Icon(Icons.tune_rounded),
-                        onPressed: () => _filter(state),
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-                if (filtered) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      if (status != null)
-                        Text(
-                          visitorStatusLabel(l10n, status),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      TextButton(
-                        onPressed: () => _clearFilters(state),
-                        child: Text(l10n.visitorClearFilters),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 20),
-                if (summary != null &&
-                    (summary.total > 0 || summary.overflow)) ...[
-                  VisitorSummaryCard(summary: summary),
-                  const SizedBox(height: 24),
-                ],
-                if (state.summaryError != null)
-                  Semantics(
-                    liveRegion: true,
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        l10n.visitorSummaryError,
-                        style: TextStyle(color: colors.error),
-                      ),
-                    ),
-                  ),
-                if (state.loading)
-                  LinearProgressIndicator(semanticsLabel: l10n.homeDataLoading),
-                if (state.error case final error?) ...[
-                  if (state.loaded) Text(l10n.visitorStale),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      localizeAppError(context, error),
-                      style: TextStyle(color: colors.error),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: state.loading ? null : state.refresh,
-                    child: Text(l10n.commonRetry),
-                  ),
-                ],
-                if (state.loaded &&
-                    state.visitors.isEmpty &&
-                    !state.hasMore &&
-                    state.error == null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 48),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.people_outline_rounded,
-                          size: 48,
-                          color: colors.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          filtered ? l10n.historyEmpty : l10n.visitorEmpty,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          filtered
-                              ? l10n.visitorFilteredEmptyHint
-                              : l10n.visitorEmptyHint,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: colors.onSurfaceVariant),
-                        ),
-                        if (filtered) ...[
-                          const SizedBox(height: 16),
-                          OutlinedButton(
-                            onPressed: () => _clearFilters(state),
-                            child: Text(l10n.historyShowAllRecords),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                if (state.visitors.isNotEmpty) ...[
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      l10n.visitorInvitationsTitle,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                for (final visitor in state.visitors)
-                  VisitorRecordCard(
-                    visitor: visitor,
-                    onTap: () => _openDetail(state, visitor),
-                  ),
-                if (state.hasMore)
-                  OutlinedButton(
-                    onPressed: state.loading
-                        ? null
-                        : () => state.refresh(more: true),
-                    child: Text(l10n.visitorLoadMore),
-                  ),
-              ],
-            ),
-          );
-        },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

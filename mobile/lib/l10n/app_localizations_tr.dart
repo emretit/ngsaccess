@@ -12,15 +12,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get appName => 'NGS Plus';
 
   @override
-  String get appTagline => 'Yoklama Takip Sistemi';
-
-  @override
-  String get pdksTitle => 'PDKS Sistemi';
-
-  @override
-  String get pdksSubtitle => 'Personel Devam Kontrol Sistemi';
-
-  @override
   String get commonOk => 'Tamam';
 
   @override
@@ -30,19 +21,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get commonClose => 'Kapat';
 
   @override
-  String get commonRetry => 'Tekrar Dene';
-
-  @override
-  String get commonError => 'Hata';
-
-  @override
-  String get commonSuccess => 'Başarılı';
-
-  @override
-  String get commonAdd => 'Ekle';
-
-  @override
-  String get comingSoon => 'Yakında eklenecek.';
+  String get commonRetry => 'Yeniden dene';
 
   @override
   String get navHome => 'Ana Sayfa';
@@ -60,11 +39,14 @@ class AppLocalizationsTr extends AppLocalizations {
   String get loginWelcomeTitle => 'Hoş geldiniz!';
 
   @override
-  String get loginTitle => 'Giriş Yap';
+  String get pdksSubtitle => 'Personel Devam Kontrol Sistemi';
 
   @override
   String get loginPrompt =>
       'PDKS sistemine giriş yapmak için bilgilerinizi giriniz';
+
+  @override
+  String get loginTitle => 'Giriş yap';
 
   @override
   String get loginEmailLabel => 'E-posta';
@@ -85,37 +67,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get loginPasswordTooShort => 'Şifre en az 6 karakter olmalı';
 
   @override
-  String get loginRememberMe => 'Beni Hatırla';
-
-  @override
-  String get loginForgotPassword => 'Şifremi unuttum';
-
-  @override
-  String get forgotPasswordTitle => 'Şifre Sıfırla';
-
-  @override
-  String get forgotPasswordHeadline => 'Şifrenizi mi unuttunuz?';
-
-  @override
-  String get forgotPasswordPrompt =>
-      'E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.';
-
-  @override
-  String get forgotPasswordSendButton => 'Sıfırlama Bağlantısı Gönder';
-
-  @override
-  String get forgotPasswordBackToLogin => 'Giriş sayfasına dön';
-
-  @override
-  String get forgotPasswordSuccessTitle => 'E-posta Gönderildi!';
-
-  @override
-  String forgotPasswordSuccessBody(String email) {
-    return '$email adresine şifre sıfırlama bağlantısı gönderildi. E-postanızı kontrol edin.';
-  }
-
-  @override
-  String get forgotPasswordSuccessButton => 'Giriş Sayfasına Dön';
+  String get loginForgotPassword => 'Şifre yardımı';
 
   @override
   String get homeGreetingMorning => 'Günaydın';
@@ -131,90 +83,48 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String homeGreetingLine(String greeting, String name) {
-    return '$greeting, $name!';
+    return '$greeting, $name';
   }
-
-  @override
-  String get homeAttendanceStatus => 'Yoklama Durumu';
-
-  @override
-  String get homeScanCheckIn => 'QR Kod Tara - Giriş Yap';
-
-  @override
-  String get homeScanCheckOut => 'QR Kod Tara - Çıkış Yap';
 
   @override
   String get homeStatusInside => 'İçeride';
 
   @override
-  String get homeStatusOut => 'Çıktı';
+  String get homeStatusOut => 'Dışarıda';
 
   @override
-  String get homeStatusNone => 'Henüz Yok';
+  String get homeStatusNone => 'Bugün kayıt yok';
 
   @override
-  String get homeAttendanceEntryRow => 'Son Giriş';
+  String get homeAttendanceEntryRow => 'Son giriş';
 
   @override
-  String get homeAttendanceExitRow => 'Son Çıkış';
+  String get homeAttendanceExitRow => 'Son çıkış';
 
   @override
-  String homeExtraMovements(int count) {
-    return '+$count hareket';
+  String homeExtraEntries(int count) {
+    return '+$count giriş daha';
   }
 
   @override
-  String get homeScanCheckInAgain => 'QR Kod Tara - Tekrar Giriş';
+  String homeExtraExits(int count) {
+    return '+$count çıkış daha';
+  }
 
   @override
   String get homeAttendanceTimeEmpty => '—';
 
   @override
-  String get homeMonthSummary => 'Bu Ayki Özet';
-
-  @override
-  String get homeStatTotalDays => 'Toplam Gün';
-
-  @override
-  String get homeStatDaysPresent => 'Mevcut Günler';
-
-  @override
-  String get homeStatTimesLate => 'Geç Kalma';
-
-  @override
-  String homeProgressLabel(int present, int total) {
-    return '$present / $total gün katıldın';
-  }
-
-  @override
-  String get homeQuoteOfTheDay => '💫 Günün Sözü';
-
-  @override
-  String get homeQuote1 => 'Başarı, hazırlık ile fırsatın buluştuğu andır.';
-
-  @override
-  String get homeQuote2 => 'Her yeni gün, yeni bir başlangıçtır.';
-
-  @override
-  String get homeQuote3 => 'Disiplin, özgürlüğün köprüsüdür.';
-
-  @override
-  String get homeQuote4 => 'Küçük adımlar büyük değişimler yaratır.';
-
-  @override
-  String get homeQuote5 => 'Bugün dün düşündüğünüz yarındır.';
-
-  @override
-  String get homeQuote6 => 'Zaman en değerli hazinedir, onu akıllıca kullan.';
-
-  @override
-  String get homeQuote7 => 'İyi alışkanlıklar, başarının anahtarıdır.';
-
-  @override
-  String get homeQuote8 => 'Her gün kendini geliştirme fırsatıdır.';
-
-  @override
   String get profileTitle => 'Profil';
+
+  @override
+  String get profileAccountSection => 'Hesap';
+
+  @override
+  String get profilePreferencesSection => 'Tercihler';
+
+  @override
+  String get profileSupportSection => 'Destek';
 
   @override
   String get profileEditButton => 'Kişisel bilgiler';
@@ -231,22 +141,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Güncellemeler ve kullanım bilgisi';
 
   @override
-  String get profileSecurity => 'Güvenlik';
-
-  @override
-  String get profileSecuritySubtitle => 'Şifre değiştirme ve kurtarma';
-
-  @override
   String get profileTheme => 'Tema';
-
-  @override
-  String get profileThemeDark => 'Koyu tema aktif';
-
-  @override
-  String get profileThemeLight => 'Açık tema aktif';
-
-  @override
-  String get profileThemeSystem => 'Sistem ayarına göre';
 
   @override
   String get profileThemeModeLight => 'Açık tema';
@@ -267,22 +162,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get profileLanguageValueEn => 'İngilizce';
 
   @override
-  String get profilePreferredDoor => 'Hızlı Erişim Kapısı';
+  String get profilePreferredDoor => 'Hızlı erişim kapısı';
 
   @override
   String get profilePreferredDoorEmpty => 'Seçilmedi';
 
   @override
-  String get homeQuickActions => 'Hızlı İşlemler';
-
-  @override
-  String get quickActionUnlock => 'Kapıyı Aç';
-
-  @override
-  String get quickActionVisitor => 'Ziyaretçi';
-
-  @override
-  String get quickActionHistory => 'Geçmiş';
+  String get quickActionUnlock => 'Kapıyı aç';
 
   @override
   String get quickActionProfile => 'Profil';
@@ -292,16 +178,13 @@ class AppLocalizationsTr extends AppLocalizations {
       'Önce Profil\'den hızlı erişim kapısını seç';
 
   @override
-  String get unlockGranted => 'Erişim Verildi';
-
-  @override
   String get unlockDenied => 'Erişim Reddedildi';
 
   @override
-  String get selectDeviceTitle => 'Kapı Seç';
+  String get selectDeviceTitle => 'Kapı seç';
 
   @override
-  String get selectDeviceSearch => 'Ara...';
+  String get selectDeviceSearch => 'Kapılarda ara';
 
   @override
   String get selectDeviceEmpty => 'Henüz erişiminiz olan kapı yok';
@@ -319,9 +202,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get profileAboutApp => 'Uygulama Hakkında';
 
   @override
-  String get profileAppVersion => 'Sürüm';
-
-  @override
   String get profilePrivacy => 'Gizlilik bilgileri';
 
   @override
@@ -331,9 +211,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get profileLogout => 'Çıkış Yap';
 
   @override
-  String get profileLogoutSubtitle => 'Hesabınızdan çıkış yapın';
-
-  @override
   String get profileLogoutConfirmTitle => 'Çıkış Yap';
 
   @override
@@ -341,38 +218,12 @@ class AppLocalizationsTr extends AppLocalizations {
       'Hesabınızdan çıkış yapmak istediğinizden emin misiniz?';
 
   @override
-  String get profileSettings => 'Ayarlar';
-
-  @override
-  String get profileSettingsBody =>
-      'Tema, dil ve hızlı erişim hedefinizi Profil ekranından ayarlayabilirsiniz.';
-
-  @override
-  String get profileNotificationsDialogTitle => 'Bildirim Ayarları';
-
-  @override
   String get profileNotificationsDialogBody =>
       'Bu sürümde anlık bildirim teslimi ve bildirim tercihi yönetimi bulunmuyor. Güncel erişim ve hareket bilgilerinizi uygulamayı açarak yenileyebilirsiniz. Eksik veya hatalı kayıtlar için kurumunuzun yöneticisine başvurun.';
 
   @override
-  String get profileSecurityDialogTitle => 'Güvenlik Ayarları';
-
-  @override
   String get profileSecurityDialogBody =>
       'Mevcut şifrenizi biliyorsanız aşağıdaki formdan yeni bir şifre belirleyebilirsiniz. Şifre değişikliği tüm mobil oturumları sonlandırır. Şifrenizi unuttuysanız kurum yöneticinizden yeni kurulum bağlantısı isteyin. Ortak bir cihazdan ayrılmadan önce Çıkış Yap seçeneğini kullanın.';
-
-  @override
-  String get profileThemeDialogTitle => 'Tema Ayarları';
-
-  @override
-  String get profileThemeDialogBody => 'Açık, koyu veya sistem temasını seçin.';
-
-  @override
-  String get profileLanguageDialogTitle => 'Dil Ayarları';
-
-  @override
-  String get profileLanguageDialogBody =>
-      'Dil tercihi bu cihazda saklanır ve çıkıştan sonra korunur.';
 
   @override
   String get profileHelpDialogTitle => 'Yardım & Destek';
@@ -395,12 +246,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get profileAboutLine1 => 'NGS Plus Yoklama Takip Sistemi';
 
   @override
-  String get profileAboutLine2 => 'Kurulu uygulama sürümü';
-
-  @override
-  String get profileAboutLine3 => 'Destek için kurum yöneticinize başvurun.';
-
-  @override
   String get profileAboutLine4 =>
       'Çalışan erişim ve hareket bilgilerini görüntüleme uygulaması.';
 
@@ -420,118 +265,34 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyTabStats => 'Özet';
 
   @override
-  String get historyLoading => 'Veriler yükleniyor...';
+  String get historyLoading => 'Kayıtlar yükleniyor';
 
   @override
-  String get historyErrorTitle => 'Bir Hata Oluştu';
-
-  @override
-  String historyErrorBody(String error) {
-    return 'Veriler yüklenirken hata oluştu: $error';
-  }
+  String get historyErrorTitle => 'Kayıtlar alınamadı';
 
   @override
   String get historyEmpty => 'Kayıt bulunamadı';
 
   @override
-  String get historyEmptyHint => 'Verileri yenilemek için aşağı çekin';
+  String get historyEmptyHint => 'Yeni geçişleriniz burada görünecek.';
 
   @override
-  String get historyColorLegend => 'Renk Açıklamaları';
+  String get historyMonthSummary => 'Bu ayın özeti';
 
   @override
-  String get historyLegendEarly => 'Erken Giriş';
+  String get historyActiveDays => 'Giriş günü';
 
   @override
-  String get historyLegendEarlyDesc =>
-      'Saat 09:00\'dan önce giriş yapılan günler';
+  String get historyThisWeek => 'Bu hafta';
 
   @override
-  String get historyLegendNormal => 'Normal Giriş';
+  String get historyWeeklySummary => 'Haftalık özet';
 
   @override
-  String get historyLegendNormalDesc =>
-      'Saat 09:00-09:30 arası giriş yapılan günler';
+  String get historyUnknownDevice => 'Kapı bilgisi yok';
 
   @override
-  String get historyLegendLate => 'Geç Giriş';
-
-  @override
-  String get historyLegendLateDesc =>
-      'Saat 09:30\'dan sonra giriş yapılan günler';
-
-  @override
-  String get historyLegendNone => 'Katılım Yok';
-
-  @override
-  String get historyLegendNoneDesc => 'Hiç giriş-çıkış kaydı bulunmayan günler';
-
-  @override
-  String get historyCalendarHint =>
-      'Günlere tıklayarak detayları görebilirsiniz. Yeşil noktalar ek katılım kayıtlarını gösterir.';
-
-  @override
-  String get historyMonthSummary => 'Bu Ay Özeti';
-
-  @override
-  String get historyTotalCheckIns => 'Toplam Giriş';
-
-  @override
-  String get historyTotalCheckOuts => 'Toplam Çıkış';
-
-  @override
-  String get historyActiveDays => 'Giriş yapılan gün';
-
-  @override
-  String get historyGeneralStats => 'Genel İstatistikler';
-
-  @override
-  String get historyThisWeek => 'Bu Hafta';
-
-  @override
-  String get historyWeeklySummary => 'Haftalık Özet';
-
-  @override
-  String historyWeeklyTotalRecords(int count) {
-    return 'Bu hafta toplam $count kayıt';
-  }
-
-  @override
-  String historyWeeklyCheckIn(int count) {
-    return 'Giriş: $count';
-  }
-
-  @override
-  String historyWeeklyCheckOut(int count) {
-    return 'Çıkış: $count';
-  }
-
-  @override
-  String get historyDeviceStats => 'Cihaz Bazlı İstatistikler';
-
-  @override
-  String get historyCheckInRecord => 'Giriş Yapıldı';
-
-  @override
-  String get historyCheckOutRecord => 'Çıkış Yapıldı';
-
-  @override
-  String get historyBadgeIn => 'GİRİŞ';
-
-  @override
-  String get historyBadgeOut => 'ÇIKIŞ';
-
-  @override
-  String get historyUnknownDevice => 'Bilinmeyen Cihaz';
-
-  @override
-  String get historyUnknownLocation => 'Bilinmeyen Konum';
-
-  @override
-  String get historyDetailCheckIn => 'Giriş Detayları';
-
-  @override
-  String get historyDetailCheckOut => 'Çıkış Detayları';
+  String get historyRecordDetailTitle => 'Kayıt ayrıntısı';
 
   @override
   String get historyDetailDate => 'Tarih';
@@ -543,32 +304,20 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyDetailLocation => 'Konum';
 
   @override
-  String get historyDetailQrCode => 'QR Kod';
-
-  @override
   String get historyFilterTitle => 'Filtrele';
 
   @override
   String get historyFilterDate => 'Tarih';
 
   @override
-  String get historyFilterDateNone => 'Tarih seçilmedi';
+  String get historyFilterDevice => 'Kapı';
 
   @override
-  String get historyFilterDevice => 'Cihaz';
-
-  @override
-  String get historyFilterDeviceNone => 'Cihaz seçilmedi';
-
-  @override
-  String get historyFilterClear => 'Filtreleri Temizle';
-
-  @override
-  String get historyFilterDeviceSelectTitle => 'Cihaz Seç';
+  String get historyFilterClear => 'Filtreleri temizle';
 
   @override
   String historyDayRecordCount(int count) {
-    return '$count Kayıt';
+    return '$count kayıt';
   }
 
   @override
@@ -587,60 +336,16 @@ class AppLocalizationsTr extends AppLocalizations {
   String get qrTabScan => 'Tara';
 
   @override
-  String get qrInvalidResponse => 'Geçersiz yanıt';
-
-  @override
-  String get qrTokenMissing => 'Token yok';
-
-  @override
   String get qrRefresh => 'Yenile';
 
   @override
   String get qrTryAgain => 'Tekrar dene';
 
   @override
-  String get qrFrameHint => 'QR kodu kare içine yerleştirin';
-
-  @override
-  String get qrTokenHint =>
-      'Bu QR kodu kapı cihazına okutun. Kod 10 saniye geçerlidir, süre dolunca yenile butonuna basın.';
-
-  @override
-  String qrProcessError(String error) {
-    return 'QR kod işlenirken bir hata oluştu: $error';
-  }
-
-  @override
-  String get qrUserCodeTitle => 'Kullanıcı QR Kodu';
-
-  @override
-  String qrUserCodeBody(String name, String email, String date) {
-    return 'Kullanıcı: $name\nE-posta: $email\nTarih: $date';
-  }
+  String get qrFrameHint => 'QR kodu çerçeveye alın';
 
   @override
   String get qrInvalidCode => 'Geçersiz QR kod';
-
-  @override
-  String get qrAccessGranted => 'Geçiş Başarılı';
-
-  @override
-  String get qrUnknownError => 'Bir hata oluştu';
-
-  @override
-  String qrDeviceLine(String name) {
-    return 'Cihaz: $name';
-  }
-
-  @override
-  String qrLocationLine(String location) {
-    return 'Konum: $location';
-  }
-
-  @override
-  String qrTimeLine(String time) {
-    return 'Zaman: $time';
-  }
 
   @override
   String get visitorTitle => 'Ziyaretçiler';
@@ -649,91 +354,37 @@ class AppLocalizationsTr extends AppLocalizations {
   String get visitorStatTotal => 'Toplam';
 
   @override
-  String get visitorStatInside => 'İçeride';
-
-  @override
-  String get visitorStatExpected => 'Beklenen';
-
-  @override
-  String get visitorEmpty => 'Henüz ziyaretçi kaydı yok';
+  String get visitorEmpty => 'Henüz davet yok';
 
   @override
   String get visitorEmptyHint =>
-      'Yeni bir davet oluşturmak için sağ üstteki Ekle düğmesini kullanın.';
-
-  @override
-  String get visitorStatusExpected => 'Bekleniyor';
-
-  @override
-  String get visitorStatusInside => 'İçeride';
-
-  @override
-  String get visitorStatusOut => 'Çıktı';
-
-  @override
-  String visitorContactPerson(String name) {
-    return 'İletişim: $name';
-  }
-
-  @override
-  String get visitorCheckOut => 'Çıkış Yap';
-
-  @override
-  String get visitorCheckIn => 'Giriş Yap';
-
-  @override
-  String visitorCheckedInToast(String name) {
-    return '$name giriş yaptı';
-  }
-
-  @override
-  String visitorCheckedOutToast(String name) {
-    return '$name çıkış yaptı';
-  }
+      'Ziyaretçi davet et düğmesiyle yeni bir davet oluşturun.';
 
   @override
   String get visitorFilterTitle => 'Filtrele';
 
   @override
-  String get visitorFilterBody => 'Filtreleme seçenekleri buraya gelecek.';
-
-  @override
-  String get visitorAddTitle => 'Yeni Ziyaretçi';
-
-  @override
-  String get visitorFieldName => 'Ad Soyad';
-
-  @override
-  String get visitorFieldCompany => 'Şirket';
+  String get visitorAddTitle => 'Ziyaretçi davet et';
 
   @override
   String get visitorFieldPurpose => 'Ziyaret Amacı';
 
   @override
-  String get visitorFieldContact => 'İletişim Kişisi';
-
-  @override
-  String get visitorAddedToast => 'Ziyaretçi eklendi';
-
-  @override
-  String get visitorAddButton => 'Ziyaretçi Ekle';
+  String get visitorAddButton => 'Ziyaretçi davet et';
 
   @override
   String get errorNetwork =>
       'İnternet bağlantısı kurulamadı. Lütfen bağlantınızı kontrol edin.';
 
   @override
-  String get errorTimeout =>
-      'Sunucu yanıt vermedi. Lütfen daha sonra tekrar deneyin.';
+  String get errorTimeout => 'İşlem zamanında tamamlanamadı. Yeniden deneyin.';
 
   @override
-  String errorServer(int code) {
-    return 'Sunucu hatası ($code). Lütfen biraz sonra tekrar deneyin.';
-  }
+  String get errorServer => 'İşlem tamamlanamadı. Biraz sonra yeniden deneyin.';
 
   @override
   String get errorEmploymentEnded =>
-      'İşten ayrıldınız. Mobil erişiminiz kapatıldı.';
+      'Mobil erişiminiz kapatıldı. Kurum yöneticinize başvurun.';
 
   @override
   String get errorAuthExpired =>
@@ -803,9 +454,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyLoadMore => 'Daha fazla yükle';
 
   @override
-  String get historyAccessDenied => 'Erişim reddedildi';
-
-  @override
   String get historyUnknownDirection => 'Bilinmeyen yön';
 
   @override
@@ -820,13 +468,13 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get historyRawEvents =>
-      'Ham erişim hareketleri; resmi PDKS sonucu değildir.';
+      'Geçiş kayıtları gösterilir. Resmi devam ve çalışma süresi sonuçları farklı olabilir.';
 
   @override
   String get homeDataLoading => 'Veriler yükleniyor';
 
   @override
-  String get homeDataUnavailable => 'Veriler alınamadı';
+  String get homeDataUnavailable => 'Bugünkü durum alınamadı';
 
   @override
   String get homeDataStale => 'Önceki veriler gösteriliyor';
@@ -839,12 +487,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get homeStatusUnknown => 'Durum bilinmiyor';
-
-  @override
-  String get homeSelfCheckIn => 'Manuel kayıt';
-
-  @override
-  String get homeSelfCheckInRecorded => 'Manuel kayıt oluşturuldu';
 
   @override
   String get homeCommandPending =>
@@ -882,8 +524,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Kodun durumu doğrulanamadı. Tekrar kontrol edin.';
 
   @override
-  String get qrReaderHint =>
-      'Bu kodu desteklenen okuyucuya gösterin. Süre sunucunun bitiş zamanına göre gösterilir. İşlem kaydı kapının açıldığını veya fiziksel geçişi doğrulamaz.';
+  String get qrReaderHint => 'Kodu okuyucuya gösterin';
 
   @override
   String get qrSwitchCamera => 'Kamerayı değiştir';
@@ -899,11 +540,14 @@ class AppLocalizationsTr extends AppLocalizations {
   String get qrOpenSettings => 'Ayarları aç';
 
   @override
+  String get qrGrantCameraPermission => 'Kamera izni ver';
+
+  @override
   String get qrCameraControlUnavailable => 'Kamera kontrolü kullanılamıyor.';
 
   @override
   String get qrDeviceIdentityOnly =>
-      'Bu bir cihaz kimlik etiketidir; geçiş yetkisi veya fiziksel bulunma kanıtı sağlamaz. Desteklenen okuyucuda QR’ım sekmesini kullanın.';
+      'Bu kod cihazı tanıtır; kapıyı açmaz veya geçiş kaydı oluşturmaz. QR Kodum sekmesindeki kodu uygun okuyucuya gösterin.';
 
   @override
   String get qrEmployeeIdentityOnly =>
@@ -911,7 +555,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get qrChallengeUnsupported =>
-      'Bu okuyucunun güvenli işlem akışı henüz desteklenmiyor. Desteklenen okuyucuda QR’ım sekmesini kullanın.';
+      'Bu okuyucuyla tarama yapılamıyor. QR Kodum sekmesindeki kodu uygun okuyucuya gösterin.';
 
   @override
   String get qrScanExpired => 'QR kodun süresi doldu.';
@@ -938,7 +582,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get passwordHelpAdminBody =>
-      'Mobil şifre kurulumunu kurum yöneticiniz yönetir. Kayıtlı e-posta adresinize yeni bir kurulum bağlantısı göndermesini isteyin. Bağlantıyı açıp yeni şifrenizi belirledikten sonra giriş ekranına dönün.';
+      'Kurum yöneticinizden kayıtlı e-postanıza şifre kurulum bağlantısı göndermesini isteyin. Şifrenizi belirledikten sonra giriş yapın.';
 
   @override
   String get passwordHelpNoEmail =>
@@ -949,7 +593,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Merhaba, NGS Plus mobil şifremi oluşturmak veya yenilemek istiyorum. Çalışan kaydımdaki e-posta adresime yeni bir şifre kurulum bağlantısı gönderebilir misiniz?';
 
   @override
-  String get passwordHelpCopy => 'Yöneticiye iletilecek talebi kopyala';
+  String get passwordHelpCopy => 'Talebi kopyala';
 
   @override
   String get passwordHelpCopied =>
@@ -969,6 +613,12 @@ class AppLocalizationsTr extends AppLocalizations {
   String get startupTitle => 'NGS Plus başlatılıyor';
 
   @override
+  String get startupBandTitle => 'Başlatılıyor';
+
+  @override
+  String get startupFailureTitle => 'Başlatılamadı';
+
+  @override
   String get startupUnavailable =>
       'Oturum doğrulanamadı. Bağlantınızı kontrol edip yeniden deneyin.';
 
@@ -980,7 +630,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String homeUpdatedAt(String time) {
-    return 'Son güncelleme: $time';
+    return 'Son güncelleme $time';
   }
 
   @override
@@ -1016,19 +666,47 @@ class AppLocalizationsTr extends AppLocalizations {
   String get visitorEnd => 'Ziyaret bitişi';
 
   @override
-  String get visitorSave => 'Kaydet';
+  String get visitorSave => 'Daveti kaydet';
 
   @override
   String get visitorEdit => 'Düzenle';
+
+  @override
+  String get visitorEditTitle => 'Daveti düzenle';
+
+  @override
+  String get visitorStartDate => 'Başlangıç tarihi';
+
+  @override
+  String get visitorEndDate => 'Bitiş tarihi';
+
+  @override
+  String get visitorStartTime => 'Başlangıç saati';
+
+  @override
+  String get visitorEndTime => 'Bitiş saati';
+
+  @override
+  String get visitorNotFound => 'Davet bulunamadı';
+
+  @override
+  String get visitorErrorEndBeforeStart => 'Bitiş, başlangıçtan sonra olmalı.';
+
+  @override
+  String get visitorErrorMaxDuration => 'Ziyaret en fazla 31 gün sürebilir.';
+
+  @override
+  String get visitorErrorEndInPast => 'Bitiş geçmişte olamaz.';
+
+  @override
+  String get visitorErrorNoticeRequired =>
+      'Devam etmek için aydınlatma metnini onaylayın.';
 
   @override
   String get visitorCancelInvitation => 'Daveti iptal et';
 
   @override
   String get visitorCancelConfirm => 'Bu davet iptal edilsin mi?';
-
-  @override
-  String get visitorPreRegistered => 'Yetkili aktivasyonu bekleniyor';
 
   @override
   String get visitorAccessActive => 'Erişim aktif';
@@ -1053,8 +731,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Aktif erişimi iptal etmek için yetkili operatörle iletişime geçin.';
 
   @override
-  String get visitorSaved =>
-      'Davet kaydı kaydedildi; yetkili aktivasyonu gerekiyor.';
+  String get visitorSaved => 'Davet kaydedildi. Yetkili onayı bekleniyor.';
 
   @override
   String get visitorCancelled => 'Davet iptal edildi.';
@@ -1069,11 +746,11 @@ class AppLocalizationsTr extends AppLocalizations {
   String get visitorNoticeReviewed => 'Güncel aydınlatma metnini inceledim.';
 
   @override
-  String get visitorInvalidForm =>
-      'Zorunlu alanları ve ziyaret tarihlerini kontrol edin.';
+  String get fieldRequired => 'Bu alan zorunlu.';
 
   @override
-  String get visitorStale => 'Yenilenemedi; önceki kayıtlar gösteriliyor.';
+  String get visitorStale =>
+      'Davetler yenilenemedi. Önceki davetler gösteriliyor.';
 
   @override
   String get visitorRefresh => 'Yenile';
@@ -1114,8 +791,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Oturum güvenli biçimde saklanamadı. Lütfen yeniden giriş yapın.';
 
   @override
-  String get errorProtocol =>
-      'Geçerli bir sunucu yanıtı alınamadı. Lütfen yeniden deneyin.';
+  String get errorProtocol => 'İşlem tamamlanamadı. Yeniden deneyin.';
 
   @override
   String get errorPasswordPolicy =>
@@ -1126,7 +802,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get homeDoorUnavailable =>
-      'Seçilen kapı artık kullanılamıyor. Profil üzerinden yeni bir kapı seçin.';
+      'Seçilen kapı kullanılamıyor. Yeni bir kapı seçin.';
 
   @override
   String get homeNoOpenableDoor => 'Bu cihazda açılabilir bir kapı yok.';
@@ -1172,13 +848,13 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get visitorSummaryLimited =>
-      'Bu toplamlar alt sınırdır; özet okuma sınırına ulaşıldı.';
+      'Bazı davetler özete dahil edilemedi; gerçek toplam daha yüksek olabilir.';
 
   @override
   String get visitorSummaryError => 'Özet yenilenemedi.';
 
   @override
-  String get visitorSyncTitle => 'Cihaz senkronizasyonu';
+  String get visitorSyncTitle => 'Cihaz durumu';
 
   @override
   String get visitorSyncPending => 'Cihaz güncellemesi bekliyor';
@@ -1238,7 +914,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyAllDates => 'Tüm tarihler';
 
   @override
-  String get historyAllDevices => 'Tüm cihazlar';
+  String get historyAllDevices => 'Tüm kapılar';
 
   @override
   String get historyApplyFilters => 'Filtreleri uygula';
@@ -1251,8 +927,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Seçtiğiniz tarih veya cihaz için kayıt bulunmuyor.';
 
   @override
-  String get historyCalendarLegend =>
-      'Çerçeve: bugün · Dolgu: seçili gün · Nokta: kayıt var';
+  String get historyCalendarLegend => 'Noktalı günlerde kayıt var.';
 
   @override
   String get historySelectDayHint => 'Kayıtlarını görmek için bir gün seçin.';
@@ -1262,7 +937,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get historyNoActivityHint =>
-      'Kayıtlar oluştukça özet burada görünür. Bu bir devamsızlık hesabı değildir.';
+      'Yeni kayıtlar burada görünecek. Kayıt olmaması devamsızlık anlamına gelmez.';
 
   @override
   String get historyDeniedCount => 'Reddedilen';
@@ -1272,10 +947,10 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get historyLoadedDevices =>
-      'Cihaz seçenekleri yüklenen kayıtlardan alınır.';
+      'Bu listedeki kayıtlarda yer alan kapılar gösterilir.';
 
   @override
-  String get historyNoDeviceOptions => 'Yüklenen kayıtlarda cihaz bulunmuyor.';
+  String get historyNoDeviceOptions => 'Bu kayıtlar için kapı seçeneği yok.';
 
   @override
   String get historyTabThisMonthPeriod => 'Bu ay';
@@ -1289,6 +964,9 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get visitorActivationHint =>
       'Davet kaydı oluşturulduktan sonra yetkili aktivasyonu gerekir.';
+
+  @override
+  String get visitorMetricPending => 'Onay bekliyor';
 
   @override
   String get visitorPendingShort => 'Aktivasyon bekliyor';
@@ -1308,7 +986,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Aydınlatma bilgisi yüklenemedi. Kaydetmeden önce tekrar deneyin.';
 
   @override
-  String get profileProject => 'Firma / proje';
+  String get profileProject => 'Kurum ve proje';
 
   @override
   String get profileProjectUnavailable =>
@@ -1316,6 +994,9 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get doorOperationRecoveryTitle => 'Kapı işlemini kontrol et';
+
+  @override
+  String get doorOperationNothingToCheck => 'Kontrol edilecek kapı işlemi yok.';
 
   @override
   String get doorOperationRecoveryHint =>
@@ -1346,7 +1027,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get errorRequestNoteTooLong => 'Not en fazla 500 karakter olabilir';
 
   @override
-  String get errorRequestDateInvalid => 'Geçerli bir tarih girin (YYYY-MM-DD)';
+  String get errorRequestDateInvalid => 'Geçerli bir tarih seçin.';
 
   @override
   String get errorRequestRangeInvalid =>
@@ -1391,7 +1072,7 @@ class AppLocalizationsTr extends AppLocalizations {
       'Düzeltme türüne uygun giriş ve çıkış saatlerini belirtin';
 
   @override
-  String get errorCorrectionTimeInvalid => 'Geçerli bir saat girin (HH:mm).';
+  String get errorCorrectionTimeInvalid => 'Geçerli bir saat seçin.';
 
   @override
   String get errorCorrectionPendingExists =>
@@ -1404,7 +1085,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get requestsLeave => 'İzin';
 
   @override
-  String get requestsCorrection => 'PDKS düzeltme';
+  String get requestsCorrection => 'Kayıt düzeltme';
 
   @override
   String get requestsNew => 'Yeni talep';
@@ -1416,7 +1097,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get requestsRetry => 'Yeniden dene';
 
   @override
-  String get requestsWithdraw => 'Geri çek';
+  String get requestsWithdraw => 'Talebi geri çek';
 
   @override
   String get requestsWithdrawConfirm =>
@@ -1424,9 +1105,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get requestsCancel => 'Vazgeç';
-
-  @override
-  String get requestsSubmit => 'Gönder';
 
   @override
   String get requestsUncertain =>
@@ -1548,4 +1226,87 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get errorRequestConflict =>
       'Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin.';
+
+  @override
+  String get navQr => 'QR';
+
+  @override
+  String get homeToday => 'Bugün';
+
+  @override
+  String get homeFirstEntry => 'İlk giriş';
+
+  @override
+  String get loginSigningIn => 'Giriş yapılıyor';
+
+  @override
+  String get fieldSelectDate => 'Tarih seçin';
+
+  @override
+  String get fieldSelectTime => 'Saat seçin';
+
+  @override
+  String get fieldSelectOption => 'Seçin';
+
+  @override
+  String get requestsLeaveFormTitle => 'İzin talebi';
+
+  @override
+  String get requestsCorrectionFormTitle => 'Kayıt düzeltme talebi';
+
+  @override
+  String get requestsLeaveSubmit => 'İzin talebi gönder';
+
+  @override
+  String get requestsLeaveSubmitting => 'İzin talebi gönderiliyor';
+
+  @override
+  String get requestsLeaveSubmitted => 'İzin talebi gönderildi';
+
+  @override
+  String get requestsCorrectionSubmit => 'Düzeltme talebi gönder';
+
+  @override
+  String get requestsCorrectionSubmitting => 'Düzeltme talebi gönderiliyor';
+
+  @override
+  String get requestsCorrectionSubmitted => 'Düzeltme talebi gönderildi';
+
+  @override
+  String get requestsWithdrawnToast => 'Talep geri çekildi';
+
+  @override
+  String get requestsTimeZoneHint => 'Saatler Türkiye saatine göre girilir.';
+
+  @override
+  String get visitorSaving => 'Davet kaydediliyor';
+
+  @override
+  String get visitorLoadFailed => 'Davetler alınamadı. Yeniden deneyin.';
+
+  @override
+  String get visitorNoMatchTitle => 'Eşleşen davet yok';
+
+  @override
+  String get commonLoading => 'Yükleniyor';
+
+  @override
+  String get fieldNoOptions => 'Seçenek yok';
+
+  @override
+  String get metricNoRecord => 'Kayıt yok';
+
+  @override
+  String get fieldClear => 'Temizle';
+
+  @override
+  String historyWeeklyTotalRecords(int count) {
+    return 'Bu hafta toplam $count kayıt';
+  }
+
+  @override
+  String get unlockGranted => 'Erişim Verildi';
+
+  @override
+  String get visitorPreRegistered => 'Yetkili aktivasyonu bekleniyor';
 }

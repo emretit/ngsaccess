@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:table_calendar/table_calendar.dart';
 
 import '../../core/attendance_date.dart';
 import '../../l10n/app_localizations.dart';
+import '../ui/ui.dart';
 
 class HistoryCalendar extends StatelessWidget {
   const HistoryCalendar({
@@ -14,129 +14,202 @@ class HistoryCalendar extends StatelessWidget {
     this.today,
     this.selectedDay,
   });
-
   final DateTime month;
-  final Map<String, int> dayCounts;
+
+  /// Null means the month counts have not been loaded successfully.
+  final Map<String, int>? dayCounts;
   final ValueChanged<DateTime> onDaySelected;
   final DateTime? today;
   final DateTime? selectedDay;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final firstDay = DateTime(month.year, month.month);
-    final lastDay = DateTime(month.year, month.month + 1, 0);
-    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final tokens = AppUiTokens.of(context);
     final colors = Theme.of(context).colorScheme;
-    final current = today ?? AttendanceDate.businessTime(DateTime.now());
-    final currentDay = DateTime(current.year, current.month, current.day);
-
-    Widget dayCell(BuildContext context, DateTime day, DateTime focusedDay) {
-      final count = dayCounts[AttendanceDate.calendarKey(day)] ?? 0;
-      final selected = isSameDay(day, selectedDay);
-      final isToday = isSameDay(day, currentDay);
-      final future = DateTime(day.year, day.month, day.day).isAfter(currentDay);
-      return Container(
-        margin: const EdgeInsets.all(2),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: selected ? colors.primary : null,
-          border: isToday
-              ? Border.all(color: colors.primary, width: 1.5)
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '${day.day}',
-              style: TextStyle(
-                color: selected
-                    ? colors.onPrimary
-                    : future
-                    ? colors.onSurface.withValues(alpha: .38)
-                    : colors.onSurface,
-                fontWeight: selected || isToday
-                    ? FontWeight.w700
-                    : FontWeight.normal,
-              ),
-            ),
-            const SizedBox(height: 3),
-            if (count > 0)
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? colors.onPrimary : colors.primary,
-                ),
-              )
-            else
-              const SizedBox(height: 5),
-          ],
-        ),
-      );
+    final now = today ?? AttendanceDate.businessTime(DateTime.now());
+    final current = DateTime(now.year, now.month, now.day);
+    final first = DateTime(month.year, month.month);
+    final length = DateTime(month.year, month.month + 1, 0).day;
+    bool selected(DateTime day) => DateUtils.isSameDay(day, selectedDay);
+    int? count(DateTime day) => dayCounts == null || day.isAfter(current)
+        ? null
+        : dayCounts?[AttendanceDate.calendarKey(day)] ?? 0;
+    String label(DateTime day) {
+      final fullDate = DateFormat.yMMMMd(locale).format(day);
+      final records = count(day);
+      return records == null
+          ? fullDate
+          : '$fullDate, ${l.historyDayRecordCount(records)}';
     }
 
-    return TableCalendar<int>(
-      firstDay: firstDay,
-      lastDay: lastDay,
-      focusedDay: firstDay,
-      currentDay: currentDay,
-      selectedDayPredicate: (day) => isSameDay(day, selectedDay),
-      enabledDayPredicate: (day) =>
-          !DateTime(day.year, day.month, day.day).isAfter(currentDay),
-      locale: locale,
-      headerVisible: false,
-      availableGestures: AvailableGestures.none,
-      startingDayOfWeek: StartingDayOfWeek.monday,
-      rowHeight: 48.0 * scale.clamp(1, 2),
-      daysOfWeekHeight: 28.0 * scale.clamp(1, 2),
-      calendarStyle: const CalendarStyle(outsideDaysVisible: false),
-      eventLoader: (day) {
-        final count = dayCounts[AttendanceDate.calendarKey(day)] ?? 0;
-        return count > 0 ? [count] : const <int>[];
-      },
-      calendarBuilders: CalendarBuilders<int>(
-        defaultBuilder: dayCell,
-        todayBuilder: dayCell,
-        selectedBuilder: dayCell,
-        disabledBuilder: dayCell,
-        // TableCalendar excludes semantics inside its day-cell builder. Its
-        // marker is a sibling of that cell: the outer day gesture merges the
-        // package's date label with this record count and exposes one action.
-        markerBuilder: (context, day, events) => Positioned.fill(
-          child: InkWell(
-            key: ValueKey('history-day-${AttendanceDate.calendarKey(day)}'),
-            excludeFromSemantics: true,
-            borderRadius: BorderRadius.circular(8),
-            onTap: DateTime(day.year, day.month, day.day).isAfter(currentDay)
-                ? null
-                : () => onDaySelected(DateTime(day.year, day.month, day.day)),
-            child: Semantics(
-              label: l10n.historyDayRecordCount(
-                dayCounts[AttendanceDate.calendarKey(day)] ?? 0,
+    final painter = TextPainter(
+      text: TextSpan(text: '28', style: Theme.of(context).textTheme.bodyMedium),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+    )..layout();
+    final numberWidth = painter.width;
+    final numberHeight = painter.height;
+    painter.dispose();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cellWidth = constraints.maxWidth / 7;
+        // The agreed grid minimum is 44dp wide and 48dp high; text must fit.
+        final useList =
+            cellWidth < 44 ||
+            numberWidth + 8 > cellWidth ||
+            numberHeight + 16 > 48;
+        if (useList) {
+          return AppListGroup(
+            children: [
+              for (
+                var d = 1;
+                d <= length &&
+                    !DateTime(month.year, month.month, d).isAfter(current);
+                d++
+              )
+                Builder(
+                  builder: (context) {
+                    final day = DateTime(month.year, month.month, d);
+                    return AppListRow(
+                      key: ValueKey(
+                        'history-day-${AttendanceDate.calendarKey(day)}',
+                      ),
+                      title: DateFormat.yMMMEd(locale).format(day),
+                      subtitle: count(day) == null
+                          ? null
+                          : l.historyDayRecordCount(count(day) ?? 0),
+                      selected: selected(day),
+                      enabled: !day.isAfter(current),
+                      leadingIcon: selected(day)
+                          ? Icons.check_circle_outline
+                          : DateUtils.isSameDay(day, current)
+                          ? Icons.today_outlined
+                          : Icons.calendar_today_outlined,
+                      semanticLabel: label(day),
+                      onTap: () => onDaySelected(day),
+                    );
+                  },
+                ),
+            ],
+          );
+        }
+        return Column(
+          children: [
+            ExcludeSemantics(
+              child: Row(
+                children: [
+                  for (var i = 0; i < 7; i++)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          DateFormat.E(
+                            locale,
+                          ).format(DateTime(2026, 10, 19 + i)),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              button: !DateTime(
-                day.year,
-                day.month,
-                day.day,
-              ).isAfter(currentDay),
-              child: const SizedBox.expand(),
             ),
-          ),
-        ),
-        dowBuilder: (context, day) => Center(
-          child: Text(
-            DateFormat('EEE', locale).format(day),
-            style: TextStyle(fontSize: 11, color: colors.onSurfaceVariant),
-          ),
-        ),
-      ),
-      onDaySelected: (day, focusedDay) =>
-          onDaySelected(DateTime(day.year, day.month, day.day)),
+            const SizedBox(height: 8),
+            for (var week = 0; week < 6; week++)
+              Row(
+                children: [
+                  for (var weekday = 0; weekday < 7; weekday++)
+                    Expanded(
+                      child: Builder(
+                        builder: (context) {
+                          final ordinal =
+                              week * 7 + weekday - (first.weekday - 1) + 1;
+                          if (ordinal < 1 || ordinal > length) {
+                            return const SizedBox(height: 48);
+                          }
+                          final day = DateTime(
+                            month.year,
+                            month.month,
+                            ordinal,
+                          );
+                          final enabled = !day.isAfter(current);
+                          final isSelected = selected(day);
+                          return Semantics(
+                            key: ValueKey(
+                              'history-day-${AttendanceDate.calendarKey(day)}',
+                            ),
+                            label: label(day),
+                            button: true,
+                            enabled: enabled,
+                            selected: isSelected,
+                            onTap: enabled ? () => onDaySelected(day) : null,
+                            excludeSemantics: true,
+                            child: SizedBox(
+                              height: 48,
+                              child: TextButton(
+                                onPressed: enabled
+                                    ? () => onDaySelected(day)
+                                    : null,
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  foregroundColor: isSelected
+                                      ? tokens.accent
+                                      : colors.onSurface,
+                                  backgroundColor: isSelected
+                                      ? tokens.selectedBackground
+                                      : null,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  side: DateUtils.isSameDay(day, current)
+                                      ? BorderSide(color: tokens.focus)
+                                      : BorderSide.none,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      '$ordinal',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: !enabled
+                                                ? tokens.disabledForeground
+                                                : isSelected
+                                                ? tokens.accent
+                                                : colors.onSurface,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    SizedBox(
+                                      width: 5,
+                                      height: 5,
+                                      child: (count(day) ?? 0) > 0
+                                          ? DecoratedBox(
+                                              key: ValueKey(
+                                                'history-day-marker-${AttendanceDate.calendarKey(day)}',
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: tokens.accent,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        );
+      },
     );
   }
 }

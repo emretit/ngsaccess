@@ -51,7 +51,6 @@ dependencies:
   go_router: ^17.5.0
 
   # Calendar widget
-  table_calendar: ^3.3.0
 
   # Charts (used by ProgressHeroCard and future history stats)
   fl_chart: ^1.2.0

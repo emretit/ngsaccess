@@ -97,9 +97,11 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
+      extendBody: false,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         top: false,
+        bottom: false,
         child: BranchVisibility(
           activeIndex: _routeVisible ? widget.navigationShell.currentIndex : -1,
           child: widget.navigationShell,

@@ -18,6 +18,7 @@ import '../screens/splash_screen.dart';
 import '../screens/visitor/visitor_screen.dart';
 import '../screens/requests/requests_screen.dart';
 import 'route_paths.dart';
+import 'qr_open_intent.dart';
 
 export 'route_paths.dart';
 
@@ -35,6 +36,14 @@ GoRouter buildRouter(
 }) {
   Widget screen(String path, BuildContext context, WidgetBuilder fallback) =>
       (screenBuilders[path] ?? fallback)(context);
+
+  QrOpenIntent? qrIntent(GoRouterState state) {
+    final intent = state.extra;
+    return intent is QrOpenIntent &&
+            intent.sessionEpoch == authProvider.sessionEpoch
+        ? intent
+        : null;
+  }
 
   return GoRouter(
     navigatorKey: GlobalKey<NavigatorState>(debugLabel: 'app-root'),
@@ -154,12 +163,14 @@ GoRouter buildRouter(
             routes: [
               GoRoute(
                 path: AppRoute.qr,
-                builder: (context, _) => Builder(
+                builder: (context, state) => Builder(
                   builder: (context) => screen(
                     AppRoute.qr,
                     context,
                     (_) => QRScanScreen(
                       isActive: BranchVisibility.isActive(context, 2),
+                      initialTab: qrIntent(state)?.tab ?? QrTab.code,
+                      scanRequestRevision: qrIntent(state)?.revision ?? 0,
                     ),
                   ),
                 ),

@@ -124,7 +124,7 @@ class BusinessError extends AppError {
             "Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin.",
           'REQUEST_PROJECT_MISSING' => "Çalışanın proje bilgisi bulunamadı",
           'REQUEST_NOTE_TOO_LONG' => "Not en fazla 500 karakter olabilir",
-          'REQUEST_DATE_INVALID' => "Geçerli bir tarih girin (YYYY-MM-DD)",
+          'REQUEST_DATE_INVALID' => "Geçerli bir tarih seçin.",
           'REQUEST_RANGE_INVALID' => "Bitiş tarihi başlangıçtan önce olamaz",
           'REQUEST_START_TOO_OLD' =>
             "İzin başlangıcı en fazla 30 gün geçmiş olabilir",
@@ -143,7 +143,7 @@ class BusinessError extends AppError {
           'CORRECTION_REASON_LENGTH' => "Gerekçe 5–300 karakter olmalı",
           'CORRECTION_TIMES_MISMATCH' =>
             "Düzeltme türüne uygun giriş ve çıkış saatlerini belirtin",
-          'CORRECTION_TIME_INVALID' => "Geçerli bir saat girin (HH:mm).",
+          'CORRECTION_TIME_INVALID' => "Geçerli bir saat seçin.",
           'CORRECTION_PENDING_EXISTS' =>
             "Bu gün için bekleyen bir düzeltme talebiniz var",
           'INVALID_CREDENTIALS' => 'E-posta veya şifre hatalı',

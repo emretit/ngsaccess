@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/attendance_date.dart';
@@ -14,16 +13,16 @@ import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/door_operation_provider.dart';
 import '../../models/device.dart';
+import '../../models/door_operation.dart';
 import '../../repositories/device_repository.dart';
 import '../../providers/preferred_device_provider.dart';
-import '../../router/app_router.dart';
-import '../../theme/app_theme.dart';
+import '../../router/route_paths.dart';
+import '../../router/qr_open_intent.dart';
+import '../../widgets/ui/ui.dart';
 import '../../widgets/brand_mark.dart';
 import '../../widgets/door_operation_recovery_dialog.dart';
 import '../../widgets/cards/attendance_status_card.dart';
-import '../../widgets/cards/quick_action_card.dart';
-import '../../widgets/cards/section_header.dart';
-import '../../widgets/responsive_card_grid.dart';
+import '../../widgets/cards/door_command_status_card.dart';
 import '../../widgets/responsive_container.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -91,30 +90,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffold(
+      brandedSystemBar: true,
+      consumeBottomInset: false,
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: SafeArea(
-            child: ResponsiveContainer(
-              maxWidth: AppSpacing.contentMaxWidth,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 24),
-                    _buildAttendanceStatusCard(),
-                    const SizedBox(height: 24),
-                    _buildQuickActions(),
-                    const SizedBox(height: 24),
-                    _buildMotivationalQuote(),
-                  ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(),
+              ResponsiveContainer(
+                maxWidth: AppSpacing.contentMaxWidth,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: _buildQuickActions(),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -123,138 +117,187 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildHeader() {
     final l10n = AppLocalizations.of(context);
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, _) {
-        final user = authProvider.currentUser;
-        final firstName = user?.firstName ?? l10n.homeGreetingFallback;
-        final localeTag = Localizations.localeOf(context).toLanguageTag();
-        final today = DateFormat(
-          'dd MMMM yyyy, EEEE',
-          localeTag,
-        ).format(AttendanceDate.businessTime(DateTime.now()));
-        final greeting = _getGreeting(l10n);
-
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              const BrandMark(size: 48),
-              const SizedBox(width: 14),
-
-              // Greeting and Date
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.homeGreetingLine(greeting, firstName),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      today,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+    final user = context.watch<AuthProvider>().currentUser;
+    final name = user == null
+        ? l10n.homeGreetingFallback
+        : '${user.firstName} ${user.lastName}'.trim();
+    final now = DateTime.now();
+    return AppBrandBand(
+      brandMark: const BrandMark.band(),
+      consumeTopInset: false,
+      title: l10n.homeGreetingLine(_getGreeting(l10n), name),
+      subtitle: user?.projectName,
+      trailing: user == null
+          ? null
+          : CircleAvatar(
+              radius: 16,
+              backgroundColor: AppUiTokens.of(context).bandAvatarBackground,
+              foregroundColor: AppUiTokens.of(context).onBand,
+              child: Text(
+                [
+                  if (user.firstName.isNotEmpty)
+                    user.firstName.characters.first,
+                  if (user.lastName.isNotEmpty) user.lastName.characters.first,
+                ].join(),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: AppUiTokens.of(context).onBand,
                 ),
               ),
-            ],
-          ),
-        );
-      },
+            ),
+      dateLabel: AppDateFormat(
+        locale: Localizations.localeOf(context),
+        now: now,
+      ).headingDate(now),
+      overlapChild: _buildAttendanceStatusCard(),
     );
   }
 
   Widget _buildAttendanceStatusCard() {
-    return Consumer<AttendanceProvider>(
-      builder: (context, attendanceProvider, _) {
-        final error = attendanceProvider.summaryError;
-        return AttendanceStatusCard(
-          status: attendanceProvider.attendanceStatus,
-          isLoading: attendanceProvider.isSummaryLoading,
-          hasLoaded: attendanceProvider.hasSummaryLoaded,
-          isStatusKnown: attendanceProvider.isTodayStatusKnown,
-          errorMessage: error == null ? null : localizeAppError(context, error),
-          updatedAt: attendanceProvider.summaryUpdatedAt,
-          onRetry: () => unawaited(_loadData()),
-          lastEntry: attendanceProvider.lastEntryToday,
-          lastExit: attendanceProvider.lastExitToday,
-          extraEntryCount: attendanceProvider.extraEntryMovementsToday,
-          extraExitCount: attendanceProvider.extraExitMovementsToday,
-          onScan: () => context.go(AppRoute.qr),
-        );
-      },
+    final attendance = context.watch<AttendanceProvider>();
+    final error = attendance.summaryError;
+    return AttendanceStatusCard(
+      status: attendance.attendanceStatus,
+      isLoading: attendance.isSummaryLoading,
+      hasLoaded: attendance.hasSummaryLoaded,
+      isStatusKnown: attendance.isTodayStatusKnown,
+      errorMessage: error == null ? null : localizeAppError(context, error),
+      updatedAt: attendance.summaryUpdatedAt,
+      onRetry: () => unawaited(_loadData()),
+      firstEntry: attendance.firstEntryToday,
+      firstEntryDoorName: _movementDoor(
+        attendance,
+        attendance.firstEntryToday,
+        entry: true,
+      ),
+      lastEntryDoorName: _movementDoor(
+        attendance,
+        attendance.lastEntryToday,
+        entry: true,
+      ),
+      lastExitDoorName: _movementDoor(
+        attendance,
+        attendance.lastExitToday,
+        entry: false,
+      ),
+      lastEntry: attendance.lastEntryToday,
+      lastExit: attendance.lastExitToday,
+      extraEntryCount: attendance.extraEntryMovementsToday,
+      extraExitCount: attendance.extraExitMovementsToday,
     );
+  }
+
+  String? _movementDoor(
+    AttendanceProvider attendance,
+    DateTime? time, {
+    required bool entry,
+  }) {
+    if (time == null) return null;
+    for (final movement in attendance.attendanceRecords) {
+      if (movement.granted &&
+          movement.accessTime.isAtSameMomentAs(time) &&
+          (entry ? movement.isEntry : movement.isExit) &&
+          movement.doorName.trim().isNotEmpty) {
+        return movement.doorName;
+      }
+    }
+    return null;
   }
 
   Widget _buildQuickActions() {
     final l10n = AppLocalizations.of(context);
+    final preferred = context.watch<PreferredDeviceProvider>();
+    final commands = context.watch<DoorOperationProvider>();
+    final auth = context.watch<AuthProvider>();
+    final preparing =
+        _preparingCommand && _preparationEpoch == auth.sessionEpoch;
+    final busy =
+        preparing ||
+        (!commands.hasUnresolvedOperation &&
+            (commands.isLoading || preferred.isSaving));
+    final uncertain =
+        commands.operation?.status == DoorOperationStatus.unknown ||
+        (commands.hasUnresolvedOperation &&
+            commands.operation == null &&
+            !commands.isLoading);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader(title: l10n.homeQuickActions),
+        AppPrimaryButton(
+          label: l10n.homeScanQr,
+          icon: Icons.qr_code_scanner,
+          onPressed: () => context.go(
+            AppRoute.qr,
+            extra: QrOpenIntent.requestScan(sessionEpoch: auth.sessionEpoch),
+          ),
+        ),
         const SizedBox(height: 12),
-        Consumer3<PreferredDeviceProvider, DoorOperationProvider, AuthProvider>(
-          builder: (context, preferred, commands, auth, _) {
-            final preparing =
-                _preparingCommand && _preparationEpoch == auth.sessionEpoch;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ResponsiveCardGrid(
-                  children: [
-                    QuickActionCard(
-                      icon: Icons.lock_open,
-                      label: l10n.quickActionUnlock,
-                      subtitle: preferred.deviceName,
-                      color: AppTheme.primaryBurgundy,
-                      isBusy:
-                          preparing ||
-                          (!commands.hasUnresolvedOperation &&
-                              (commands.isLoading || preferred.isSaving)),
-                      busyLabel: preparing && commands.isLoading
-                          ? l10n.homeCommandSending
-                          : l10n.homeDataLoading,
-                      onTap:
-                          !auth.isAuthenticated ||
-                              preparing ||
-                              (!commands.hasUnresolvedOperation &&
-                                  (commands.isLoading || preferred.isSaving))
-                          ? null
-                          : () => unawaited(
-                              _handleQuickUnlock(preferred, commands),
-                            ),
-                    ),
-                    QuickActionCard(
-                      icon: Icons.person_add_alt_1,
-                      label: l10n.quickActionVisitor,
-                      color: AppTheme.info,
-                      onTap: () => context.go(AppRoute.visitor),
-                    ),
-                    QuickActionCard(
-                      icon: Icons.assignment_outlined,
-                      label: l10n.requestsTitle,
-                      color: AppTheme.primaryBurgundy2,
-                      onTap: () => context.push(AppRoute.requests),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
+        if (commands.operation != null || commands.hasUnresolvedOperation) ...[
+          DoorCommandStatusCard(
+            operation: commands.operation,
+            hasUnresolvedOperation: commands.hasUnresolvedOperation,
+            isLoading: commands.isLoading,
+            isSending: preparing && commands.isLoading,
+            error: commands.error,
+            onCheckStatus: () => unawaited(_showRecovery(commands, auth)),
+            onRetrySameRequest: () => unawaited(_showRecovery(commands, auth)),
+          ),
+          const SizedBox(height: 12),
+        ],
+        AppListGroup(
+          children: [
+            AppListRow(
+              key: const Key('home-open-door'),
+              leadingIcon: Icons.door_front_door_outlined,
+              title: l10n.quickActionUnlock,
+              subtitle: uncertain
+                  ? l10n.homeCommandUnknown
+                  : busy
+                  ? (preparing && commands.isLoading
+                        ? l10n.homeCommandSending
+                        : l10n.homeDataLoading)
+                  : preferred.deviceName ?? l10n.homeChooseDoor,
+              enabled: auth.isAuthenticated && !busy,
+              showChevron: true,
+              onTap: () => unawaited(_handleQuickUnlock(preferred, commands)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        AppListGroup(
+          children: [
+            AppListRow(
+              leadingIcon: Icons.assignment_outlined,
+              title: l10n.requestsTitle,
+              showChevron: true,
+              onTap: () => context.push(AppRoute.requests),
+            ),
+            AppListRow(
+              leadingIcon: Icons.person_add_alt_1,
+              title: l10n.visitorAddButton,
+              showChevron: true,
+              onTap: () => context.go(AppRoute.visitor),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  Future<void> _showRecovery(
+    DoorOperationProvider commands,
+    AuthProvider auth,
+  ) async {
+    if (!auth.isAuthenticated || _recoveryOpen) return;
+    _recoveryOpen = true;
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (_) =>
+            DoorOperationRecoveryDialog(commands: commands, auth: auth),
+      );
+    } finally {
+      _recoveryOpen = false;
+    }
   }
 
   Future<void> _handleQuickUnlock(
@@ -267,24 +310,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!auth.isAuthenticated) return;
     if (_preparingCommand && _preparationEpoch == epoch) return;
     if (commands.hasUnresolvedOperation) {
-      if (_recoveryOpen) return;
-      _recoveryOpen = true;
-      try {
-        await showDialog<void>(
-          context: context,
-          builder: (_) =>
-              DoorOperationRecoveryDialog(commands: commands, auth: auth),
-        );
-      } finally {
-        _recoveryOpen = false;
-      }
+      await _showRecovery(commands, auth);
       return;
     }
     if (commands.isLoading || preferred.isSaving) {
       return;
     }
     if (!preferred.hasDevice) {
-      _showDeviceSelectionNotice(preferred.wasInvalidated);
+      if (preferred.wasInvalidated) {
+        _showDeviceSelectionNotice(true);
+      } else {
+        await context.push(AppRoute.selectDevice);
+      }
       return;
     }
     final generation = preferred.identityGeneration;
@@ -376,58 +413,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             if (mounted) context.go(AppRoute.profile);
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildMotivationalQuote() {
-    final l10n = AppLocalizations.of(context);
-    final quotes = <String>[
-      l10n.homeQuote1,
-      l10n.homeQuote2,
-      l10n.homeQuote3,
-      l10n.homeQuote4,
-      l10n.homeQuote5,
-      l10n.homeQuote6,
-      l10n.homeQuote7,
-      l10n.homeQuote8,
-    ];
-
-    final today = AttendanceDate.businessTime(DateTime.now());
-    final quoteIndex = today.day % quotes.length;
-    final quote = quotes[quoteIndex];
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(
-            color: Theme.of(context).colorScheme.primary,
-            width: 4,
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            quote,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              fontStyle: FontStyle.italic,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            l10n.homeQuoteOfTheDay,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-        ],
       ),
     );
   }

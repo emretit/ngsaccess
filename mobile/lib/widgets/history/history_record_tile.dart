@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/attendance_date.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/attendance.dart';
+import '../ui/ui.dart';
 
 enum HistoryAccessState { granted, denied, unknown }
 
@@ -22,7 +23,6 @@ class HistoryRecordTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final colors = Theme.of(context).colorScheme;
     final direction = switch (record.direction) {
       'entry' => l10n.historyEntryShort,
       'exit' => l10n.historyExitShort,
@@ -49,95 +49,20 @@ class HistoryRecordTile extends StatelessWidget {
     ).add_Hm().format(AttendanceDate.businessTime(record.timestamp));
     final status = access == null ? direction : '$access · $direction';
 
-    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-    final tone = accessState == HistoryAccessState.denied
-        ? colors.error
-        : accessState == HistoryAccessState.unknown
-        ? colors.onSurfaceVariant
-        : colors.primary;
     final time = DateFormat.Hm(
       Localizations.localeOf(context).toLanguageTag(),
     ).format(AttendanceDate.businessTime(record.timestamp));
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Semantics(
-        button: true,
-        label: '$deviceName, $timestamp, $status',
-        onTap: onTap,
-        excludeSemantics: true,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: tone.withValues(alpha: .08),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Icon(icon, color: tone, size: 18),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        status,
-                        style: TextStyle(
-                          color: accessState == HistoryAccessState.denied
-                              ? colors.error
-                              : colors.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        deviceName,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                      if (scale > 1.3) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          time,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (scale <= 1.3) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    time,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: colors.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return AppListRow(
+      leadingText: time,
+      leadingIcon: icon,
+      title: status,
+      subtitle: deviceName,
+      tone: accessState == HistoryAccessState.denied
+          ? AppStatusTone.danger
+          : null,
+      semanticLabel: '$deviceName, $timestamp, $status',
+      showChevron: true,
+      onTap: onTap,
     );
   }
 }

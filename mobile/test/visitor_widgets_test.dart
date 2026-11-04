@@ -9,6 +9,7 @@ import 'package:ngsplusapp/screens/visitor/visitor_screen.dart';
 import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:ngsplusapp/widgets/visitor/visitor_cards.dart';
 import 'package:ngsplusapp/widgets/visitor/visitor_detail.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
 
 import 'visitor_provider_test.dart'
     show FakeVisitorRepository, visitorFixture, visitorPage;
@@ -59,17 +60,17 @@ void main() {
       addTearDown(state.dispose);
       await state.refresh();
       await tester.pumpWidget(app(state));
-      expect(find.text('No visitor records yet'), findsOneWidget);
+      expect(find.text('No invitations yet'), findsOneWidget);
       expect(find.byType(VisitorSummaryCard), findsNothing);
       expect(find.byType(FloatingActionButton), findsNothing);
       repo.listResult = () => Future.error(const NetworkError());
       await tester.drag(find.byType(ListView), const Offset(0, 400));
       await tester.pumpAndSettle();
       expect(repo.listCalls, 2);
-      expect(find.text('Try Again'), findsOneWidget);
-      expect(find.text('No visitor records yet'), findsNothing);
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.text('No invitations yet'), findsNothing);
       repo.listResult = () async => visitorPage([visitorFixture('own')]);
-      await tester.tap(find.text('Try Again'));
+      await tester.tap(find.text('Try again'));
       await tester.pumpAndSettle();
       expect(find.text('Synthetic own'), findsOneWidget);
     },
@@ -96,11 +97,22 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Physical presence unknown'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(VisitorDetail),
+          matching: find.text('Physical presence unknown'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Edit'), findsNothing);
       await tester.tap(find.text('Cancel invitation'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Cancel invitation'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AppDialog),
+          matching: find.widgetWithText(OutlinedButton, 'Cancel invitation'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(repo.cancelCalls, 1);
       expect(
@@ -123,7 +135,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel invitation'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
     await tester.pumpAndSettle();
     expect(repo.cancelCalls, 0);
     expect(state.selected?.id, 'own');
@@ -158,7 +170,7 @@ void main() {
       addTearDown(state.dispose);
       await state.refresh();
       await tester.pumpWidget(app(state));
-      await tester.tap(find.byTooltip('Add Visitor'));
+      await tester.tap(find.byTooltip('Invite a visitor'));
       await tester.pumpAndSettle();
       final fields = find.byType(TextFormField);
       await tester.enterText(fields.at(0), 'Synthetic');
@@ -168,7 +180,7 @@ void main() {
       tester.testTextInput.hide();
       await tester.pump();
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Save'),
+        find.widgetWithText(FilledButton, 'Save invitation'),
         200,
         scrollable: find
             .descendant(
@@ -178,7 +190,7 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Save invitation'));
       await tester.pumpAndSettle();
       expect(repo.createCalls, 1);
       expect(
@@ -206,7 +218,7 @@ void main() {
       expect(repo.requests.first, repo.requests.last);
       expect(state.pendingCreate, isNull);
       expect(
-        find.text('Invitation record saved; operator activation is required.'),
+        find.text('Invitation saved. Approval is required.'),
         findsOneWidget,
       );
     },
@@ -227,10 +239,11 @@ void main() {
       await tester.pumpWidget(app(state));
       expect(
         find.text(
-          'These totals are lower bounds; the summary read limit was reached.',
+          'Some invitations could not be included; the actual total may be higher.',
         ),
         findsOneWidget,
       );
+      await tester.ensureVisible(find.byType(AppTextField));
       await tester.enterText(find.byType(TextField), 'IŞIL');
       await tester.pump(const Duration(milliseconds: 200));
       expect(repo.listCalls, 1);
@@ -271,12 +284,12 @@ void main() {
       tester.testTextInput.hide();
       await tester.pump();
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Save'),
+        find.widgetWithText(FilledButton, 'Save invitation'),
         150,
         scrollable: scrollable,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Save invitation'));
       await tester.pumpAndSettle();
       expect(repo.updatedDraft, isNotNull);
       expect(repo.updatedDraft?.toJson(), containsPair('visitorPhone', null));
@@ -292,7 +305,9 @@ void main() {
       addTearDown(state.dispose);
       await state.refresh();
       await tester.pumpWidget(app(state));
-      await tester.tap(find.byTooltip('Filter'));
+      await tester.tap(
+        find.byType(AppSelectField<({VisitorAccessStatus? status})>),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Access active'));
       await tester.pumpAndSettle();
@@ -328,14 +343,16 @@ void main() {
       addTearDown(state.dispose);
       await state.refresh();
       await tester.pumpWidget(app(state));
-      await tester.tap(find.byTooltip('Filter'));
+      await tester.tap(
+        find.byType(AppSelectField<({VisitorAccessStatus? status})>),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.text('Expired'));
       await tester.pumpAndSettle();
       expect(repo.filters.last.status, VisitorAccessStatus.expired);
       expect(find.text('All invitations'), findsOneWidget);
       expect(find.text('2'), findsOneWidget);
-      expect(find.text('No records found'), findsOneWidget);
+      expect(find.text('No matching invitations'), findsOneWidget);
       expect(find.text('Inside'), findsNothing);
     },
   );
@@ -352,7 +369,9 @@ void main() {
       final navTop = tester
           .getTopLeft(find.byKey(const Key('visitor-outer-nav')))
           .dy;
-      await tester.tap(find.byTooltip('Filter'));
+      await tester.tap(
+        find.byType(AppSelectField<({VisitorAccessStatus? status})>),
+      );
       await tester.pumpAndSettle();
       expect(
         tester.getRect(find.byType(BottomSheet)).bottom,
@@ -420,6 +439,16 @@ void main() {
           );
           await tester.tap(find.byTooltip(l10n.visitorAddButton));
           await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.text(l10n.visitorActivationHint),
+            250,
+            scrollable: find
+                .descendant(
+                  of: find.byType(Form),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
           expect(find.text(l10n.visitorActivationHint), findsOneWidget);
           expect(find.text(l10n.visitorPreRegistered), findsNothing);
           await tester.scrollUntilVisible(
@@ -441,9 +470,21 @@ void main() {
           await tester.pumpAndSettle();
           await tester.drag(find.byType(ListView), const Offset(0, 4000));
           await tester.pumpAndSettle();
-          await tester.tap(find.byTooltip(l10n.visitorFilterTitle));
+          await tester.ensureVisible(
+            find.byType(AppSelectField<({VisitorAccessStatus? status})>),
+          );
           await tester.pumpAndSettle();
-          expect(find.text(l10n.visitorAllStatuses), findsOneWidget);
+          await tester.tap(
+            find.byType(AppSelectField<({VisitorAccessStatus? status})>),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: find.byType(AppSheet),
+              matching: find.text(l10n.visitorAllStatuses),
+            ),
+            findsOneWidget,
+          );
           await tester.tap(find.byTooltip(l10n.commonClose));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);

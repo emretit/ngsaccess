@@ -15,8 +15,17 @@ import '../../providers/preferred_device_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../router/app_router.dart';
 import '../../widgets/responsive_container.dart';
+import '../../widgets/ui/ui.dart';
 
-enum _ProfilePage { details, notifications, help, security, about, privacy }
+enum _ProfilePage {
+  details,
+  notifications,
+  help,
+  security,
+  about,
+  privacy,
+  diagnostics,
+}
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.packageInfoLoader, this.diagnostics});
@@ -53,174 +62,155 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? user?.projectName?.trim()
         : null;
     final preferred = context.watch<PreferredDeviceProvider>();
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.profileTitle),
-        actions: [
-          IconButton(
-            tooltip: l10n.profileHelp,
-            icon: const Icon(Icons.help_outline),
-            onPressed: _showHelp,
-          ),
-        ],
-      ),
+    return AppScaffold(
+      header: AppPageHeader(title: l10n.profileTitle),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         child: ResponsiveContainer(
           maxWidth: AppSpacing.contentMaxWidth,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: SizedBox(
-                    width: double.infinity,
+              Row(
+                children: [
+                  ExcludeSemantics(
+                    child: CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppUiTokens.of(context).subtle,
+                      foregroundColor: colors.onSurface,
+                      child: Text(
+                        initial == 'i' &&
+                                Localizations.localeOf(context).languageCode ==
+                                    'tr'
+                            ? 'İ'
+                            : initial.toUpperCase(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ExcludeSemantics(
-                          child: CircleAvatar(
-                            radius: 42,
-                            backgroundColor: colors.primaryContainer,
-                            foregroundColor: colors.onPrimaryContainer,
-                            child: Text(
-                              initial == 'i' &&
-                                      Localizations.localeOf(
-                                            context,
-                                          ).languageCode ==
-                                          'tr'
-                                  ? 'İ'
-                                  : initial.toUpperCase(),
-                              style: Theme.of(context).textTheme.headlineLarge
-                                  ?.copyWith(color: colors.onPrimaryContainer),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         Text(
                           fullName.isEmpty
                               ? l10n.homeGreetingFallback
                               : fullName,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineSmall,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        const SizedBox(height: 8),
                         Text(
                           user?.email.isNotEmpty == true
                               ? user?.email ?? ''
                               : l10n.profileFallbackEmail,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: colors.onSurfaceVariant),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          l10n.profileProject,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.labelMedium
+                          style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: colors.onSurfaceVariant),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          projectName?.isNotEmpty == true
-                              ? projectName ?? ''
-                              : l10n.profileProjectUnavailable,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.badge_outlined),
-                          label: Text(l10n.profileEditButton),
-                          onPressed: () => _openContent(_ProfilePage.details),
+                        Semantics(
+                          label: l10n.profileProject,
+                          child: Text(
+                            projectName?.isNotEmpty == true
+                                ? projectName ?? ''
+                                : l10n.profileProjectUnavailable,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colors.onSurfaceVariant),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Card(
-                child: Column(
-                  children: [
-                    Consumer<ThemeProvider>(
-                      builder: (context, theme, _) => _tile(
-                        Icons.palette_outlined,
-                        l10n.profileTheme,
-                        _themeLabel(l10n, theme.themeMode),
-                        _showTheme,
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    Consumer<LocaleProvider>(
-                      builder: (context, locale, _) => _tile(
-                        Icons.language,
-                        l10n.profileLanguage,
-                        _localeLabel(l10n, locale.locale?.languageCode),
-                        _showLanguage,
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    _tile(
-                      Icons.door_front_door_outlined,
-                      l10n.profilePreferredDoor,
-                      preferred.hasDevice
-                          ? preferred.deviceName ?? l10n.historyUnknownDevice
-                          : l10n.profilePreferredDoorEmpty,
-                      () => context.push(AppRoute.selectDevice),
-                    ),
-                    const Divider(height: 1),
-                    _tile(
-                      Icons.security_outlined,
-                      l10n.profileSecurity,
-                      l10n.profileSecuritySubtitle,
-                      _showSecurity,
-                    ),
-                    const Divider(height: 1),
-                    _tile(
-                      Icons.notifications_outlined,
-                      l10n.profileNotifications,
-                      l10n.profileNotificationsSubtitle,
-                      () => _openContent(_ProfilePage.notifications),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 24),
+              AppListGroup(
+                title: l10n.profileAccountSection,
+                children: [
+                  AppListRow(
+                    leadingIcon: Icons.badge_outlined,
+                    title: l10n.profileEditButton,
+                    showChevron: true,
+                    onTap: () => _openContent(_ProfilePage.details),
+                  ),
+                  AppListRow(
+                    leadingIcon: Icons.security_outlined,
+                    title: l10n.profileChangePassword,
+                    showChevron: true,
+                    onTap: _showSecurity,
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Card(
-                child: Column(
-                  children: [
-                    _tile(
-                      Icons.help_outline,
-                      l10n.profileHelp,
-                      l10n.profileHelpSubtitle,
-                      _showHelp,
+              const SizedBox(height: 24),
+              AppListGroup(
+                title: l10n.profilePreferencesSection,
+                children: [
+                  Consumer<ThemeProvider>(
+                    builder: (context, theme, _) => _tile(
+                      Icons.palette_outlined,
+                      l10n.profileTheme,
+                      _themeLabel(l10n, theme.themeMode),
+                      _showTheme,
                     ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.info_outline),
-                      title: Text(l10n.profileAboutApp),
-                      subtitle: _VersionLabel(info: _packageInfo),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _openContent(_ProfilePage.about),
+                  ),
+                  Consumer<LocaleProvider>(
+                    builder: (context, locale, _) => _tile(
+                      Icons.language,
+                      l10n.profileLanguage,
+                      _localeLabel(l10n, locale.locale?.languageCode),
+                      _showLanguage,
                     ),
-                    const Divider(height: 1),
-                    _tile(
-                      Icons.privacy_tip_outlined,
-                      l10n.profilePrivacy,
-                      l10n.profilePrivacySubtitle,
-                      () => _openContent(_ProfilePage.privacy),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: Icon(Icons.logout, color: colors.error),
-                      title: Text(
-                        l10n.profileLogout,
-                        style: TextStyle(color: colors.error),
-                      ),
-                      subtitle: Text(l10n.profileLogoutSubtitle),
-                      onTap: _showLogout,
-                    ),
-                  ],
-                ),
+                  ),
+                  _tile(
+                    Icons.door_front_door_outlined,
+                    l10n.profilePreferredDoor,
+                    preferred.hasDevice
+                        ? preferred.deviceName ?? l10n.historyUnknownDevice
+                        : l10n.profilePreferredDoorEmpty,
+                    () => context.push(AppRoute.selectDevice),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              AppListGroup(
+                title: l10n.profileSupportSection,
+                children: [
+                  _tile(
+                    Icons.notifications_outlined,
+                    l10n.profileNotifications,
+                    l10n.profileNotificationsSubtitle,
+                    () => _openContent(_ProfilePage.notifications),
+                  ),
+                  _tile(
+                    Icons.help_outline,
+                    l10n.profileHelp,
+                    l10n.profileHelpSubtitle,
+                    _showHelp,
+                  ),
+                  AppListRow(
+                    leadingIcon: Icons.assignment_outlined,
+                    title: l10n.profileDiagnosticsTitle,
+                    showChevron: true,
+                    onTap: () => _openContent(_ProfilePage.diagnostics),
+                  ),
+                  AppListRow(
+                    leadingIcon: Icons.info_outline,
+                    title: l10n.profileAboutApp,
+                    trailing: _VersionLabel(info: _packageInfo),
+                    showChevron: true,
+                    onTap: () => _openContent(_ProfilePage.about),
+                  ),
+                  _tile(
+                    Icons.privacy_tip_outlined,
+                    l10n.profilePrivacy,
+                    l10n.profilePrivacySubtitle,
+                    () => _openContent(_ProfilePage.privacy),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              AppListRow(
+                title: l10n.profileLogout,
+                leadingIcon: Icons.logout,
+                tone: AppStatusTone.danger,
+                onTap: _showLogout,
               ),
             ],
           ),
@@ -234,11 +224,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String title,
     String subtitle,
     VoidCallback onTap,
-  ) => ListTile(
-    leading: Icon(icon),
-    title: Text(title),
-    subtitle: Text(subtitle),
-    trailing: const Icon(Icons.chevron_right),
+  ) => AppListRow(
+    leadingIcon: icon,
+    title: title,
+    subtitle: subtitle,
+    showChevron: true,
     onTap: onTap,
   );
 
@@ -271,60 +261,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
   };
 
   void _showTheme() {
-    showDialog<void>(
+    showAppSheet<void>(
       context: context,
-      builder: (dialogContext) => Consumer<ThemeProvider>(
+      builder: (sheetContext) => Consumer<ThemeProvider>(
         builder: (context, provider, _) {
           final l10n = AppLocalizations.of(context);
-          return AlertDialog(
-            title: Text(l10n.profileTheme),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (provider.isSaving) const LinearProgressIndicator(),
-                  RadioGroup<ThemeMode>(
-                    groupValue: provider.themeMode,
-                    onChanged: (mode) async {
-                      if (mode == null || provider.isSaving) return;
-                      final saved = await provider.setThemeMode(mode);
-                      if (saved && dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final mode in ThemeMode.values)
-                          RadioListTile<ThemeMode>(
-                            value: mode,
-                            title: Text(_themeLabel(l10n, mode)),
-                            enabled: !provider.isSaving,
+          return AppSheet(
+            title: l10n.profileTheme,
+            busy: provider.isSaving,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppListGroup(
+                  children: [
+                    for (final mode in ThemeMode.values)
+                      AppListRow(
+                        title: _themeLabel(l10n, mode),
+                        selected: provider.themeMode == mode,
+                        leadingIcon: switch (mode) {
+                          ThemeMode.system => Icons.phone_android_outlined,
+                          ThemeMode.light => Icons.light_mode_outlined,
+                          ThemeMode.dark => Icons.dark_mode_outlined,
+                        },
+                        trailing: ExcludeSemantics(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Icon(
+                              provider.themeMode == mode
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              color: provider.themeMode == mode
+                                  ? AppUiTokens.of(context).accent
+                                  : Theme.of(context).colorScheme.outline,
+                            ),
                           ),
-                      ],
-                    ),
-                  ),
-                  if (provider.error != null)
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        l10n.preferenceSaveFailed,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
                         ),
+                        enabled: !provider.isSaving,
+                        onTap: () async {
+                          if (provider.isSaving) return;
+                          final saved = await provider.setThemeMode(mode);
+                          if (saved && sheetContext.mounted) {
+                            Navigator.of(sheetContext).pop();
+                          }
+                        },
                       ),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+                if (provider.error != null)
+                  AppDataNotice(
+                    message: l10n.preferenceSaveFailed,
+                    tone: AppStatusTone.danger,
+                  ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: provider.isSaving
-                    ? null
-                    : () => Navigator.of(dialogContext).pop(),
-                child: Text(l10n.commonClose),
-              ),
-            ],
           );
         },
       ),
@@ -332,63 +321,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showLanguage() {
-    showDialog<void>(
+    showAppSheet<void>(
       context: context,
-      builder: (dialogContext) => Consumer<LocaleProvider>(
+      builder: (sheetContext) => Consumer<LocaleProvider>(
         builder: (context, provider, _) {
           final l10n = AppLocalizations.of(context);
-          return AlertDialog(
-            title: Text(l10n.profileLanguage),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(l10n.profileLanguageScope),
-                  if (provider.isSaving) const LinearProgressIndicator(),
-                  RadioGroup<String>(
-                    groupValue: provider.locale?.languageCode ?? 'system',
-                    onChanged: (code) async {
-                      if (code == null || provider.isSaving) return;
-                      final saved = await provider.setLocale(
-                        code == 'system' ? null : Locale(code),
-                      );
-                      if (saved && dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final code in ['system', 'tr', 'en'])
-                          RadioListTile<String>(
-                            value: code,
-                            title: Text(_localeLabel(l10n, code)),
-                            enabled: !provider.isSaving,
+          return AppSheet(
+            title: l10n.profileLanguage,
+            busy: provider.isSaving,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(l10n.profileLanguageScope),
+                const SizedBox(height: 12),
+                AppListGroup(
+                  children: [
+                    for (final code in ['system', 'tr', 'en'])
+                      AppListRow(
+                        title: _localeLabel(l10n, code),
+                        selected:
+                            (provider.locale?.languageCode ?? 'system') == code,
+                        leadingIcon: Icons.language,
+                        trailing: ExcludeSemantics(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Icon(
+                              (provider.locale?.languageCode ?? 'system') ==
+                                      code
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                              color:
+                                  (provider.locale?.languageCode ?? 'system') ==
+                                      code
+                                  ? AppUiTokens.of(context).accent
+                                  : Theme.of(context).colorScheme.outline,
+                            ),
                           ),
-                      ],
-                    ),
-                  ),
-                  if (provider.error != null)
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        l10n.preferenceSaveFailed,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
                         ),
+                        enabled: !provider.isSaving,
+                        onTap: () async {
+                          if (provider.isSaving) return;
+                          final saved = await provider.setLocale(
+                            code == 'system' ? null : Locale(code),
+                          );
+                          if (saved && sheetContext.mounted) {
+                            Navigator.of(sheetContext).pop();
+                          }
+                        },
                       ),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+                if (provider.error != null)
+                  AppDataNotice(
+                    message: l10n.preferenceSaveFailed,
+                    tone: AppStatusTone.danger,
+                  ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: provider.isSaving
-                    ? null
-                    : () => Navigator.of(dialogContext).pop(),
-                child: Text(l10n.commonClose),
-              ),
-            ],
           );
         },
       ),
@@ -400,25 +389,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final auth = context.read<AuthProvider>();
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.profileLogoutConfirmTitle),
-        content: Text(l10n.profileLogoutConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.commonCancel),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(dialogContext).pop();
-              await auth.signOut();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text(l10n.profileLogout),
-          ),
-        ],
+      builder: (dialogContext) => AppDialog(
+        title: l10n.profileLogoutConfirmTitle,
+        body: Text(l10n.profileLogoutConfirmBody),
+        cancelLabel: l10n.commonCancel,
+        confirmLabel: l10n.profileLogout,
+        destructive: true,
+        onCancel: () => Navigator.of(dialogContext).pop(),
+        onConfirm: () async {
+          Navigator.of(dialogContext).pop();
+          await auth.signOut();
+        },
       ),
     );
   }
@@ -459,6 +440,12 @@ class _ProfileContentScreen extends StatelessWidget {
         l10n.profileNotifications,
         <Widget>[Text(l10n.profileNotificationsDialogBody)],
       ),
+      _ProfilePage.diagnostics => (
+        l10n.profileDiagnosticsTitle,
+        <Widget>[
+          _SupportDiagnostics(diagnostics: diagnostics, showTitle: false),
+        ],
+      ),
       _ProfilePage.help => (
         l10n.profileHelpDialogTitle,
         <Widget>[
@@ -468,7 +455,7 @@ class _ProfileContentScreen extends StatelessWidget {
         ],
       ),
       _ProfilePage.security => (
-        l10n.profileSecurityDialogTitle,
+        l10n.profileChangePassword,
         <Widget>[
           Text(l10n.profileSecurityDialogBody),
           const SizedBox(height: 16),
@@ -492,18 +479,16 @@ class _ProfileContentScreen extends StatelessWidget {
         <Widget>[Text(l10n.profilePrivacyDialogBody)],
       ),
     };
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ResponsiveContainer(
-            maxWidth: AppSpacing.contentMaxWidth,
-            child: SelectionArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: children,
-              ),
+    return AppScaffold(
+      header: AppPageHeader(title: title, showBack: true),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: ResponsiveContainer(
+          maxWidth: AppSpacing.contentMaxWidth,
+          child: SelectionArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
             ),
           ),
         ),
@@ -513,8 +498,9 @@ class _ProfileContentScreen extends StatelessWidget {
 }
 
 class _SupportDiagnostics extends StatefulWidget {
-  const _SupportDiagnostics({required this.diagnostics});
+  const _SupportDiagnostics({required this.diagnostics, this.showTitle = true});
   final SafeDiagnostics diagnostics;
+  final bool showTitle;
 
   @override
   State<_SupportDiagnostics> createState() => _SupportDiagnosticsState();
@@ -567,11 +553,13 @@ class _SupportDiagnosticsState extends State<_SupportDiagnostics> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          l10n.profileDiagnosticsTitle,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 12),
+        if (widget.showTitle) ...[
+          Text(
+            l10n.profileDiagnosticsTitle,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+        ],
         Text(l10n.profileDiagnosticsBody),
         const SizedBox(height: 12),
         if (widget.diagnostics.events.isEmpty)
@@ -581,16 +569,18 @@ class _SupportDiagnosticsState extends State<_SupportDiagnostics> {
           Semantics(liveRegion: true, child: Text(feedback)),
         ],
         const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _copying ? null : _copy,
-          icon: const Icon(Icons.copy_outlined),
-          label: Text(l10n.profileDiagnosticsCopy),
+        AppPrimaryButton(
+          onPressed: _copy,
+          busy: _copying,
+          icon: Icons.copy_outlined,
+          label: l10n.profileDiagnosticsCopy,
         ),
         const SizedBox(height: 8),
-        OutlinedButton.icon(
+        AppSecondaryButton(
+          expanded: true,
           onPressed: _copying ? null : _clear,
-          icon: const Icon(Icons.delete_outline),
-          label: Text(l10n.profileDiagnosticsClear),
+          icon: Icons.delete_outline,
+          label: l10n.profileDiagnosticsClear,
         ),
       ],
     );
@@ -660,36 +650,33 @@ class _ChangePasswordFormState extends State<_ChangePasswordForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              l10n.profileChangePassword,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
             Text(l10n.profilePasswordRules),
             const SizedBox(height: 16),
-            TextFormField(
+            AppTextField(
               controller: _current,
               enabled: !busy,
               obscureText: !_showPasswords,
               autocorrect: false,
               enableSuggestions: false,
               autofillHints: const [AutofillHints.password],
-              decoration: InputDecoration(
-                labelText: l10n.profileCurrentPassword,
-              ),
+              label: l10n.profileCurrentPassword,
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              errorMaxLines: 4,
               validator: (value) => value == null || value.isEmpty
                   ? l10n.profilePasswordRequired
                   : null,
             ),
             const SizedBox(height: 16),
-            TextFormField(
+            AppTextField(
               controller: _next,
               enabled: !busy,
               obscureText: !_showPasswords,
               autocorrect: false,
               enableSuggestions: false,
               autofillHints: const [AutofillHints.newPassword],
-              decoration: InputDecoration(labelText: l10n.profileNewPassword),
+              label: l10n.profileNewPassword,
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              errorMaxLines: 4,
               validator: (value) {
                 if (value == null ||
                     !isAcceptableNewPassword(value, current: _current.text)) {
@@ -699,16 +686,17 @@ class _ChangePasswordFormState extends State<_ChangePasswordForm> {
               },
             ),
             const SizedBox(height: 16),
-            TextFormField(
+            AppTextField(
               controller: _repeat,
               enabled: !busy,
               obscureText: !_showPasswords,
               autocorrect: false,
               enableSuggestions: false,
               autofillHints: const [AutofillHints.newPassword],
-              decoration: InputDecoration(
-                labelText: l10n.profileRepeatPassword,
-              ),
+              label: l10n.profileRepeatPassword,
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              errorMaxLines: 4,
+              textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _submit(),
               validator: (value) =>
                   value != _next.text || value == null || value.isEmpty
@@ -716,33 +704,25 @@ class _ChangePasswordFormState extends State<_ChangePasswordForm> {
                   : null,
             ),
             const SizedBox(height: 8),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
+            AppCheckboxRow(
+              label: l10n.loginShowPassword,
               value: _showPasswords,
               onChanged: busy
                   ? null
                   : (value) => setState(() => _showPasswords = value ?? false),
-              title: Text(l10n.loginShowPassword),
             ),
             if (error != null)
-              Semantics(
-                liveRegion: true,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    localizeAppError(context, error),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
+              AppDataNotice(
+                message: localizeAppError(context, error),
+                tone: AppStatusTone.danger,
               ),
-            if (busy) const LinearProgressIndicator(),
             const SizedBox(height: 12),
-            FilledButton(
-              onPressed: busy ? null : _submit,
-              child: Text(l10n.profileChangePassword),
+            AppFormActionBar(
+              primaryAction: AppPrimaryButton(
+                label: l10n.profileChangePassword,
+                busy: busy,
+                onPressed: _submit,
+              ),
             ),
           ],
         ),

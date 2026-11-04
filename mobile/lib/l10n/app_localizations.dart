@@ -104,24 +104,6 @@ abstract class AppLocalizations {
   /// **'NGS Plus'**
   String get appName;
 
-  /// No description provided for @appTagline.
-  ///
-  /// In tr, this message translates to:
-  /// **'Yoklama Takip Sistemi'**
-  String get appTagline;
-
-  /// No description provided for @pdksTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'PDKS Sistemi'**
-  String get pdksTitle;
-
-  /// No description provided for @pdksSubtitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Personel Devam Kontrol Sistemi'**
-  String get pdksSubtitle;
-
   /// No description provided for @commonOk.
   ///
   /// In tr, this message translates to:
@@ -143,32 +125,8 @@ abstract class AppLocalizations {
   /// No description provided for @commonRetry.
   ///
   /// In tr, this message translates to:
-  /// **'Tekrar Dene'**
+  /// **'Yeniden dene'**
   String get commonRetry;
-
-  /// No description provided for @commonError.
-  ///
-  /// In tr, this message translates to:
-  /// **'Hata'**
-  String get commonError;
-
-  /// No description provided for @commonSuccess.
-  ///
-  /// In tr, this message translates to:
-  /// **'Başarılı'**
-  String get commonSuccess;
-
-  /// No description provided for @commonAdd.
-  ///
-  /// In tr, this message translates to:
-  /// **'Ekle'**
-  String get commonAdd;
-
-  /// No description provided for @comingSoon.
-  ///
-  /// In tr, this message translates to:
-  /// **'Yakında eklenecek.'**
-  String get comingSoon;
 
   /// No description provided for @navHome.
   ///
@@ -200,17 +158,23 @@ abstract class AppLocalizations {
   /// **'Hoş geldiniz!'**
   String get loginWelcomeTitle;
 
-  /// No description provided for @loginTitle.
+  /// No description provided for @pdksSubtitle.
   ///
   /// In tr, this message translates to:
-  /// **'Giriş Yap'**
-  String get loginTitle;
+  /// **'Personel Devam Kontrol Sistemi'**
+  String get pdksSubtitle;
 
   /// No description provided for @loginPrompt.
   ///
   /// In tr, this message translates to:
   /// **'PDKS sistemine giriş yapmak için bilgilerinizi giriniz'**
   String get loginPrompt;
+
+  /// No description provided for @loginTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Giriş yap'**
+  String get loginTitle;
 
   /// No description provided for @loginEmailLabel.
   ///
@@ -248,65 +212,11 @@ abstract class AppLocalizations {
   /// **'Şifre en az 6 karakter olmalı'**
   String get loginPasswordTooShort;
 
-  /// No description provided for @loginRememberMe.
-  ///
-  /// In tr, this message translates to:
-  /// **'Beni Hatırla'**
-  String get loginRememberMe;
-
   /// No description provided for @loginForgotPassword.
   ///
   /// In tr, this message translates to:
-  /// **'Şifremi unuttum'**
+  /// **'Şifre yardımı'**
   String get loginForgotPassword;
-
-  /// No description provided for @forgotPasswordTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Şifre Sıfırla'**
-  String get forgotPasswordTitle;
-
-  /// No description provided for @forgotPasswordHeadline.
-  ///
-  /// In tr, this message translates to:
-  /// **'Şifrenizi mi unuttunuz?'**
-  String get forgotPasswordHeadline;
-
-  /// No description provided for @forgotPasswordPrompt.
-  ///
-  /// In tr, this message translates to:
-  /// **'E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.'**
-  String get forgotPasswordPrompt;
-
-  /// No description provided for @forgotPasswordSendButton.
-  ///
-  /// In tr, this message translates to:
-  /// **'Sıfırlama Bağlantısı Gönder'**
-  String get forgotPasswordSendButton;
-
-  /// No description provided for @forgotPasswordBackToLogin.
-  ///
-  /// In tr, this message translates to:
-  /// **'Giriş sayfasına dön'**
-  String get forgotPasswordBackToLogin;
-
-  /// No description provided for @forgotPasswordSuccessTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'E-posta Gönderildi!'**
-  String get forgotPasswordSuccessTitle;
-
-  /// No description provided for @forgotPasswordSuccessBody.
-  ///
-  /// In tr, this message translates to:
-  /// **'{email} adresine şifre sıfırlama bağlantısı gönderildi. E-postanızı kontrol edin.'**
-  String forgotPasswordSuccessBody(String email);
-
-  /// No description provided for @forgotPasswordSuccessButton.
-  ///
-  /// In tr, this message translates to:
-  /// **'Giriş Sayfasına Dön'**
-  String get forgotPasswordSuccessButton;
 
   /// No description provided for @homeGreetingMorning.
   ///
@@ -335,26 +245,8 @@ abstract class AppLocalizations {
   /// No description provided for @homeGreetingLine.
   ///
   /// In tr, this message translates to:
-  /// **'{greeting}, {name}!'**
+  /// **'{greeting}, {name}'**
   String homeGreetingLine(String greeting, String name);
-
-  /// No description provided for @homeAttendanceStatus.
-  ///
-  /// In tr, this message translates to:
-  /// **'Yoklama Durumu'**
-  String get homeAttendanceStatus;
-
-  /// No description provided for @homeScanCheckIn.
-  ///
-  /// In tr, this message translates to:
-  /// **'QR Kod Tara - Giriş Yap'**
-  String get homeScanCheckIn;
-
-  /// No description provided for @homeScanCheckOut.
-  ///
-  /// In tr, this message translates to:
-  /// **'QR Kod Tara - Çıkış Yap'**
-  String get homeScanCheckOut;
 
   /// No description provided for @homeStatusInside.
   ///
@@ -365,38 +257,38 @@ abstract class AppLocalizations {
   /// No description provided for @homeStatusOut.
   ///
   /// In tr, this message translates to:
-  /// **'Çıktı'**
+  /// **'Dışarıda'**
   String get homeStatusOut;
 
   /// No description provided for @homeStatusNone.
   ///
   /// In tr, this message translates to:
-  /// **'Henüz Yok'**
+  /// **'Bugün kayıt yok'**
   String get homeStatusNone;
 
   /// No description provided for @homeAttendanceEntryRow.
   ///
   /// In tr, this message translates to:
-  /// **'Son Giriş'**
+  /// **'Son giriş'**
   String get homeAttendanceEntryRow;
 
   /// No description provided for @homeAttendanceExitRow.
   ///
   /// In tr, this message translates to:
-  /// **'Son Çıkış'**
+  /// **'Son çıkış'**
   String get homeAttendanceExitRow;
 
-  /// Localized record count; English singular/plural, Turkish number followed by noun.
+  /// Additional entries today beyond the last entry shown.
   ///
   /// In tr, this message translates to:
-  /// **'+{count} hareket'**
-  String homeExtraMovements(int count);
+  /// **'+{count} giriş daha'**
+  String homeExtraEntries(int count);
 
-  /// No description provided for @homeScanCheckInAgain.
+  /// Additional exits today beyond the last exit shown.
   ///
   /// In tr, this message translates to:
-  /// **'QR Kod Tara - Tekrar Giriş'**
-  String get homeScanCheckInAgain;
+  /// **'+{count} çıkış daha'**
+  String homeExtraExits(int count);
 
   /// No description provided for @homeAttendanceTimeEmpty.
   ///
@@ -404,95 +296,29 @@ abstract class AppLocalizations {
   /// **'—'**
   String get homeAttendanceTimeEmpty;
 
-  /// No description provided for @homeMonthSummary.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bu Ayki Özet'**
-  String get homeMonthSummary;
-
-  /// No description provided for @homeStatTotalDays.
-  ///
-  /// In tr, this message translates to:
-  /// **'Toplam Gün'**
-  String get homeStatTotalDays;
-
-  /// No description provided for @homeStatDaysPresent.
-  ///
-  /// In tr, this message translates to:
-  /// **'Mevcut Günler'**
-  String get homeStatDaysPresent;
-
-  /// No description provided for @homeStatTimesLate.
-  ///
-  /// In tr, this message translates to:
-  /// **'Geç Kalma'**
-  String get homeStatTimesLate;
-
-  /// No description provided for @homeProgressLabel.
-  ///
-  /// In tr, this message translates to:
-  /// **'{present} / {total} gün katıldın'**
-  String homeProgressLabel(int present, int total);
-
-  /// No description provided for @homeQuoteOfTheDay.
-  ///
-  /// In tr, this message translates to:
-  /// **'💫 Günün Sözü'**
-  String get homeQuoteOfTheDay;
-
-  /// No description provided for @homeQuote1.
-  ///
-  /// In tr, this message translates to:
-  /// **'Başarı, hazırlık ile fırsatın buluştuğu andır.'**
-  String get homeQuote1;
-
-  /// No description provided for @homeQuote2.
-  ///
-  /// In tr, this message translates to:
-  /// **'Her yeni gün, yeni bir başlangıçtır.'**
-  String get homeQuote2;
-
-  /// No description provided for @homeQuote3.
-  ///
-  /// In tr, this message translates to:
-  /// **'Disiplin, özgürlüğün köprüsüdür.'**
-  String get homeQuote3;
-
-  /// No description provided for @homeQuote4.
-  ///
-  /// In tr, this message translates to:
-  /// **'Küçük adımlar büyük değişimler yaratır.'**
-  String get homeQuote4;
-
-  /// No description provided for @homeQuote5.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bugün dün düşündüğünüz yarındır.'**
-  String get homeQuote5;
-
-  /// No description provided for @homeQuote6.
-  ///
-  /// In tr, this message translates to:
-  /// **'Zaman en değerli hazinedir, onu akıllıca kullan.'**
-  String get homeQuote6;
-
-  /// No description provided for @homeQuote7.
-  ///
-  /// In tr, this message translates to:
-  /// **'İyi alışkanlıklar, başarının anahtarıdır.'**
-  String get homeQuote7;
-
-  /// No description provided for @homeQuote8.
-  ///
-  /// In tr, this message translates to:
-  /// **'Her gün kendini geliştirme fırsatıdır.'**
-  String get homeQuote8;
-
   /// No description provided for @profileTitle.
   ///
   /// In tr, this message translates to:
   /// **'Profil'**
   String get profileTitle;
+
+  /// No description provided for @profileAccountSection.
+  ///
+  /// In tr, this message translates to:
+  /// **'Hesap'**
+  String get profileAccountSection;
+
+  /// No description provided for @profilePreferencesSection.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tercihler'**
+  String get profilePreferencesSection;
+
+  /// No description provided for @profileSupportSection.
+  ///
+  /// In tr, this message translates to:
+  /// **'Destek'**
+  String get profileSupportSection;
 
   /// No description provided for @profileEditButton.
   ///
@@ -518,41 +344,11 @@ abstract class AppLocalizations {
   /// **'Güncellemeler ve kullanım bilgisi'**
   String get profileNotificationsSubtitle;
 
-  /// No description provided for @profileSecurity.
-  ///
-  /// In tr, this message translates to:
-  /// **'Güvenlik'**
-  String get profileSecurity;
-
-  /// No description provided for @profileSecuritySubtitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Şifre değiştirme ve kurtarma'**
-  String get profileSecuritySubtitle;
-
   /// No description provided for @profileTheme.
   ///
   /// In tr, this message translates to:
   /// **'Tema'**
   String get profileTheme;
-
-  /// No description provided for @profileThemeDark.
-  ///
-  /// In tr, this message translates to:
-  /// **'Koyu tema aktif'**
-  String get profileThemeDark;
-
-  /// No description provided for @profileThemeLight.
-  ///
-  /// In tr, this message translates to:
-  /// **'Açık tema aktif'**
-  String get profileThemeLight;
-
-  /// No description provided for @profileThemeSystem.
-  ///
-  /// In tr, this message translates to:
-  /// **'Sistem ayarına göre'**
-  String get profileThemeSystem;
 
   /// No description provided for @profileThemeModeLight.
   ///
@@ -593,7 +389,7 @@ abstract class AppLocalizations {
   /// No description provided for @profilePreferredDoor.
   ///
   /// In tr, this message translates to:
-  /// **'Hızlı Erişim Kapısı'**
+  /// **'Hızlı erişim kapısı'**
   String get profilePreferredDoor;
 
   /// No description provided for @profilePreferredDoorEmpty.
@@ -602,29 +398,11 @@ abstract class AppLocalizations {
   /// **'Seçilmedi'**
   String get profilePreferredDoorEmpty;
 
-  /// No description provided for @homeQuickActions.
-  ///
-  /// In tr, this message translates to:
-  /// **'Hızlı İşlemler'**
-  String get homeQuickActions;
-
   /// No description provided for @quickActionUnlock.
   ///
   /// In tr, this message translates to:
-  /// **'Kapıyı Aç'**
+  /// **'Kapıyı aç'**
   String get quickActionUnlock;
-
-  /// No description provided for @quickActionVisitor.
-  ///
-  /// In tr, this message translates to:
-  /// **'Ziyaretçi'**
-  String get quickActionVisitor;
-
-  /// No description provided for @quickActionHistory.
-  ///
-  /// In tr, this message translates to:
-  /// **'Geçmiş'**
-  String get quickActionHistory;
 
   /// No description provided for @quickActionProfile.
   ///
@@ -638,12 +416,6 @@ abstract class AppLocalizations {
   /// **'Önce Profil\'den hızlı erişim kapısını seç'**
   String get unlockNoDeviceSelected;
 
-  /// No description provided for @unlockGranted.
-  ///
-  /// In tr, this message translates to:
-  /// **'Erişim Verildi'**
-  String get unlockGranted;
-
   /// No description provided for @unlockDenied.
   ///
   /// In tr, this message translates to:
@@ -653,13 +425,13 @@ abstract class AppLocalizations {
   /// No description provided for @selectDeviceTitle.
   ///
   /// In tr, this message translates to:
-  /// **'Kapı Seç'**
+  /// **'Kapı seç'**
   String get selectDeviceTitle;
 
   /// No description provided for @selectDeviceSearch.
   ///
   /// In tr, this message translates to:
-  /// **'Ara...'**
+  /// **'Kapılarda ara'**
   String get selectDeviceSearch;
 
   /// No description provided for @selectDeviceEmpty.
@@ -692,12 +464,6 @@ abstract class AppLocalizations {
   /// **'Uygulama Hakkında'**
   String get profileAboutApp;
 
-  /// No description provided for @profileAppVersion.
-  ///
-  /// In tr, this message translates to:
-  /// **'Sürüm'**
-  String get profileAppVersion;
-
   /// No description provided for @profilePrivacy.
   ///
   /// In tr, this message translates to:
@@ -716,12 +482,6 @@ abstract class AppLocalizations {
   /// **'Çıkış Yap'**
   String get profileLogout;
 
-  /// No description provided for @profileLogoutSubtitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Hesabınızdan çıkış yapın'**
-  String get profileLogoutSubtitle;
-
   /// No description provided for @profileLogoutConfirmTitle.
   ///
   /// In tr, this message translates to:
@@ -734,65 +494,17 @@ abstract class AppLocalizations {
   /// **'Hesabınızdan çıkış yapmak istediğinizden emin misiniz?'**
   String get profileLogoutConfirmBody;
 
-  /// No description provided for @profileSettings.
-  ///
-  /// In tr, this message translates to:
-  /// **'Ayarlar'**
-  String get profileSettings;
-
-  /// No description provided for @profileSettingsBody.
-  ///
-  /// In tr, this message translates to:
-  /// **'Tema, dil ve hızlı erişim hedefinizi Profil ekranından ayarlayabilirsiniz.'**
-  String get profileSettingsBody;
-
-  /// No description provided for @profileNotificationsDialogTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bildirim Ayarları'**
-  String get profileNotificationsDialogTitle;
-
   /// No description provided for @profileNotificationsDialogBody.
   ///
   /// In tr, this message translates to:
   /// **'Bu sürümde anlık bildirim teslimi ve bildirim tercihi yönetimi bulunmuyor. Güncel erişim ve hareket bilgilerinizi uygulamayı açarak yenileyebilirsiniz. Eksik veya hatalı kayıtlar için kurumunuzun yöneticisine başvurun.'**
   String get profileNotificationsDialogBody;
 
-  /// No description provided for @profileSecurityDialogTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Güvenlik Ayarları'**
-  String get profileSecurityDialogTitle;
-
   /// No description provided for @profileSecurityDialogBody.
   ///
   /// In tr, this message translates to:
   /// **'Mevcut şifrenizi biliyorsanız aşağıdaki formdan yeni bir şifre belirleyebilirsiniz. Şifre değişikliği tüm mobil oturumları sonlandırır. Şifrenizi unuttuysanız kurum yöneticinizden yeni kurulum bağlantısı isteyin. Ortak bir cihazdan ayrılmadan önce Çıkış Yap seçeneğini kullanın.'**
   String get profileSecurityDialogBody;
-
-  /// No description provided for @profileThemeDialogTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Tema Ayarları'**
-  String get profileThemeDialogTitle;
-
-  /// No description provided for @profileThemeDialogBody.
-  ///
-  /// In tr, this message translates to:
-  /// **'Açık, koyu veya sistem temasını seçin.'**
-  String get profileThemeDialogBody;
-
-  /// No description provided for @profileLanguageDialogTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Dil Ayarları'**
-  String get profileLanguageDialogTitle;
-
-  /// No description provided for @profileLanguageDialogBody.
-  ///
-  /// In tr, this message translates to:
-  /// **'Dil tercihi bu cihazda saklanır ve çıkıştan sonra korunur.'**
-  String get profileLanguageDialogBody;
 
   /// No description provided for @profileHelpDialogTitle.
   ///
@@ -829,18 +541,6 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'NGS Plus Yoklama Takip Sistemi'**
   String get profileAboutLine1;
-
-  /// No description provided for @profileAboutLine2.
-  ///
-  /// In tr, this message translates to:
-  /// **'Kurulu uygulama sürümü'**
-  String get profileAboutLine2;
-
-  /// No description provided for @profileAboutLine3.
-  ///
-  /// In tr, this message translates to:
-  /// **'Destek için kurum yöneticinize başvurun.'**
-  String get profileAboutLine3;
 
   /// No description provided for @profileAboutLine4.
   ///
@@ -881,20 +581,14 @@ abstract class AppLocalizations {
   /// No description provided for @historyLoading.
   ///
   /// In tr, this message translates to:
-  /// **'Veriler yükleniyor...'**
+  /// **'Kayıtlar yükleniyor'**
   String get historyLoading;
 
   /// No description provided for @historyErrorTitle.
   ///
   /// In tr, this message translates to:
-  /// **'Bir Hata Oluştu'**
+  /// **'Kayıtlar alınamadı'**
   String get historyErrorTitle;
-
-  /// No description provided for @historyErrorBody.
-  ///
-  /// In tr, this message translates to:
-  /// **'Veriler yüklenirken hata oluştu: {error}'**
-  String historyErrorBody(String error);
 
   /// No description provided for @historyEmpty.
   ///
@@ -905,182 +599,44 @@ abstract class AppLocalizations {
   /// No description provided for @historyEmptyHint.
   ///
   /// In tr, this message translates to:
-  /// **'Verileri yenilemek için aşağı çekin'**
+  /// **'Yeni geçişleriniz burada görünecek.'**
   String get historyEmptyHint;
-
-  /// No description provided for @historyColorLegend.
-  ///
-  /// In tr, this message translates to:
-  /// **'Renk Açıklamaları'**
-  String get historyColorLegend;
-
-  /// No description provided for @historyLegendEarly.
-  ///
-  /// In tr, this message translates to:
-  /// **'Erken Giriş'**
-  String get historyLegendEarly;
-
-  /// No description provided for @historyLegendEarlyDesc.
-  ///
-  /// In tr, this message translates to:
-  /// **'Saat 09:00\'dan önce giriş yapılan günler'**
-  String get historyLegendEarlyDesc;
-
-  /// No description provided for @historyLegendNormal.
-  ///
-  /// In tr, this message translates to:
-  /// **'Normal Giriş'**
-  String get historyLegendNormal;
-
-  /// No description provided for @historyLegendNormalDesc.
-  ///
-  /// In tr, this message translates to:
-  /// **'Saat 09:00-09:30 arası giriş yapılan günler'**
-  String get historyLegendNormalDesc;
-
-  /// No description provided for @historyLegendLate.
-  ///
-  /// In tr, this message translates to:
-  /// **'Geç Giriş'**
-  String get historyLegendLate;
-
-  /// No description provided for @historyLegendLateDesc.
-  ///
-  /// In tr, this message translates to:
-  /// **'Saat 09:30\'dan sonra giriş yapılan günler'**
-  String get historyLegendLateDesc;
-
-  /// No description provided for @historyLegendNone.
-  ///
-  /// In tr, this message translates to:
-  /// **'Katılım Yok'**
-  String get historyLegendNone;
-
-  /// No description provided for @historyLegendNoneDesc.
-  ///
-  /// In tr, this message translates to:
-  /// **'Hiç giriş-çıkış kaydı bulunmayan günler'**
-  String get historyLegendNoneDesc;
-
-  /// No description provided for @historyCalendarHint.
-  ///
-  /// In tr, this message translates to:
-  /// **'Günlere tıklayarak detayları görebilirsiniz. Yeşil noktalar ek katılım kayıtlarını gösterir.'**
-  String get historyCalendarHint;
 
   /// No description provided for @historyMonthSummary.
   ///
   /// In tr, this message translates to:
-  /// **'Bu Ay Özeti'**
+  /// **'Bu ayın özeti'**
   String get historyMonthSummary;
-
-  /// No description provided for @historyTotalCheckIns.
-  ///
-  /// In tr, this message translates to:
-  /// **'Toplam Giriş'**
-  String get historyTotalCheckIns;
-
-  /// No description provided for @historyTotalCheckOuts.
-  ///
-  /// In tr, this message translates to:
-  /// **'Toplam Çıkış'**
-  String get historyTotalCheckOuts;
 
   /// No description provided for @historyActiveDays.
   ///
   /// In tr, this message translates to:
-  /// **'Giriş yapılan gün'**
+  /// **'Giriş günü'**
   String get historyActiveDays;
-
-  /// No description provided for @historyGeneralStats.
-  ///
-  /// In tr, this message translates to:
-  /// **'Genel İstatistikler'**
-  String get historyGeneralStats;
 
   /// No description provided for @historyThisWeek.
   ///
   /// In tr, this message translates to:
-  /// **'Bu Hafta'**
+  /// **'Bu hafta'**
   String get historyThisWeek;
 
   /// No description provided for @historyWeeklySummary.
   ///
   /// In tr, this message translates to:
-  /// **'Haftalık Özet'**
+  /// **'Haftalık özet'**
   String get historyWeeklySummary;
-
-  /// Localized record count; English singular/plural, Turkish number followed by noun.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bu hafta toplam {count} kayıt'**
-  String historyWeeklyTotalRecords(int count);
-
-  /// No description provided for @historyWeeklyCheckIn.
-  ///
-  /// In tr, this message translates to:
-  /// **'Giriş: {count}'**
-  String historyWeeklyCheckIn(int count);
-
-  /// No description provided for @historyWeeklyCheckOut.
-  ///
-  /// In tr, this message translates to:
-  /// **'Çıkış: {count}'**
-  String historyWeeklyCheckOut(int count);
-
-  /// No description provided for @historyDeviceStats.
-  ///
-  /// In tr, this message translates to:
-  /// **'Cihaz Bazlı İstatistikler'**
-  String get historyDeviceStats;
-
-  /// No description provided for @historyCheckInRecord.
-  ///
-  /// In tr, this message translates to:
-  /// **'Giriş Yapıldı'**
-  String get historyCheckInRecord;
-
-  /// No description provided for @historyCheckOutRecord.
-  ///
-  /// In tr, this message translates to:
-  /// **'Çıkış Yapıldı'**
-  String get historyCheckOutRecord;
-
-  /// No description provided for @historyBadgeIn.
-  ///
-  /// In tr, this message translates to:
-  /// **'GİRİŞ'**
-  String get historyBadgeIn;
-
-  /// No description provided for @historyBadgeOut.
-  ///
-  /// In tr, this message translates to:
-  /// **'ÇIKIŞ'**
-  String get historyBadgeOut;
 
   /// No description provided for @historyUnknownDevice.
   ///
   /// In tr, this message translates to:
-  /// **'Bilinmeyen Cihaz'**
+  /// **'Kapı bilgisi yok'**
   String get historyUnknownDevice;
 
-  /// No description provided for @historyUnknownLocation.
+  /// No description provided for @historyRecordDetailTitle.
   ///
   /// In tr, this message translates to:
-  /// **'Bilinmeyen Konum'**
-  String get historyUnknownLocation;
-
-  /// No description provided for @historyDetailCheckIn.
-  ///
-  /// In tr, this message translates to:
-  /// **'Giriş Detayları'**
-  String get historyDetailCheckIn;
-
-  /// No description provided for @historyDetailCheckOut.
-  ///
-  /// In tr, this message translates to:
-  /// **'Çıkış Detayları'**
-  String get historyDetailCheckOut;
+  /// **'Kayıt ayrıntısı'**
+  String get historyRecordDetailTitle;
 
   /// No description provided for @historyDetailDate.
   ///
@@ -1100,12 +656,6 @@ abstract class AppLocalizations {
   /// **'Konum'**
   String get historyDetailLocation;
 
-  /// No description provided for @historyDetailQrCode.
-  ///
-  /// In tr, this message translates to:
-  /// **'QR Kod'**
-  String get historyDetailQrCode;
-
   /// No description provided for @historyFilterTitle.
   ///
   /// In tr, this message translates to:
@@ -1118,40 +668,22 @@ abstract class AppLocalizations {
   /// **'Tarih'**
   String get historyFilterDate;
 
-  /// No description provided for @historyFilterDateNone.
-  ///
-  /// In tr, this message translates to:
-  /// **'Tarih seçilmedi'**
-  String get historyFilterDateNone;
-
   /// No description provided for @historyFilterDevice.
   ///
   /// In tr, this message translates to:
-  /// **'Cihaz'**
+  /// **'Kapı'**
   String get historyFilterDevice;
-
-  /// No description provided for @historyFilterDeviceNone.
-  ///
-  /// In tr, this message translates to:
-  /// **'Cihaz seçilmedi'**
-  String get historyFilterDeviceNone;
 
   /// No description provided for @historyFilterClear.
   ///
   /// In tr, this message translates to:
-  /// **'Filtreleri Temizle'**
+  /// **'Filtreleri temizle'**
   String get historyFilterClear;
-
-  /// No description provided for @historyFilterDeviceSelectTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Cihaz Seç'**
-  String get historyFilterDeviceSelectTitle;
 
   /// Localized record count; English singular/plural, Turkish number followed by noun.
   ///
   /// In tr, this message translates to:
-  /// **'{count} Kayıt'**
+  /// **'{count} kayıt'**
   String historyDayRecordCount(int count);
 
   /// No description provided for @historyEntryShort.
@@ -1184,18 +716,6 @@ abstract class AppLocalizations {
   /// **'Tara'**
   String get qrTabScan;
 
-  /// No description provided for @qrInvalidResponse.
-  ///
-  /// In tr, this message translates to:
-  /// **'Geçersiz yanıt'**
-  String get qrInvalidResponse;
-
-  /// No description provided for @qrTokenMissing.
-  ///
-  /// In tr, this message translates to:
-  /// **'Token yok'**
-  String get qrTokenMissing;
-
   /// No description provided for @qrRefresh.
   ///
   /// In tr, this message translates to:
@@ -1211,68 +731,14 @@ abstract class AppLocalizations {
   /// No description provided for @qrFrameHint.
   ///
   /// In tr, this message translates to:
-  /// **'QR kodu kare içine yerleştirin'**
+  /// **'QR kodu çerçeveye alın'**
   String get qrFrameHint;
-
-  /// No description provided for @qrTokenHint.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bu QR kodu kapı cihazına okutun. Kod 10 saniye geçerlidir, süre dolunca yenile butonuna basın.'**
-  String get qrTokenHint;
-
-  /// No description provided for @qrProcessError.
-  ///
-  /// In tr, this message translates to:
-  /// **'QR kod işlenirken bir hata oluştu: {error}'**
-  String qrProcessError(String error);
-
-  /// No description provided for @qrUserCodeTitle.
-  ///
-  /// In tr, this message translates to:
-  /// **'Kullanıcı QR Kodu'**
-  String get qrUserCodeTitle;
-
-  /// No description provided for @qrUserCodeBody.
-  ///
-  /// In tr, this message translates to:
-  /// **'Kullanıcı: {name}\nE-posta: {email}\nTarih: {date}'**
-  String qrUserCodeBody(String name, String email, String date);
 
   /// No description provided for @qrInvalidCode.
   ///
   /// In tr, this message translates to:
   /// **'Geçersiz QR kod'**
   String get qrInvalidCode;
-
-  /// No description provided for @qrAccessGranted.
-  ///
-  /// In tr, this message translates to:
-  /// **'Geçiş Başarılı'**
-  String get qrAccessGranted;
-
-  /// No description provided for @qrUnknownError.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bir hata oluştu'**
-  String get qrUnknownError;
-
-  /// No description provided for @qrDeviceLine.
-  ///
-  /// In tr, this message translates to:
-  /// **'Cihaz: {name}'**
-  String qrDeviceLine(String name);
-
-  /// No description provided for @qrLocationLine.
-  ///
-  /// In tr, this message translates to:
-  /// **'Konum: {location}'**
-  String qrLocationLine(String location);
-
-  /// No description provided for @qrTimeLine.
-  ///
-  /// In tr, this message translates to:
-  /// **'Zaman: {time}'**
-  String qrTimeLine(String time);
 
   /// No description provided for @visitorTitle.
   ///
@@ -1286,77 +752,17 @@ abstract class AppLocalizations {
   /// **'Toplam'**
   String get visitorStatTotal;
 
-  /// No description provided for @visitorStatInside.
-  ///
-  /// In tr, this message translates to:
-  /// **'İçeride'**
-  String get visitorStatInside;
-
-  /// No description provided for @visitorStatExpected.
-  ///
-  /// In tr, this message translates to:
-  /// **'Beklenen'**
-  String get visitorStatExpected;
-
   /// No description provided for @visitorEmpty.
   ///
   /// In tr, this message translates to:
-  /// **'Henüz ziyaretçi kaydı yok'**
+  /// **'Henüz davet yok'**
   String get visitorEmpty;
 
   /// No description provided for @visitorEmptyHint.
   ///
   /// In tr, this message translates to:
-  /// **'Yeni bir davet oluşturmak için sağ üstteki Ekle düğmesini kullanın.'**
+  /// **'Ziyaretçi davet et düğmesiyle yeni bir davet oluşturun.'**
   String get visitorEmptyHint;
-
-  /// No description provided for @visitorStatusExpected.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bekleniyor'**
-  String get visitorStatusExpected;
-
-  /// No description provided for @visitorStatusInside.
-  ///
-  /// In tr, this message translates to:
-  /// **'İçeride'**
-  String get visitorStatusInside;
-
-  /// No description provided for @visitorStatusOut.
-  ///
-  /// In tr, this message translates to:
-  /// **'Çıktı'**
-  String get visitorStatusOut;
-
-  /// No description provided for @visitorContactPerson.
-  ///
-  /// In tr, this message translates to:
-  /// **'İletişim: {name}'**
-  String visitorContactPerson(String name);
-
-  /// No description provided for @visitorCheckOut.
-  ///
-  /// In tr, this message translates to:
-  /// **'Çıkış Yap'**
-  String get visitorCheckOut;
-
-  /// No description provided for @visitorCheckIn.
-  ///
-  /// In tr, this message translates to:
-  /// **'Giriş Yap'**
-  String get visitorCheckIn;
-
-  /// No description provided for @visitorCheckedInToast.
-  ///
-  /// In tr, this message translates to:
-  /// **'{name} giriş yaptı'**
-  String visitorCheckedInToast(String name);
-
-  /// No description provided for @visitorCheckedOutToast.
-  ///
-  /// In tr, this message translates to:
-  /// **'{name} çıkış yaptı'**
-  String visitorCheckedOutToast(String name);
 
   /// No description provided for @visitorFilterTitle.
   ///
@@ -1364,29 +770,11 @@ abstract class AppLocalizations {
   /// **'Filtrele'**
   String get visitorFilterTitle;
 
-  /// No description provided for @visitorFilterBody.
-  ///
-  /// In tr, this message translates to:
-  /// **'Filtreleme seçenekleri buraya gelecek.'**
-  String get visitorFilterBody;
-
   /// No description provided for @visitorAddTitle.
   ///
   /// In tr, this message translates to:
-  /// **'Yeni Ziyaretçi'**
+  /// **'Ziyaretçi davet et'**
   String get visitorAddTitle;
-
-  /// No description provided for @visitorFieldName.
-  ///
-  /// In tr, this message translates to:
-  /// **'Ad Soyad'**
-  String get visitorFieldName;
-
-  /// No description provided for @visitorFieldCompany.
-  ///
-  /// In tr, this message translates to:
-  /// **'Şirket'**
-  String get visitorFieldCompany;
 
   /// No description provided for @visitorFieldPurpose.
   ///
@@ -1394,22 +782,10 @@ abstract class AppLocalizations {
   /// **'Ziyaret Amacı'**
   String get visitorFieldPurpose;
 
-  /// No description provided for @visitorFieldContact.
-  ///
-  /// In tr, this message translates to:
-  /// **'İletişim Kişisi'**
-  String get visitorFieldContact;
-
-  /// No description provided for @visitorAddedToast.
-  ///
-  /// In tr, this message translates to:
-  /// **'Ziyaretçi eklendi'**
-  String get visitorAddedToast;
-
   /// No description provided for @visitorAddButton.
   ///
   /// In tr, this message translates to:
-  /// **'Ziyaretçi Ekle'**
+  /// **'Ziyaretçi davet et'**
   String get visitorAddButton;
 
   /// No description provided for @errorNetwork.
@@ -1421,19 +797,19 @@ abstract class AppLocalizations {
   /// No description provided for @errorTimeout.
   ///
   /// In tr, this message translates to:
-  /// **'Sunucu yanıt vermedi. Lütfen daha sonra tekrar deneyin.'**
+  /// **'İşlem zamanında tamamlanamadı. Yeniden deneyin.'**
   String get errorTimeout;
 
   /// No description provided for @errorServer.
   ///
   /// In tr, this message translates to:
-  /// **'Sunucu hatası ({code}). Lütfen biraz sonra tekrar deneyin.'**
-  String errorServer(int code);
+  /// **'İşlem tamamlanamadı. Biraz sonra yeniden deneyin.'**
+  String get errorServer;
 
   /// No description provided for @errorEmploymentEnded.
   ///
   /// In tr, this message translates to:
-  /// **'İşten ayrıldınız. Mobil erişiminiz kapatıldı.'**
+  /// **'Mobil erişiminiz kapatıldı. Kurum yöneticinize başvurun.'**
   String get errorEmploymentEnded;
 
   /// No description provided for @errorAuthExpired.
@@ -1550,12 +926,6 @@ abstract class AppLocalizations {
   /// **'Daha fazla yükle'**
   String get historyLoadMore;
 
-  /// No description provided for @historyAccessDenied.
-  ///
-  /// In tr, this message translates to:
-  /// **'Erişim reddedildi'**
-  String get historyAccessDenied;
-
   /// No description provided for @historyUnknownDirection.
   ///
   /// In tr, this message translates to:
@@ -1583,7 +953,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyRawEvents.
   ///
   /// In tr, this message translates to:
-  /// **'Ham erişim hareketleri; resmi PDKS sonucu değildir.'**
+  /// **'Geçiş kayıtları gösterilir. Resmi devam ve çalışma süresi sonuçları farklı olabilir.'**
   String get historyRawEvents;
 
   /// No description provided for @homeDataLoading.
@@ -1595,7 +965,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeDataUnavailable.
   ///
   /// In tr, this message translates to:
-  /// **'Veriler alınamadı'**
+  /// **'Bugünkü durum alınamadı'**
   String get homeDataUnavailable;
 
   /// No description provided for @homeDataStale.
@@ -1621,18 +991,6 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Durum bilinmiyor'**
   String get homeStatusUnknown;
-
-  /// No description provided for @homeSelfCheckIn.
-  ///
-  /// In tr, this message translates to:
-  /// **'Manuel kayıt'**
-  String get homeSelfCheckIn;
-
-  /// No description provided for @homeSelfCheckInRecorded.
-  ///
-  /// In tr, this message translates to:
-  /// **'Manuel kayıt oluşturuldu'**
-  String get homeSelfCheckInRecorded;
 
   /// No description provided for @homeCommandPending.
   ///
@@ -1697,7 +1055,7 @@ abstract class AppLocalizations {
   /// No description provided for @qrReaderHint.
   ///
   /// In tr, this message translates to:
-  /// **'Bu kodu desteklenen okuyucuya gösterin. Süre sunucunun bitiş zamanına göre gösterilir. İşlem kaydı kapının açıldığını veya fiziksel geçişi doğrulamaz.'**
+  /// **'Kodu okuyucuya gösterin'**
   String get qrReaderHint;
 
   /// No description provided for @qrSwitchCamera.
@@ -1724,6 +1082,12 @@ abstract class AppLocalizations {
   /// **'Ayarları aç'**
   String get qrOpenSettings;
 
+  /// No description provided for @qrGrantCameraPermission.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kamera izni ver'**
+  String get qrGrantCameraPermission;
+
   /// No description provided for @qrCameraControlUnavailable.
   ///
   /// In tr, this message translates to:
@@ -1733,7 +1097,7 @@ abstract class AppLocalizations {
   /// No description provided for @qrDeviceIdentityOnly.
   ///
   /// In tr, this message translates to:
-  /// **'Bu bir cihaz kimlik etiketidir; geçiş yetkisi veya fiziksel bulunma kanıtı sağlamaz. Desteklenen okuyucuda QR’ım sekmesini kullanın.'**
+  /// **'Bu kod cihazı tanıtır; kapıyı açmaz veya geçiş kaydı oluşturmaz. QR Kodum sekmesindeki kodu uygun okuyucuya gösterin.'**
   String get qrDeviceIdentityOnly;
 
   /// No description provided for @qrEmployeeIdentityOnly.
@@ -1745,7 +1109,7 @@ abstract class AppLocalizations {
   /// No description provided for @qrChallengeUnsupported.
   ///
   /// In tr, this message translates to:
-  /// **'Bu okuyucunun güvenli işlem akışı henüz desteklenmiyor. Desteklenen okuyucuda QR’ım sekmesini kullanın.'**
+  /// **'Bu okuyucuyla tarama yapılamıyor. QR Kodum sekmesindeki kodu uygun okuyucuya gösterin.'**
   String get qrChallengeUnsupported;
 
   /// No description provided for @qrScanExpired.
@@ -1793,7 +1157,7 @@ abstract class AppLocalizations {
   /// No description provided for @passwordHelpAdminBody.
   ///
   /// In tr, this message translates to:
-  /// **'Mobil şifre kurulumunu kurum yöneticiniz yönetir. Kayıtlı e-posta adresinize yeni bir kurulum bağlantısı göndermesini isteyin. Bağlantıyı açıp yeni şifrenizi belirledikten sonra giriş ekranına dönün.'**
+  /// **'Kurum yöneticinizden kayıtlı e-postanıza şifre kurulum bağlantısı göndermesini isteyin. Şifrenizi belirledikten sonra giriş yapın.'**
   String get passwordHelpAdminBody;
 
   /// No description provided for @passwordHelpNoEmail.
@@ -1811,7 +1175,7 @@ abstract class AppLocalizations {
   /// No description provided for @passwordHelpCopy.
   ///
   /// In tr, this message translates to:
-  /// **'Yöneticiye iletilecek talebi kopyala'**
+  /// **'Talebi kopyala'**
   String get passwordHelpCopy;
 
   /// No description provided for @passwordHelpCopied.
@@ -1844,6 +1208,18 @@ abstract class AppLocalizations {
   /// **'NGS Plus başlatılıyor'**
   String get startupTitle;
 
+  /// No description provided for @startupBandTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Başlatılıyor'**
+  String get startupBandTitle;
+
+  /// No description provided for @startupFailureTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Başlatılamadı'**
+  String get startupFailureTitle;
+
   /// No description provided for @startupUnavailable.
   ///
   /// In tr, this message translates to:
@@ -1865,7 +1241,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeUpdatedAt.
   ///
   /// In tr, this message translates to:
-  /// **'Son güncelleme: {time}'**
+  /// **'Son güncelleme {time}'**
   String homeUpdatedAt(String time);
 
   /// No description provided for @homeScanQr.
@@ -1931,7 +1307,7 @@ abstract class AppLocalizations {
   /// No description provided for @visitorSave.
   ///
   /// In tr, this message translates to:
-  /// **'Kaydet'**
+  /// **'Daveti kaydet'**
   String get visitorSave;
 
   /// No description provided for @visitorEdit.
@@ -1939,6 +1315,66 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Düzenle'**
   String get visitorEdit;
+
+  /// No description provided for @visitorEditTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Daveti düzenle'**
+  String get visitorEditTitle;
+
+  /// No description provided for @visitorStartDate.
+  ///
+  /// In tr, this message translates to:
+  /// **'Başlangıç tarihi'**
+  String get visitorStartDate;
+
+  /// No description provided for @visitorEndDate.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bitiş tarihi'**
+  String get visitorEndDate;
+
+  /// No description provided for @visitorStartTime.
+  ///
+  /// In tr, this message translates to:
+  /// **'Başlangıç saati'**
+  String get visitorStartTime;
+
+  /// No description provided for @visitorEndTime.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bitiş saati'**
+  String get visitorEndTime;
+
+  /// No description provided for @visitorNotFound.
+  ///
+  /// In tr, this message translates to:
+  /// **'Davet bulunamadı'**
+  String get visitorNotFound;
+
+  /// No description provided for @visitorErrorEndBeforeStart.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bitiş, başlangıçtan sonra olmalı.'**
+  String get visitorErrorEndBeforeStart;
+
+  /// No description provided for @visitorErrorMaxDuration.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ziyaret en fazla 31 gün sürebilir.'**
+  String get visitorErrorMaxDuration;
+
+  /// No description provided for @visitorErrorEndInPast.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bitiş geçmişte olamaz.'**
+  String get visitorErrorEndInPast;
+
+  /// No description provided for @visitorErrorNoticeRequired.
+  ///
+  /// In tr, this message translates to:
+  /// **'Devam etmek için aydınlatma metnini onaylayın.'**
+  String get visitorErrorNoticeRequired;
 
   /// No description provided for @visitorCancelInvitation.
   ///
@@ -1951,12 +1387,6 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Bu davet iptal edilsin mi?'**
   String get visitorCancelConfirm;
-
-  /// No description provided for @visitorPreRegistered.
-  ///
-  /// In tr, this message translates to:
-  /// **'Yetkili aktivasyonu bekleniyor'**
-  String get visitorPreRegistered;
 
   /// No description provided for @visitorAccessActive.
   ///
@@ -2003,7 +1433,7 @@ abstract class AppLocalizations {
   /// No description provided for @visitorSaved.
   ///
   /// In tr, this message translates to:
-  /// **'Davet kaydı kaydedildi; yetkili aktivasyonu gerekiyor.'**
+  /// **'Davet kaydedildi. Yetkili onayı bekleniyor.'**
   String get visitorSaved;
 
   /// No description provided for @visitorCancelled.
@@ -2030,16 +1460,16 @@ abstract class AppLocalizations {
   /// **'Güncel aydınlatma metnini inceledim.'**
   String get visitorNoticeReviewed;
 
-  /// No description provided for @visitorInvalidForm.
+  /// No description provided for @fieldRequired.
   ///
   /// In tr, this message translates to:
-  /// **'Zorunlu alanları ve ziyaret tarihlerini kontrol edin.'**
-  String get visitorInvalidForm;
+  /// **'Bu alan zorunlu.'**
+  String get fieldRequired;
 
   /// No description provided for @visitorStale.
   ///
   /// In tr, this message translates to:
-  /// **'Yenilenemedi; önceki kayıtlar gösteriliyor.'**
+  /// **'Davetler yenilenemedi. Önceki davetler gösteriliyor.'**
   String get visitorStale;
 
   /// No description provided for @visitorRefresh.
@@ -2111,7 +1541,7 @@ abstract class AppLocalizations {
   /// No description provided for @errorProtocol.
   ///
   /// In tr, this message translates to:
-  /// **'Geçerli bir sunucu yanıtı alınamadı. Lütfen yeniden deneyin.'**
+  /// **'İşlem tamamlanamadı. Yeniden deneyin.'**
   String get errorProtocol;
 
   /// No description provided for @errorPasswordPolicy.
@@ -2129,7 +1559,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeDoorUnavailable.
   ///
   /// In tr, this message translates to:
-  /// **'Seçilen kapı artık kullanılamıyor. Profil üzerinden yeni bir kapı seçin.'**
+  /// **'Seçilen kapı kullanılamıyor. Yeni bir kapı seçin.'**
   String get homeDoorUnavailable;
 
   /// No description provided for @homeNoOpenableDoor.
@@ -2213,7 +1643,7 @@ abstract class AppLocalizations {
   /// No description provided for @visitorSummaryLimited.
   ///
   /// In tr, this message translates to:
-  /// **'Bu toplamlar alt sınırdır; özet okuma sınırına ulaşıldı.'**
+  /// **'Bazı davetler özete dahil edilemedi; gerçek toplam daha yüksek olabilir.'**
   String get visitorSummaryLimited;
 
   /// No description provided for @visitorSummaryError.
@@ -2225,7 +1655,7 @@ abstract class AppLocalizations {
   /// No description provided for @visitorSyncTitle.
   ///
   /// In tr, this message translates to:
-  /// **'Cihaz senkronizasyonu'**
+  /// **'Cihaz durumu'**
   String get visitorSyncTitle;
 
   /// No description provided for @visitorSyncPending.
@@ -2333,7 +1763,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyAllDevices.
   ///
   /// In tr, this message translates to:
-  /// **'Tüm cihazlar'**
+  /// **'Tüm kapılar'**
   String get historyAllDevices;
 
   /// No description provided for @historyApplyFilters.
@@ -2357,7 +1787,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyCalendarLegend.
   ///
   /// In tr, this message translates to:
-  /// **'Çerçeve: bugün · Dolgu: seçili gün · Nokta: kayıt var'**
+  /// **'Noktalı günlerde kayıt var.'**
   String get historyCalendarLegend;
 
   /// No description provided for @historySelectDayHint.
@@ -2375,7 +1805,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyNoActivityHint.
   ///
   /// In tr, this message translates to:
-  /// **'Kayıtlar oluştukça özet burada görünür. Bu bir devamsızlık hesabı değildir.'**
+  /// **'Yeni kayıtlar burada görünecek. Kayıt olmaması devamsızlık anlamına gelmez.'**
   String get historyNoActivityHint;
 
   /// No description provided for @historyDeniedCount.
@@ -2393,13 +1823,13 @@ abstract class AppLocalizations {
   /// No description provided for @historyLoadedDevices.
   ///
   /// In tr, this message translates to:
-  /// **'Cihaz seçenekleri yüklenen kayıtlardan alınır.'**
+  /// **'Bu listedeki kayıtlarda yer alan kapılar gösterilir.'**
   String get historyLoadedDevices;
 
   /// No description provided for @historyNoDeviceOptions.
   ///
   /// In tr, this message translates to:
-  /// **'Yüklenen kayıtlarda cihaz bulunmuyor.'**
+  /// **'Bu kayıtlar için kapı seçeneği yok.'**
   String get historyNoDeviceOptions;
 
   /// No description provided for @historyTabThisMonthPeriod.
@@ -2425,6 +1855,12 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Davet kaydı oluşturulduktan sonra yetkili aktivasyonu gerekir.'**
   String get visitorActivationHint;
+
+  /// No description provided for @visitorMetricPending.
+  ///
+  /// In tr, this message translates to:
+  /// **'Onay bekliyor'**
+  String get visitorMetricPending;
 
   /// No description provided for @visitorPendingShort.
   ///
@@ -2459,7 +1895,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileProject.
   ///
   /// In tr, this message translates to:
-  /// **'Firma / proje'**
+  /// **'Kurum ve proje'**
   String get profileProject;
 
   /// No description provided for @profileProjectUnavailable.
@@ -2473,6 +1909,12 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Kapı işlemini kontrol et'**
   String get doorOperationRecoveryTitle;
+
+  /// No description provided for @doorOperationNothingToCheck.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kontrol edilecek kapı işlemi yok.'**
+  String get doorOperationNothingToCheck;
 
   /// No description provided for @doorOperationRecoveryHint.
   ///
@@ -2525,7 +1967,7 @@ abstract class AppLocalizations {
   /// No description provided for @errorRequestDateInvalid.
   ///
   /// In tr, this message translates to:
-  /// **'Geçerli bir tarih girin (YYYY-MM-DD)'**
+  /// **'Geçerli bir tarih seçin.'**
   String get errorRequestDateInvalid;
 
   /// No description provided for @errorRequestRangeInvalid.
@@ -2597,7 +2039,7 @@ abstract class AppLocalizations {
   /// No description provided for @errorCorrectionTimeInvalid.
   ///
   /// In tr, this message translates to:
-  /// **'Geçerli bir saat girin (HH:mm).'**
+  /// **'Geçerli bir saat seçin.'**
   String get errorCorrectionTimeInvalid;
 
   /// No description provided for @errorCorrectionPendingExists.
@@ -2621,7 +2063,7 @@ abstract class AppLocalizations {
   /// No description provided for @requestsCorrection.
   ///
   /// In tr, this message translates to:
-  /// **'PDKS düzeltme'**
+  /// **'Kayıt düzeltme'**
   String get requestsCorrection;
 
   /// No description provided for @requestsNew.
@@ -2645,7 +2087,7 @@ abstract class AppLocalizations {
   /// No description provided for @requestsWithdraw.
   ///
   /// In tr, this message translates to:
-  /// **'Geri çek'**
+  /// **'Talebi geri çek'**
   String get requestsWithdraw;
 
   /// No description provided for @requestsWithdrawConfirm.
@@ -2659,12 +2101,6 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Vazgeç'**
   String get requestsCancel;
-
-  /// No description provided for @requestsSubmit.
-  ///
-  /// In tr, this message translates to:
-  /// **'Gönder'**
-  String get requestsSubmit;
 
   /// No description provided for @requestsUncertain.
   ///
@@ -2887,6 +2323,168 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin.'**
   String get errorRequestConflict;
+
+  /// No description provided for @navQr.
+  ///
+  /// In tr, this message translates to:
+  /// **'QR'**
+  String get navQr;
+
+  /// No description provided for @homeToday.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bugün'**
+  String get homeToday;
+
+  /// No description provided for @homeFirstEntry.
+  ///
+  /// In tr, this message translates to:
+  /// **'İlk giriş'**
+  String get homeFirstEntry;
+
+  /// No description provided for @loginSigningIn.
+  ///
+  /// In tr, this message translates to:
+  /// **'Giriş yapılıyor'**
+  String get loginSigningIn;
+
+  /// No description provided for @fieldSelectDate.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tarih seçin'**
+  String get fieldSelectDate;
+
+  /// No description provided for @fieldSelectTime.
+  ///
+  /// In tr, this message translates to:
+  /// **'Saat seçin'**
+  String get fieldSelectTime;
+
+  /// No description provided for @fieldSelectOption.
+  ///
+  /// In tr, this message translates to:
+  /// **'Seçin'**
+  String get fieldSelectOption;
+
+  /// No description provided for @requestsLeaveFormTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'İzin talebi'**
+  String get requestsLeaveFormTitle;
+
+  /// No description provided for @requestsCorrectionFormTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıt düzeltme talebi'**
+  String get requestsCorrectionFormTitle;
+
+  /// No description provided for @requestsLeaveSubmit.
+  ///
+  /// In tr, this message translates to:
+  /// **'İzin talebi gönder'**
+  String get requestsLeaveSubmit;
+
+  /// No description provided for @requestsLeaveSubmitting.
+  ///
+  /// In tr, this message translates to:
+  /// **'İzin talebi gönderiliyor'**
+  String get requestsLeaveSubmitting;
+
+  /// No description provided for @requestsLeaveSubmitted.
+  ///
+  /// In tr, this message translates to:
+  /// **'İzin talebi gönderildi'**
+  String get requestsLeaveSubmitted;
+
+  /// No description provided for @requestsCorrectionSubmit.
+  ///
+  /// In tr, this message translates to:
+  /// **'Düzeltme talebi gönder'**
+  String get requestsCorrectionSubmit;
+
+  /// No description provided for @requestsCorrectionSubmitting.
+  ///
+  /// In tr, this message translates to:
+  /// **'Düzeltme talebi gönderiliyor'**
+  String get requestsCorrectionSubmitting;
+
+  /// No description provided for @requestsCorrectionSubmitted.
+  ///
+  /// In tr, this message translates to:
+  /// **'Düzeltme talebi gönderildi'**
+  String get requestsCorrectionSubmitted;
+
+  /// No description provided for @requestsWithdrawnToast.
+  ///
+  /// In tr, this message translates to:
+  /// **'Talep geri çekildi'**
+  String get requestsWithdrawnToast;
+
+  /// No description provided for @requestsTimeZoneHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Saatler Türkiye saatine göre girilir.'**
+  String get requestsTimeZoneHint;
+
+  /// No description provided for @visitorSaving.
+  ///
+  /// In tr, this message translates to:
+  /// **'Davet kaydediliyor'**
+  String get visitorSaving;
+
+  /// No description provided for @visitorLoadFailed.
+  ///
+  /// In tr, this message translates to:
+  /// **'Davetler alınamadı. Yeniden deneyin.'**
+  String get visitorLoadFailed;
+
+  /// No description provided for @visitorNoMatchTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Eşleşen davet yok'**
+  String get visitorNoMatchTitle;
+
+  /// No description provided for @commonLoading.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yükleniyor'**
+  String get commonLoading;
+
+  /// No description provided for @fieldNoOptions.
+  ///
+  /// In tr, this message translates to:
+  /// **'Seçenek yok'**
+  String get fieldNoOptions;
+
+  /// No description provided for @metricNoRecord.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıt yok'**
+  String get metricNoRecord;
+
+  /// No description provided for @fieldClear.
+  ///
+  /// In tr, this message translates to:
+  /// **'Temizle'**
+  String get fieldClear;
+
+  /// Localized record count; English singular/plural, Turkish number followed by noun.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu hafta toplam {count} kayıt'**
+  String historyWeeklyTotalRecords(int count);
+
+  /// No description provided for @unlockGranted.
+  ///
+  /// In tr, this message translates to:
+  /// **'Erişim Verildi'**
+  String get unlockGranted;
+
+  /// No description provided for @visitorPreRegistered.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yetkili aktivasyonu bekleniyor'**
+  String get visitorPreRegistered;
 }
 
 class _AppLocalizationsDelegate

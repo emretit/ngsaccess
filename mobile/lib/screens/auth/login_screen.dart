@@ -4,12 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/error_localizer.dart';
-import '../../core/errors.dart';
 import '../../core/spacing.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../router/app_router.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/ui/ui.dart';
 import '../../widgets/brand_mark.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -23,6 +22,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _submitting = false;
@@ -36,6 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -63,7 +66,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signIn() async {
-    if (_submitting || _formKey.currentState?.validate() != true) return;
+    if (_submitting) return;
+    if (_formKey.currentState?.validate() != true) {
+      final email = _emailController.text;
+      if (email.isEmpty || !email.contains('@')) {
+        _emailFocus.requestFocus();
+      } else {
+        _passwordFocus.requestFocus();
+      }
+      return;
+    }
     final auth = context.read<AuthProvider>();
     if (auth.isLoading) return;
     // Snapshot all widget values before provider notifications can remove it.
@@ -83,50 +95,31 @@ class _LoginScreenState extends State<LoginScreen> {
       // The router restores the original protected destination after auth notify.
       return;
     }
-    final error = auth.lastError;
-    final fallback = auth.errorMessage;
-    // EmploymentEndedError is already shown inline above the login card.
-    if (error is EmploymentEndedError) return;
-    if (error != null || fallback != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error != null ? localizeAppError(context, error) : fallback ?? '',
-          ),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
+    // Provider errors remain visible with the form so retry preserves input.
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final t = AppUiTokens.of(context);
     final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthProvider>();
     final busy = auth.isLoading || _submitting;
+    final error = auth.lastError;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: const Color(0xFF460E22),
+        backgroundColor: t.bandBackground,
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: isDark
-                  ? const [
-                      Color(0xFF6E1A35),
-                      Color(0xFF460E22),
-                      Color(0xFF270B16),
-                    ]
-                  : const [
-                      AppTheme.primaryBurgundy2,
-                      AppTheme.primaryBurgundy,
-                      Color(0xFF460E22),
-                    ],
+              colors: [
+                t.bandBackground,
+                t.bandBackground,
+                t.bandAvatarBackground,
+              ],
               stops: const [0, 0.45, 1],
             ),
           ),
@@ -163,13 +156,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             Row(
                               children: [
-                                const BrandMark(size: 44, onDark: true),
+                                const BrandMark.band(size: 44),
                                 const SizedBox(width: 12),
                                 Flexible(
                                   child: Text(
                                     l10n.appName,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: t.onBand,
                                       fontSize: 23,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: -0.4,
@@ -183,8 +176,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               header: true,
                               child: Text(
                                 l10n.loginWelcomeTitle,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: t.onBand,
                                   fontSize: 36,
                                   fontWeight: FontWeight.w700,
                                   height: 1.12,
@@ -195,20 +188,19 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 10),
                             Text(
                               l10n.pdksSubtitle,
-                              style: const TextStyle(
-                                color: Color(0xFFEDD7DF),
+                              style: TextStyle(
+                                color: t.onBandMuted,
                                 fontSize: 15,
                                 height: 1.4,
                               ),
                             ),
                             const SizedBox(height: 28),
-                            if (auth.lastError is EmploymentEndedError) ...[
-                              Semantics(
-                                liveRegion: true,
-                                child: Text(
-                                  l10n.errorEmploymentEnded,
-                                  style: const TextStyle(color: Colors.white),
-                                ),
+                            if (error != null || auth.errorMessage != null) ...[
+                              AppDataNotice(
+                                tone: AppStatusTone.danger,
+                                message: error != null
+                                    ? localizeAppError(context, error)
+                                    : auth.errorMessage ?? '',
                               ),
                               const SizedBox(height: 16),
                             ],
@@ -228,18 +220,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLoginCard(BuildContext context, {required bool busy}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final c = theme.colorScheme;
+    final t = AppUiTokens.of(context);
     final l10n = AppLocalizations.of(context);
-    final ink = isDark ? const Color(0xFFF7EDF1) : const Color(0xFF241C21);
-    final muted = isDark ? const Color(0xFFC9B8C0) : const Color(0xFF71626A);
-    final accent = isDark ? const Color(0xFFF3A8BD) : AppTheme.primaryBurgundy;
+    final ink = c.onSurface;
+    final muted = c.onSurfaceVariant;
+    final accent = t.accent;
 
     InputDecoration fieldDecoration(String label, IconData icon) {
       final border = OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: BorderSide(
-          color: isDark ? const Color(0xFF51404A) : const Color(0xFFE5DDE1),
-        ),
+        borderSide: BorderSide(color: c.outlineVariant),
       );
       return InputDecoration(
         labelText: label,
@@ -247,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
         floatingLabelStyle: TextStyle(color: accent),
         prefixIcon: Icon(icon, size: 21, color: muted),
         filled: true,
-        fillColor: isDark ? const Color(0xFF30252C) : const Color(0xFFF8F5F6),
+        fillColor: busy ? t.disabledBackground : t.subtle,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 18,
@@ -258,21 +250,21 @@ class _LoginScreenState extends State<LoginScreen> {
         focusedBorder: border.copyWith(
           borderSide: BorderSide(color: accent, width: 1.6),
         ),
-        errorMaxLines: 3,
+        errorMaxLines: 4,
       );
     }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 24, 22, 16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF211A20) : Colors.white,
+        color: c.surface,
         borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x400F0308),
+            color: c.shadow.withValues(alpha: 0.25),
             blurRadius: 34,
             spreadRadius: -8,
-            offset: Offset(0, 18),
+            offset: const Offset(0, 18),
           ),
         ],
       ),
@@ -299,6 +291,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 22),
                 TextFormField(
+                  key: const ValueKey('login-email'),
+                  focusNode: _emailFocus,
                   controller: _emailController,
                   enabled: !busy,
                   style: TextStyle(color: ink, fontSize: 16),
@@ -327,6 +321,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 14),
                 TextFormField(
+                  key: const ValueKey('login-password'),
+                  focusNode: _passwordFocus,
                   controller: _passwordController,
                   enabled: !busy,
                   style: TextStyle(color: ink, fontSize: 16),
@@ -377,66 +373,48 @@ class _LoginScreenState extends State<LoginScreen> {
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
+                  minTileHeight: 56,
                   activeColor: accent,
-                  checkColor: isDark ? const Color(0xFF460E22) : Colors.white,
+                  checkColor: c.surface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  value: _rememberMe,
-                  onChanged: busy
-                      ? null
-                      : (value) {
-                          setState(() {
-                            _emailEdited = true;
-                            _rememberMe = value ?? false;
-                          });
-                        },
                   title: Text(
                     l10n.loginRememberEmail,
                     style: TextStyle(color: muted, fontSize: 14),
                   ),
+                  value: _rememberMe,
+                  onChanged: busy
+                      ? null
+                      : (value) => setState(() {
+                          _emailEdited = true;
+                          _rememberMe = value ?? false;
+                        }),
                 ),
                 const SizedBox(height: 12),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryBurgundy,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: isDark
-                        ? const Color(0xFF5C2B3B)
-                        : const Color(0xFFE8D5DC),
-                    disabledForegroundColor: isDark
-                        ? Colors.white70
-                        : const Color(0xFF78606A),
-                    minimumSize: const Size(48, 56),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  onPressed: busy ? null : _signIn,
-                  child: busy
-                      ? SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: isDark
-                                ? Colors.white
-                                : AppTheme.primaryBurgundy,
-                          ),
-                        )
-                      : Text(
-                          l10n.loginTitle,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                Theme(
+                  data: theme.copyWith(
+                    filledButtonTheme: FilledButtonThemeData(
+                      style: theme.filledButtonTheme.style?.copyWith(
+                        minimumSize: const WidgetStatePropertyAll(Size(48, 56)),
+                        padding: const WidgetStatePropertyAll(
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        ),
+                        shape: WidgetStatePropertyAll(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
+                      ),
+                    ),
+                  ),
+                  child: AppPrimaryButton(
+                    key: const ValueKey('login-submit'),
+                    label: l10n.loginTitle,
+                    busyLabel: l10n.loginSigningIn,
+                    busy: busy,
+                    onPressed: _signIn,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 TextButton(

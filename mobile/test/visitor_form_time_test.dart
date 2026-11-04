@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
@@ -6,6 +7,7 @@ import 'package:ngsplusapp/models/visitor.dart';
 import 'package:ngsplusapp/providers/visitor_provider.dart';
 import 'package:ngsplusapp/screens/visitor/visitor_form_screen.dart';
 import 'package:ngsplusapp/widgets/visitor/visitor_labels.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:provider/provider.dart';
 
 import 'visitor_provider_test.dart' show FakeVisitorRepository, visitorFixture;
@@ -40,6 +42,7 @@ Future<void> openForm(
     ChangeNotifierProvider.value(
       value: state,
       child: MaterialApp(
+        theme: AppTheme.lightTheme,
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -69,7 +72,10 @@ Future<void> openForm(
   }
 }
 
-Future<void> submit(WidgetTester tester, {String label = 'Save'}) async {
+Future<void> submit(
+  WidgetTester tester, {
+  String label = 'Save invitation',
+}) async {
   final button = find.widgetWithText(FilledButton, label);
   await tester.scrollUntilVisible(
     button,
@@ -96,8 +102,27 @@ Future<void> resume(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-String displayedDate(WidgetTester tester, DateTime date) =>
-    visitorDate(tester.element(find.byType(VisitorFormScreen)), date);
+Future<void> expectDisplayed(
+  WidgetTester tester,
+  DateTime instant, {
+  bool start = true,
+}) async {
+  final date = find.byKey(
+    Key(start ? 'visitor-start-date' : 'visitor-end-date'),
+  );
+  await tester.scrollUntilVisible(
+    date,
+    200,
+    scrollable: find
+        .descendant(of: find.byType(Form), matching: find.byType(Scrollable))
+        .first,
+  );
+  expect(tester.widget<AppDateField>(date).value, VisitorTime.day(instant));
+  final time = find.byKey(
+    Key(start ? 'visitor-start-time' : 'visitor-end-time'),
+  );
+  expect(tester.widget<AppTimeField>(time).value, VisitorTime.time(instant));
+}
 
 void main() {
   testWidgets(
@@ -113,10 +138,10 @@ void main() {
       expect(repo.drafts, hasLength(1));
       final draft = repo.drafts.single;
       expect(draft.start.isBefore(now), isFalse);
-      expect(draft.start, DateTime(2030, 1, 1, 13, 1));
+      expect(draft.start, DateTime(2030, 1, 1, 13, 1).toUtc());
       expect(draft.end.difference(draft.start), const Duration(hours: 1));
       expect(
-        find.text('Invitation record saved; operator activation is required.'),
+        find.text('Invitation saved. Approval is required.'),
         findsOneWidget,
       );
     },
@@ -132,14 +157,15 @@ void main() {
       await openForm(tester, state, () => now);
       now = now.add(const Duration(hours: 3));
       await resume(tester);
-      expect(find.text(displayedDate(tester, now)), findsOneWidget);
-      expect(
-        find.text(displayedDate(tester, now.add(const Duration(hours: 1)))),
-        findsOneWidget,
+      await expectDisplayed(tester, now);
+      await expectDisplayed(
+        tester,
+        now.add(const Duration(hours: 1)),
+        start: false,
       );
       now = now.add(const Duration(hours: 2));
       await submit(tester);
-      expect(repo.drafts.single.start, now);
+      expect(repo.drafts.single.start, now.toUtc());
       expect(repo.drafts.single.end.difference(now), const Duration(hours: 1));
     },
   );
@@ -153,25 +179,37 @@ void main() {
         final state = VisitorProvider(repository: repo);
         addTearDown(state.dispose);
         await openForm(tester, state, () => now);
-        final button = find.widgetWithText(OutlinedButton, label);
-        await tester.ensureVisible(button);
+        final button = find.byKey(
+          Key(
+            label == 'Visit starts' ? 'visitor-start-date' : 'visitor-end-date',
+          ),
+        );
+        await tester.scrollUntilVisible(
+          button,
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byType(Form),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.pumpAndSettle();
         await tester.tap(button);
         await tester.pumpAndSettle();
         await tester.tap(find.text('OK'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('OK'));
-        await tester.pumpAndSettle();
-        final initial = displayedDate(tester, now);
-        final end = displayedDate(tester, now.add(const Duration(hours: 1)));
+        final initial = now;
+        final end = now.add(const Duration(hours: 1));
         now = now.add(const Duration(hours: 3));
         await resume(tester);
-        expect(find.text(initial), findsOneWidget);
-        expect(find.text(end), findsOneWidget);
+        await expectDisplayed(tester, initial);
+        await expectDisplayed(tester, end, start: false);
         await submit(tester);
         expect(repo.drafts, isEmpty);
-        expect(find.byType(SnackBar), findsOneWidget);
-        expect(find.text(initial), findsOneWidget);
+        // The stale end is rejected with an inline reason, not a snackbar.
+        expect(find.text('End cannot be in the past.'), findsOneWidget);
+        await expectDisplayed(tester, initial);
       },
     );
   }
@@ -185,14 +223,14 @@ void main() {
     final state = VisitorProvider(repository: repo);
     addTearDown(state.dispose);
     await openForm(tester, state, () => now, visitor: visitor);
-    final initial = displayedDate(tester, now);
+    final initial = now;
     now = now.add(const Duration(hours: 3));
     await resume(tester);
-    expect(find.text(initial), findsOneWidget);
+    await expectDisplayed(tester, initial);
     await submit(tester);
     expect(repo.updatedDraft, isNull);
-    expect(find.byType(SnackBar), findsOneWidget);
-    expect(find.text(initial), findsOneWidget);
+    expect(find.text('End cannot be in the past.'), findsOneWidget);
+    await expectDisplayed(tester, initial);
   });
 
   testWidgets(
@@ -216,10 +254,10 @@ void main() {
         noticeReviewed: false,
       );
       await openForm(tester, state, () => now);
-      final initial = displayedDate(tester, now);
+      final initial = now;
       now = now.add(const Duration(hours: 3));
       await resume(tester);
-      expect(find.text(initial), findsOneWidget);
+      await expectDisplayed(tester, initial);
       await submit(tester, label: 'Retry same request');
       expect(repo.drafts.single, same(draft));
       expect(repo.requests, ['pending-request']);
@@ -239,7 +277,7 @@ void main() {
       final first = repo.drafts.single;
       now = now.add(const Duration(hours: 3));
       await resume(tester);
-      expect(find.text(displayedDate(tester, first.start)), findsOneWidget);
+      await expectDisplayed(tester, first.start);
       repo.createResult = () async => 'created';
       await submit(tester, label: 'Retry same request');
       expect(repo.drafts.last, same(first));

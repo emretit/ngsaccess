@@ -1,0 +1,1236 @@
+{
+  "viewport": [
+    390,
+    844
+  ],
+  "dpr": 2,
+  "results": [
+    {
+      "name": "startup-loading",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "startup-error",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Yeniden dene",
+          "x": 20,
+          "y": 439,
+          "width": 350,
+          "height": 52,
+          "bottom": 491
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "login-empty",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Giriş yap",
+          "x": 20,
+          "y": 503,
+          "width": 350,
+          "height": 52,
+          "bottom": 555
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "login-error",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Giriş yap",
+          "x": 20,
+          "y": 595,
+          "width": 350,
+          "height": 52,
+          "bottom": 647
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "login-loading",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Giriş yapılıyor",
+          "x": 20,
+          "y": 503,
+          "width": 350,
+          "height": 52,
+          "bottom": 555
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "login-empty-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Giriş yap",
+          "x": 20,
+          "y": 503,
+          "width": 350,
+          "height": 52,
+          "bottom": 555
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "login-error-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Giriş yap",
+          "x": 20,
+          "y": 595,
+          "width": 350,
+          "height": 52,
+          "bottom": 647
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "login-loading-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Giriş yapılıyor",
+          "x": 20,
+          "y": 503,
+          "width": 350,
+          "height": 52,
+          "bottom": 555
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "password-help",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Talebi kopyala",
+          "x": 20,
+          "y": 391,
+          "width": 350,
+          "height": 54,
+          "bottom": 445
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "home-loading",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "QR kod tara",
+          "x": 20,
+          "y": 417,
+          "width": 350,
+          "height": 54,
+          "bottom": 471
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "home-error",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "QR kod tara",
+          "x": 20,
+          "y": 417,
+          "width": 350,
+          "height": 54,
+          "bottom": 471
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "home-empty",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "QR kod tara",
+          "x": 20,
+          "y": 417,
+          "width": 350,
+          "height": 54,
+          "bottom": 471
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "qr-scan",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "qr-permission",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Ayarları aç",
+          "x": 20,
+          "y": 385,
+          "width": 350,
+          "height": 52,
+          "bottom": 437
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "qr-expired",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "device-filled",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "device-empty",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "door-recovery",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Aynı isteği yeniden gönder",
+          "x": 44,
+          "y": 538,
+          "width": 302,
+          "height": 52,
+          "bottom": 590
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "history-calendar",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "history-summary",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "history-empty",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "history-filter",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Filtreleri uygula",
+          "x": 20,
+          "y": 758,
+          "width": 350,
+          "height": 52,
+          "bottom": 810
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 681,
+          "width": 390,
+          "height": 163,
+          "bottom": 844
+        }
+      ],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "history-detail",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "requests-leave",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Yeni talep",
+          "x": 20,
+          "y": 193,
+          "width": 350,
+          "height": 54,
+          "bottom": 247
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "requests-correction",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Yeni talep",
+          "x": 20,
+          "y": 193,
+          "width": 350,
+          "height": 54,
+          "bottom": 247
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "requests-empty",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Yeni talep",
+          "x": 20,
+          "y": 193,
+          "width": 350,
+          "height": 54,
+          "bottom": 247
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "leave-filled",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "İzin talebi gönder",
+          "x": 20,
+          "y": 758,
+          "width": 350,
+          "height": 52,
+          "bottom": 810
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 745,
+          "width": 390,
+          "height": 99,
+          "bottom": 844
+        }
+      ],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "leave-error",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "İzin talebi gönder",
+          "x": 20,
+          "y": 758,
+          "width": 350,
+          "height": 52,
+          "bottom": 810
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 745,
+          "width": 390,
+          "height": 99,
+          "bottom": 844
+        }
+      ],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "requests-leave-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Yeni talep",
+          "x": 20,
+          "y": 193,
+          "width": 350,
+          "height": 54,
+          "bottom": 247
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "requests-correction-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Yeni talep",
+          "x": 20,
+          "y": 193,
+          "width": 350,
+          "height": 54,
+          "bottom": 247
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "requests-empty-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Yeni talep",
+          "x": 20,
+          "y": 193,
+          "width": 350,
+          "height": 54,
+          "bottom": 247
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "leave-filled-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "İzin talebi gönder",
+          "x": 20,
+          "y": 758,
+          "width": 350,
+          "height": 52,
+          "bottom": 810
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 745,
+          "width": 390,
+          "height": 99,
+          "bottom": 844
+        }
+      ],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "leave-error-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "İzin talebi gönder",
+          "x": 20,
+          "y": 758,
+          "width": 350,
+          "height": 52,
+          "bottom": 810
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 745,
+          "width": 390,
+          "height": 99,
+          "bottom": 844
+        }
+      ],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "correction-filled",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Düzeltme talebi gönder",
+          "x": 20,
+          "y": 758,
+          "width": 350,
+          "height": 52,
+          "bottom": 810
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 745,
+          "width": 390,
+          "height": 99,
+          "bottom": 844
+        }
+      ],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "request-withdraw",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitors-filled",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Ziyaretçi davet et",
+          "x": 20,
+          "y": 127,
+          "width": 350,
+          "height": 54,
+          "bottom": 181
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitors-empty",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Ziyaretçi davet et",
+          "x": 20,
+          "y": 127,
+          "width": 350,
+          "height": 54,
+          "bottom": 181
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitors-error",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Ziyaretçi davet et",
+          "x": 20,
+          "y": 127,
+          "width": 350,
+          "height": 54,
+          "bottom": 181
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitor-form-filled",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Daveti kaydet",
+          "x": 20,
+          "y": 758,
+          "width": 350,
+          "height": 52,
+          "bottom": 810
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 745,
+          "width": 390,
+          "height": 99,
+          "bottom": 844
+        }
+      ],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitor-form-keyboard",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Daveti kaydet",
+          "x": 20,
+          "y": 494,
+          "width": 350,
+          "height": 52,
+          "bottom": 546
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 481,
+          "width": 390,
+          "height": 77,
+          "bottom": 558
+        }
+      ],
+      "keyboard": [
+        {
+          "x": 0,
+          "y": 558,
+          "width": 390,
+          "height": 286,
+          "bottom": 844
+        }
+      ],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitors-filled-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Ziyaretçi davet et",
+          "x": 20,
+          "y": 127,
+          "width": 350,
+          "height": 54,
+          "bottom": 181
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitors-empty-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Ziyaretçi davet et",
+          "x": 20,
+          "y": 127,
+          "width": 350,
+          "height": 54,
+          "bottom": 181
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitors-error-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Ziyaretçi davet et",
+          "x": 20,
+          "y": 127,
+          "width": 350,
+          "height": 54,
+          "bottom": 181
+        }
+      ],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitor-form-filled-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Daveti kaydet",
+          "x": 20,
+          "y": 758,
+          "width": 350,
+          "height": 52,
+          "bottom": 810
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 745,
+          "width": 390,
+          "height": 99,
+          "bottom": 844
+        }
+      ],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitor-form-keyboard-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 1,
+      "primary": [
+        {
+          "label": "Daveti kaydet",
+          "x": 20,
+          "y": 494,
+          "width": 350,
+          "height": 52,
+          "bottom": 546
+        }
+      ],
+      "footer": [
+        {
+          "x": 0,
+          "y": 481,
+          "width": 390,
+          "height": 77,
+          "bottom": 558
+        }
+      ],
+      "keyboard": [
+        {
+          "x": 0,
+          "y": 558,
+          "width": 390,
+          "height": 286,
+          "bottom": 844
+        }
+      ],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitor-detail",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "visitor-cancel",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "profile-main",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "profile-theme",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "profile-main-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    },
+    {
+      "name": "profile-theme-dark",
+      "horizontalOverflow": 0,
+      "overflowingContainers": [],
+      "smallTargets": [],
+      "primaryCount": 0,
+      "primary": [],
+      "footer": [],
+      "keyboard": [],
+      "png": [
+        780,
+        1688
+      ],
+      "pageErrors": [],
+      "externalRequests": []
+    }
+  ]
+}

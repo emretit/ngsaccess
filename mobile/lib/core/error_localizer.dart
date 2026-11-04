@@ -9,7 +9,7 @@ String localizeAppError(BuildContext context, AppError error) {
   return switch (error) {
     NetworkError _ => l10n.errorNetwork,
     TimeoutError _ => l10n.errorTimeout,
-    ServerError(:final statusCode) => l10n.errorServer(statusCode),
+    ServerError _ => l10n.errorServer,
     EmploymentEndedError _ => l10n.errorEmploymentEnded,
     AuthExpiredError _ => l10n.errorAuthExpired,
     UnknownError _ => l10n.errorUnknown,

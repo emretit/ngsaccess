@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../ui/ui.dart';
 
 /// Keeps retry, refresh and pagination reachable even for an empty server page.
 class HistoryRecordsList extends StatelessWidget {
@@ -53,67 +54,47 @@ class HistoryRecordsList extends StatelessWidget {
           if (headerWidget != null) SliverToBoxAdapter(child: headerWidget),
           if (error != null)
             SliverToBoxAdapter(
-              child: Semantics(
-                liveRegion: true,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (hasPreviousData) Text(l10n.historyStaleData),
-                      Text(error),
-                      TextButton.icon(
-                        onPressed: isLoading ? null : onRefresh,
-                        icon: const Icon(Icons.refresh),
-                        label: Text(l10n.commonRetry),
-                      ),
-                    ],
-                  ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: AppDataNotice(
+                  title: hasPreviousData
+                      ? l10n.historyStaleData
+                      : l10n.historyErrorTitle,
+                  message: error,
+                  tone: AppStatusTone.danger,
+                  actionLabel: l10n.commonRetry,
+                  onAction: isLoading ? null : onRefresh,
                 ),
               ),
             ),
           if (isLoading)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    semanticsLabel: l10n.historyLoading,
-                  ),
-                ),
+                padding: const EdgeInsets.all(20),
+                child: recordCount == 0
+                    ? AppSkeleton(semanticLabel: l10n.historyLoading)
+                    : LinearProgressIndicator(
+                        semanticsLabel: l10n.historyLoading,
+                      ),
               ),
             ),
           if (!isLoading && error == null && recordCount == 0 && !hasMore)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.event_note_rounded,
-                      size: 32,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(l10n.historyEmpty, textAlign: TextAlign.center),
-                    const SizedBox(height: 8),
-                    Text(
-                      emptyHint ?? l10n.historyEmptyHint,
-                      textAlign: TextAlign.center,
-                    ),
-                    if (onClearFilters != null) ...[
-                      const SizedBox(height: 16),
-                      OutlinedButton(
-                        onPressed: onClearFilters,
-                        child: Text(l10n.historyShowAllRecords),
-                      ),
-                    ],
-                  ],
+                padding: const EdgeInsets.all(20),
+                child: AppEmptyState(
+                  title: l10n.historyEmpty,
+                  message: emptyHint ?? l10n.historyEmptyHint,
+                  icon: Icons.event_note_rounded,
+                  actionLabel: onClearFilters == null
+                      ? null
+                      : l10n.historyShowAllRecords,
+                  onAction: onClearFilters,
                 ),
               ),
             ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate(
                 itemBuilder,
@@ -136,11 +117,11 @@ class HistoryRecordsList extends StatelessWidget {
                         ),
                       )
                     else
-                      OutlinedButton.icon(
+                      AppSecondaryButton(
                         key: const ValueKey('history-load-more'),
                         onPressed: isLoading ? null : onLoadMore,
-                        icon: const Icon(Icons.expand_more),
-                        label: Text(l10n.historyLoadMore),
+                        icon: Icons.expand_more,
+                        label: l10n.historyLoadMore,
                       ),
                   ],
                 ),

@@ -1,0 +1,1025 @@
+{
+  "viewport": [
+    390,
+    844
+  ],
+  "deviceScaleFactor": 2,
+  "results": [
+    {
+      "direction": "A",
+      "screen": "home",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 659,
+      "contentClientHeight": 659,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "QR kod tara",
+          "width": 350,
+          "height": 54,
+          "bottom": 444.296875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Kapıyı açAna Giriş",
+          "width": 350,
+          "height": 66,
+          "bottom": 520.296875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Taleplerimİzin ve kayıt düzeltme1 bekleyen",
+          "width": 350,
+          "height": 62,
+          "bottom": 599.296875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi davet et",
+          "width": 350,
+          "height": 62,
+          "bottom": 661.296875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": null
+    },
+    {
+      "direction": "A",
+      "screen": "history",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 705,
+      "contentClientHeight": 705,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "Kayıtlar",
+          "width": 116.65625,
+          "height": 48,
+          "bottom": 179.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Takvim",
+          "width": 116.671875,
+          "height": 48,
+          "bottom": 179.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Özet",
+          "width": 116.671875,
+          "height": 48,
+          "bottom": 179.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Filtrele",
+          "width": 86.96875,
+          "height": 48,
+          "bottom": 234.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": 708.9375,
+      "refreshBottom": null
+    },
+    {
+      "direction": "A",
+      "screen": "qr",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 705,
+      "contentClientHeight": 705,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "QR Kodum",
+          "width": 175,
+          "height": 48,
+          "bottom": 161.1875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Tara",
+          "width": 175,
+          "height": 48,
+          "bottom": 161.1875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Yenile",
+          "width": 248,
+          "height": 50,
+          "bottom": 677.15625,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": 677.15625
+    },
+    {
+      "direction": "A",
+      "screen": "home-dark",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 659,
+      "contentClientHeight": 659,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "QR kod tara",
+          "width": 350,
+          "height": 54,
+          "bottom": 444.296875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Kapıyı açAna Giriş",
+          "width": 350,
+          "height": 66,
+          "bottom": 520.296875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Taleplerimİzin ve kayıt düzeltme1 bekleyen",
+          "width": 350,
+          "height": 62,
+          "bottom": 599.296875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi davet et",
+          "width": 350,
+          "height": 62,
+          "bottom": 661.296875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": null
+    },
+    {
+      "direction": "B",
+      "screen": "home",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 659,
+      "contentClientHeight": 659,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "QR kod tara",
+          "width": 350,
+          "height": 54,
+          "bottom": 454.9375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Kapıyı açAna Giriş",
+          "width": 350,
+          "height": 66,
+          "bottom": 530.9375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Taleplerimİzin ve kayıt düzeltme1 bekleyen",
+          "width": 320,
+          "height": 62,
+          "bottom": 609.9375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi davet et",
+          "width": 320,
+          "height": 62,
+          "bottom": 671.9375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": null
+    },
+    {
+      "direction": "B",
+      "screen": "history",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 705,
+      "contentClientHeight": 705,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "Kayıtlar",
+          "width": 113.328125,
+          "height": 48,
+          "bottom": 184.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Takvim",
+          "width": 113.34375,
+          "height": 48,
+          "bottom": 184.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Özet",
+          "width": 113.328125,
+          "height": 48,
+          "bottom": 184.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Filtrele",
+          "width": 86.96875,
+          "height": 48,
+          "bottom": 243.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": 722.9375,
+      "refreshBottom": null
+    },
+    {
+      "direction": "B",
+      "screen": "qr",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 705,
+      "contentClientHeight": 705,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "QR Kodum",
+          "width": 170,
+          "height": 48,
+          "bottom": 166.1875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Tara",
+          "width": 170,
+          "height": 48,
+          "bottom": 166.1875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Yenile",
+          "width": 248,
+          "height": 50,
+          "bottom": 684.15625,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": 684.15625
+    },
+    {
+      "direction": "B",
+      "screen": "home-dark",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 659,
+      "contentClientHeight": 659,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "QR kod tara",
+          "width": 350,
+          "height": 54,
+          "bottom": 454.9375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Kapıyı açAna Giriş",
+          "width": 350,
+          "height": 66,
+          "bottom": 530.9375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Taleplerimİzin ve kayıt düzeltme1 bekleyen",
+          "width": 320,
+          "height": 62,
+          "bottom": 609.9375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi davet et",
+          "width": 320,
+          "height": 62,
+          "bottom": 671.9375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": null
+    },
+    {
+      "direction": "C",
+      "screen": "home",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 659,
+      "contentClientHeight": 659,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "Kapıyı açAna Giriş",
+          "width": 174,
+          "height": 112,
+          "bottom": 596.921875,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR kod taraKamerayı aç",
+          "width": 174,
+          "height": 112,
+          "bottom": 596.921875,
+          "fullyVisible": true
+        },
+        {
+          "label": "1 bekleyenTaleplerimİzin ve düzeltme",
+          "width": 174,
+          "height": 112,
+          "bottom": 718.921875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi davet etYeni davet oluştur",
+          "width": 174,
+          "height": 112,
+          "bottom": 718.921875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": null
+    },
+    {
+      "direction": "C",
+      "screen": "history",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 705,
+      "contentClientHeight": 705,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "Kayıtlar",
+          "width": 113.328125,
+          "height": 48,
+          "bottom": 184.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Takvim",
+          "width": 113.34375,
+          "height": 48,
+          "bottom": 184.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Özet",
+          "width": 113.328125,
+          "height": 48,
+          "bottom": 184.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Filtrele",
+          "width": 86.96875,
+          "height": 48,
+          "bottom": 243.375,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": 722.9375,
+      "refreshBottom": null
+    },
+    {
+      "direction": "C",
+      "screen": "qr",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 705,
+      "contentClientHeight": 705,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "QR Kodum",
+          "width": 170,
+          "height": 48,
+          "bottom": 166.1875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Tara",
+          "width": 170,
+          "height": 48,
+          "bottom": 166.1875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Yenile",
+          "width": 248,
+          "height": 50,
+          "bottom": 686.15625,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": 686.15625
+    },
+    {
+      "direction": "C",
+      "screen": "home-dark",
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": 0,
+      "contentScrollHeight": 659,
+      "contentClientHeight": 659,
+      "footerTop": 749,
+      "navWidths": [
+        76.390625,
+        76.40625,
+        76.390625,
+        76.40625,
+        76.40625
+      ],
+      "controls": [
+        {
+          "label": "Kapıyı açAna Giriş",
+          "width": 174,
+          "height": 112,
+          "bottom": 596.921875,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR kod taraKamerayı aç",
+          "width": 174,
+          "height": 112,
+          "bottom": 596.921875,
+          "fullyVisible": true
+        },
+        {
+          "label": "1 bekleyenTaleplerimİzin ve düzeltme",
+          "width": 174,
+          "height": 112,
+          "bottom": 718.921875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi davet etYeni davet oluştur",
+          "width": 174,
+          "height": 112,
+          "bottom": 718.921875,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ana Sayfa",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Geçmiş",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "QR",
+          "width": 76.390625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Ziyaretçi",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        },
+        {
+          "label": "Profil",
+          "width": 76.40625,
+          "height": 60,
+          "bottom": 815,
+          "fullyVisible": true
+        }
+      ],
+      "lastRecordBottom": null,
+      "refreshBottom": null
+    }
+  ],
+  "routes": [
+    {
+      "direction": "A",
+      "selected": "Tara",
+      "qrCodeCount": 0
+    },
+    {
+      "direction": "B",
+      "selected": "Tara",
+      "qrCodeCount": 0
+    },
+    {
+      "direction": "C",
+      "selected": "Tara",
+      "qrCodeCount": 0
+    }
+  ],
+  "index": {
+    "iframes": 12,
+    "width": 1280,
+    "viewport": 1280,
+    "loadedFrames": 12
+  },
+  "mobileIndex": {
+    "width": 390,
+    "viewport": 390
+  },
+  "externalRequests": [],
+  "pageErrors": []
+}

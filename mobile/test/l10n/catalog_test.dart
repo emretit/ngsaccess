@@ -49,11 +49,15 @@ void main() {
     () {
       final en = AppLocalizationsEn();
       final tr = AppLocalizationsTr();
-      expect(en.homeExtraMovements(1), '+1 movement');
+      expect(en.homeExtraEntries(1), '+1 more entry');
+      expect(en.homeExtraExits(1), '+1 more exit');
+      expect(tr.homeExtraEntries(2), '+2 giriş daha');
+      expect(tr.homeExtraExits(2), '+2 çıkış daha');
       expect(en.historyWeeklyTotalRecords(1), '1 record this week');
       expect(en.historyDayRecordCount(1), '1 record');
       for (final count in [0, 2, 1000]) {
-        expect(en.homeExtraMovements(count), '+$count movements');
+        expect(en.homeExtraEntries(count), '+$count more entries');
+        expect(en.homeExtraExits(count), '+$count more exits');
         expect(en.historyDayRecordCount(count), '$count records');
         expect(tr.historyDayRecordCount(count), contains('$count'));
       }

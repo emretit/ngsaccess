@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../models/door_operation.dart';
 import '../providers/auth_provider.dart';
 import '../providers/door_operation_provider.dart';
+import 'ui/ui.dart';
 
 /// Recovery is explicit and scoped to the session that opened the dialog.
 /// Opening or checking this dialog never sends a door command.
@@ -107,56 +108,87 @@ class _DoorOperationRecoveryDialogState
                       : l10n.homeCommandFailed,
                 DoorOperationStatus.unknown || null => l10n.homeCommandUnknown,
               };
+        final hasRequest =
+            operation != null || (owns && commands.hasUnresolvedOperation);
         final unresolvedError =
             problem is BusinessError && problem.code == 'OPERATION_UNRESOLVED';
-        return AlertDialog(
-          title: Text(l10n.doorOperationRecoveryTitle),
-          scrollable: true,
-          content: Column(
+        final canRetry =
+            owns &&
+            operation == null &&
+            commands.hasUnresolvedOperation &&
+            commands.canRetrySameRequest;
+        final tone = switch (operation?.status) {
+          DoorOperationStatus.confirmed => AppStatusTone.success,
+          DoorOperationStatus.failed => AppStatusTone.danger,
+          DoorOperationStatus.pending ||
+          DoorOperationStatus.sent => AppStatusTone.info,
+          _ => AppStatusTone.warning,
+        };
+        return AppDialog(
+          title: l10n.doorOperationRecoveryTitle,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(l10n.doorOperationRecoveryHint),
               if (operation != null) ...[
+                Text(
+                  operation.deviceName,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                Text(
+                  AppDateFormat(
+                    locale: Localizations.localeOf(context),
+                    now: DateTime.now(),
+                  ).relativeDateTime(operation.requestedAt),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 16),
-                Text(operation.deviceName),
               ],
-              const SizedBox(height: 16),
-              Semantics(liveRegion: true, child: Text(message)),
+              AppDataNotice(
+                message: hasRequest || !owns
+                    ? message
+                    : l10n.doorOperationNothingToCheck,
+                tone: !owns
+                    ? AppStatusTone.danger
+                    : hasRequest
+                    ? tone
+                    : AppStatusTone.info,
+                busy: owns && busy,
+              ),
               if (problem != null && !unresolvedError) ...[
                 const SizedBox(height: 12),
-                Semantics(
-                  liveRegion: true,
-                  child: Text(localizeAppError(context, problem)),
+                AppDataNotice(
+                  message: localizeAppError(context, problem),
+                  tone: AppStatusTone.danger,
                 ),
               ],
-              if (owns && busy) ...[
+              if (owns && commands.hasUnresolvedOperation) ...[
                 const SizedBox(height: 16),
-                LinearProgressIndicator(semanticsLabel: l10n.homeDataLoading),
+                AppSecondaryButton(
+                  label: l10n.homeCommandCheckStatus,
+                  semanticLabel: operation == null
+                      ? l10n.homeCommandCheckStatus
+                      : '${operation.deviceName}: ${l10n.homeCommandCheckStatus}',
+                  icon: Icons.refresh,
+                  busy: busy,
+                  onPressed: busy ? null : () => unawaited(_checkStatus()),
+                ),
+              ],
+              if (hasRequest) ...[
+                const SizedBox(height: 16),
+                Text(
+                  l10n.doorOperationRecoveryHint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ],
             ],
           ),
-          actions: [
-            if (owns && commands.hasUnresolvedOperation)
-              TextButton(
-                onPressed: busy ? null : () => unawaited(_checkStatus()),
-                child: Text(l10n.homeCommandCheckStatus),
-              ),
-            if (owns &&
-                operation == null &&
-                commands.hasUnresolvedOperation &&
-                commands.canRetrySameRequest)
-              TextButton(
-                onPressed: busy || !_reconciled
-                    ? null
-                    : () => unawaited(_retry()),
-                child: Text(l10n.homeCommandRetrySameRequest),
-              ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(l10n.commonClose),
-            ),
-          ],
+          confirmLabel: canRetry ? l10n.homeCommandRetrySameRequest : null,
+          onConfirm: canRetry
+              ? (busy || !_reconciled ? null : () => unawaited(_retry()))
+              : null,
+          cancelLabel: l10n.commonClose,
+          onCancel: () => Navigator.of(context).pop(),
         );
       },
     );

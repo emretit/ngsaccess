@@ -283,8 +283,8 @@ void main() {
 
   for (final language in ['tr', 'en']) {
     final message = language == 'tr'
-        ? 'İşten ayrıldınız. Mobil erişiminiz kapatıldı.'
-        : 'Your employment has ended. Your mobile access has been disabled.';
+        ? 'Mobil erişiminiz kapatıldı. Kurum yöneticinize başvurun.'
+        : 'Your mobile access is disabled. Contact your organisation’s administrator.';
     testWidgets('$language real login EMPLOYMENT_ENDED displays safe reason', (
       tester,
     ) async {
@@ -301,7 +301,7 @@ void main() {
         find.byType(TextFormField).last,
         'fixture-password',
       );
-      await tester.tap(find.byType(ElevatedButton));
+      await tester.tap(find.byType(FilledButton));
       await tester.pumpAndSettle();
       final auth = pageContext(tester).read<AuthProvider>();
       expect(auth.lastError, isA<EmploymentEndedError>());
@@ -413,7 +413,7 @@ void main() {
       find.byType(TextFormField).at(1),
       'fixture-password',
     );
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(FilledButton));
     await tester.pumpAndSettle();
     expect(find.byType(HistoryScreen), findsOneWidget);
     expect(backend.signInCalls, 1);
@@ -544,7 +544,7 @@ void main() {
     await mount(tester);
     await tester.pumpAndSettle();
     expect(backend.visitorCalls, 0);
-    await tester.tap(find.text('QR Actions'));
+    await tester.tap(find.text('QR'));
     await tester.pumpAndSettle();
     expect(
       tester.widget<QRScanScreen>(find.byType(QRScanScreen)).isActive,

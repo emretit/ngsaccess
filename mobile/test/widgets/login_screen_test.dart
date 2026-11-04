@@ -8,6 +8,7 @@ import 'package:ngsplusapp/providers/auth_provider.dart';
 import 'package:ngsplusapp/repositories/auth_repository.dart';
 import 'package:ngsplusapp/screens/auth/login_screen.dart';
 import 'package:ngsplusapp/theme/app_theme.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:provider/provider.dart';
 
 import '../auth_fakes.dart';
@@ -18,6 +19,7 @@ Widget wrapLogin(
   Brightness brightness = Brightness.light,
   double textScale = 1,
 }) => MaterialApp(
+  debugShowCheckedModeBanner: false,
   theme: brightness == Brightness.dark
       ? AppTheme.darkTheme
       : AppTheme.lightTheme,
@@ -79,11 +81,37 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(1), 'test-password');
   }
 
+  testWidgets(
+    'restored remember row and centered password help have 48dp targets',
+    (tester) async {
+      await mount(tester, size: const Size(390, 844));
+      final row = find.byType(CheckboxListTile);
+      final checkbox = find.descendant(
+        of: row,
+        matching: find.byType(Checkbox),
+      );
+      expect(checkbox, findsOneWidget);
+      final title = find.text('E-postamı hatırla');
+      final fieldLeft = tester.getRect(find.byType(TextFormField).first).left;
+      expect(tester.getRect(row).height, greaterThanOrEqualTo(48));
+      expect(tester.getRect(row).left, closeTo(fieldLeft, 1));
+      expect(tester.getRect(title).left - fieldLeft, closeTo(56, 1));
+      expect(
+        tester.getRect(find.text('Şifre yardımı')).center.dx,
+        closeTo(tester.getRect(find.byType(FilledButton)).center.dx, 1),
+      );
+      expect(
+        tester.getRect(find.byType(TextButton)).height,
+        greaterThanOrEqualTo(48),
+      );
+    },
+  );
+
   testWidgets('empty email and password show validation errors', (
     tester,
   ) async {
     await mount(tester);
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(FilledButton));
     await tester.pump();
     expect(find.text('E-posta adresinizi girin'), findsOneWidget);
     expect(find.text('Şifrenizi girin'), findsOneWidget);
@@ -94,7 +122,7 @@ void main() {
     await mount(tester);
     await tester.enterText(find.byType(TextFormField).at(0), 'invalid');
     await tester.enterText(find.byType(TextFormField).at(1), '123');
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(FilledButton));
     await tester.pump();
     expect(find.text('Geçerli bir e-posta adresi girin'), findsOneWidget);
     expect(find.text('Şifre en az 6 karakter olmalı'), findsOneWidget);
@@ -160,12 +188,12 @@ void main() {
     );
     await mount(tester);
     await enterCredentials(tester);
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(FilledButton));
     await tester.pumpAndSettle();
-    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.byType(AppDataNotice), findsOneWidget);
     expect(find.text('E-posta veya şifre hatalı'), findsOneWidget);
     expect(
-      tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNotNull,
     );
   });
@@ -177,10 +205,10 @@ void main() {
       repo.onSignIn = (email, password) => reply.future;
       await mount(tester);
       await enterCredentials(tester);
-      await tester.tap(find.byType(ElevatedButton));
+      await tester.tap(find.byType(FilledButton));
       await tester.pump();
       expect(
-        tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
         isNull,
       );
       expect(
@@ -203,7 +231,7 @@ void main() {
             .every((field) => !field.enabled),
         isTrue,
       );
-      await tester.tap(find.byType(ElevatedButton));
+      await tester.tap(find.byType(FilledButton));
       await tester.pump();
       expect(repo.signInCalls, 1);
       reply.complete(authResult());
@@ -227,7 +255,7 @@ void main() {
     repo.onSignIn = (email, password) => reply.future;
     await mount(tester);
     await enterCredentials(tester);
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(FilledButton));
     await tester.pump();
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     reply.complete(authResult());
@@ -286,8 +314,8 @@ void main() {
           tester.widget<CheckboxListTile>(find.byType(CheckboxListTile)).value,
           isTrue,
         );
-        await tester.ensureVisible(find.byType(ElevatedButton));
-        await tester.tap(find.byType(ElevatedButton));
+        await tester.ensureVisible(find.byType(FilledButton));
+        await tester.tap(find.byType(FilledButton));
         await tester.pumpAndSettle();
         expect(
           find.text(

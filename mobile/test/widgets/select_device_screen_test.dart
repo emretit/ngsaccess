@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
@@ -74,6 +76,7 @@ void main() {
           ),
         ],
         child: MaterialApp(
+          theme: AppTheme.lightTheme,
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -106,6 +109,34 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
     }
   }
+
+  testWidgets(
+    'selected door appears once in one lazy group with a full-width clear action',
+    (tester) async {
+      await prepare();
+      await preferred.setDevice(
+        id: 'panel',
+        name: 'İç Kapı',
+        doorId: 'front',
+        targetId: 'panel:front',
+      );
+      await mount(tester);
+      expect(find.text('İç Kapı'), findsOneWidget);
+      expect(find.byType(DecoratedSliver), findsOneWidget);
+      expect(find.byType(AppListRow), findsNWidgets(2));
+      final clear = find.widgetWithText(AppSecondaryButton, 'Clear selection');
+      expect(tester.getSize(clear).width, closeTo(320, 0.1));
+      final firstRow = find.ancestor(
+        of: find.text('İç Kapı'),
+        matching: find.byType(AppListRow),
+      );
+      expect(tester.widget<AppListRow>(firstRow).selected, isTrue);
+      expect(
+        tester.getTopLeft(firstRow).dy - tester.getBottomLeft(clear).dy,
+        greaterThanOrEqualTo(16),
+      );
+    },
+  );
 
   testWidgets(
     'localized network failure preserves preference and allows explicit clear',
@@ -164,7 +195,7 @@ void main() {
     await mount(tester);
     await tester.tap(find.text('Rear door'));
     await tester.pumpAndSettle();
-    expect(find.text('Select Door'), findsOneWidget);
+    expect(find.text('Choose a door'), findsOneWidget);
     expect(
       find.text('Could not save your preference. Please try again.'),
       findsOneWidget,
@@ -181,7 +212,7 @@ void main() {
       await tester.tap(find.text('Rear door'));
       await tester.pump();
       expect(preferred.isSaving, isTrue);
-      expect(find.text('Select Door'), findsOneWidget);
+      expect(find.text('Choose a door'), findsOneWidget);
       await tester.tap(find.text('İç Kapı'));
       await tester.pump();
       expect(prefs.writes, hasLength(1));
@@ -228,7 +259,7 @@ void main() {
       ),
     ];
     await mount(tester);
-    expect(find.text('Unknown Device'), findsOneWidget);
+    expect(find.text('Door unavailable'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'ic kapi');
     await tester.pumpAndSettle();
     // This query intentionally includes a distinct Turkish consonant: ç != c.
@@ -267,13 +298,13 @@ void main() {
       expect(find.text('Door 1'), findsNWidgets(2));
       expect(find.text('NGS0001 • Office'), findsOneWidget);
       expect(find.text('Deneme1 • Test zone'), findsOneWidget);
-      final disabledTile = tester.widget<ListTile>(
+      final disabledTile = tester.widget<AppListRow>(
         find.ancestor(
           of: find.text('Deneme1 • Test zone'),
-          matching: find.byType(ListTile),
+          matching: find.byType(AppListRow),
         ),
       );
-      expect(disabledTile.onTap, isNull);
+      expect(disabledTile.enabled, isFalse);
       expect(tester.takeException(), isNull);
 
       await tester.enterText(find.byType(TextField), 'Deneme1');

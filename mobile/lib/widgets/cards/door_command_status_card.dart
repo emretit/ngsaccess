@@ -4,7 +4,7 @@ import '../../core/error_localizer.dart';
 import '../../core/errors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/door_operation.dart';
-import '../../theme/app_theme.dart';
+import '../ui/ui.dart';
 
 /// Device acknowledgement is deliberately described separately from passage.
 class DoorCommandStatusCard extends StatelessWidget {
@@ -66,61 +66,30 @@ class DoorCommandStatusCard extends StatelessWidget {
                 AppStatusTone.danger,
               ),
     };
-    final colors = AppTheme.statusColors(context, tone);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (current != null) ...[
-            Text(
-              current.deviceName,
-              style: TextStyle(
-                color: colors.foreground,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          Semantics(
-            liveRegion: true,
-            child: Text(message, style: TextStyle(color: colors.foreground)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppDataNotice(
+          title: current?.deviceName,
+          message: message,
+          tone: tone,
+          busy: isLoading,
+          actionLabel: hasUnresolvedOperation
+              ? l10n.homeCommandCheckStatus
+              : null,
+          onAction: hasUnresolvedOperation ? onCheckStatus : null,
+        ),
+        if (problem != null && (current != null || hasUnresolvedOperation))
+          AppDataNotice(
+            message: localizeAppError(context, problem),
+            tone: AppStatusTone.danger,
           ),
-          if (problem != null &&
-              (current != null || hasUnresolvedOperation)) ...[
-            const SizedBox(height: 8),
-            Text(
-              localizeAppError(context, problem),
-              style: TextStyle(color: colors.foreground),
-            ),
-          ],
-          if (isLoading) ...[
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              semanticsLabel: message,
-              color: colors.foreground,
-              backgroundColor: colors.background,
-            ),
-          ],
-          if (hasUnresolvedOperation)
-            TextButton.icon(
-              onPressed: isLoading ? null : onCheckStatus,
-              icon: const Icon(Icons.refresh),
-              label: Text(l10n.homeCommandCheckStatus),
-              style: TextButton.styleFrom(foregroundColor: colors.foreground),
-            ),
-          if (hasUnresolvedOperation && current == null && canRetrySameRequest)
-            TextButton(
-              onPressed: isLoading ? null : onRetrySameRequest,
-              style: TextButton.styleFrom(foregroundColor: colors.foreground),
-              child: Text(l10n.homeCommandRetrySameRequest),
-            ),
-        ],
-      ),
+        if (hasUnresolvedOperation && current == null && canRetrySameRequest)
+          AppSecondaryButton(
+            label: l10n.homeCommandRetrySameRequest,
+            onPressed: isLoading ? null : onRetrySameRequest,
+          ),
+      ],
     );
   }
 }

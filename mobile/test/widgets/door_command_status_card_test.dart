@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
@@ -23,7 +24,7 @@ Widget _wrap(Widget child, {double scale = 1, bool dark = false}) =>
       locale: const Locale('en'),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      theme: ThemeData(brightness: dark ? Brightness.dark : Brightness.light),
+      theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
       home: Builder(
         builder: (context) => MediaQuery(
           data: MediaQuery.of(

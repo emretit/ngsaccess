@@ -38,7 +38,7 @@ void main() {
         ),
         home: StatefulBuilder(
           builder: (context, setState) => Scaffold(
-            extendBody: true,
+            extendBody: false,
             body: SafeArea(
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -90,6 +90,15 @@ void main() {
               final target = find.byKey(ValueKey('app_nav_button_$index'));
               final bounds = tester.getRect(target);
               expect(bounds.width, greaterThanOrEqualTo(48));
+              expect(
+                bounds.width,
+                closeTo(
+                  tester
+                      .getSize(find.byKey(const ValueKey('app_nav_button_0')))
+                      .width,
+                  0.01,
+                ),
+              );
               expect(bounds.height, greaterThanOrEqualTo(48));
               expect(bounds.left, greaterThanOrEqualTo(0));
               expect(bounds.right, lessThanOrEqualTo(320));
@@ -118,23 +127,30 @@ void main() {
     }
   }
 
-  testWidgets('floating navigation leaves the final content action reachable', (
-    tester,
-  ) async {
-    var taps = 0;
-    await mount(tester, size: const Size(390, 844), onLastAction: () => taps++);
-    final action = find.byKey(const Key('last_content_action'));
-    await tester.scrollUntilVisible(action, 400);
-    await tester.pumpAndSettle();
-    expect(
-      tester.getRect(action).bottom,
-      lessThanOrEqualTo(tester.getTopLeft(find.byType(AppBottomNavigation)).dy),
-    );
-    await tester.tap(action);
-    await tester.pump();
-    expect(taps, 1);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'navigation reserves space and leaves the final content action reachable',
+    (tester) async {
+      var taps = 0;
+      await mount(
+        tester,
+        size: const Size(390, 844),
+        onLastAction: () => taps++,
+      );
+      final action = find.byKey(const Key('last_content_action'));
+      await tester.scrollUntilVisible(action, 400);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(action).bottom,
+        lessThanOrEqualTo(
+          tester.getTopLeft(find.byType(AppBottomNavigation)).dy,
+        ),
+      );
+      await tester.tap(action);
+      await tester.pump();
+      expect(taps, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('tablet navigation stays centered and honors reduced motion', (
     tester,

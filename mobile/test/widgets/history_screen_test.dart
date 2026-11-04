@@ -11,6 +11,7 @@ import 'package:ngsplusapp/providers/attendance_provider.dart';
 import 'package:ngsplusapp/screens/history/history_screen.dart';
 import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:ngsplusapp/widgets/history/history_calendar.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:provider/provider.dart';
 
 import '../helpers/mocks.dart';
@@ -196,7 +197,7 @@ void main() {
     );
     expect(find.text('150'), findsOneWidget);
     expect(find.text('25'), findsNothing);
-    await tester.tap(find.text('This Week'));
+    await tester.tap(find.text('This week'));
     await tester.pumpAndSettle();
     expect(find.text('25'), findsOneWidget);
     expect(find.text('150'), findsNothing);
@@ -224,7 +225,7 @@ void main() {
         find.byType(HistoryCalendar),
       );
       // Three granted movements plus five denied attempts are eight records.
-      expect(calendar.dayCounts['2026-10-19'], 8);
+      expect(calendar.dayCounts?['2026-10-19'], 8);
       final day = find.byKey(const ValueKey('history-day-2026-10-19'));
       await tester.ensureVisible(day);
       await tester.tap(day);
@@ -315,7 +316,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Filter'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Date').first);
+    await tester.tap(find.byType(AppDateField));
     await tester.pumpAndSettle();
     expect(find.byType(CalendarDatePicker), findsOneWidget);
     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
@@ -337,7 +338,7 @@ void main() {
     expect(find.byTooltip('Refresh'), findsOneWidget);
     await tester.tap(find.byTooltip('Filter'));
     await tester.pumpAndSettle();
-    expect(find.text('Clear Filters'), findsOneWidget);
+    expect(find.text('Clear filters'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -357,7 +358,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(provider.filters.length, originalRequests);
     expect(find.byTooltip('Filter'), findsOneWidget);
-    expect(find.text('All devices'), findsNothing);
+    expect(find.text('All doors'), findsNothing);
     expect(find.text('All dates'), findsNothing);
   });
 
@@ -368,6 +369,7 @@ void main() {
     addTearDown(provider.dispose);
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.lightTheme,
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -412,7 +414,7 @@ void main() {
       await tester.tap(find.byTooltip('Filter'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('history-device-door-a')));
-      await tester.tap(find.text('Date'));
+      await tester.tap(find.byType(AppDateField));
       await tester.pumpAndSettle();
       final day = find.descendant(
         of: find.byType(CalendarDatePicker),
@@ -420,6 +422,7 @@ void main() {
       );
       await tester.ensureVisible(day);
       await tester.tap(day);
+      await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
       expect(provider.filters.last.deviceId, isNull);
       await tester.tap(find.byKey(const Key('history-apply-filters')));
@@ -477,7 +480,22 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(find.byTooltip(l10n.historyFilterTitle));
           await tester.pumpAndSettle();
-          await tester.tap(find.text(l10n.historyFilterDate).first);
+          final fieldTap = find
+              .descendant(
+                of: find.byType(AppDateField),
+                matching: find.byIcon(Icons.calendar_today_outlined),
+              )
+              .first;
+          await tester.ensureVisible(fieldTap);
+          await tester.tap(fieldTap);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.text(
+              MaterialLocalizations.of(
+                tester.element(find.byType(DatePickerDialog)),
+              ).cancelButtonLabel,
+            ),
+          );
           await tester.pumpAndSettle();
           expect(
             find.byKey(const Key('history-apply-filters')).hitTestable(),

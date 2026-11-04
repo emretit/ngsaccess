@@ -1,52 +1,30 @@
 {
   "@@locale": "tr",
   "appName": "NGS Plus",
-  "appTagline": "Yoklama Takip Sistemi",
-  "pdksTitle": "PDKS Sistemi",
-  "pdksSubtitle": "Personel Devam Kontrol Sistemi",
   "commonOk": "Tamam",
   "commonCancel": "İptal",
   "commonClose": "Kapat",
-  "commonRetry": "Tekrar Dene",
-  "commonError": "Hata",
-  "commonSuccess": "Başarılı",
-  "commonAdd": "Ekle",
-  "comingSoon": "Yakında eklenecek.",
+  "commonRetry": "Yeniden dene",
   "navHome": "Ana Sayfa",
   "navHistory": "Geçmiş",
   "navVisitor": "Ziyaretçi",
   "navProfile": "Profil",
   "loginWelcomeTitle": "Hoş geldiniz!",
-  "loginTitle": "Giriş Yap",
+  "pdksSubtitle": "Personel Devam Kontrol Sistemi",
   "loginPrompt": "PDKS sistemine giriş yapmak için bilgilerinizi giriniz",
+  "loginTitle": "Giriş yap",
   "loginEmailLabel": "E-posta",
   "loginPasswordLabel": "Şifre",
   "loginEmailRequired": "E-posta adresinizi girin",
   "loginEmailInvalid": "Geçerli bir e-posta adresi girin",
   "loginPasswordRequired": "Şifrenizi girin",
   "loginPasswordTooShort": "Şifre en az 6 karakter olmalı",
-  "loginRememberMe": "Beni Hatırla",
-  "loginForgotPassword": "Şifremi unuttum",
-  "forgotPasswordTitle": "Şifre Sıfırla",
-  "forgotPasswordHeadline": "Şifrenizi mi unuttunuz?",
-  "forgotPasswordPrompt": "E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.",
-  "forgotPasswordSendButton": "Sıfırlama Bağlantısı Gönder",
-  "forgotPasswordBackToLogin": "Giriş sayfasına dön",
-  "forgotPasswordSuccessTitle": "E-posta Gönderildi!",
-  "forgotPasswordSuccessBody": "{email} adresine şifre sıfırlama bağlantısı gönderildi. E-postanızı kontrol edin.",
-  "@forgotPasswordSuccessBody": {
-    "placeholders": {
-      "email": {
-        "type": "String"
-      }
-    }
-  },
-  "forgotPasswordSuccessButton": "Giriş Sayfasına Dön",
+  "loginForgotPassword": "Şifre yardımı",
   "homeGreetingMorning": "Günaydın",
   "homeGreetingDay": "İyi günler",
   "homeGreetingEvening": "İyi akşamlar",
   "homeGreetingFallback": "Kullanıcı",
-  "homeGreetingLine": "{greeting}, {name}!",
+  "homeGreetingLine": "{greeting}, {name}",
   "@homeGreetingLine": {
     "placeholders": {
       "greeting": {
@@ -57,189 +35,95 @@
       }
     }
   },
-  "homeAttendanceStatus": "Yoklama Durumu",
-  "homeScanCheckIn": "QR Kod Tara - Giriş Yap",
-  "homeScanCheckOut": "QR Kod Tara - Çıkış Yap",
   "homeStatusInside": "İçeride",
-  "homeStatusOut": "Çıktı",
-  "homeStatusNone": "Henüz Yok",
-  "homeAttendanceEntryRow": "Son Giriş",
-  "homeAttendanceExitRow": "Son Çıkış",
-  "homeExtraMovements": "+{count} hareket",
-  "@homeExtraMovements": {
+  "homeStatusOut": "Dışarıda",
+  "homeStatusNone": "Bugün kayıt yok",
+  "homeAttendanceEntryRow": "Son giriş",
+  "homeAttendanceExitRow": "Son çıkış",
+  "homeExtraEntries": "+{count} giriş daha",
+  "@homeExtraEntries": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     },
-    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
+    "description": "Additional entries today beyond the last entry shown."
   },
-  "homeScanCheckInAgain": "QR Kod Tara - Tekrar Giriş",
-  "homeAttendanceTimeEmpty": "—",
-  "homeMonthSummary": "Bu Ayki Özet",
-  "homeStatTotalDays": "Toplam Gün",
-  "homeStatDaysPresent": "Mevcut Günler",
-  "homeStatTimesLate": "Geç Kalma",
-  "homeProgressLabel": "{present} / {total} gün katıldın",
-  "@homeProgressLabel": {
+  "homeExtraExits": "+{count} çıkış daha",
+  "@homeExtraExits": {
     "placeholders": {
-      "present": {
-        "type": "int"
-      },
-      "total": {
+      "count": {
         "type": "int"
       }
-    }
+    },
+    "description": "Additional exits today beyond the last exit shown."
   },
-  "homeQuoteOfTheDay": "💫 Günün Sözü",
-  "homeQuote1": "Başarı, hazırlık ile fırsatın buluştuğu andır.",
-  "homeQuote2": "Her yeni gün, yeni bir başlangıçtır.",
-  "homeQuote3": "Disiplin, özgürlüğün köprüsüdür.",
-  "homeQuote4": "Küçük adımlar büyük değişimler yaratır.",
-  "homeQuote5": "Bugün dün düşündüğünüz yarındır.",
-  "homeQuote6": "Zaman en değerli hazinedir, onu akıllıca kullan.",
-  "homeQuote7": "İyi alışkanlıklar, başarının anahtarıdır.",
-  "homeQuote8": "Her gün kendini geliştirme fırsatıdır.",
+  "homeAttendanceTimeEmpty": "—",
   "profileTitle": "Profil",
+  "profileAccountSection": "Hesap",
+  "profilePreferencesSection": "Tercihler",
+  "profileSupportSection": "Destek",
   "profileEditButton": "Kişisel bilgiler",
   "profileEditDialogBody": "Adınız, soyadınız ve e-posta adresiniz kuruluşunuz tarafından yönetilir. Düzeltme için kurumunuzun personel veya sistem yöneticisine başvurun. Bu uygulama bu alanları değiştirmez.",
   "profileNotifications": "Bildirimler",
   "profileNotificationsSubtitle": "Güncellemeler ve kullanım bilgisi",
-  "profileSecurity": "Güvenlik",
-  "profileSecuritySubtitle": "Şifre değiştirme ve kurtarma",
   "profileTheme": "Tema",
-  "profileThemeDark": "Koyu tema aktif",
-  "profileThemeLight": "Açık tema aktif",
-  "profileThemeSystem": "Sistem ayarına göre",
   "profileThemeModeLight": "Açık tema",
   "profileThemeModeDark": "Koyu tema",
   "profileThemeModeSystem": "Sistem ayarına göre",
   "profileLanguage": "Dil",
   "profileLanguageValueTr": "Türkçe",
   "profileLanguageValueEn": "İngilizce",
-  "profilePreferredDoor": "Hızlı Erişim Kapısı",
+  "profilePreferredDoor": "Hızlı erişim kapısı",
   "profilePreferredDoorEmpty": "Seçilmedi",
-  "homeQuickActions": "Hızlı İşlemler",
-  "quickActionUnlock": "Kapıyı Aç",
-  "quickActionVisitor": "Ziyaretçi",
-  "quickActionHistory": "Geçmiş",
+  "quickActionUnlock": "Kapıyı aç",
   "quickActionProfile": "Profil",
   "unlockNoDeviceSelected": "Önce Profil'den hızlı erişim kapısını seç",
-  "unlockGranted": "Erişim Verildi",
   "unlockDenied": "Erişim Reddedildi",
-  "selectDeviceTitle": "Kapı Seç",
-  "selectDeviceSearch": "Ara...",
+  "selectDeviceTitle": "Kapı seç",
+  "selectDeviceSearch": "Kapılarda ara",
   "selectDeviceEmpty": "Henüz erişiminiz olan kapı yok",
   "selectDeviceNoMatch": "Eşleşen kapı bulunamadı",
   "profileHelp": "Yardım & Destek",
   "profileHelpSubtitle": "SSS ve destek",
   "profileAboutApp": "Uygulama Hakkında",
-  "profileAppVersion": "Sürüm",
   "profilePrivacy": "Gizlilik bilgileri",
   "profilePrivacySubtitle": "Uygulamadaki veriler ve başvuru yolu",
   "profileLogout": "Çıkış Yap",
-  "profileLogoutSubtitle": "Hesabınızdan çıkış yapın",
   "profileLogoutConfirmTitle": "Çıkış Yap",
   "profileLogoutConfirmBody": "Hesabınızdan çıkış yapmak istediğinizden emin misiniz?",
-  "profileSettings": "Ayarlar",
-  "profileSettingsBody": "Tema, dil ve hızlı erişim hedefinizi Profil ekranından ayarlayabilirsiniz.",
-  "profileNotificationsDialogTitle": "Bildirim Ayarları",
   "profileNotificationsDialogBody": "Bu sürümde anlık bildirim teslimi ve bildirim tercihi yönetimi bulunmuyor. Güncel erişim ve hareket bilgilerinizi uygulamayı açarak yenileyebilirsiniz. Eksik veya hatalı kayıtlar için kurumunuzun yöneticisine başvurun.",
-  "profileSecurityDialogTitle": "Güvenlik Ayarları",
   "profileSecurityDialogBody": "Mevcut şifrenizi biliyorsanız aşağıdaki formdan yeni bir şifre belirleyebilirsiniz. Şifre değişikliği tüm mobil oturumları sonlandırır. Şifrenizi unuttuysanız kurum yöneticinizden yeni kurulum bağlantısı isteyin. Ortak bir cihazdan ayrılmadan önce Çıkış Yap seçeneğini kullanın.",
-  "profileThemeDialogTitle": "Tema Ayarları",
-  "profileThemeDialogBody": "Açık, koyu veya sistem temasını seçin.",
-  "profileLanguageDialogTitle": "Dil Ayarları",
-  "profileLanguageDialogBody": "Dil tercihi bu cihazda saklanır ve çıkıştan sonra korunur.",
   "profileHelpDialogTitle": "Yardım & Destek",
   "profileHelpDialogBody": "Kapı seçimi\nProfil > Hızlı Erişim Kapısı bölümünden erişebildiğiniz bir hedef seçin. Seçimi kaldırabilir veya listeyi yenileyebilirsiniz. Liste boşsa erişim yetkilerinizi kurum yöneticinize kontrol ettirin.\n\nQR kullanımı\nKamera izni yalnız kod taramak için gerekir. İzin verilmediyse cihaz ayarlarından kamera erişimini kontrol edin. Kişisel QR kodunu desteklenen okuyucuya gösterin; kodun süresi dolduğunda yenileyin. Kimlik etiketi taramak tek başına geçiş kaydı oluşturmaz.\n\nKayıt ve erişim sorunları\nAğ bağlantısını kontrol edip ilgili ekranı yenileyin. Kapı komutu ile fiziksel geçiş ve resmi PDKS sonucu farklı durumlardır. Eksik veya hatalı kayıt için personel/sistem yöneticinize başvurun.\n\nDestek bilgisi\nYöneticinize uygulama sürümünü (Uygulama Hakkında), sorunun zamanını ve görünen hata açıklamasını iletin. Parola, oturum bilgisi veya kişisel QR kodunu paylaşmayın.",
   "profilePrivacyDialogTitle": "Gizlilik bilgileri",
   "profilePrivacyDialogBody": "Uygulama veri bilgisi — 19 Ekim 2026\n\nNGS Plus, oturum açtığınız kuruluşun çalışan bilgilerini, erişilebilir cihazları ve size ait erişim hareketlerini hizmetten alıp gösterir. Kişisel QR kodu hizmetten alınır; kamera kod taramak için kullanılır. Kapı isteğinde seçilen hedef hizmete iletilir. Tema, dil ve kapsamlı hedef tercihi bu cihazda saklanır.\n\nÇalışan kaydını, erişim yetkilerini ve hareket kayıtlarını kuruluşunuz yönetir. Verilerin işlenme amacı, saklama süresi, hukuki dayanağı ve kişisel veri talepleriniz için kurumunuzun personel/veri sorumlusuna başvurun.\n\nBu açıklama uygulamanın veri kullanımını anlatır; kuruluşunuzun onaylı gizlilik politikasının yerine geçmez. Kuruluşunuza ait yayımlanmış politika bağlantısı bu sürümde yapılandırılmamıştır.",
   "profileAboutDialogTitle": "NGS Plus Hakkında",
   "profileAboutLine1": "NGS Plus Yoklama Takip Sistemi",
-  "profileAboutLine2": "Kurulu uygulama sürümü",
-  "profileAboutLine3": "Destek için kurum yöneticinize başvurun.",
   "profileAboutLine4": "Çalışan erişim ve hareket bilgilerini görüntüleme uygulaması.",
   "profileFallbackEmail": "E-posta bilgisi yok",
   "historyTitle": "Geçmiş",
   "historyTabAll": "Kayıtlar",
   "historyTabThisMonth": "Takvim",
   "historyTabStats": "Özet",
-  "historyLoading": "Veriler yükleniyor...",
-  "historyErrorTitle": "Bir Hata Oluştu",
-  "historyErrorBody": "Veriler yüklenirken hata oluştu: {error}",
-  "@historyErrorBody": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
+  "historyLoading": "Kayıtlar yükleniyor",
+  "historyErrorTitle": "Kayıtlar alınamadı",
   "historyEmpty": "Kayıt bulunamadı",
-  "historyEmptyHint": "Verileri yenilemek için aşağı çekin",
-  "historyColorLegend": "Renk Açıklamaları",
-  "historyLegendEarly": "Erken Giriş",
-  "historyLegendEarlyDesc": "Saat 09:00'dan önce giriş yapılan günler",
-  "historyLegendNormal": "Normal Giriş",
-  "historyLegendNormalDesc": "Saat 09:00-09:30 arası giriş yapılan günler",
-  "historyLegendLate": "Geç Giriş",
-  "historyLegendLateDesc": "Saat 09:30'dan sonra giriş yapılan günler",
-  "historyLegendNone": "Katılım Yok",
-  "historyLegendNoneDesc": "Hiç giriş-çıkış kaydı bulunmayan günler",
-  "historyCalendarHint": "Günlere tıklayarak detayları görebilirsiniz. Yeşil noktalar ek katılım kayıtlarını gösterir.",
-  "historyMonthSummary": "Bu Ay Özeti",
-  "historyTotalCheckIns": "Toplam Giriş",
-  "historyTotalCheckOuts": "Toplam Çıkış",
-  "historyActiveDays": "Giriş yapılan gün",
-  "historyGeneralStats": "Genel İstatistikler",
-  "historyThisWeek": "Bu Hafta",
-  "historyWeeklySummary": "Haftalık Özet",
-  "historyWeeklyTotalRecords": "Bu hafta toplam {count} kayıt",
-  "@historyWeeklyTotalRecords": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    },
-    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
-  },
-  "historyWeeklyCheckIn": "Giriş: {count}",
-  "@historyWeeklyCheckIn": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "historyWeeklyCheckOut": "Çıkış: {count}",
-  "@historyWeeklyCheckOut": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "historyDeviceStats": "Cihaz Bazlı İstatistikler",
-  "historyCheckInRecord": "Giriş Yapıldı",
-  "historyCheckOutRecord": "Çıkış Yapıldı",
-  "historyBadgeIn": "GİRİŞ",
-  "historyBadgeOut": "ÇIKIŞ",
-  "historyUnknownDevice": "Bilinmeyen Cihaz",
-  "historyUnknownLocation": "Bilinmeyen Konum",
-  "historyDetailCheckIn": "Giriş Detayları",
-  "historyDetailCheckOut": "Çıkış Detayları",
+  "historyEmptyHint": "Yeni geçişleriniz burada görünecek.",
+  "historyMonthSummary": "Bu ayın özeti",
+  "historyActiveDays": "Giriş günü",
+  "historyThisWeek": "Bu hafta",
+  "historyWeeklySummary": "Haftalık özet",
+  "historyUnknownDevice": "Kapı bilgisi yok",
+  "historyRecordDetailTitle": "Kayıt ayrıntısı",
   "historyDetailDate": "Tarih",
   "historyDetailTime": "Saat",
   "historyDetailLocation": "Konum",
-  "historyDetailQrCode": "QR Kod",
   "historyFilterTitle": "Filtrele",
   "historyFilterDate": "Tarih",
-  "historyFilterDateNone": "Tarih seçilmedi",
-  "historyFilterDevice": "Cihaz",
-  "historyFilterDeviceNone": "Cihaz seçilmedi",
-  "historyFilterClear": "Filtreleri Temizle",
-  "historyFilterDeviceSelectTitle": "Cihaz Seç",
-  "historyDayRecordCount": "{count} Kayıt",
+  "historyFilterDevice": "Kapı",
+  "historyFilterClear": "Filtreleri temizle",
+  "historyDayRecordCount": "{count} kayıt",
   "@historyDayRecordCount": {
     "placeholders": {
       "count": {
@@ -253,117 +137,22 @@
   "qrTabTitle": "QR İşlemleri",
   "qrTabMyQr": "QR Kodum",
   "qrTabScan": "Tara",
-  "qrInvalidResponse": "Geçersiz yanıt",
-  "qrTokenMissing": "Token yok",
   "qrRefresh": "Yenile",
   "qrTryAgain": "Tekrar dene",
-  "qrFrameHint": "QR kodu kare içine yerleştirin",
-  "qrTokenHint": "Bu QR kodu kapı cihazına okutun. Kod 10 saniye geçerlidir, süre dolunca yenile butonuna basın.",
-  "qrProcessError": "QR kod işlenirken bir hata oluştu: {error}",
-  "@qrProcessError": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
-  "qrUserCodeTitle": "Kullanıcı QR Kodu",
-  "qrUserCodeBody": "Kullanıcı: {name}\nE-posta: {email}\nTarih: {date}",
-  "@qrUserCodeBody": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      },
-      "email": {
-        "type": "String"
-      },
-      "date": {
-        "type": "String"
-      }
-    }
-  },
+  "qrFrameHint": "QR kodu çerçeveye alın",
   "qrInvalidCode": "Geçersiz QR kod",
-  "qrAccessGranted": "Geçiş Başarılı",
-  "qrUnknownError": "Bir hata oluştu",
-  "qrDeviceLine": "Cihaz: {name}",
-  "@qrDeviceLine": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "qrLocationLine": "Konum: {location}",
-  "@qrLocationLine": {
-    "placeholders": {
-      "location": {
-        "type": "String"
-      }
-    }
-  },
-  "qrTimeLine": "Zaman: {time}",
-  "@qrTimeLine": {
-    "placeholders": {
-      "time": {
-        "type": "String"
-      }
-    }
-  },
   "visitorTitle": "Ziyaretçiler",
   "visitorStatTotal": "Toplam",
-  "visitorStatInside": "İçeride",
-  "visitorStatExpected": "Beklenen",
-  "visitorEmpty": "Henüz ziyaretçi kaydı yok",
-  "visitorEmptyHint": "Yeni bir davet oluşturmak için sağ üstteki Ekle düğmesini kullanın.",
-  "visitorStatusExpected": "Bekleniyor",
-  "visitorStatusInside": "İçeride",
-  "visitorStatusOut": "Çıktı",
-  "visitorContactPerson": "İletişim: {name}",
-  "@visitorContactPerson": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "visitorCheckOut": "Çıkış Yap",
-  "visitorCheckIn": "Giriş Yap",
-  "visitorCheckedInToast": "{name} giriş yaptı",
-  "@visitorCheckedInToast": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
-  "visitorCheckedOutToast": "{name} çıkış yaptı",
-  "@visitorCheckedOutToast": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "visitorEmpty": "Henüz davet yok",
+  "visitorEmptyHint": "Ziyaretçi davet et düğmesiyle yeni bir davet oluşturun.",
   "visitorFilterTitle": "Filtrele",
-  "visitorFilterBody": "Filtreleme seçenekleri buraya gelecek.",
-  "visitorAddTitle": "Yeni Ziyaretçi",
-  "visitorFieldName": "Ad Soyad",
-  "visitorFieldCompany": "Şirket",
+  "visitorAddTitle": "Ziyaretçi davet et",
   "visitorFieldPurpose": "Ziyaret Amacı",
-  "visitorFieldContact": "İletişim Kişisi",
-  "visitorAddedToast": "Ziyaretçi eklendi",
-  "visitorAddButton": "Ziyaretçi Ekle",
+  "visitorAddButton": "Ziyaretçi davet et",
   "errorNetwork": "İnternet bağlantısı kurulamadı. Lütfen bağlantınızı kontrol edin.",
-  "errorTimeout": "Sunucu yanıt vermedi. Lütfen daha sonra tekrar deneyin.",
-  "errorServer": "Sunucu hatası ({code}). Lütfen biraz sonra tekrar deneyin.",
-  "@errorServer": {
-    "placeholders": {
-      "code": {
-        "type": "int"
-      }
-    }
-  },
-  "errorEmploymentEnded": "İşten ayrıldınız. Mobil erişiminiz kapatıldı.",
+  "errorTimeout": "İşlem zamanında tamamlanamadı. Yeniden deneyin.",
+  "errorServer": "İşlem tamamlanamadı. Biraz sonra yeniden deneyin.",
+  "errorEmploymentEnded": "Mobil erişiminiz kapatıldı. Kurum yöneticinize başvurun.",
   "errorAuthExpired": "Oturumunuz sona erdi. Lütfen tekrar giriş yapın.",
   "errorUnknown": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
   "errorBusinessInvalidCredentials": "E-posta veya şifre hatalı",
@@ -383,20 +172,17 @@
   "selectDeviceClear": "Seçimi kaldır",
   "selectDeviceInvalidated": "Önceki hedef artık erişilebilir değil. Lütfen yeni bir hedef seçin.",
   "historyLoadMore": "Daha fazla yükle",
-  "historyAccessDenied": "Erişim reddedildi",
   "historyUnknownDirection": "Bilinmeyen yön",
   "historyUnknownAccess": "Erişim sonucu bilinmiyor",
   "historyStaleData": "Son veriler gösteriliyor; yenileme başarısız.",
   "historySummaryUnavailable": "Dönem özeti alınamadı.",
-  "historyRawEvents": "Ham erişim hareketleri; resmi PDKS sonucu değildir.",
+  "historyRawEvents": "Geçiş kayıtları gösterilir. Resmi devam ve çalışma süresi sonuçları farklı olabilir.",
   "homeDataLoading": "Veriler yükleniyor",
-  "homeDataUnavailable": "Veriler alınamadı",
+  "homeDataUnavailable": "Bugünkü durum alınamadı",
   "homeDataStale": "Önceki veriler gösteriliyor",
   "homeDataRefreshing": "Veriler yenileniyor",
   "homeRetry": "Yeniden dene",
   "homeStatusUnknown": "Durum bilinmiyor",
-  "homeSelfCheckIn": "Manuel kayıt",
-  "homeSelfCheckInRecorded": "Manuel kayıt oluşturuldu",
   "homeCommandPending": "Komut gönderildi; fiziksel geçiş doğrulanmadı.",
   "@profileVersionBuild": {
     "description": "Version and build from installed package metadata, never translated.",
@@ -418,15 +204,16 @@
   "qrExpiredHint": "Kodun süresi doldu.",
   "qrRefreshFailed": "QR yenilenemedi.",
   "qrStatusUnavailable": "Kodun durumu doğrulanamadı. Tekrar kontrol edin.",
-  "qrReaderHint": "Bu kodu desteklenen okuyucuya gösterin. Süre sunucunun bitiş zamanına göre gösterilir. İşlem kaydı kapının açıldığını veya fiziksel geçişi doğrulamaz.",
+  "qrReaderHint": "Kodu okuyucuya gösterin",
   "qrSwitchCamera": "Kamerayı değiştir",
   "qrFlashlight": "Flaş",
   "qrCameraPermissionRequired": "QR taramak için kamera izni gerekiyor.",
   "qrOpenSettings": "Ayarları aç",
+  "qrGrantCameraPermission": "Kamera izni ver",
   "qrCameraControlUnavailable": "Kamera kontrolü kullanılamıyor.",
-  "qrDeviceIdentityOnly": "Bu bir cihaz kimlik etiketidir; geçiş yetkisi veya fiziksel bulunma kanıtı sağlamaz. Desteklenen okuyucuda QR’ım sekmesini kullanın.",
+  "qrDeviceIdentityOnly": "Bu kod cihazı tanıtır; kapıyı açmaz veya geçiş kaydı oluşturmaz. QR Kodum sekmesindeki kodu uygun okuyucuya gösterin.",
   "qrEmployeeIdentityOnly": "Bu bir çalışan kimlik kodudur. Kimlik doğrulaması veya geçiş kaydı oluşturmaz.",
-  "qrChallengeUnsupported": "Bu okuyucunun güvenli işlem akışı henüz desteklenmiyor. Desteklenen okuyucuda QR’ım sekmesini kullanın.",
+  "qrChallengeUnsupported": "Bu okuyucuyla tarama yapılamıyor. QR Kodum sekmesindeki kodu uygun okuyucuya gösterin.",
   "qrScanExpired": "QR kodun süresi doldu.",
   "qrInvalidDate": "QR kodun tarihi geçersiz.",
   "qrUnsupportedVersion": "Bu QR sürümü desteklenmiyor.",
@@ -441,19 +228,21 @@
   "loginRememberEmail": "E-postamı hatırla",
   "passwordHelpTitle": "Şifre yardımı",
   "passwordHelpAdminTitle": "Yöneticinizle iletişime geçin",
-  "passwordHelpAdminBody": "Mobil şifre kurulumunu kurum yöneticiniz yönetir. Kayıtlı e-posta adresinize yeni bir kurulum bağlantısı göndermesini isteyin. Bağlantıyı açıp yeni şifrenizi belirledikten sonra giriş ekranına dönün.",
+  "passwordHelpAdminBody": "Kurum yöneticinizden kayıtlı e-postanıza şifre kurulum bağlantısı göndermesini isteyin. Şifrenizi belirledikten sonra giriş yapın.",
   "passwordHelpNoEmail": "Bu ekran e-posta göndermez veya şifrenizi değiştirmez.",
   "passwordHelpRequest": "Merhaba, NGS Plus mobil şifremi oluşturmak veya yenilemek istiyorum. Çalışan kaydımdaki e-posta adresime yeni bir şifre kurulum bağlantısı gönderebilir misiniz?",
-  "passwordHelpCopy": "Yöneticiye iletilecek talebi kopyala",
+  "passwordHelpCopy": "Talebi kopyala",
   "passwordHelpCopied": "Talep kopyalandı. Yöneticinizle paylaşabilirsiniz.",
   "passwordHelpCopyFailed": "Kopyalanamadı. Aşağıdaki talep metnini seçebilirsiniz.",
   "loginShowPassword": "Şifreyi göster",
   "loginHidePassword": "Şifreyi gizle",
   "startupTitle": "NGS Plus başlatılıyor",
+  "startupBandTitle": "Başlatılıyor",
+  "startupFailureTitle": "Başlatılamadı",
   "startupUnavailable": "Oturum doğrulanamadı. Bağlantınızı kontrol edip yeniden deneyin.",
   "startupRetry": "Yeniden dene",
   "startupUseLogin": "Giriş ekranına dön",
-  "homeUpdatedAt": "Son güncelleme: {time}",
+  "homeUpdatedAt": "Son güncelleme {time}",
   "@homeUpdatedAt": {
     "placeholders": {
       "time": {
@@ -471,11 +260,20 @@
   "visitorPhone": "Telefon",
   "visitorStart": "Ziyaret başlangıcı",
   "visitorEnd": "Ziyaret bitişi",
-  "visitorSave": "Kaydet",
+  "visitorSave": "Daveti kaydet",
   "visitorEdit": "Düzenle",
+  "visitorEditTitle": "Daveti düzenle",
+  "visitorStartDate": "Başlangıç tarihi",
+  "visitorEndDate": "Bitiş tarihi",
+  "visitorStartTime": "Başlangıç saati",
+  "visitorEndTime": "Bitiş saati",
+  "visitorNotFound": "Davet bulunamadı",
+  "visitorErrorEndBeforeStart": "Bitiş, başlangıçtan sonra olmalı.",
+  "visitorErrorMaxDuration": "Ziyaret en fazla 31 gün sürebilir.",
+  "visitorErrorEndInPast": "Bitiş geçmişte olamaz.",
+  "visitorErrorNoticeRequired": "Devam etmek için aydınlatma metnini onaylayın.",
   "visitorCancelInvitation": "Daveti iptal et",
   "visitorCancelConfirm": "Bu davet iptal edilsin mi?",
-  "visitorPreRegistered": "Yetkili aktivasyonu bekleniyor",
   "visitorAccessActive": "Erişim aktif",
   "visitorAccessEnded": "Erişim sonlandırıldı",
   "visitorExpired": "Süresi doldu",
@@ -483,13 +281,13 @@
   "visitorPresenceInside": "Son kayda göre içeride",
   "visitorPresenceOutside": "Son kayda göre dışarıda",
   "visitorOperatorRequired": "Aktif erişimi iptal etmek için yetkili operatörle iletişime geçin.",
-  "visitorSaved": "Davet kaydı kaydedildi; yetkili aktivasyonu gerekiyor.",
+  "visitorSaved": "Davet kaydedildi. Yetkili onayı bekleniyor.",
   "visitorCancelled": "Davet iptal edildi.",
   "visitorLoadMore": "Daha fazla",
   "visitorNotice": "Proje ziyaretçi aydınlatma metni",
   "visitorNoticeReviewed": "Güncel aydınlatma metnini inceledim.",
-  "visitorInvalidForm": "Zorunlu alanları ve ziyaret tarihlerini kontrol edin.",
-  "visitorStale": "Yenilenemedi; önceki kayıtlar gösteriliyor.",
+  "fieldRequired": "Bu alan zorunlu.",
+  "visitorStale": "Davetler yenilenemedi. Önceki davetler gösteriliyor.",
   "visitorRefresh": "Yenile",
   "profileChangePassword": "Şifreyi değiştir",
   "profileCurrentPassword": "Mevcut şifre",
@@ -501,10 +299,10 @@
   "profilePasswordChanged": "Şifreniz değiştirildi. Yeni şifrenizle giriş yapın.",
   "errorRateLimited": "Çok fazla deneme yapıldı. Bir süre bekleyip yeniden deneyin.",
   "errorSessionStorageFailed": "Oturum güvenli biçimde saklanamadı. Lütfen yeniden giriş yapın.",
-  "errorProtocol": "Geçerli bir sunucu yanıtı alınamadı. Lütfen yeniden deneyin.",
+  "errorProtocol": "İşlem tamamlanamadı. Yeniden deneyin.",
   "errorPasswordPolicy": "Yeni şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermeli, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalıdır.",
   "homeChooseDoor": "Kapı seçin",
-  "homeDoorUnavailable": "Seçilen kapı artık kullanılamıyor. Profil üzerinden yeni bir kapı seçin.",
+  "homeDoorUnavailable": "Seçilen kapı kullanılamıyor. Yeni bir kapı seçin.",
   "homeNoOpenableDoor": "Bu cihazda açılabilir bir kapı yok.",
   "startupContactAdministrator": "Sorun devam ederse kurumunuzun sistem yöneticisine başvurun.",
   "selectDeviceInactive": "Hedef devre dışı",
@@ -518,9 +316,9 @@
   "visitorSearch": "Davetlerde ara",
   "visitorAllStatuses": "Tüm erişim durumları",
   "visitorSummaryTitle": "Tüm davetlerin özeti",
-  "visitorSummaryLimited": "Bu toplamlar alt sınırdır; özet okuma sınırına ulaşıldı.",
+  "visitorSummaryLimited": "Bazı davetler özete dahil edilemedi; gerçek toplam daha yüksek olabilir.",
   "visitorSummaryError": "Özet yenilenemedi.",
-  "visitorSyncTitle": "Cihaz senkronizasyonu",
+  "visitorSyncTitle": "Cihaz durumu",
   "visitorSyncPending": "Cihaz güncellemesi bekliyor",
   "visitorSyncApplied": "Cihaz güncellemeyi onayladı",
   "visitorSyncFailed": "Cihaz güncellemesi başarısız; operatörle iletişime geçin.",
@@ -538,30 +336,32 @@
   "historyInfoTitle": "Kayıtlar hakkında",
   "historyTimeZone": "Türkiye saati · UTC+3",
   "historyAllDates": "Tüm tarihler",
-  "historyAllDevices": "Tüm cihazlar",
+  "historyAllDevices": "Tüm kapılar",
   "historyApplyFilters": "Filtreleri uygula",
   "historyShowAllRecords": "Tüm kayıtları göster",
   "historyFilteredEmptyHint": "Seçtiğiniz tarih veya cihaz için kayıt bulunmuyor.",
-  "historyCalendarLegend": "Çerçeve: bugün · Dolgu: seçili gün · Nokta: kayıt var",
+  "historyCalendarLegend": "Noktalı günlerde kayıt var.",
   "historySelectDayHint": "Kayıtlarını görmek için bir gün seçin.",
   "historyNoActivity": "Bu dönemde erişim hareketi yok",
-  "historyNoActivityHint": "Kayıtlar oluştukça özet burada görünür. Bu bir devamsızlık hesabı değildir.",
+  "historyNoActivityHint": "Yeni kayıtlar burada görünecek. Kayıt olmaması devamsızlık anlamına gelmez.",
   "historyDeniedCount": "Reddedilen",
   "historyUnknownCount": "Belirsiz",
-  "historyLoadedDevices": "Cihaz seçenekleri yüklenen kayıtlardan alınır.",
-  "historyNoDeviceOptions": "Yüklenen kayıtlarda cihaz bulunmuyor.",
+  "historyLoadedDevices": "Bu listedeki kayıtlarda yer alan kapılar gösterilir.",
+  "historyNoDeviceOptions": "Bu kayıtlar için kapı seçeneği yok.",
   "historyTabThisMonthPeriod": "Bu ay",
   "visitorPeopleSection": "Kişi bilgileri",
   "visitorVisitSection": "Ziyaret bilgileri",
   "visitorActivationHint": "Davet kaydı oluşturulduktan sonra yetkili aktivasyonu gerekir.",
+  "visitorMetricPending": "Onay bekliyor",
   "visitorPendingShort": "Aktivasyon bekliyor",
   "visitorInvitationsTitle": "Davetler",
   "visitorFilteredEmptyHint": "Arama veya durum filtresiyle eşleşen davet bulunamadı.",
   "visitorClearFilters": "Filtreleri temizle",
   "visitorNoticeUnavailable": "Aydınlatma bilgisi yüklenemedi. Kaydetmeden önce tekrar deneyin.",
-  "profileProject": "Firma / proje",
+  "profileProject": "Kurum ve proje",
   "profileProjectUnavailable": "Proje bilgisi şu anda kullanılamıyor",
   "doorOperationRecoveryTitle": "Kapı işlemini kontrol et",
+  "doorOperationNothingToCheck": "Kontrol edilecek kapı işlemi yok.",
   "doorOperationRecoveryHint": "Önce önceki isteğin durumu kontrol edilir. Tekrar denerseniz aynı istek ve aynı kapı kullanılır. Komut sonucu fiziksel geçişi doğrulamaz.",
   "visitorRecoveryChecking": "Önceki ziyaretçi isteği kontrol ediliyor…",
   "visitorRecoveryUnresolved": "Önceki isteğin sonucu henüz doğrulanamadı. Aynı ziyaretçi bilgilerini girip aynı isteği tekrar deneyebilirsiniz. Yeni bir istek oluşturulmayacak.",
@@ -570,7 +370,7 @@
   "visitorRecoveryStorageError": "Ziyaretçi isteği güvenli biçimde saklanamadı veya okunamadı. Devam etmeden önce durumu tekrar kontrol edin.",
   "errorRequestProjectMissing": "Çalışanın proje bilgisi bulunamadı",
   "errorRequestNoteTooLong": "Not en fazla 500 karakter olabilir",
-  "errorRequestDateInvalid": "Geçerli bir tarih girin (YYYY-MM-DD)",
+  "errorRequestDateInvalid": "Geçerli bir tarih seçin.",
   "errorRequestRangeInvalid": "Bitiş tarihi başlangıçtan önce olamaz",
   "errorRequestStartTooOld": "İzin başlangıcı en fazla 30 gün geçmiş olabilir",
   "errorRequestRangeTooLong": "İzin aralığı en fazla 60 gün olabilir",
@@ -582,18 +382,17 @@
   "errorCorrectionDateOutOfRange": "Tarih bugün ile son 30 gün arasında olmalı",
   "errorCorrectionReasonLength": "Gerekçe 5–300 karakter olmalı",
   "errorCorrectionTimesMismatch": "Düzeltme türüne uygun giriş ve çıkış saatlerini belirtin",
-  "errorCorrectionTimeInvalid": "Geçerli bir saat girin (HH:mm).",
+  "errorCorrectionTimeInvalid": "Geçerli bir saat seçin.",
   "errorCorrectionPendingExists": "Bu gün için bekleyen bir düzeltme talebiniz var",
   "requestsTitle": "Taleplerim",
   "requestsLeave": "İzin",
-  "requestsCorrection": "PDKS düzeltme",
+  "requestsCorrection": "Kayıt düzeltme",
   "requestsNew": "Yeni talep",
   "requestsEmpty": "Henüz talebiniz yok.",
   "requestsRetry": "Yeniden dene",
-  "requestsWithdraw": "Geri çek",
+  "requestsWithdraw": "Talebi geri çek",
   "requestsWithdrawConfirm": "Bu talebi geri çekmek istiyor musunuz?",
   "requestsCancel": "Vazgeç",
-  "requestsSubmit": "Gönder",
   "requestsUncertain": "Talep gönderilmiş olabilir; listeyi kontrol edin.",
   "requestsAdmin": "Yönetici kaydı",
   "requestsPending": "Bekliyor",
@@ -630,5 +429,40 @@
   "errorVisitorInvalid": "Ziyaretçi bilgileri veya liste sayfası geçersiz. Bilgileri ve tarihleri kontrol edin; gerekirse listeyi yenileyin.",
   "errorVisitorLocked": "Bu davet artık düzenlenemiyor. Daveti yenileyin veya operatöre başvurun.",
   "errorVisitorNoticeChanged": "Ziyaretçi aydınlatma metni değişti. Davet formunu yenileyip güncel metni okuyun ve tekrar onaylayın.",
-  "errorRequestConflict": "Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin."
+  "errorRequestConflict": "Bu işlem farklı ziyaretçi bilgileriyle daha önce kaydedilmiş. Ziyaretçi listesini yenileyip mevcut daveti kontrol edin.",
+  "navQr": "QR",
+  "homeToday": "Bugün",
+  "homeFirstEntry": "İlk giriş",
+  "loginSigningIn": "Giriş yapılıyor",
+  "fieldSelectDate": "Tarih seçin",
+  "fieldSelectTime": "Saat seçin",
+  "fieldSelectOption": "Seçin",
+  "requestsLeaveFormTitle": "İzin talebi",
+  "requestsCorrectionFormTitle": "Kayıt düzeltme talebi",
+  "requestsLeaveSubmit": "İzin talebi gönder",
+  "requestsLeaveSubmitting": "İzin talebi gönderiliyor",
+  "requestsLeaveSubmitted": "İzin talebi gönderildi",
+  "requestsCorrectionSubmit": "Düzeltme talebi gönder",
+  "requestsCorrectionSubmitting": "Düzeltme talebi gönderiliyor",
+  "requestsCorrectionSubmitted": "Düzeltme talebi gönderildi",
+  "requestsWithdrawnToast": "Talep geri çekildi",
+  "requestsTimeZoneHint": "Saatler Türkiye saatine göre girilir.",
+  "visitorSaving": "Davet kaydediliyor",
+  "visitorLoadFailed": "Davetler alınamadı. Yeniden deneyin.",
+  "visitorNoMatchTitle": "Eşleşen davet yok",
+  "commonLoading": "Yükleniyor",
+  "fieldNoOptions": "Seçenek yok",
+  "metricNoRecord": "Kayıt yok",
+  "fieldClear": "Temizle",
+  "historyWeeklyTotalRecords": "Bu hafta toplam {count} kayıt",
+  "@historyWeeklyTotalRecords": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    },
+    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
+  },
+  "unlockGranted": "Erişim Verildi",
+  "visitorPreRegistered": "Yetkili aktivasyonu bekleniyor"
 }

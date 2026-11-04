@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:ngsplusapp/core/errors.dart';
@@ -15,7 +17,6 @@ import 'package:ngsplusapp/providers/preferred_device_provider.dart';
 import 'package:ngsplusapp/repositories/device_repository.dart';
 import 'package:ngsplusapp/screens/home/home_screen.dart';
 import 'package:ngsplusapp/widgets/cards/door_command_status_card.dart';
-import 'package:ngsplusapp/widgets/cards/quick_action_card.dart';
 import 'package:ngsplusapp/widgets/door_operation_recovery_dialog.dart';
 import 'package:provider/provider.dart';
 
@@ -100,6 +101,7 @@ void main() {
           Provider<DeviceRepository>.value(value: devices),
         ],
         child: MaterialApp(
+          theme: AppTheme.lightTheme,
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -113,12 +115,15 @@ void main() {
         ),
       );
 
-  Finder unlock() => find.byWidgetPredicate(
-    (widget) => widget is QuickActionCard && widget.icon == Icons.lock_open,
-  );
+  Finder unlock() => find.byKey(const Key('home-open-door'));
 
   AppLocalizations l10n(WidgetTester tester) =>
       AppLocalizations.of(tester.element(find.byType(HomeScreen)));
+
+  Finder recoveryText(String value) => find.descendant(
+    of: find.byType(DoorOperationRecoveryDialog),
+    matching: find.text(value),
+  );
 
   Future<void> mount(WidgetTester tester) async {
     tester.view.physicalSize = const Size(430, 1000);
@@ -131,7 +136,7 @@ void main() {
 
   Future<void> recover(WidgetTester tester) async {
     await tester.ensureVisible(unlock());
-    expect(tester.widget<QuickActionCard>(unlock()).onTap, isNotNull);
+    expect(tester.widget<AppListRow>(unlock()).onTap, isNotNull);
     await tester.tap(unlock());
     await tester.pumpAndSettle();
     expect(find.byType(DoorOperationRecoveryDialog), findsOneWidget);
@@ -149,7 +154,7 @@ void main() {
       await loseResponse();
       final id = commands.requestId;
       await mount(tester);
-      expect(find.byType(DoorCommandStatusCard), findsNothing);
+      expect(find.byType(DoorCommandStatusCard), findsOneWidget);
       expect(find.byType(DoorOperationRecoveryDialog), findsNothing);
       await tester
           .widget<RefreshIndicator>(find.byType(RefreshIndicator))
@@ -173,7 +178,7 @@ void main() {
       expect(devices.calls, 0);
       final gate = Completer<DoorOperation>();
       repository.onRequest = () => gate.future;
-      final retry = find.text(l10n(tester).homeCommandRetrySameRequest);
+      final retry = recoveryText(l10n(tester).homeCommandRetrySameRequest);
       await tester.tap(retry);
       await tester.tap(retry);
       await tester.pump();
@@ -186,14 +191,14 @@ void main() {
       expect(repository.requests, hasLength(2));
       gate.complete(door.receipt(status: DoorOperationStatus.confirmed));
       await tester.pumpAndSettle();
-      expect(find.text(l10n(tester).homeCommandConfirmed), findsOneWidget);
+      expect(recoveryText(l10n(tester).homeCommandConfirmed), findsOneWidget);
       expect(find.text(l10n(tester).unlockGranted), findsNothing);
       expect(commands.hasUnresolvedOperation, isFalse);
       expect(store.records, isEmpty);
       await tester.tap(find.text(l10n(tester).commonClose));
       await tester.pumpAndSettle();
-      expect(find.byType(DoorCommandStatusCard), findsNothing);
-      expect(find.text(l10n(tester).homeCommandConfirmed), findsNothing);
+      expect(find.byType(DoorCommandStatusCard), findsOneWidget);
+      expect(find.text(l10n(tester).homeCommandConfirmed), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
@@ -206,23 +211,26 @@ void main() {
     repository.onLookup = () async => throw const NetworkError();
     await mount(tester);
     await recover(tester);
-    expect(find.text(l10n(tester).errorNetwork), findsOneWidget);
-    await tester.tap(find.text(l10n(tester).homeCommandRetrySameRequest));
+    expect(recoveryText(l10n(tester).errorNetwork), findsOneWidget);
+    await tester.tap(recoveryText(l10n(tester).homeCommandRetrySameRequest));
     await tester.pumpAndSettle();
     expect(repository.requests, hasLength(1));
     expect(commands.hasUnresolvedOperation, isTrue);
     repository.onLookup = () async => null;
     repository.onRequest = () async => door.receipt();
-    await tester.tap(find.text(l10n(tester).homeCommandRetrySameRequest));
+    await tester.tap(recoveryText(l10n(tester).homeCommandRetrySameRequest));
     await tester.pumpAndSettle();
     expect(repository.requests, hasLength(2));
-    expect(find.text(l10n(tester).homeCommandPending), findsOneWidget);
-    expect(find.text(l10n(tester).homeCommandRetrySameRequest), findsNothing);
+    expect(recoveryText(l10n(tester).homeCommandPending), findsOneWidget);
+    expect(
+      recoveryText(l10n(tester).homeCommandRetrySameRequest),
+      findsNothing,
+    );
     repository.onOperation = () async =>
         door.receipt(status: DoorOperationStatus.failed);
-    await tester.tap(find.text(l10n(tester).homeCommandCheckStatus));
+    await tester.tap(recoveryText(l10n(tester).homeCommandCheckStatus));
     await tester.pumpAndSettle();
-    expect(find.text(l10n(tester).homeCommandFailed), findsOneWidget);
+    expect(recoveryText(l10n(tester).homeCommandFailed), findsOneWidget);
     expect(commands.hasUnresolvedOperation, isFalse);
     expect(repository.requests, hasLength(2));
     await tester.pumpWidget(const SizedBox.shrink());
@@ -238,7 +246,7 @@ void main() {
     await recover(tester);
     final gate = Completer<DoorOperation?>();
     repository.onLookup = () => gate.future;
-    await tester.tap(find.text(l10n(tester).homeCommandRetrySameRequest));
+    await tester.tap(recoveryText(l10n(tester).homeCommandRetrySameRequest));
     await tester.pump();
     await auth.signOut();
     await commands.synchronizeSession(auth, deployment: door.scopeA.deployment);
@@ -246,21 +254,30 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.requests, hasLength(1));
     expect(store.records[door.scopeA]?.requestId, id);
-    expect(find.text(l10n(tester).errorAuthExpired), findsOneWidget);
-    expect(find.text(l10n(tester).homeCommandRetrySameRequest), findsNothing);
-    expect(find.text(l10n(tester).homeCommandCheckStatus), findsNothing);
+    expect(recoveryText(l10n(tester).errorAuthExpired), findsOneWidget);
+    expect(
+      recoveryText(l10n(tester).homeCommandRetrySameRequest),
+      findsNothing,
+    );
+    expect(recoveryText(l10n(tester).homeCommandCheckStatus), findsNothing);
     // Even a new session for the same employee cannot reactivate the old
     // dialog. Closing and reopening establishes the new session's ownership.
     repository.onLookup = () async => null;
     await auth.signIn('a@example.test', 'synthetic-password');
     await commands.synchronizeSession(auth, deployment: door.scopeA.deployment);
     await tester.pumpAndSettle();
-    expect(find.text(l10n(tester).errorAuthExpired), findsOneWidget);
-    expect(find.text(l10n(tester).homeCommandRetrySameRequest), findsNothing);
+    expect(recoveryText(l10n(tester).errorAuthExpired), findsOneWidget);
+    expect(
+      recoveryText(l10n(tester).homeCommandRetrySameRequest),
+      findsNothing,
+    );
     await tester.tap(find.text(l10n(tester).commonClose));
     await tester.pumpAndSettle();
     await recover(tester);
-    expect(find.text(l10n(tester).homeCommandRetrySameRequest), findsOneWidget);
+    expect(
+      recoveryText(l10n(tester).homeCommandRetrySameRequest),
+      findsOneWidget,
+    );
     expect(commands.requestId, id);
     expect(repository.requests, hasLength(1));
     await tester.pumpWidget(const SizedBox.shrink());
@@ -276,9 +293,9 @@ void main() {
       await recover(tester);
       repository.onRequest = () async =>
           throw const BusinessError(message: '', code: 'ACCESS_DENIED');
-      await tester.tap(find.text(l10n(tester).homeCommandRetrySameRequest));
+      await tester.tap(recoveryText(l10n(tester).homeCommandRetrySameRequest));
       await tester.pumpAndSettle();
-      expect(find.text(l10n(tester).accessDenied), findsOneWidget);
+      expect(recoveryText(l10n(tester).accessDenied), findsOneWidget);
       expect(commands.requestId, id);
       expect(commands.hasUnresolvedOperation, isTrue);
       await commands.open(deviceId: 'device-b');
@@ -299,13 +316,19 @@ void main() {
     await commands.synchronizeSession(auth, deployment: door.scopeA.deployment);
     await mount(tester);
     await recover(tester);
-    expect(find.text(l10n(tester).homeCommandCheckStatus), findsOneWidget);
-    expect(find.text(l10n(tester).homeCommandRetrySameRequest), findsNothing);
+    expect(recoveryText(l10n(tester).homeCommandCheckStatus), findsOneWidget);
+    expect(
+      recoveryText(l10n(tester).homeCommandRetrySameRequest),
+      findsNothing,
+    );
     expect(repository.requests, isEmpty);
     store.readError = null;
-    await tester.tap(find.text(l10n(tester).homeCommandCheckStatus));
+    await tester.tap(recoveryText(l10n(tester).homeCommandCheckStatus));
     await tester.pumpAndSettle();
-    expect(find.text(l10n(tester).homeCommandRetrySameRequest), findsOneWidget);
+    expect(
+      recoveryText(l10n(tester).homeCommandRetrySameRequest),
+      findsOneWidget,
+    );
     expect(commands.requestId, door.storedIntent.requestId);
     expect(repository.requests, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -319,11 +342,14 @@ void main() {
     await mount(tester);
     await recover(tester);
     repository.onLookup = () async => door.receipt();
-    await tester.tap(find.text(l10n(tester).homeCommandRetrySameRequest));
+    await tester.tap(recoveryText(l10n(tester).homeCommandRetrySameRequest));
     await tester.pumpAndSettle();
     expect(repository.requests, hasLength(1));
-    expect(find.text(l10n(tester).homeCommandPending), findsOneWidget);
-    expect(find.text(l10n(tester).homeCommandRetrySameRequest), findsNothing);
+    expect(recoveryText(l10n(tester).homeCommandPending), findsOneWidget);
+    expect(
+      recoveryText(l10n(tester).homeCommandRetrySameRequest),
+      findsNothing,
+    );
     expect(commands.hasUnresolvedOperation, isTrue);
     await tester.pumpWidget(const SizedBox.shrink());
   });

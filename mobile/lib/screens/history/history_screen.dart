@@ -15,6 +15,7 @@ import '../../widgets/history/history_calendar.dart';
 import '../../widgets/history/history_filter_sheet.dart';
 import '../../widgets/history/history_record_tile.dart';
 import '../../widgets/history/history_records_list.dart';
+import '../../widgets/ui/ui.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key, this.now});
@@ -35,6 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   late DateTime _periodInstant;
   bool _weeklyOverview = false;
   DateTime? _calendarSelection;
+  DateTime? _calendarMonth;
   bool _isAppActive = true;
   bool _isVisible = true;
   bool _periodReady = false;
@@ -133,6 +135,12 @@ class _HistoryScreenState extends State<HistoryScreen>
     await Future.wait([
       provider.loadSummary(startDate: month.startDate, endDate: month.endDate),
       provider.loadSummary(startDate: week.startDate, endDate: week.endDate),
+      if (_calendarMonth case final displayed?)
+        if (_calendarRange(displayed).startDate != month.startDate)
+          provider.loadSummary(
+            startDate: _calendarRange(displayed).startDate,
+            endDate: _calendarRange(displayed).endDate,
+          ),
     ]);
   }
 
@@ -150,6 +158,9 @@ class _HistoryScreenState extends State<HistoryScreen>
   void _applyFilter({required DateTime? date, required String? deviceId}) {
     if (!mounted) return;
     setState(() {
+      if (!DateUtils.isSameDay(date, _calendarSelection)) {
+        _calendarSelection = null;
+      }
       _selectedDate = date;
       _selectedDeviceId = deviceId;
     });
@@ -168,73 +179,49 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.historyTitle),
+    final l = AppLocalizations.of(context);
+    return AppScaffold(
+      consumeBottomInset: false,
+      header: AppPageHeader(
+        title: l.historyTitle,
         actions: [
           IconButton(
-            tooltip: l10n.historyInfoTitle,
-            icon: const Icon(Icons.info_outline_rounded),
-            onPressed: _showInfo,
-          ),
-          IconButton(
-            tooltip: l10n.qrRefresh,
+            tooltip: l.qrRefresh,
             icon: const Icon(Icons.refresh_rounded),
             onPressed: _refresh,
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(64),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: TabBar(
-                controller: _tabs,
-                padding: const EdgeInsets.all(4),
-                isScrollable: MediaQuery.textScalerOf(context).scale(14) > 19,
-                dividerColor: Colors.transparent,
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicator: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                labelColor: Theme.of(context).colorScheme.primary,
-                unselectedLabelColor: Theme.of(
-                  context,
-                ).colorScheme.onSurfaceVariant,
-                labelStyle: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-                tabs: [
-                  Tab(text: l10n.historyTabAll),
-                  Tab(text: l10n.historyTabThisMonth),
-                  Tab(text: l10n.historyTabStats),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 840),
-            child: Consumer<AttendanceProvider>(
-              builder: (context, provider, child) => TabBarView(
-                controller: _tabs,
-                children: [
-                  _buildRecords(provider),
-                  _buildMonth(provider),
-                  _buildStats(provider),
-                ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: AppSegmentControl<int>(
+                  segments: [
+                    AppSegment(value: 0, label: l.historyTabAll),
+                    AppSegment(value: 1, label: l.historyTabThisMonth),
+                    AppSegment(value: 2, label: l.historyTabStats),
+                  ],
+                  selected: _tabs.index,
+                  onChanged: _tabs.animateTo,
+                ),
               ),
-            ),
+              Expanded(
+                child: Consumer<AttendanceProvider>(
+                  builder: (context, provider, child) => TabBarView(
+                    controller: _tabs,
+                    children: [
+                      _buildRecords(provider),
+                      _buildMonth(provider),
+                      _buildStats(provider),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -247,40 +234,36 @@ class _HistoryScreenState extends State<HistoryScreen>
     final error = identical(provider.listError, loadMoreError)
         ? null
         : provider.listError;
+    final days = <List<Attendance>>[];
+    for (final record in records) {
+      if (days.isEmpty ||
+          AttendanceDate.instantKey(days.last.first.timestamp) !=
+              AttendanceDate.instantKey(record.timestamp)) {
+        days.add(<Attendance>[]);
+      }
+      days.last.add(record);
+    }
     return HistoryRecordsList(
       controller: _scroll,
-      recordCount: records.length,
+      recordCount: days.length,
       itemBuilder: (context, index) {
-        final record = records[index];
-        final day = AttendanceDate.instantKey(record.timestamp);
-        final startsDay =
-            index == 0 ||
-            AttendanceDate.instantKey(records[index - 1].timestamp) != day;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (startsDay)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 16, 4, 10),
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    DateFormat.yMMMEd(
-                      Localizations.localeOf(context).toLanguageTag(),
-                    ).format(AttendanceDate.businessTime(record.timestamp)),
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+        final dayRecords = days[index];
+        return Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: AppListGroup(
+            title: DateFormat.yMMMEd(
+              Localizations.localeOf(context).toLanguageTag(),
+            ).format(AttendanceDate.businessTime(dayRecords.first.timestamp)),
+            children: [
+              for (final record in dayRecords)
+                HistoryRecordTile(
+                  key: ValueKey(record.id),
+                  record: record,
+                  accessState: _accessState(record),
+                  onTap: () => _showRecordDetails(record),
                 ),
-              ),
-            HistoryRecordTile(
-              key: ValueKey(record.id),
-              record: record,
-              accessState: _accessState(record),
-              onTap: () => _showRecordDetails(record),
-            ),
-          ],
+            ],
+          ),
         );
       },
       hasMore: provider.listLoaded && provider.hasMore,
@@ -308,127 +291,175 @@ class _HistoryScreenState extends State<HistoryScreen>
     final date = _selectedDate;
     final deviceId = _selectedDeviceId;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Tooltip(
-                message: l10n.historyFilterTitle,
-                child: OutlinedButton.icon(
-                  onPressed: _showFilterDialog,
-                  icon: const Icon(Icons.tune_rounded, size: 18),
-                  label: Text(l10n.historyFilterTitle),
-                ),
-              ),
-              if (date != null || deviceId != null)
-                TextButton(
-                  onPressed: () => _applyFilter(date: null, deviceId: null),
-                  child: Text(l10n.historyFilterClear),
-                ),
-            ],
+          Text(
+            [
+              date == null ? l10n.historyAllDates : _formatDay(date),
+              deviceId == null
+                  ? l10n.historyAllDevices
+                  : _deviceLabel(provider.deviceFacets[deviceId]),
+            ].join(' · '),
+            style: Theme.of(context).textTheme.bodySmall,
           ),
-          if (date != null || deviceId != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              [
-                if (date != null) _formatDay(date),
-                if (deviceId != null)
-                  _deviceLabel(provider.deviceFacets[deviceId]),
-              ].join(' · '),
-              style: Theme.of(context).textTheme.bodySmall,
+          Tooltip(
+            message: l10n.historyFilterTitle,
+            child: AppSecondaryButton(
+              label: l10n.historyFilterTitle,
+              icon: Icons.tune_rounded,
+              onPressed: _showFilterDialog,
             ),
-          ],
+          ),
+          if (date != null || deviceId != null)
+            AppSecondaryButton(
+              label: l10n.historyFilterClear,
+              onPressed: () => _applyFilter(date: null, deviceId: null),
+            ),
         ],
+      ),
+    );
+  }
+
+  ({String startDate, String endDate}) _calendarRange(DateTime day) => (
+    startDate: AttendanceDate.calendarKey(DateTime(day.year, day.month)),
+    endDate: AttendanceDate.calendarKey(DateTime(day.year, day.month + 1, 0)),
+  );
+
+  void _changeMonth(int offset) {
+    final base = _calendarMonth ?? AttendanceDate.businessTime(_periodInstant);
+    final next = DateTime(base.year, base.month + offset);
+    setState(() => _calendarMonth = next);
+    final range = _calendarRange(next);
+    unawaited(
+      context.read<AttendanceProvider>().loadSummary(
+        startDate: range.startDate,
+        endDate: range.endDate,
       ),
     );
   }
 
   Widget _buildMonth(AttendanceProvider provider) {
-    final month = AttendanceDate.month(_periodInstant);
+    final l = AppLocalizations.of(context);
+    final now = AttendanceDate.businessTime(_periodInstant);
+    final displayed = _calendarMonth ?? now;
+    final month = _calendarRange(displayed);
     final summary = provider.summaryFor(
       startDate: month.startDate,
       endDate: month.endDate,
     );
-    final businessNow = AttendanceDate.businessTime(_periodInstant);
-    final locale = Localizations.localeOf(context).toLanguageTag();
-    return _refreshablePage([
-      Text(
-        DateFormat.yMMMM(locale).format(businessNow),
-        style: Theme.of(context).textTheme.headlineSmall,
-      ),
-      const SizedBox(height: 8),
-      Text(
-        AppLocalizations.of(context).historyTimeZone,
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-      const SizedBox(height: 16),
-      if (summary != null)
-        HistoryCalendar(
-          month: businessNow,
-          today: businessNow,
-          selectedDay: _calendarSelection,
-          dayCounts: {
-            for (final day in summary.days)
-              day.date:
-                  day.entryCount +
-                  day.exitCount +
-                  day.deniedCount +
-                  day.unknownCount,
-          },
-          onDaySelected: (day) {
-            setState(() => _calendarSelection = day);
-            _applyFilter(date: day, deviceId: null);
-            _tabs.animateTo(0);
-          },
+    final selected = _calendarSelection;
+    final loading = provider.isSummaryLoadingFor(
+      startDate: month.startDate,
+      endDate: month.endDate,
+    );
+    final monthHeader = Row(
+      children: [
+        IconButton(
+          tooltip: MaterialLocalizations.of(context).previousMonthTooltip,
+          onPressed: () => _changeMonth(-1),
+          icon: const Icon(Icons.chevron_left),
         ),
-      const SizedBox(height: 12),
-      Text(
-        AppLocalizations.of(context).historyCalendarLegend,
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-      const SizedBox(height: 8),
-      Text(
-        AppLocalizations.of(context).historySelectDayHint,
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-      if (summary == null ||
-          provider.isSummaryLoadingFor(
-            startDate: month.startDate,
-            endDate: month.endDate,
-          ) ||
-          provider.summaryErrorFor(
-                startDate: month.startDate,
-                endDate: month.endDate,
-              ) !=
-              null)
-        _summaryPanel(
-          provider,
-          month,
-          AppLocalizations.of(context).historyMonthSummary,
+        Expanded(
+          child: Semantics(
+            header: true,
+            liveRegion: true,
+            child: Text(
+              DateFormat.yMMMM(
+                Localizations.localeOf(context).toLanguageTag(),
+              ).format(displayed),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
         ),
-    ]);
+        IconButton(
+          tooltip: MaterialLocalizations.of(context).nextMonthTooltip,
+          onPressed: displayed.year == now.year && displayed.month == now.month
+              ? null
+              : () => _changeMonth(1),
+          icon: const Icon(Icons.chevron_right),
+        ),
+      ],
+    );
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: monthHeader,
+        ),
+        Expanded(
+          child: _refreshablePage([
+            const SizedBox(height: 8),
+            HistoryCalendar(
+              month: displayed,
+              today: now,
+              selectedDay: selected,
+              dayCounts: summary == null
+                  ? null
+                  : {
+                      for (final day in summary.days)
+                        day.date:
+                            day.entryCount +
+                            day.exitCount +
+                            day.deniedCount +
+                            day.unknownCount,
+                    },
+              onDaySelected: (day) {
+                setState(() => _calendarSelection = day);
+                _applyFilter(date: day, deviceId: null);
+                _tabs.animateTo(0);
+              },
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l.historyCalendarLegend,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l.historySelectDayHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (summary != null &&
+                summary.totals.entryCount +
+                        summary.totals.exitCount +
+                        summary.totals.deniedCount +
+                        summary.totals.unknownCount ==
+                    0)
+              AppEmptyState(
+                title: l.historyNoActivity,
+                message: l.historyNoActivityHint,
+                icon: Icons.calendar_today_outlined,
+              ),
+            if (summary == null ||
+                loading ||
+                provider.summaryErrorFor(
+                      startDate: month.startDate,
+                      endDate: month.endDate,
+                    ) !=
+                    null)
+              _summaryPanel(provider, month, l.historyMonthSummary),
+          ]),
+        ),
+      ],
+    );
   }
 
   Widget _buildStats(AttendanceProvider provider) {
     final l10n = AppLocalizations.of(context);
     return _refreshablePage([
-      SegmentedButton<bool>(
+      AppSegmentControl<bool>(
         segments: [
-          ButtonSegment(
-            value: false,
-            label: Text(l10n.historyTabThisMonthPeriod),
-          ),
-          ButtonSegment(value: true, label: Text(l10n.historyThisWeek)),
+          AppSegment(value: false, label: l10n.historyTabThisMonthPeriod),
+          AppSegment(value: true, label: l10n.historyThisWeek),
         ],
-        selected: {_weeklyOverview},
-        showSelectedIcon: false,
-        onSelectionChanged: (value) =>
-            setState(() => _weeklyOverview = value.single),
+        selected: _weeklyOverview,
+        onChanged: (value) => setState(() => _weeklyOverview = value),
       ),
       const SizedBox(height: 16),
       _summaryPanel(
@@ -445,7 +476,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     onRefresh: _refresh,
     child: ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       children: children,
     ),
   );
@@ -468,172 +499,126 @@ class _HistoryScreenState extends State<HistoryScreen>
       startDate: range.startDate,
       endDate: range.endDate,
     );
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(
-              '${_formatDay(AttendanceDate.parseDay(range.startDate))} – '
-              '${_formatDay(AttendanceDate.parseDay(range.endDate))}',
-            ),
-            if (isLoading) ...[
-              const SizedBox(height: 12),
-              LinearProgressIndicator(semanticsLabel: l10n.historyLoading),
-            ],
-            if (error != null || (summary == null && !isLoading)) ...[
-              const SizedBox(height: 12),
-              Semantics(
-                liveRegion: true,
-                child: Text(
-                  summary == null
-                      ? l10n.historySummaryUnavailable
-                      : l10n.historyStaleData,
-                ),
-              ),
-              if (error != null) Text(localizeAppError(context, error)),
-              TextButton.icon(
-                onPressed: isLoading
-                    ? null
-                    : () => unawaited(
-                        provider.loadSummary(
-                          startDate: range.startDate,
-                          endDate: range.endDate,
-                        ),
-                      ),
-                icon: const Icon(Icons.refresh),
-                label: Text(l10n.commonRetry),
-              ),
-            ],
-            if (summary != null) ...[
-              const SizedBox(height: 16),
-              _summaryNumbers(summary.totals),
-              const SizedBox(height: 8),
-              Text(
-                l10n.homeUpdatedAt(
-                  DateFormat.yMd(
-                    Localizations.localeOf(context).toLanguageTag(),
-                  ).add_Hm().format(
-                    AttendanceDate.businessTime(summary.generatedAt),
-                  ),
-                ),
-              ),
-            ],
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 24),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        Text(
+          AppDateFormat(
+            locale: Localizations.localeOf(context),
+            now: _periodInstant,
+          ).dateRange(
+            startDay: AttendanceDate.parseDay(range.startDate),
+            endDay: AttendanceDate.parseDay(range.endDate),
+          ),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-      ),
+        if (isLoading) ...[
+          const SizedBox(height: 12),
+          if (summary == null)
+            AppSkeleton(
+              semanticLabel: l10n.historyLoading,
+              kind: AppSkeletonKind.metrics,
+              itemCount: 1,
+            )
+          else
+            LinearProgressIndicator(semanticsLabel: l10n.historyLoading),
+        ],
+        if (error != null || (summary == null && !isLoading)) ...[
+          const SizedBox(height: 12),
+          AppDataNotice(
+            title: summary == null
+                ? l10n.historySummaryUnavailable
+                : l10n.historyStaleData,
+            message: error == null
+                ? l10n.historySummaryUnavailable
+                : localizeAppError(context, error),
+            tone: AppStatusTone.warning,
+            actionLabel: l10n.commonRetry,
+            onAction: isLoading
+                ? null
+                : () => unawaited(
+                    provider.loadSummary(
+                      startDate: range.startDate,
+                      endDate: range.endDate,
+                    ),
+                  ),
+          ),
+        ],
+        if (summary != null) ...[
+          const SizedBox(height: 16),
+          _summaryNumbers(summary.totals),
+          const SizedBox(height: 12),
+          Text(
+            l10n.homeUpdatedAt(
+              AppDateFormat(
+                locale: Localizations.localeOf(context),
+                now: _periodInstant,
+              ).dateTime(summary.generatedAt),
+            ),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: AppSecondaryButton(
+            label: l10n.historyInfoTitle,
+            icon: Icons.info_outline_rounded,
+            onPressed: _showInfo,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _summaryNumbers(AttendanceTotals totals) {
-    final l10n = AppLocalizations.of(context);
-    final metrics = [
-      (l10n.historyEntryShort, totals.entryCount),
-      (l10n.historyExitShort, totals.exitCount),
-      (l10n.historyActiveDays, totals.presentDays),
-    ];
-    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final columns = scale > 1.3 || constraints.maxWidth < 280 ? 1 : 3;
-            final cards = [
-              for (final (label, count) in metrics)
-                Semantics(
-                  label: '$label: $count',
-                  excludeSemantics: true,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '$count',
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w700,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ];
-            if (columns == 1) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final card in cards)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: card,
-                    ),
-                ],
-              );
-            }
-            return IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final (index, card) in cards.indexed) ...[
-                    if (index > 0) const SizedBox(width: 8),
-                    Expanded(child: card),
-                  ],
-                ],
-              ),
-            );
-          },
+        AppMetricRow(
+          metrics: [
+            AppMetric(
+              label: l.historyEntryShort,
+              value: '${totals.entryCount}',
+            ),
+            AppMetric(label: l.historyExitShort, value: '${totals.exitCount}'),
+            AppMetric(
+              label: l.historyActiveDays,
+              value: '${totals.presentDays}',
+            ),
+          ],
         ),
-        if (totals.deniedCount > 0 || totals.unknownCount > 0) ...[
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: [
-              Text('${l10n.historyDeniedCount}: ${totals.deniedCount}'),
-              Text('${l10n.historyUnknownCount}: ${totals.unknownCount}'),
-            ],
-          ),
-        ],
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
+          children: [
+            AppStatusBadge(
+              label: '${l.historyDeniedCount}: ${totals.deniedCount}',
+              tone: AppStatusTone.danger,
+              icon: Icons.block_rounded,
+            ),
+            AppStatusBadge(
+              label: '${l.historyUnknownCount}: ${totals.unknownCount}',
+              tone: AppStatusTone.info,
+              icon: Icons.help_outline_rounded,
+            ),
+          ],
+        ),
         if (totals.entryCount +
                 totals.exitCount +
                 totals.deniedCount +
                 totals.unknownCount ==
-            0) ...[
-          const SizedBox(height: 20),
-          Text(
-            l10n.historyNoActivity,
-            style: Theme.of(context).textTheme.titleSmall,
+            0)
+          AppEmptyState(
+            title: l.historyNoActivity,
+            message: l.historyNoActivityHint,
+            icon: Icons.event_note_outlined,
           ),
-          const SizedBox(height: 6),
-          Text(
-            l10n.historyNoActivityHint,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
       ],
     );
   }
@@ -667,67 +652,63 @@ class _HistoryScreenState extends State<HistoryScreen>
       AttendanceDecision.unknown => '${l10n.historyUnknownAccess} · $direction',
       AttendanceDecision.granted => direction,
     };
-    await showDialog<void>(
+    final location = record.deviceInfo?['location'];
+    await showAppSheet<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        scrollable: true,
-        content: Column(
+      builder: (dialogContext) => AppSheet(
+        title: l10n.historyRecordDetailTitle,
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${l10n.historyDetailDate}: ${DateFormat.yMMMMEEEEd(locale).format(timestamp)}',
+            AppStatusBadge(
+              label: title,
+              tone: record.denied
+                  ? AppStatusTone.danger
+                  : record.granted
+                  ? AppStatusTone.success
+                  : AppStatusTone.info,
             ),
-            const SizedBox(height: 12),
-            Text(
-              '${l10n.historyDetailTime}: ${DateFormat.Hms(locale).format(timestamp)}',
+            const SizedBox(height: 16),
+            AppListRow(
+              title: DateFormat.yMMMMEEEEd(locale).format(timestamp),
+              subtitle: l10n.historyDetailDate,
             ),
-            const Text(AttendanceDate.timeZone),
-            const SizedBox(height: 12),
-            Text(
-              '${l10n.historyDetailLocation}: ${_deviceLabel(record.doorName)}',
+            AppListRow(
+              title: DateFormat.Hms(locale).format(timestamp),
+              subtitle: l10n.historyDetailTime,
             ),
+            Text(l10n.historyTimeZone),
+            AppListRow(title: direction, subtitle: l10n.requestsType),
+            AppListRow(
+              title: _deviceLabel(record.doorName),
+              subtitle: l10n.historyFilterDevice,
+            ),
+            AppListRow(
+              title: location is String && location.trim().isNotEmpty
+                  ? location
+                  : '—',
+              subtitle: l10n.historyDetailLocation,
+            ),
+            const SizedBox(height: 16),
+            Text(l10n.historyRawEvents),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n.commonClose),
-          ),
-        ],
       ),
     );
   }
 
-  Future<void> _showInfo() => showModalBottomSheet<void>(
+  Future<void> _showInfo() => showAppSheet<void>(
     context: context,
-    useRootNavigator: true,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (context) => SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppLocalizations.of(context).historyInfoTitle,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            Text(AppLocalizations.of(context).historyRawEvents),
-            const SizedBox(height: 8),
-            Text(AppLocalizations.of(context).historyTimeZone),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(AppLocalizations.of(context).commonClose),
-            ),
-          ],
-        ),
+    builder: (context) => AppSheet(
+      title: AppLocalizations.of(context).historyInfoTitle,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(AppLocalizations.of(context).historyRawEvents),
+          const SizedBox(height: 12),
+          Text(AppLocalizations.of(context).historyTimeZone),
+        ],
       ),
     ),
   );
@@ -737,14 +718,8 @@ class _HistoryScreenState extends State<HistoryScreen>
       widget.now?.call() ?? DateTime.now(),
     );
     final provider = context.read<AttendanceProvider>();
-    final selected = await showModalBottomSheet<HistoryFilters>(
+    final selected = await showAppSheet<HistoryFilters>(
       context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      showDragHandle: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .9,
-      ),
       builder: (context) => ChangeNotifierProvider<AttendanceProvider>.value(
         value: provider,
         child: HistoryFilterSheet(

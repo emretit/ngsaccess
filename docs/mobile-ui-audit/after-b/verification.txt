@@ -1,0 +1,31 @@
+D4 final verification — 2026-11-04T16:26:35
+
+Analyze: PASS (0 issues)
+No issues found! (ran in 8.4s)
+Raw log: /tmp/d4-analyze-final.log
+
+Full tests: PASS (864/864)
+01:25 +864: All tests passed!
+Raw log: /tmp/d4-full-tests.log
+
+L10n: PASS (2/2)
+00:00 +2: All tests passed!
+Raw log: /tmp/d4-l10n-tests.log
+
+Acceptance: PASS (12/12)
+00:01 +12: All tests passed!
+Raw log: /tmp/d4-acceptance-tests.log
+
+Harness generation: PASS (294/294)
+01:03 +294: All tests passed!
+Raw log: /tmp/d4-harness-final.log
+
+Harness comparison: PASS (294/294)
+00:22 +294: All tests passed!
+Raw log: /tmp/d4-harness-compare.log
+
+PNG files: 294 (292 screen states + 2 kit catalogs)
+B references: 55 mapped
+Side-by-side review: 20 pairs / 5 JPEG sheets
+Golden comparison: exact except <=32 pixels inside the measured QR clock progress rectangle.
+Human/device checks and screen-owner decisions remain in ACCEPTANCE_D4.md.

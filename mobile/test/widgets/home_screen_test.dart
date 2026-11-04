@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
+import 'package:ngsplusapp/widgets/brand_mark.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
@@ -14,7 +16,7 @@ import 'package:ngsplusapp/providers/door_operation_provider.dart';
 import 'package:ngsplusapp/providers/preferred_device_provider.dart';
 import 'package:ngsplusapp/repositories/device_repository.dart';
 import 'package:ngsplusapp/screens/home/home_screen.dart';
-import 'package:ngsplusapp/widgets/cards/quick_action_card.dart';
+import 'package:ngsplusapp/widgets/cards/door_command_status_card.dart';
 import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
@@ -26,13 +28,14 @@ class _Commands extends DoorOperationProvider {
   final opens = <({String deviceId, String? doorId})>[];
   bool unresolved = false;
   bool resolveOnCheck = false;
+  DoorOperation? snapshot;
   int statusChecks = 0;
   @override
   bool get isLoading => false;
   @override
   bool get hasUnresolvedOperation => unresolved;
   @override
-  DoorOperation? get operation => null;
+  DoorOperation? get operation => snapshot;
   @override
   AppError? get error => null;
   @override
@@ -42,6 +45,20 @@ class _Commands extends DoorOperationProvider {
       unresolved = false;
       notifyListeners();
     }
+  }
+
+  void setSnapshot(DoorOperationStatus status) {
+    final value = DoorOperation(
+      operationId: 'existing-operation',
+      status: status,
+      deviceId: 'controller',
+      doorId: 'north-door',
+      deviceName: 'North entrance',
+      requestedAt: DateTime.utc(2026, 11, 4, 10),
+    );
+    snapshot = value;
+    unresolved = value.isUnresolved;
+    notifyListeners();
   }
 
   @override
@@ -204,6 +221,7 @@ void main() {
       Provider<DeviceRepository>.value(value: devices),
     ],
     child: MaterialApp(
+      theme: AppTheme.lightTheme,
       locale: const Locale('en'),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -211,9 +229,7 @@ void main() {
     ),
   );
 
-  Finder unlock() => find.byWidgetPredicate(
-    (widget) => widget is QuickActionCard && widget.icon == Icons.lock_open,
-  );
+  Finder unlock() => find.byKey(const Key('home-open-door'));
 
   Future<void> mount(WidgetTester tester, {bool unresolved = false}) async {
     prepare();
@@ -231,29 +247,28 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets(
-    'requests and visitor quick action cards use different existing theme accents',
-    (tester) async {
-      await mount(tester);
-      final requests = tester.widget<QuickActionCard>(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is QuickActionCard &&
-              widget.icon == Icons.assignment_outlined,
-        ),
-      );
-      final visitor = tester.widget<QuickActionCard>(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is QuickActionCard &&
-              widget.icon == Icons.person_add_alt_1,
-        ),
-      );
-      expect(requests.color, AppTheme.primaryBurgundy2);
-      expect(requests.color, isNot(visitor.color));
-      await unmount(tester);
-    },
-  );
+  testWidgets('home uses neutral grouped actions and one scan primary', (
+    tester,
+  ) async {
+    await mount(tester);
+    expect(
+      tester.widget<AppBrandBand>(find.byType(AppBrandBand)).brandMark,
+      isA<BrandMark>(),
+    );
+    expect(tester.getSize(find.byType(BrandMark)), const Size(32, 32));
+    expect(find.byType(AppPrimaryButton), findsOneWidget);
+    expect(find.byType(AppListRow), findsNWidgets(3));
+    expect(find.text('My requests'), findsOneWidget);
+    expect(
+      find.text(
+        AppLocalizations.of(
+          tester.element(find.byType(HomeScreen)),
+        ).visitorAddButton,
+      ),
+      findsOneWidget,
+    );
+    await unmount(tester);
+  });
   testWidgets(
     'home requests independent summary and recovers from first-load error',
     (tester) async {
@@ -365,10 +380,74 @@ void main() {
       await tester.pump();
       expect(commands.statusChecks, 2);
       expect(commands.opens, isEmpty);
-      expect(tester.widget<QuickActionCard>(unlock()).onTap, isNotNull);
+      expect(tester.widget<AppListRow>(unlock()).onTap, isNotNull);
       await unmount(tester);
     },
   );
+
+  testWidgets(
+    'unknown command notice opens read-only recovery and never resends',
+    (tester) async {
+      await mount(tester, unresolved: true);
+      attendance.empty();
+      commands.setSnapshot(DoorOperationStatus.unknown);
+      await tester.pump();
+      final l10n = AppLocalizations.of(tester.element(find.byType(HomeScreen)));
+      final card = find.byType(DoorCommandStatusCard);
+      expect(
+        find.descendant(of: card, matching: find.text(l10n.homeCommandUnknown)),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<AppListRow>(unlock()).subtitle,
+        l10n.homeCommandUnknown,
+      );
+      expect(find.text(l10n.homeCommandRetrySameRequest), findsNothing);
+      final checks = commands.statusChecks;
+      final check = find.descendant(
+        of: card,
+        matching: find.text(l10n.homeCommandCheckStatus),
+      );
+      await tester.ensureVisible(check);
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(commands.statusChecks, checks + 1);
+      expect(commands.opens, isEmpty);
+      expect(devices.calls, 0);
+      expect(find.text(l10n.homeCommandRetrySameRequest), findsNothing);
+      await unmount(tester);
+    },
+  );
+
+  for (final status in [
+    DoorOperationStatus.confirmed,
+    DoorOperationStatus.failed,
+  ]) {
+    testWidgets('home presents the existing $status command outcome', (
+      tester,
+    ) async {
+      await mount(tester);
+      attendance.empty();
+      commands.setSnapshot(status);
+      await tester.pump();
+      final l10n = AppLocalizations.of(tester.element(find.byType(HomeScreen)));
+      expect(
+        find.descendant(
+          of: find.byType(DoorCommandStatusCard),
+          matching: find.text(
+            status == DoorOperationStatus.confirmed
+                ? l10n.homeCommandConfirmed
+                : l10n.homeCommandFailed,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(l10n.homeCommandRetrySameRequest), findsNothing);
+      expect(commands.opens, isEmpty);
+      await unmount(tester);
+    });
+  }
 
   testWidgets(
     'unresolved operation opens recovery without validating or submitting a new target',
@@ -381,7 +460,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(devices.calls, 0);
       expect(commands.opens, isEmpty);
-      final action = tester.widget<QuickActionCard>(unlock());
+      final action = tester.widget<AppListRow>(unlock());
       expect(action.onTap, isNotNull);
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(commands.statusChecks, 2);

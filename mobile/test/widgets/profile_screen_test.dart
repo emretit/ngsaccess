@@ -15,6 +15,9 @@ import 'package:ngsplusapp/screens/profile/profile_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
+import 'package:ngsplusapp/theme/app_theme.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
+
 import '../auth_fakes.dart';
 import '../helpers/preference_store.dart';
 
@@ -81,9 +84,7 @@ void main() {
             locale: provider.locale,
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: AppLocalizations.localizationsDelegates,
-            theme: ThemeData(
-              brightness: dark ? Brightness.dark : Brightness.light,
-            ),
+            theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
             builder: (context, child) => MediaQuery(
               data: MediaQuery.of(
                 context,
@@ -112,8 +113,8 @@ void main() {
   }
 
   Future<void> openSecurity(WidgetTester tester) async {
-    await tester.ensureVisible(find.text('Security'));
-    await tester.tap(find.text('Security'));
+    await tester.ensureVisible(find.text('Change password'));
+    await tester.tap(find.text('Change password'));
     await tester.pumpAndSettle();
   }
 
@@ -149,12 +150,20 @@ void main() {
   ) async {
     await prepare(user: mobileProjectUser);
     await mount(tester);
-    expect(find.text('Company / project'), findsOneWidget);
+    final semantics = tester.ensureSemantics();
+    expect(
+      find.bySemanticsLabel(RegExp('Organisation and project')),
+      findsOneWidget,
+    );
+    semantics.dispose();
     expect(find.text('Mobile project A'), findsOneWidget);
     expect(find.text('Department is not the project'), findsNothing);
     await tester.tap(find.text('Personal details'));
     await tester.pumpAndSettle();
-    expect(find.text('Company / project: Mobile project A'), findsOneWidget);
+    expect(
+      find.text('Organisation and project: Mobile project A'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('project label updates after switching mobile accounts', (
@@ -181,7 +190,9 @@ void main() {
     (tester) async {
       await prepare();
       await mount(tester, language: 'tr');
-      expect(find.text('Firma / proje'), findsOneWidget);
+      final semantics = tester.ensureSemantics();
+      expect(find.bySemanticsLabel(RegExp('Kurum ve proje')), findsOneWidget);
+      semantics.dispose();
       expect(find.text('Proje bilgisi şu anda kullanılamıyor'), findsOneWidget);
     },
   );
@@ -222,6 +233,163 @@ void main() {
     },
   );
 
+  testWidgets(
+    'theme sheet prevents closing or duplicate choices while saving',
+    (tester) async {
+      await prepare();
+      await mount(tester);
+      prefs.writeGate = Completer<void>();
+      await tester.ensureVisible(find.text('Theme'));
+      await tester.tap(find.text('Theme'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dark theme'));
+      await tester.pump();
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      final rows = tester.widgetList<AppListRow>(
+        find.descendant(
+          of: find.byType(AppSheet),
+          matching: find.byType(AppListRow),
+        ),
+      );
+      expect(rows.every((row) => !row.enabled), isTrue);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.descendant(
+                of: find.byType(AppSheet),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(find.byType(AppSheet), findsOneWidget);
+      prefs.writeGate?.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(AppSheet), findsNothing);
+      expect(theme.themeMode, ThemeMode.dark);
+      expect(prefs.values['mobile_theme_mode'], 'dark');
+    },
+  );
+
+  for (final languageSheet in [false, true]) {
+    testWidgets(
+      'pending preference survives sheet fling language=$languageSheet',
+      (tester) async {
+        await prepare();
+        await mount(tester);
+        final gate = Completer<void>();
+        prefs.writeGate = gate;
+        await tester.ensureVisible(
+          find.text(languageSheet ? 'Language' : 'Theme'),
+        );
+        await tester.tap(find.text(languageSheet ? 'Language' : 'Theme'));
+        await tester.pumpAndSettle();
+        final l10n = AppLocalizations.of(tester.element(find.byType(AppSheet)));
+        await tester.tap(
+          find.text(
+            languageSheet
+                ? l10n.profileLanguageValueTr
+                : l10n.profileThemeModeDark,
+          ),
+        );
+        await tester.pump();
+        expect(find.byType(LinearProgressIndicator), findsOneWidget);
+        await tester.fling(find.byType(AppSheet), const Offset(0, 500), 1000);
+        await tester.pump(const Duration(milliseconds: 400));
+        final heading = find.descendant(
+          of: find.byType(AppSheet),
+          matching: find.text(
+            languageSheet ? l10n.profileLanguage : l10n.profileTheme,
+          ),
+        );
+        if (heading.evaluate().isNotEmpty) {
+          await tester.fling(heading, const Offset(0, 500), 1000);
+          await tester.pump(const Duration(milliseconds: 400));
+        }
+        final stayedOpen = find.byType(AppSheet).evaluate().isNotEmpty;
+        gate.complete();
+        await tester.pumpAndSettle();
+        expect(
+          stayedOpen,
+          isTrue,
+          reason: 'Saving preferences must retain error/retry feedback',
+        );
+        expect(find.byType(AppSheet), findsNothing);
+        if (languageSheet) {
+          expect(locale.locale, const Locale('tr'));
+        } else {
+          expect(theme.themeMode, ThemeMode.dark);
+        }
+      },
+    );
+  }
+
+  testWidgets('logout kit confirmation cancels or signs out exactly once', (
+    tester,
+  ) async {
+    await prepare();
+    await mount(tester);
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(ProfileScreen)),
+    );
+    Future<void> open() async {
+      await tester.ensureVisible(find.text(l10n.profileLogout));
+      await tester.tap(find.text(l10n.profileLogout));
+      await tester.pumpAndSettle();
+    }
+
+    await open();
+    expect(
+      tester.widget<AppDialog>(find.byType(AppDialog)).destructive,
+      isTrue,
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AppDialog),
+        matching: find.text(l10n.commonCancel),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(auth.isAuthenticated, isTrue);
+    expect(repository.signOutCalls, 0);
+    await open();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AppDialog),
+        matching: find.widgetWithText(OutlinedButton, l10n.profileLogout),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(AppDialog), findsNothing);
+    expect(auth.isAuthenticated, isFalse);
+    expect(repository.signOutCalls, 1);
+  });
+
+  testWidgets('standalone support and password pages have one heading', (
+    tester,
+  ) async {
+    await prepare();
+    await mount(tester);
+    final l10n = AppLocalizations.of(
+      tester.element(find.byType(ProfileScreen)),
+    );
+    await tester.ensureVisible(find.text(l10n.profileDiagnosticsTitle));
+    await tester.tap(find.text(l10n.profileDiagnosticsTitle));
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.profileDiagnosticsTitle), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await openSecurity(tester);
+    expect(
+      find.text(l10n.profileChangePassword),
+      findsNWidgets(2),
+      reason: 'One page heading and the submit action',
+    );
+  });
+
   testWidgets('failed theme save keeps the picker open with localized error', (
     tester,
   ) async {
@@ -233,7 +401,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Dark theme'));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byType(AppSheet), findsOneWidget);
     expect(
       find.text('Could not save your preference. Please try again.'),
       findsOneWidget,
@@ -340,7 +508,8 @@ void main() {
     await prepare();
     await mount(tester, scale: 2, dark: true);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byTooltip('Help & Support'));
+    await tester.ensureVisible(find.text('Help & Support'));
+    await tester.tap(find.text('Help & Support'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Door selection'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -359,7 +528,8 @@ void main() {
   ) async {
     await prepare();
     await mount(tester);
-    await tester.tap(find.byTooltip('Help & Support'));
+    await tester.ensureVisible(find.text('Help & Support'));
+    await tester.tap(find.text('Help & Support'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Door selection'), findsOneWidget);
     await locale.setLocale(const Locale('tr'));
@@ -408,11 +578,11 @@ void main() {
           scale: 2,
           dark: true,
         );
-        await tester.tap(
-          find.byTooltip(
-            language == 'tr' ? 'Yardım & Destek' : 'Help & Support',
-          ),
+        final help = find.text(
+          language == 'tr' ? 'Yardım & Destek' : 'Help & Support',
         );
+        await tester.ensureVisible(help);
+        await tester.tap(help);
         await tester.pumpAndSettle();
         expect(copies, isEmpty);
         final l10n = AppLocalizations.of(
@@ -476,7 +646,8 @@ void main() {
         ),
       );
       await mount(tester, diagnostics: diagnostics);
-      await tester.tap(find.byTooltip('Help & Support'));
+      await tester.ensureVisible(find.text('Help & Support'));
+      await tester.tap(find.text('Help & Support'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Copy support report'));
       await tester.tap(find.text('Copy support report'));
@@ -510,7 +681,8 @@ void main() {
         ),
       );
       await mount(tester, diagnostics: SafeDiagnostics());
-      await tester.tap(find.byTooltip('Help & Support'));
+      await tester.ensureVisible(find.text('Help & Support'));
+      await tester.tap(find.text('Help & Support'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Copy support report'));
       await tester.tap(find.text('Copy support report'));

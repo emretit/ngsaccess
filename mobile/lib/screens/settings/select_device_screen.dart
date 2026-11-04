@@ -9,7 +9,8 @@ import '../../models/device.dart';
 import '../../providers/preferred_device_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../repositories/device_repository.dart';
-import '../../router/app_router.dart';
+import '../../router/route_paths.dart';
+import '../../widgets/ui/ui.dart';
 
 class SelectDeviceScreen extends StatefulWidget {
   const SelectDeviceScreen({super.key});
@@ -23,6 +24,7 @@ class _SelectDeviceScreenState extends State<SelectDeviceScreen> {
   AppError? _error;
   List<Device> _devices = const [];
   String _query = '';
+  final _search = TextEditingController();
   int? _identityGeneration;
   int _request = 0;
 
@@ -103,18 +105,20 @@ class _SelectDeviceScreenState extends State<SelectDeviceScreen> {
   }
 
   @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final preferred = context.watch<PreferredDeviceProvider>();
-    final colors = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.selectDeviceTitle),
-        leading: IconButton(
-          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _close,
-        ),
+    return AppScaffold(
+      header: AppPageHeader(
+        title: l10n.selectDeviceTitle,
+        showBack: true,
+        onBack: _close,
         actions: [
           IconButton(
             tooltip: l10n.qrRefresh,
@@ -125,67 +129,51 @@ class _SelectDeviceScreenState extends State<SelectDeviceScreen> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
+          constraints: const BoxConstraints(maxWidth: 720),
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
-                child: Column(
-                  children: [
-                    if (preferred.isSaving) const LinearProgressIndicator(),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: l10n.selectDeviceSearch,
-                          prefixIcon: const Icon(Icons.search),
-                          border: const OutlineInputBorder(),
-                        ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppTextField(
+                        controller: _search,
+                        label: l10n.selectDeviceSearch,
                         onChanged: (value) => setState(() => _query = value),
                       ),
-                    ),
-                    if (preferred.hasDevice)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              preferred.deviceName ?? l10n.historyUnknownDevice,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            Text(l10n.profilePreferredDoor),
-                            TextButton(
-                              onPressed: preferred.isSaving
-                                  ? null
-                                  : () async {
-                                      await preferred.clear();
-                                    },
-                              child: Text(l10n.selectDeviceClear),
-                            ),
-                          ],
+                      if (preferred.isSaving ||
+                          (_loading && _devices.isNotEmpty))
+                        LinearProgressIndicator(
+                          semanticsLabel: l10n.commonLoading,
                         ),
-                      ),
-                    if (preferred.wasInvalidated)
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(l10n.selectDeviceInvalidated),
-                      ),
-                    if (preferred.error != null || !preferred.hasIdentity)
-                      Semantics(
-                        liveRegion: true,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            !preferred.hasIdentity ||
-                                    preferred.error ==
-                                        PreferenceError.unavailableIdentity
-                                ? l10n.preferenceIdentityUnavailable
-                                : l10n.preferenceSaveFailed,
-                            style: TextStyle(color: colors.error),
-                          ),
+                      if (preferred.hasDevice) ...[
+                        const SizedBox(height: 16),
+                        AppSecondaryButton(
+                          label: l10n.selectDeviceClear,
+                          expanded: true,
+                          onPressed: preferred.isSaving
+                              ? null
+                              : () async {
+                                  await preferred.clear();
+                                },
                         ),
-                      ),
-                  ],
+                      ],
+                      if (preferred.wasInvalidated)
+                        AppDataNotice(message: l10n.selectDeviceInvalidated),
+                      if (preferred.error != null || !preferred.hasIdentity)
+                        AppDataNotice(
+                          tone: AppStatusTone.danger,
+                          message:
+                              !preferred.hasIdentity ||
+                                  preferred.error ==
+                                      PreferenceError.unavailableIdentity
+                              ? l10n.preferenceIdentityUnavailable
+                              : l10n.preferenceSaveFailed,
+                        ),
+                    ],
+                  ),
                 ),
               ),
               _buildBody(l10n, preferred),
@@ -197,104 +185,125 @@ class _SelectDeviceScreenState extends State<SelectDeviceScreen> {
   }
 
   Widget _buildBody(AppLocalizations l10n, PreferredDeviceProvider preferred) {
-    if (_loading) {
-      return const SliverFillRemaining(
-        hasScrollBody: false,
-        child: Center(child: CircularProgressIndicator()),
+    if (_loading && _devices.isEmpty) {
+      return SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        sliver: SliverToBoxAdapter(
+          child: AppSkeleton(semanticLabel: l10n.commonLoading),
+        ),
       );
     }
     final error = _error;
     if (error != null) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                localizeAppError(context, error),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: _load, child: Text(l10n.commonRetry)),
-            ],
+      return SliverPadding(
+        padding: const EdgeInsets.all(20),
+        sliver: SliverToBoxAdapter(
+          child: AppDataNotice(
+            message: localizeAppError(context, error),
+            tone: AppStatusTone.danger,
+            actionLabel: l10n.commonRetry,
+            onAction: _load,
           ),
         ),
       );
     }
     final filtered = _filtered;
     if (filtered.isEmpty) {
-      return SliverFillRemaining(
-        hasScrollBody: false,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: Text(
-              _devices.isEmpty
-                  ? l10n.selectDeviceEmpty
-                  : l10n.selectDeviceNoMatch,
-              textAlign: TextAlign.center,
-            ),
-          ),
+      return SliverToBoxAdapter(
+        child: AppEmptyState(
+          title: _devices.isEmpty
+              ? l10n.selectDeviceEmpty
+              : l10n.selectDeviceNoMatch,
+          message: _devices.isEmpty
+              ? l10n.selectDeviceUnavailable
+              : l10n.selectDeviceSearch,
+          icon: Icons.door_front_door_outlined,
+          actionLabel: _devices.isEmpty ? null : l10n.historyFilterClear,
+          onAction: _devices.isEmpty
+              ? null
+              : () => setState(() {
+                  _query = '';
+                  _search.clear();
+                }),
         ),
       );
     }
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate((context, index) {
-          final device = filtered[index];
-          final selected =
-              preferred.deviceId == device.id &&
-              preferred.doorId == device.doorId &&
-              (preferred.targetId == null ||
-                  preferred.targetId == device.targetId);
-          final colors = Theme.of(context).colorScheme;
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: Semantics(
-              selected: selected,
-              child: ListTile(
-                selected: selected,
-                selectedColor: colors.onSecondaryContainer,
-                selectedTileColor: colors.secondaryContainer,
-                leading: const Icon(Icons.door_front_door_outlined),
-                title: Text(
-                  device.doorName ?? device.name ?? l10n.historyUnknownDevice,
-                ),
-                subtitle: device.subtitle.isEmpty && device.canOpen != false
-                    ? null
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (device.subtitle.isNotEmpty) Text(device.subtitle),
-                          if (device.canOpen == false)
-                            Text(_unavailableLabel(l10n, device.reason)),
-                        ],
-                      ),
-                trailing: Icon(
-                  selected ? Icons.check_circle : Icons.radio_button_unchecked,
-                ),
-                onTap:
-                    !preferred.hasIdentity ||
-                        preferred.isSaving ||
-                        device.canOpen != true
-                    ? null
-                    : () async {
-                        final saved = await preferred.setDevice(
-                          id: device.id,
-                          name: device.doorName ?? device.name,
-                          doorId: device.doorId,
-                          targetId: device.targetId,
-                        );
-                        if (!mounted || !saved) return;
-                        _close();
-                      },
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      sliver: DecoratedSliver(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          borderRadius: BorderRadius.circular(
+            AppUiTokens.of(context).groupRadius,
+          ),
+        ),
+        sliver: SliverList.separated(
+          itemCount: filtered.length,
+          separatorBuilder: (_, _) =>
+              const Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
+          itemBuilder: (context, index) {
+            final device = filtered[index];
+            final selected =
+                preferred.deviceId == device.id &&
+                preferred.doorId == device.doorId &&
+                (preferred.targetId == null ||
+                    preferred.targetId == device.targetId);
+            final radius = Radius.circular(AppUiTokens.of(context).groupRadius);
+            return ClipRRect(
+              borderRadius: BorderRadius.vertical(
+                top: index == 0 ? radius : Radius.zero,
+                bottom: index == filtered.length - 1 ? radius : Radius.zero,
               ),
-            ),
-          );
-        }, childCount: filtered.length),
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surface,
+                child: AppListRow(
+                  title:
+                      device.doorName ??
+                      device.name ??
+                      l10n.historyUnknownDevice,
+                  subtitle: device.subtitle.isEmpty ? null : device.subtitle,
+                  leadingIcon: Icons.door_front_door_outlined,
+                  selected: selected,
+                  trailing: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        selected
+                            ? Icons.check_circle_outline
+                            : Icons.radio_button_unchecked,
+                        color: selected
+                            ? AppUiTokens.of(context).accent
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      if (device.canOpen == false)
+                        Text(
+                          _unavailableLabel(l10n, device.reason),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
+                  enabled:
+                      preferred.hasIdentity &&
+                      !preferred.isSaving &&
+                      device.canOpen == true,
+                  onTap: () async {
+                    final saved = await preferred.setDevice(
+                      id: device.id,
+                      name: device.doorName ?? device.name,
+                      doorId: device.doorId,
+                      targetId: device.targetId,
+                    );
+                    if (!mounted || !saved) return;
+                    _close();
+                  },
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NGS Plus — Ana Sayfa tasarım önerisi</title>
+<style>
+:root{color-scheme:light;--canvas:#fcfcfc;--surface:#fff;--subtle:#f3f3f2;--line:#e2e2e0;--text:#252523;--muted:#646461;--primary:#7a1f1f;--selected:#f8eeee;--success:#356047;--success-bg:#edf4ef}
+*{box-sizing:border-box}body{margin:0;background:#ededeb;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;font-size:15px;line-height:1.4}button{font:inherit;color:inherit;cursor:default}button:focus-visible{outline:2px solid var(--primary);outline-offset:3px}.phone{width:100%;max-width:390px;min-height:844px;margin:auto;background:var(--canvas);display:flex;flex-direction:column}.status{height:47px;padding:14px 24px 0;display:flex;justify-content:space-between;font-size:13px;font-weight:600}.system-icons{display:flex;gap:6px;align-items:center;height:18px}svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}.status svg{width:18px;height:18px}.top{height:60px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.brand{font-weight:700;font-size:19px;letter-spacing:-.5px}.identity{font-size:13px;color:var(--muted)}main{padding:24px 20px 20px;flex:1}h1{font-size:26px;line-height:1.2;letter-spacing:-.6px;margin:0 0 5px;font-weight:650}p{margin:0}.muted{color:var(--muted)}.date{font-size:14px}.today{padding:22px 0 18px;border-bottom:1px solid var(--line)}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px}h2{font-size:18px;line-height:1.3;margin:0;font-weight:600}.badge{display:inline-flex;align-items:center;gap:5px;background:var(--success-bg);color:var(--success);padding:4px 8px;border-radius:4px;font-size:13px;font-weight:600}.badge svg{width:15px;height:15px}.times{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:19px 0 12px}.times>div+div{border-left:1px solid var(--line);padding-left:20px}.times dt{font-size:13px;color:var(--muted)}.times dd{margin:3px 0 0;font-size:24px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums}.fresh{font-size:12px;color:var(--muted)}.actions{padding:20px 0 16px}.primary{display:flex;gap:10px;justify-content:center;align-items:center;width:100%;min-height:54px;padding:14px 16px;border:0;background:var(--primary);color:white;border-radius:8px;font-weight:600;font-size:16px}.door{width:100%;margin-top:10px;min-height:62px;padding:10px 12px;border:1px solid #858582;border-radius:8px;background:var(--surface);display:flex;align-items:center;text-align:left;gap:12px}.door .label{flex:1}.door strong{display:block;font-size:15px;font-weight:600}.door small{display:block;font-size:13px;color:var(--muted)}.door .chevron{width:18px}.tools{border-top:1px solid var(--line)}.row{width:100%;display:flex;align-items:center;gap:12px;min-height:60px;padding:12px 0;border:0;border-bottom:1px solid var(--line);text-align:left;background:transparent}.row>svg{color:var(--muted)}.row .text{flex:1}.row strong{font-size:15px;font-weight:550}.row small{display:block;color:var(--muted);font-size:12px}.count{background:var(--subtle);padding:3px 7px;border-radius:4px;font-size:12px;color:var(--muted)}.recent{padding-top:18px}.recent h2{font-size:15px}.recent p{font-size:13px;margin-top:8px}.recent time{font-variant-numeric:tabular-nums;font-weight:600;margin-right:10px}.nav{background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:8px 5px 0}.nav button{border:0;background:none;min-width:48px;min-height:58px;padding:5px 1px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--muted)}.nav button[aria-current="page"]{color:var(--primary);font-weight:600}.nav .icon{display:flex;align-items:center;justify-content:center;width:48px;height:26px;border-radius:6px}.nav [aria-current="page"] .icon{background:var(--selected)}.home-indicator{height:34px;background:var(--surface);display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px}.home-indicator:after{content:"";height:4px;width:120px;border-radius:4px;background:var(--text)}@media(max-width:340px){main{padding-left:16px;padding-right:16px}.top{padding:0 16px}.identity{font-size:12px}.nav button{font-size:11px}}@media print{body{background:white}.phone{margin:0}}
+</style>
+</head>
+<body>
+<svg aria-hidden="true" style="display:none"><defs>
+<symbol id="home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></symbol>
+<symbol id="qr" viewBox="0 0 24 24"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM21 15v3h-3v3h3M12 3v3M3 12h3M12 9v3h3M12 18v3"/></symbol>
+<symbol id="door" viewBox="0 0 24 24"><path d="M4 21h16M7 21V3h10v18M13 12h1"/></symbol>
+<symbol id="chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+<symbol id="people" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3c0-6 14-6 14 0v3M17 4c4 0 4 6 0 6M19 14c3 1 3 4 3 7"/></symbol>
+<symbol id="profile" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3"/><path d="M4 21v-3c0-6 16-6 16 0v3Z"/></symbol>
+<symbol id="history" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 1 8M3 4v6h6M12 7v5l4 2"/></symbol>
+<symbol id="request" viewBox="0 0 24 24"><path d="M8 5H4v16h16V5h-4M8 3h8v4H8zM8 12h8M8 16h5"/></symbol>
+<symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+</defs></svg>
+<div class="phone">
+<div class="status" aria-hidden="true"><span>13:05</span><span class="system-icons"><svg viewBox="0 0 24 24"><path d="M3 19v-3M8 19v-6M13 19V9M18 19V5"/></svg><svg viewBox="0 0 24 24"><rect x="2" y="6" width="18" height="12" rx="2"/><path d="M22 10v4M5 9h12v6H5Z"/></svg></span></div>
+<header class="top"><span class="brand">NGS Plus</span><span class="identity">Ayşe Yılmaz</span></header>
+<main>
+<h1>Bugün</h1><p class="muted date">4 Kasım Çarşamba</p>
+<section class="today" aria-labelledby="attendance-title">
+<div class="section-head"><h2 id="attendance-title">Yoklama durumu</h2><span class="badge"><svg aria-hidden="true"><use href="#check"/></svg>İçeride</span></div>
+<dl class="times"><div><dt>Son giriş</dt><dd>13:00</dd></div><div><dt>Son çıkış</dt><dd>12:00</dd></div></dl>
+<p class="fresh">13:05’te güncellendi · Türkiye saati</p>
+</section>
+<section class="actions" aria-label="Geçiş işlemleri">
+<button class="primary" type="button"><svg aria-hidden="true"><use href="#qr"/></svg>QR kod tara</button>
+<button class="door" type="button"><svg aria-hidden="true"><use href="#door"/></svg><span class="label"><strong>Kapıyı aç</strong><small>Ana Giriş · Merkez</small></span><svg aria-hidden="true" class="chevron"><use href="#chevron"/></svg></button>
+</section>
+<section class="tools" aria-label="Diğer işlemler">
+<button class="row" type="button"><svg aria-hidden="true"><use href="#request"/></svg><span class="text"><strong>Taleplerim</strong><small>İzin ve kayıt düzeltme</small></span><span class="count">1 bekleyen</span><svg aria-hidden="true"><use href="#chevron"/></svg></button>
+<button class="row" type="button"><svg aria-hidden="true"><use href="#people"/></svg><span class="text"><strong>Ziyaretçi davet et</strong></span><svg aria-hidden="true"><use href="#chevron"/></svg></button>
+</section>
+<section class="recent" aria-labelledby="recent-title"><h2 id="recent-title">Son hareket</h2><p><time datetime="2026-11-04T13:00:00+03:00">13:00</time>Giriş · Ana Giriş</p></section>
+</main>
+<nav class="nav" aria-label="Ana gezinme">
+<button aria-current="page" type="button"><span class="icon"><svg aria-hidden="true"><use href="#home"/></svg></span>Ana Sayfa</button>
+<button type="button"><span class="icon"><svg aria-hidden="true"><use href="#history"/></svg></span>Geçmiş</button>
+<button type="button"><span class="icon"><svg aria-hidden="true"><use href="#qr"/></svg></span>QR</button>
+<button type="button"><span class="icon"><svg aria-hidden="true"><use href="#people"/></svg></span>Ziyaretçi</button>
+<button type="button"><span class="icon"><svg aria-hidden="true"><use href="#profile"/></svg></span>Profil</button>
+</nav>
+<div class="home-indicator" aria-hidden="true"></div>
+</div>
+</body>
+</html>

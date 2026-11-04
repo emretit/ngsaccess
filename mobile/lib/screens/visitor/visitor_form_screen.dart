@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/visitor.dart';
 import '../../providers/visitor_provider.dart';
 import '../../widgets/visitor/visitor_labels.dart';
+import '../../widgets/ui/ui.dart';
 
 class VisitorFormScreen extends StatefulWidget {
   const VisitorFormScreen({super.key, this.visitor, this.now});
@@ -19,6 +20,15 @@ class VisitorFormScreen extends StatefulWidget {
 class _VisitorFormScreenState extends State<VisitorFormScreen>
     with WidgetsBindingObserver {
   final _form = GlobalKey<FormState>();
+  final _scroll = ScrollController();
+  final _firstFocus = FocusNode(),
+      _lastFocus = FocusNode(),
+      _purposeFocus = FocusNode();
+  final _endDateFocus = FocusNode(),
+      _endTimeFocus = FocusNode(),
+      _noticeFocus = FocusNode();
+  final _noticeAnchor = GlobalKey();
+  bool _showErrors = false;
   late final TextEditingController _first, _last, _phone, _purpose, _notes;
   late DateTime _start, _end;
   late final String _requestId;
@@ -55,12 +65,12 @@ class _VisitorFormScreenState extends State<VisitorFormScreen>
       text: pending?.draft.notes ?? visitor?.notes ?? '',
     );
     _start =
-        pending?.draft.start.toLocal() ??
-        visitor?.visitStart.toLocal() ??
-        _now();
+        pending?.draft.start.toUtc() ??
+        visitor?.visitStart.toUtc() ??
+        _now().toUtc();
     _end =
-        pending?.draft.end.toLocal() ??
-        visitor?.visitEnd.toLocal() ??
+        pending?.draft.end.toUtc() ??
+        visitor?.visitEnd.toUtc() ??
         _start.add(const Duration(hours: 1));
     _requestId = pending?.requestId ?? visitorRequestId();
     _pending = pending?.draft;
@@ -89,7 +99,14 @@ class _VisitorFormScreenState extends State<VisitorFormScreen>
     }
     final duration = _end.difference(_start);
     // Round up so the minute displayed in the form is never before now.
-    final minute = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    final utc = now.toUtc();
+    final minute = DateTime.utc(
+      utc.year,
+      utc.month,
+      utc.day,
+      utc.hour,
+      utc.minute,
+    );
     final start = minute.isBefore(now)
         ? minute.add(const Duration(minutes: 1))
         : minute;
@@ -134,41 +151,49 @@ class _VisitorFormScreenState extends State<VisitorFormScreen>
     });
   }
 
-  Future<void> _pickDate(bool start) async {
+  void _changeTime(bool start, {DateTime? day, TimeOfDay? time}) {
     final current = start ? _start : _end;
-    final now = _now();
-    final initial = current.isBefore(now.subtract(const Duration(days: 1)))
-        ? now
-        : current;
-    final day = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: now.subtract(const Duration(days: 1)),
-      lastDate: DateTime(
-        initial.year > now.year + 2 ? initial.year + 1 : now.year + 2,
-      ),
+    final value = VisitorTime.instant(
+      day ?? VisitorTime.day(current),
+      time ?? VisitorTime.time(current),
     );
-    if (!mounted || day == null) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(current),
-    );
-    if (!mounted || time == null) return;
     setState(() {
       _timesTouched = true;
-      final value = DateTime(
-        day.year,
-        day.month,
-        day.day,
-        time.hour,
-        time.minute,
-      );
       if (start) {
         _start = value;
       } else {
         _end = value;
       }
     });
+  }
+
+  String? _rangeError(DateTime now) {
+    final l10n = AppLocalizations.of(context);
+    if (!_end.isAfter(_start)) return l10n.visitorErrorEndBeforeStart;
+    if (!_end.isAfter(now)) return l10n.visitorErrorEndInPast;
+    if (_end.difference(_start) > const Duration(days: 31)) {
+      return l10n.visitorErrorMaxDuration;
+    }
+    return null;
+  }
+
+  bool _rangeErrorOnTime(DateTime now) {
+    if (!_end.isAfter(_start)) {
+      return VisitorTime.day(_end) == VisitorTime.day(_start);
+    }
+    return !_end.isAfter(now) && VisitorTime.day(_end) == VisitorTime.day(now);
+  }
+
+  Future<void> _revealInvalid(FocusNode node) async {
+    node.requestFocus();
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final target = identical(node, _noticeFocus)
+        ? _noticeAnchor.currentContext
+        : node.context;
+    if (target != null && target.mounted) {
+      await Scrollable.ensureVisible(target, alignment: .15);
+    }
   }
 
   Future<void> _save() async {
@@ -184,18 +209,32 @@ class _VisitorFormScreenState extends State<VisitorFormScreen>
     }
     final now = _now();
     _refreshDefaultTimes(now);
-    if (!_uncertain &&
-        (_form.currentState?.validate() != true ||
-            !_end.isAfter(_start) ||
-            !_end.isAfter(now) ||
-            _end.difference(_start) > const Duration(days: 31) ||
-            (notice.available && !_reviewed))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).visitorInvalidForm),
-        ),
-      );
-      return;
+    if (!_uncertain) {
+      setState(() => _showErrors = true);
+      final fieldsValid = _form.currentState?.validate() == true;
+      FocusNode? invalid;
+      for (final (controller, focus) in [
+        (_first, _firstFocus),
+        (_last, _lastFocus),
+        (_purpose, _purposeFocus),
+      ]) {
+        if (controller.text.trim().isEmpty) {
+          invalid = focus;
+          break;
+        }
+      }
+      final rangeError = _rangeError(now);
+      if (rangeError != null) {
+        invalid ??= _rangeErrorOnTime(now) ? _endTimeFocus : _endDateFocus;
+      }
+      final noticeInvalid = notice.available && !_reviewed;
+      if (noticeInvalid) invalid ??= _noticeFocus;
+      if (!fieldsValid || rangeError != null || noticeInvalid) {
+        // Errors are shown inline; focus the first one instead of a snackbar
+        // that would cover the save bar.
+        if (invalid != null) await _revealInvalid(invalid);
+        return;
+      }
     }
     final draft =
         _pending ??
@@ -235,6 +274,7 @@ class _VisitorFormScreenState extends State<VisitorFormScreen>
         _uncertain = ambiguous;
         _pending = ambiguous ? draft : null;
       });
+      if (_scroll.hasClients) _scroll.jumpTo(0);
     }
   }
 
@@ -253,198 +293,191 @@ class _VisitorFormScreenState extends State<VisitorFormScreen>
             _recoveryPreparing ||
             (widget.visitor == null && state.createRecoveryLoading);
         final locked = state.busy || _uncertain || recovering;
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(
-              widget.visitor == null ? l10n.visitorAddTitle : l10n.visitorEdit,
-            ),
+        return AppScaffold(
+          consumeBottomInset: false,
+          header: AppPageHeader(
+            title: widget.visitor == null
+                ? l10n.visitorAddTitle
+                : l10n.visitorEditTitle,
+            showBack: true,
           ),
-          body: Form(
-            key: _form,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              children: [
-                if (widget.visitor == null && recovering) ...[
-                  const LinearProgressIndicator(),
-                  Text(l10n.visitorRecoveryChecking),
-                ],
-                if (widget.visitor == null &&
-                    state.hasUnresolvedCreate &&
-                    !_uncertain)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(l10n.visitorRecoveryUnresolved),
-                  ),
-                if (state.createRecoveryError case final recoveryError?
-                    when widget.visitor == null) ...[
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      state.createRecoveryStorageFailed
-                          ? l10n.visitorRecoveryStorageError
-                          : localizeAppError(context, recoveryError),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: recovering || state.busy ? null : _prepareCreate,
-                    child: Text(l10n.commonRetry),
-                  ),
-                ],
-                if (widget.visitor == null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primaryContainer.withValues(alpha: .5),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          size: 20,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            l10n.visitorActivationHint,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimaryContainer,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                _section(l10n.visitorPeopleSection, [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final fields = [
-                        _field(_first, l10n.visitorFirstName, 80, locked),
-                        _field(_last, l10n.visitorLastName, 80, locked),
-                      ];
-                      if (constraints.maxWidth >= 320 &&
-                          MediaQuery.textScalerOf(context).scale(14) < 19) {
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Form(
+                key: _form,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(child: fields[0]),
-                            const SizedBox(width: 12),
-                            Expanded(child: fields[1]),
+                            if (widget.visitor == null && recovering)
+                              AppDataNotice(
+                                message: l10n.visitorRecoveryChecking,
+                                busy: true,
+                              ),
+                            if (widget.visitor == null &&
+                                state.hasUnresolvedCreate &&
+                                !_uncertain)
+                              AppDataNotice(
+                                message: l10n.visitorRecoveryUnresolved,
+                                tone: AppStatusTone.warning,
+                              ),
+                            if (state.createRecoveryError
+                                case final recoveryError?
+                                when widget.visitor == null)
+                              AppDataNotice(
+                                message: state.createRecoveryStorageFailed
+                                    ? l10n.visitorRecoveryStorageError
+                                    : localizeAppError(context, recoveryError),
+                                tone: AppStatusTone.warning,
+                                actionLabel: l10n.commonRetry,
+                                onAction: recovering || state.busy
+                                    ? null
+                                    : _prepareCreate,
+                              ),
+                            if (_uncertain)
+                              AppDataNotice(
+                                message: l10n.visitorOutcomeUnknown,
+                                tone: AppStatusTone.warning,
+                              ),
+                            if (state.mutationError case final error?) ...[
+                              AppDataNotice(
+                                message: localizeAppError(context, error),
+                                tone: AppStatusTone.danger,
+                                actionLabel:
+                                    !_uncertain && widget.visitor == null
+                                    ? l10n.visitorRefresh
+                                    : null,
+                                onAction: !locked ? _loadNotice : null,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            _section(l10n.visitorPeopleSection, [
+                              _field(
+                                _first,
+                                l10n.visitorFirstName,
+                                80,
+                                locked,
+                                focusNode: _firstFocus,
+                              ),
+                              _field(
+                                _last,
+                                l10n.visitorLastName,
+                                80,
+                                locked,
+                                focusNode: _lastFocus,
+                              ),
+                              _field(
+                                _phone,
+                                l10n.visitorPhone,
+                                40,
+                                locked,
+                                keyboard: TextInputType.phone,
+                                isRequired: false,
+                              ),
+                            ]),
+                            const SizedBox(height: 24),
+                            _section(l10n.visitorVisitSection, [
+                              _field(
+                                _purpose,
+                                l10n.visitorFieldPurpose,
+                                500,
+                                locked,
+                                focusNode: _purposeFocus,
+                              ),
+                              _field(
+                                _notes,
+                                l10n.visitorNotes,
+                                1000,
+                                locked,
+                                lines: 2,
+                                isRequired: false,
+                              ),
+                              _dateFields(
+                                l10n.visitorStartDate,
+                                _start,
+                                locked,
+                                true,
+                              ),
+                              const SizedBox(height: 16),
+                              _dateFields(
+                                l10n.visitorEndDate,
+                                _end,
+                                locked,
+                                false,
+                              ),
+                            ]),
+                            const SizedBox(height: 24),
+                            if (_noticeLoading)
+                              AppSkeleton(
+                                semanticLabel: l10n.homeDataLoading,
+                                kind: AppSkeletonKind.form,
+                                itemCount: 1,
+                              ),
+                            if (!_noticeLoading && _notice == null)
+                              AppDataNotice(
+                                message: l10n.visitorNoticeUnavailable,
+                                tone: AppStatusTone.warning,
+                                actionLabel: l10n.commonRetry,
+                                onAction: locked ? null : _loadNotice,
+                              ),
+                            if (_notice?.available == true) ...[
+                              Text(
+                                l10n.visitorNotice,
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              SelectableText(
+                                '${_notice?.url}\n${_notice?.version}',
+                              ),
+                              AppCheckboxRow(
+                                key: _noticeAnchor,
+                                focusNode: _noticeFocus,
+                                label: l10n.visitorNoticeReviewed,
+                                value: _reviewed,
+                                errorText: _showErrors && !_reviewed
+                                    ? l10n.visitorErrorNoticeRequired
+                                    : null,
+                                onChanged: locked
+                                    ? null
+                                    : (value) => setState(
+                                        () => _reviewed = value ?? false,
+                                      ),
+                              ),
+                            ],
+                            if (widget.visitor == null)
+                              Text(
+                                l10n.visitorActivationHint,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                           ],
-                        );
-                      }
-                      return Column(children: fields);
-                    },
-                  ),
-                  _field(
-                    _phone,
-                    l10n.visitorPhone,
-                    40,
-                    locked,
-                    keyboard: TextInputType.phone,
-                    isRequired: false,
-                  ),
-                ]),
-                const SizedBox(height: 16),
-                _section(l10n.visitorVisitSection, [
-                  _field(
-                    _purpose,
-                    l10n.visitorFieldPurpose,
-                    500,
-                    locked,
-                    lines: 2,
-                  ),
-                  _dateButton(l10n.visitorStart, _start, locked, true),
-                  const SizedBox(height: 10),
-                  _dateButton(l10n.visitorEnd, _end, locked, false),
-                  const SizedBox(height: 16),
-                  _field(
-                    _notes,
-                    l10n.visitorNotes,
-                    1000,
-                    locked,
-                    lines: 2,
-                    isRequired: false,
-                  ),
-                ]),
-                const SizedBox(height: 16),
-                if (_noticeLoading) const LinearProgressIndicator(),
-                if (!_noticeLoading && _notice == null) ...[
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(l10n.visitorNoticeUnavailable),
-                  ),
-                  TextButton(
-                    onPressed: _loadNotice,
-                    child: Text(l10n.commonRetry),
-                  ),
-                ],
-                if (_notice?.available == true) ...[
-                  const SizedBox(height: 12),
-                  Text(l10n.visitorNotice),
-                  SelectableText('${_notice?.url}\n${_notice?.version}'),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _reviewed,
-                    title: Text(l10n.visitorNoticeReviewed),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    onChanged: locked
-                        ? null
-                        : (value) => setState(() => _reviewed = value ?? false),
-                  ),
-                ],
-                if (_uncertain)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(l10n.visitorOutcomeUnknown),
-                  ),
-                if (state.mutationError case final error?) ...[
-                  Text(
-                    localizeAppError(context, error),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                  if (!_uncertain && widget.visitor == null)
-                    TextButton(
-                      onPressed: _loadNotice,
-                      child: Text(l10n.visitorRefresh),
-                    ),
-                ],
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed:
-                      state.busy ||
-                          recovering ||
-                          _notice == null ||
-                          (widget.visitor == null &&
-                              state.createRecoveryError != null)
-                      ? null
-                      : _save,
-                  child: state.busy
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(),
-                        )
-                      : Text(
-                          widget.visitor == null && state.hasUnresolvedCreate
-                              ? l10n.visitorRecoveryRetry
-                              : l10n.visitorSave,
                         ),
+                      ),
+                    ),
+                    AppFormActionBar(
+                      primaryAction: AppPrimaryButton(
+                        label:
+                            widget.visitor == null && state.hasUnresolvedCreate
+                            ? l10n.visitorRecoveryRetry
+                            : l10n.visitorSave,
+                        busy: state.busy,
+                        busyLabel: l10n.visitorSaving,
+                        onPressed:
+                            recovering ||
+                                _notice == null ||
+                                (widget.visitor == null &&
+                                    state.createRecoveryError != null)
+                            ? null
+                            : _save,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -452,109 +485,107 @@ class _VisitorFormScreenState extends State<VisitorFormScreen>
     );
   }
 
-  Widget _section(String title, List<Widget> children) => Card(
-    elevation: 0,
-    margin: EdgeInsets.zero,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-      side: BorderSide(
-        color: Theme.of(
-          context,
-        ).colorScheme.outlineVariant.withValues(alpha: .5),
+  Widget _section(String title, List<Widget> children) => AppListGroup(
+    title: title,
+    showDividers: false,
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
       ),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Semantics(
-            header: true,
-            child: Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...children,
-        ],
-      ),
-    ),
+    ],
   );
 
-  Widget _dateButton(String label, DateTime value, bool locked, bool start) =>
-      OutlinedButton(
-        onPressed: locked ? null : () => _pickDate(start),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.all(12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+  Widget _dateFields(String label, DateTime value, bool locked, bool start) {
+    final now = VisitorTime.day(_now());
+    final currentDay = VisitorTime.day(value);
+    final minimum = now.subtract(const Duration(days: 1));
+    final fields = [
+      AppDateField(
+        now: _now,
+        key: Key(start ? 'visitor-start-date' : 'visitor-end-date'),
+        label: label,
+        value: currentDay,
+        focusNode: start ? null : _endDateFocus,
+        errorText: !start && _showErrors && !_rangeErrorOnTime(_now())
+            ? _rangeError(_now())
+            : null,
+        firstDate: currentDay.isBefore(minimum) ? currentDay : minimum,
+        lastDate: DateTime.utc(
+          currentDay.year > now.year + 2 ? currentDay.year + 1 : now.year + 2,
         ),
-        child: Row(
+        enabled: !locked,
+        onChanged: (day) {
+          if (day != null) _changeTime(start, day: day);
+        },
+      ),
+      AppTimeField(
+        now: _now,
+        key: Key(start ? 'visitor-start-time' : 'visitor-end-time'),
+        label: start
+            ? AppLocalizations.of(context).visitorStartTime
+            : AppLocalizations.of(context).visitorEndTime,
+        focusNode: start ? null : _endTimeFocus,
+        errorText: !start && _showErrors && _rangeErrorOnTime(_now())
+            ? _rangeError(_now())
+            : null,
+        value: VisitorTime.time(value),
+        enabled: !locked,
+        onChanged: (time) {
+          if (time != null) _changeTime(start, time: time);
+        },
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (isLargeText(context) || constraints.maxWidth < 300) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [fields[0], const SizedBox(height: 16), fields[1]],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.calendar_today_rounded, size: 20),
+            Expanded(flex: 3, child: fields[0]),
             const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(height: 3),
-                  Text(
-                    visitorDate(context, value),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right_rounded, size: 18),
+            Expanded(flex: 2, child: fields[1]),
           ],
-        ),
-      );
+        );
+      },
+    );
+  }
 
   Widget _field(
     TextEditingController controller,
     String label,
     int limit,
     bool locked, {
+    FocusNode? focusNode,
     TextInputType? keyboard,
     int lines = 1,
     bool isRequired = true,
   }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextFormField(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: AppTextField(
       controller: controller,
+      focusNode: focusNode,
+      label: isRequired ? '$label *' : label,
       enabled: !locked,
       maxLength: limit,
+      showCounter: false,
+      minLines: lines,
       maxLines: lines,
-      keyboardType: keyboard,
-      decoration: InputDecoration(
-        labelText: isRequired ? '$label *' : label,
-        counterText: '',
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: Theme.of(
-              context,
-            ).colorScheme.outlineVariant.withValues(alpha: .6),
-          ),
-        ),
-        helperText: isRequired
-            ? null
-            : AppLocalizations.of(context).visitorOptionalHint,
-      ),
+      keyboardType: keyboard ?? TextInputType.text,
+      helperText: isRequired
+          ? null
+          : AppLocalizations.of(context).visitorOptionalHint,
       validator: (value) =>
           isRequired && (value == null || value.trim().isEmpty)
-          ? AppLocalizations.of(context).visitorInvalidForm
+          ? AppLocalizations.of(context).fieldRequired
           : null,
     ),
   );
@@ -562,6 +593,17 @@ class _VisitorFormScreenState extends State<VisitorFormScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scroll.dispose();
+    for (final node in [
+      _firstFocus,
+      _lastFocus,
+      _purposeFocus,
+      _endDateFocus,
+      _endTimeFocus,
+      _noticeFocus,
+    ]) {
+      node.dispose();
+    }
     _first.dispose();
     _last.dispose();
     _phone.dispose();

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -61,11 +62,15 @@ void main() {
 
   Widget app({
     bool active = true,
+    QrTab initialTab = QrTab.code,
+    int scanRequestRevision = 0,
     PermissionStatus permission = PermissionStatus.granted,
     double textScale = 1,
     Future<PermissionStatus> Function()? permissionStatus,
+    Future<PermissionStatus> Function()? requestPermission,
     Future<bool> Function()? openSettings,
   }) => MaterialApp(
+    theme: AppTheme.lightTheme,
     locale: const Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -77,9 +82,11 @@ void main() {
     ),
     home: QRScanScreen(
       isActive: active,
+      initialTab: initialTab,
+      scanRequestRevision: scanRequestRevision,
       repository: repository,
       cameraController: camera,
-      requestCameraPermission: () async => permission,
+      requestCameraPermission: requestPermission ?? () async => permission,
       cameraPermissionStatus: permissionStatus ?? () async => permission,
       openSettings: openSettings,
     ),
@@ -92,6 +99,55 @@ void main() {
     await tester.pump();
     await tester.pump();
   }
+
+  testWidgets('scan intent selects camera on cold and retained QR branches', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(initialTab: QrTab.scan, scanRequestRevision: 1),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MobileScanner), findsOneWidget);
+    await tester.tap(find.text('My QR'));
+    await tester.pumpAndSettle();
+    expect(find.byType(QrImageView), findsOneWidget);
+    await tester.pumpWidget(
+      app(active: false, initialTab: QrTab.scan, scanRequestRevision: 1),
+    );
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      app(initialTab: QrTab.scan, scanRequestRevision: 2),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MobileScanner), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('requestable camera denial offers the system permission action', (
+    tester,
+  ) async {
+    var requests = 0;
+    await tester.pumpWidget(
+      app(
+        permission: PermissionStatus.denied,
+        requestPermission: () async {
+          requests++;
+          return PermissionStatus.denied;
+        },
+      ),
+    );
+    await scanTab(tester);
+    expect(find.text('Allow camera access'), findsOneWidget);
+    expect(find.text('Open settings'), findsNothing);
+    expect(requests, 1);
+    await tester.tap(find.text('Allow camera access'));
+    await tester.pumpAndSettle();
+    expect(requests, 2);
+    verifyNever(() => camera.start());
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
 
   testWidgets(
     'camera runs only in visible scan tab and pauses in background; caller retains ownership',
@@ -130,6 +186,7 @@ void main() {
     await tester.pumpWidget(app());
     await tester.pump();
     await scanTab(tester);
+    await tester.ensureVisible(find.byTooltip('Switch camera'));
     await tester.tap(find.byTooltip('Switch camera'));
     await tester.pump();
     await tester.pumpWidget(app(active: false));

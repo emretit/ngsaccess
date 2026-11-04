@@ -5,8 +5,10 @@ import 'package:ngsplusapp/core/branch_visibility.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/providers/attendance_provider.dart';
 import 'package:ngsplusapp/screens/history/history_screen.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:ngsplusapp/widgets/history/history_calendar.dart';
 import 'package:ngsplusapp/widgets/history/history_filter_sheet.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:provider/provider.dart';
 
 import 'history_screen_test.dart' show HistoryTestProvider, summary;
@@ -18,6 +20,7 @@ Widget periodScreen(
 ) => ChangeNotifierProvider<AttendanceProvider>.value(
   value: provider,
   child: MaterialApp(
+    theme: AppTheme.lightTheme,
     locale: const Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -156,7 +159,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Overview'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('This Week'));
+    await tester.tap(find.text('This week'));
     await tester.pumpAndSettle();
     expect(find.text('125'), findsOneWidget);
 
@@ -257,7 +260,7 @@ void main() {
     await tester.tap(find.byTooltip('Filter'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('history-device-door-a')));
-    await tester.tap(find.text('Date'));
+    await tester.tap(find.byType(AppDateField));
     await tester.pumpAndSettle();
     final day = find.descendant(
       of: find.byType(CalendarDatePicker),
@@ -265,6 +268,7 @@ void main() {
     );
     await tester.ensureVisible(day);
     await tester.tap(day);
+    await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('history-apply-filters')));
     await tester.pumpAndSettle();

@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/providers/visitor_provider.dart';
 import 'package:ngsplusapp/screens/visitor/visitor_screen.dart';
+import 'package:ngsplusapp/screens/visitor/visitor_form_screen.dart';
 import 'package:provider/provider.dart';
 
 import 'visitor_create_recovery_test.dart'
@@ -18,8 +20,9 @@ import 'visitor_provider_test.dart' show visitorFixture, visitorPage;
 
 Widget recoveryApp(VisitorProvider state) => ChangeNotifierProvider.value(
   value: state,
-  child: const MaterialApp(
-    locale: Locale('en'),
+  child: MaterialApp(
+    theme: AppTheme.lightTheme,
+    locale: const Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: VisitorScreen(),
@@ -144,7 +147,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(OutlinedButton, 'Edit'));
       await tester.pumpAndSettle();
-      final save = find.widgetWithText(FilledButton, 'Save');
+      final save = find.widgetWithText(FilledButton, 'Save invitation');
       await tester.scrollUntilVisible(
         save,
         200,
@@ -208,10 +211,18 @@ void main() {
       expect(repo.createCalls, 0);
       await tester.enterText(find.byType(TextFormField).at(0), 'Synthetic');
       await tester.enterText(find.byType(TextFormField).at(1), 'Recovery');
-      await tester.enterText(
-        find.byType(TextFormField).at(3),
-        'Synthetic visit',
+      final purpose = find.widgetWithText(TextFormField, 'Visit Purpose *');
+      await tester.scrollUntilVisible(
+        purpose,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(Form),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
+      await tester.enterText(purpose, 'Synthetic visit');
       tester.testTextInput.hide();
       await tester.pump();
       final retry = find.widgetWithText(FilledButton, 'Retry same request');
@@ -253,7 +264,7 @@ void main() {
         find.text('The previous visitor record was found.'),
         findsOneWidget,
       );
-      expect(find.byType(TextFormField), findsNothing);
+      expect(find.byType(VisitorFormScreen), findsNothing);
       expect(repo.createCalls, 0);
       expect(store.values, isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -277,7 +288,7 @@ void main() {
       await tester.tap(find.byKey(const Key('visitor-add')));
       await tester.pumpAndSettle();
       expect(state.createRecoveryStorageFailed, isTrue);
-      final save = find.widgetWithText(FilledButton, 'Save');
+      final save = find.widgetWithText(FilledButton, 'Save invitation');
       final formScroll = find
           .descendant(of: find.byType(Form), matching: find.byType(Scrollable))
           .first; // The outer ListView precedes each text field's Scrollable.
@@ -286,7 +297,7 @@ void main() {
       expect(tester.widget<FilledButton>(save).onPressed, isNull);
       expect(repo.createCalls, 0);
       store.failRead = false;
-      final retry = find.widgetWithText(TextButton, 'Try Again');
+      final retry = find.widgetWithText(OutlinedButton, 'Try again');
       await tester.scrollUntilVisible(retry, -200, scrollable: formScroll);
       await tester.tap(retry);
       await tester.pumpAndSettle();

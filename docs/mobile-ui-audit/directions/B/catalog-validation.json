@@ -1,0 +1,494 @@
+{
+  "screenHtml": 55,
+  "totalHtml": 56,
+  "png": [
+    {
+      "name": "startup-loading",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "startup-error",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "login-empty",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "login-error",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "login-loading",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "login-empty-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "login-error-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "login-loading-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "password-help",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "home-loading",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "home-error",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "home-empty",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "qr-scan",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "qr-permission",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "qr-expired",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "device-filled",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "device-empty",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "door-recovery",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "history-calendar",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "history-summary",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "history-empty",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "history-filter",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "history-detail",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "requests-leave",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "requests-correction",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "requests-empty",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "leave-filled",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "leave-error",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "requests-leave-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "requests-correction-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "requests-empty-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "leave-filled-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "leave-error-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "correction-filled",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "request-withdraw",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitors-filled",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitors-empty",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitors-error",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitor-form-filled",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitor-form-keyboard",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitors-filled-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitors-empty-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitors-error-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitor-form-filled-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitor-form-keyboard-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitor-detail",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "visitor-cancel",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "profile-main",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "profile-theme",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "profile-main-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "profile-theme-dark",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "home",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "history",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "qr",
+      "size": [
+        780,
+        1688
+      ]
+    },
+    {
+      "name": "home-dark",
+      "size": [
+        780,
+        1688
+      ]
+    }
+  ],
+  "referenceHashes": [
+    {
+      "name": "home",
+      "unchanged": true
+    },
+    {
+      "name": "history",
+      "unchanged": true
+    },
+    {
+      "name": "qr",
+      "unchanged": true
+    },
+    {
+      "name": "home-dark",
+      "unchanged": true
+    }
+  ],
+  "catalog": [
+    {
+      "width": 1440,
+      "overflow": 0,
+      "previews": 55,
+      "missingImages": 0
+    },
+    {
+      "width": 390,
+      "overflow": 0,
+      "previews": 55
+    }
+  ],
+  "footerChecks": [
+    {
+      "name": "history-filter",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "leave-filled",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "leave-error",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "leave-filled-dark",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "leave-error-dark",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "correction-filled",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "visitor-form-filled",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "visitor-form-keyboard",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "visitor-form-filled-dark",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    },
+    {
+      "name": "visitor-form-keyboard-dark",
+      "applicable": true,
+      "visible": true,
+      "aboveKeyboard": true,
+      "contentEndsBeforeFooter": true
+    }
+  ]
+}

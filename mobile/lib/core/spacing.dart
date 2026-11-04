@@ -6,6 +6,7 @@
 class AppSpacing {
   AppSpacing._();
 
+  static const double pageInset = 20;
   static const double xs = 4;
   static const double sm = 8;
   static const double md = 12;

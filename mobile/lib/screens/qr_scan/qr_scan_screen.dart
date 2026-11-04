@@ -13,11 +13,17 @@ import '../../models/qr_code_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/qr_provider.dart';
 import '../../repositories/qr_repository.dart';
+import '../../router/qr_open_intent.dart';
+import '../../widgets/ui/ui.dart';
+
+export '../../router/qr_open_intent.dart' show QrTab;
 
 class QRScanScreen extends StatefulWidget {
   const QRScanScreen({
     super.key,
     this.isActive = true,
+    this.initialTab = QrTab.code,
+    this.scanRequestRevision = 0,
     this.repository,
     this.cameraController,
     this.requestCameraPermission,
@@ -27,6 +33,8 @@ class QRScanScreen extends StatefulWidget {
 
   /// The navigation shell must update this for its retained QR branch.
   final bool isActive;
+  final QrTab initialTab;
+  final int scanRequestRevision;
   final QrRepository? repository;
 
   /// Caller-owned controllers must have autoStart:false. The screen starts and
@@ -57,6 +65,7 @@ class _QRScanScreenState extends State<QRScanScreen>
   DialogRoute<void>? _dialog;
   NavigatorState? _dialogNavigator;
   int _operationEpoch = 0;
+  int? _sessionEpoch;
 
   bool get _visible => widget.isActive && (_route?.isCurrent ?? true);
   bool get _scanSelected => _tabs.index == 1 && !_tabs.indexIsChanging;
@@ -68,8 +77,11 @@ class _QRScanScreenState extends State<QRScanScreen>
     _resumed =
         (WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed) ==
         AppLifecycleState.resumed;
-    _tabs = TabController(length: 2, vsync: this)
-      ..addListener(_activityChanged);
+    _tabs = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab.index,
+    )..addListener(_activityChanged);
     _attachCamera();
   }
 
@@ -93,7 +105,14 @@ class _QRScanScreenState extends State<QRScanScreen>
     super.didChangeDependencies();
     _route = ModalRoute.of(context);
     // Observe auth changes so a retained branch drops the previous account's QR.
-    context.watch<AuthProvider?>();
+    final auth = context.watch<AuthProvider?>();
+    final epoch = auth?.sessionEpoch;
+    if (_sessionEpoch != null && epoch != _sessionEpoch) {
+      _operationEpoch++;
+      _tabs.index = QrTab.code.index;
+      _dismissDialog();
+    }
+    _sessionEpoch = epoch;
     final repository = widget.repository ?? context.watch<QrRepository?>();
     if (!identical(repository, _repository)) {
       _tokens?.removeListener(_tokenChanged);
@@ -108,6 +127,11 @@ class _QRScanScreenState extends State<QRScanScreen>
   @override
   void didUpdateWidget(covariant QRScanScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.scanRequestRevision != oldWidget.scanRequestRevision &&
+        widget.initialTab == QrTab.scan &&
+        widget.scanRequestRevision != 0) {
+      _tabs.index = QrTab.scan.index;
+    }
     if (oldWidget.isActive != widget.isActive) {
       _operationEpoch++;
       if (!widget.isActive) _dismissDialog();
@@ -258,16 +282,24 @@ class _QRScanScreenState extends State<QRScanScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.qrTabTitle),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: [
-            Tab(icon: const Icon(Icons.qr_code), text: l10n.qrTabMyQr),
-            Tab(icon: const Icon(Icons.camera_alt), text: l10n.qrTabScan),
-          ],
-        ),
+    return AppScaffold(
+      consumeBottomInset: false,
+      header: Column(
+        children: [
+          AppPageHeader(title: l10n.navQr),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: AppSegmentControl<QrTab>(
+              segments: [
+                AppSegment(value: QrTab.code, label: l10n.qrTabMyQr),
+                AppSegment(value: QrTab.scan, label: l10n.qrTabScan),
+              ],
+              selected: QrTab.values[_tabs.index],
+              onChanged: (value) => _tabs.animateTo(value.index),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
       body: TabBarView(
         controller: _tabs,
@@ -284,33 +316,49 @@ class _QRScanScreenState extends State<QRScanScreen>
     final statusError = tokens?.statusError;
     final status = tokens?.status ?? QrViewStatus.empty;
     final canDisplay = tokens?.canDisplay ?? false;
+    final user = context.watch<AuthProvider?>()?.currentUser;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = math.min(280.0, math.max(1.0, constraints.maxWidth - 80));
+        final size = math.min(
+          224.0,
+          math.max(176.0, constraints.maxWidth - 88),
+        );
         return SingleChildScrollView(
           key: const Key('qr-token-scroll'),
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (tokens == null)
-                    Text(AppLocalizations.of(context).qrServiceUnavailable),
-                  if ((tokens?.isRefreshing ?? false) ||
-                      (tokens?.isVerifying ?? false))
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
+                  if (user != null) ...[
+                    Text(
+                      '${user.firstName} ${user.lastName}',
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
-                  if (token != null && canDisplay)
+                    if (user.projectName case final project?)
+                      Text(
+                        project,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    const SizedBox(height: 24),
+                  ],
+                  if (tokens == null)
+                    AppDataNotice(message: l10n.qrServiceUnavailable),
+                  if (token == null && (tokens?.isRefreshing ?? false))
+                    AppSkeleton(
+                      semanticLabel: l10n.commonLoading,
+                      kind: AppSkeletonKind.qr,
+                      itemCount: 1,
+                    )
+                  else if (token != null && canDisplay)
                     Semantics(
-                      label: AppLocalizations.of(context).qrPersonalCode,
+                      label: l10n.qrPersonalCode,
                       image: true,
-                      child: Container(
-                        color: Colors.white,
-                        padding: const EdgeInsets.all(16),
+                      child: AppSurface(
+                        kind: AppSurfaceKind.qr,
+                        padding: const EdgeInsets.all(24),
                         child: QrImageView(
                           data: token.value,
                           size: size,
@@ -330,57 +378,57 @@ class _QRScanScreenState extends State<QRScanScreen>
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   if (canDisplay) ...[
-                    LinearProgressIndicator(value: tokens?.progress),
+                    // Seconds are visual updates, not live-region announcements.
+                    SizedBox(
+                      width: size + 48,
+                      child: Text(
+                        l10n.qrRemainingSeconds(
+                          tokens?.remaining.inSeconds ?? 0,
+                        ),
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    Text(
-                      l10n.qrRemainingSeconds(tokens?.remaining.inSeconds ?? 0),
+                    SizedBox(
+                      width: size + 48,
+                      child: LinearProgressIndicator(value: tokens?.progress),
                     ),
                   ],
                   if (token?.status == QrTokenStatus.consumed)
-                    Text(AppLocalizations.of(context).qrConsumedHint),
+                    AppDataNotice(message: l10n.qrConsumedHint),
                   if (token != null &&
                       token.status != QrTokenStatus.consumed &&
                       (tokens?.remaining == Duration.zero ||
                           token.status == QrTokenStatus.expired))
-                    Text(AppLocalizations.of(context).qrExpiredHint),
-                  if (error != null) ...[
-                    Text(
-                      AppLocalizations.of(context).qrRefreshFailed,
+                    AppDataNotice(message: l10n.qrExpiredHint),
+                  if (error != null)
+                    AppDataNotice(
                       key: const Key('qr-refresh-error'),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                      title: l10n.qrRefreshFailed,
+                      message: localizeAppError(context, error),
+                      tone: AppStatusTone.danger,
                     ),
-                    Text(
-                      localizeAppError(context, error),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                  if (statusError != null) ...[
-                    Text(
-                      AppLocalizations.of(context).qrStatusUnavailable,
+                  if (statusError != null)
+                    AppDataNotice(
                       key: const Key('qr-status-error'),
+                      message: l10n.qrStatusUnavailable,
+                      actionLabel: l10n.qrTryAgain,
+                      onAction: tokens?.checkStatus,
                     ),
-                    TextButton(
-                      onPressed: tokens?.checkStatus,
-                      child: Text(l10n.qrTryAgain),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Text(
-                    AppLocalizations.of(context).qrReaderHint,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
+                  const SizedBox(height: 24),
+                  Text(l10n.qrReaderHint, textAlign: TextAlign.center),
+                  const SizedBox(height: 20),
+                  AppSecondaryButton(
                     key: const Key('qr-refresh'),
+                    expanded: true,
+                    label: l10n.qrRefresh,
+                    icon: Icons.refresh,
+                    busy: tokens?.isRefreshing ?? false,
                     onPressed: tokens == null || tokens.isRefreshing
                         ? null
                         : tokens.refresh,
-                    icon: const Icon(Icons.refresh),
-                    label: Text(l10n.qrRefresh),
                   ),
                 ],
               ),
@@ -394,114 +442,117 @@ class _QRScanScreenState extends State<QRScanScreen>
   Widget _buildScanner() {
     final l10n = AppLocalizations.of(context);
     final granted = _permission == PermissionStatus.granted;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = math.max(
-          0.0,
-          math.min(
-            400.0,
-            math.min(constraints.maxWidth - 48, constraints.maxHeight - 160),
-          ),
-        );
-        final scanWindow = Rect.fromCenter(
-          center: constraints.biggest.center(Offset.zero),
-          width: size,
-          height: size,
-        );
-        return ColoredBox(
-          color: Colors.black,
-          child: Stack(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Column(
             children: [
-              if (granted && _scanSelected && widget.isActive)
-                MobileScanner(
-                  key: ObjectKey(_camera),
-                  controller: _camera,
-                  useAppLifecycleState: false,
-                  scanWindow: size > 0 ? scanWindow : null,
-                  onDetect: _onDetect,
-                  errorBuilder: (context, error) => _cameraRecovery(
-                    message:
-                        error.errorCode ==
-                            MobileScannerErrorCode.permissionDenied
-                        ? l10n.qrCameraPermissionRequired
-                        : l10n.qrCameraUnavailableRetry,
-                  ),
-                ),
-              if (granted && _cameraError == null && size > 0)
-                Positioned.fromRect(
-                  rect: scanWindow,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.white, width: 3),
-                        borderRadius: BorderRadius.circular(16),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final side = math.min(350.0, constraints.maxWidth);
+                  final scanWindow = Rect.fromCenter(
+                    center: Offset(side / 2, side / 2),
+                    width: math.min(224.0, math.max(0, side - 64)),
+                    height: math.min(224.0, math.max(0, side - 64)),
+                  );
+                  return SizedBox(
+                    height: side,
+                    width: side,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: ColoredBox(
+                        color: granted && _cameraError == null
+                            ? Colors.black
+                            : Theme.of(context).colorScheme.surface,
+                        child: Stack(
+                          children: [
+                            if (granted && _scanSelected && widget.isActive)
+                              MobileScanner(
+                                key: ObjectKey(_camera),
+                                controller: _camera,
+                                useAppLifecycleState: false,
+                                scanWindow: scanWindow,
+                                onDetect: _onDetect,
+                                errorBuilder: (context, error) =>
+                                    _cameraRecovery(
+                                      message:
+                                          error.errorCode ==
+                                              MobileScannerErrorCode
+                                                  .permissionDenied
+                                          ? l10n.qrCameraPermissionRequired
+                                          : l10n.qrCameraUnavailableRetry,
+                                    ),
+                              ),
+                            if (granted && _cameraError == null)
+                              Positioned.fromRect(
+                                rect: scanWindow,
+                                child: const IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: _ScanFramePainter(),
+                                  ),
+                                ),
+                              ),
+                            if (!granted || _cameraError != null)
+                              Positioned.fill(child: _cameraRecovery()),
+                            if (_gate.busy)
+                              const Positioned.fill(
+                                child: ColoredBox(
+                                  color: Colors.black54,
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              if (!granted || _cameraError != null)
-                Positioned.fill(child: _cameraRecovery())
-              else ...[
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 16,
-                  child: Text(
-                    l10n.qrFrameHint,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      backgroundColor: Colors.black,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: ValueListenableBuilder<MobileScannerState>(
-                    valueListenable: _camera,
-                    builder: (context, value, _) => Wrap(
-                      children: [
-                        IconButton.filled(
-                          tooltip: AppLocalizations.of(context).qrSwitchCamera,
-                          onPressed:
-                              _gate.cameraAllowed &&
-                                  value.isRunning &&
-                                  (value.availableCameras ?? 0) > 1
-                              ? () => _cameraAction(_camera.switchCamera)
-                              : null,
-                          icon: const Icon(Icons.flip_camera_android),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              Text(l10n.qrFrameHint, textAlign: TextAlign.center),
+              if (granted && _cameraError == null) ...[
+                const SizedBox(height: 16),
+                ValueListenableBuilder<MobileScannerState>(
+                  valueListenable: _camera,
+                  builder: (context, value, _) => Wrap(
+                    spacing: 16,
+                    children: [
+                      IconButton.outlined(
+                        tooltip: l10n.qrSwitchCamera,
+                        onPressed:
+                            _gate.cameraAllowed &&
+                                value.isRunning &&
+                                (value.availableCameras ?? 0) > 1
+                            ? () => _cameraAction(_camera.switchCamera)
+                            : null,
+                        icon: const Icon(Icons.flip_camera_android),
+                      ),
+                      IconButton.outlined(
+                        tooltip: l10n.qrFlashlight,
+                        onPressed:
+                            _gate.cameraAllowed &&
+                                value.isRunning &&
+                                value.torchState != TorchState.unavailable
+                            ? () => _cameraAction(_camera.toggleTorch)
+                            : null,
+                        icon: Icon(
+                          value.torchState == TorchState.on
+                              ? Icons.flash_on
+                              : Icons.flash_off,
                         ),
-                        IconButton.filled(
-                          tooltip: AppLocalizations.of(context).qrFlashlight,
-                          onPressed:
-                              _gate.cameraAllowed &&
-                                  value.isRunning &&
-                                  value.torchState != TorchState.unavailable
-                              ? () => _cameraAction(_camera.toggleTorch)
-                              : null,
-                          icon: Icon(
-                            value.torchState == TorchState.on
-                                ? Icons.flash_on
-                                : Icons.flash_off,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-              if (_gate.busy)
-                const Positioned.fill(
-                  child: ColoredBox(
-                    color: Colors.black54,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -515,9 +566,9 @@ class _QRScanScreenState extends State<QRScanScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.camera_alt_outlined,
-              color: Colors.white,
+              color: AppUiTokens.of(context).accent,
               size: 48,
             ),
             const SizedBox(height: 16),
@@ -526,10 +577,10 @@ class _QRScanScreenState extends State<QRScanScreen>
                   _cameraError ??
                   AppLocalizations.of(context).qrCameraPermissionRequired,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             ),
             const SizedBox(height: 16),
-            FilledButton(
+            AppPrimaryButton(
               onPressed: _permissionBusy
                   ? null
                   : () {
@@ -539,11 +590,11 @@ class _QRScanScreenState extends State<QRScanScreen>
                         unawaited(_checkPermission(request: true));
                       }
                     },
-              child: Text(
-                permanent
-                    ? AppLocalizations.of(context).qrOpenSettings
-                    : AppLocalizations.of(context).qrTryAgain,
-              ),
+              label: permanent
+                  ? AppLocalizations.of(context).qrOpenSettings
+                  : _cameraError != null || message != null
+                  ? AppLocalizations.of(context).qrTryAgain
+                  : AppLocalizations.of(context).qrGrantCameraPermission,
             ),
           ],
         ),
@@ -616,15 +667,11 @@ class _QRScanScreenState extends State<QRScanScreen>
       final navigator = Navigator.of(context);
       final route = DialogRoute<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(l10n.qrTabTitle),
-          content: SingleChildScrollView(child: Text(message)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(l10n.commonOk),
-            ),
-          ],
+        builder: (dialogContext) => AppDialog(
+          title: l10n.qrTabTitle,
+          body: Text(message),
+          confirmLabel: l10n.commonOk,
+          onConfirm: () => Navigator.of(dialogContext).pop(),
         ),
       );
       _dialog = route;
@@ -673,4 +720,42 @@ class _QRScanScreenState extends State<QRScanScreen>
     );
     super.dispose();
   }
+}
+
+/// The scan window is a camera overlay, independent of the shared UI surfaces.
+class _ScanFramePainter extends CustomPainter {
+  const _ScanFramePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    const radius = 12.0;
+    const arm = 28.0;
+    for (final corner in [
+      Offset.zero,
+      Offset(size.width, 0),
+      Offset(size.width, size.height),
+      Offset(0, size.height),
+    ]) {
+      final dx = corner.dx == 0 ? 1.0 : -1.0;
+      final dy = corner.dy == 0 ? 1.0 : -1.0;
+      final path = Path()
+        ..moveTo(corner.dx, corner.dy + dy * arm)
+        ..lineTo(corner.dx, corner.dy + dy * radius)
+        ..quadraticBezierTo(
+          corner.dx,
+          corner.dy,
+          corner.dx + dx * radius,
+          corner.dy,
+        )
+        ..lineTo(corner.dx + dx * arm, corner.dy);
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScanFramePainter oldDelegate) => false;
 }
