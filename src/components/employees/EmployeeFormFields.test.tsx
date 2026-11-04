@@ -112,3 +112,11 @@ it("connects shared field errors and hints to the existing employee controls", (
   expect(payInput).toContain('aria-invalid="true"');
   expect(html).toMatch(/<p[^>]*id="employee-hourlyRate-error"[^>]*role="alert">Ücret geçersiz/);
 });
+it("pozisyon seçicisi seçili adı gösterir; boş katalogda ekleme yönlendirmesi yalnız yetkiyle çıkar", () => {
+  const picked = renderToStaticMarkup(<EmployeeFormFields formData={{ ...formData, positionId: "p1" as EmployeeFormData["positionId"] }} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[{ id: "p1", name: "Teknisyen" }]} />);
+  expect(picked).toMatch(/id="employee-positionId"[^>]*role="combobox"|role="combobox"[^>]*id="employee-positionId"/);
+  expect(picked).toContain("Teknisyen");
+  const actions = { add: async () => "p2", rename: async () => null, remove: async () => null };
+  expect(renderToStaticMarkup(<EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} positionActions={actions} />)).toContain("Pozisyon ekle");
+  expect(render(false)).toContain("Henüz pozisyon tanımlı değil.");
+});

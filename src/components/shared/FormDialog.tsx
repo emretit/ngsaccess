@@ -84,7 +84,8 @@ export function FormDialog({
         </DialogHeader>
         <form
           noValidate
-          onSubmit={onSubmit}
+          // Portal'daki form React ağacında dış forma kabarcıklanır; başka formun içinden açılınca onu göndermesin.
+          onSubmit={(event) => { event.stopPropagation(); onSubmit(event); }}
           aria-busy={pending}
           className="flex min-h-0 flex-col gap-4"
         >

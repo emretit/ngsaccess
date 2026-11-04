@@ -3,7 +3,7 @@ import { useState } from "react";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import type { Id } from "../../../convex/_generated/dataModel";
 
-import { Briefcase, Plus, Users, UserX } from "lucide-react";
+import { Plus, Users, UserX } from "lucide-react";
 import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { CompanyTreeItem } from "./CompanyTreeItem";
 import { AddDepartmentDialog } from "./AddDepartmentDialog";
@@ -11,41 +11,32 @@ import { CompanyDialog } from "./CompanyDialog";
 import { MoveDepartmentDialog } from "./MoveDepartmentDialog";
 import {
   TREE_ICON_BUTTON,
-  TREE_NAME_BUTTON,
-  TREE_ROW_ACTIONS,
   TreePanel,
   TreePanelHeader,
   treeFixedItemClass,
 } from "@/components/shared/TreePanel";
-import { RowActions } from "@/components/shared/RowActions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useDepartments } from "@/hooks/useDepartments";
-import { useCompanies, usePositions, type Company, type Position } from "@/hooks/useOrgUnits";
+import { useCompanies, type Company } from "@/hooks/useOrgUnits";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { cn } from "@/lib/utils";
 import type { Department } from "@/types/department";
 
 interface DepartmentTreeProps {
   /** Seçili departman ya da "unassigned". */
   selectedValue?: string;
   selectedCompany?: string;
-  selectedPosition?: string;
   onSelectUnassigned?: () => void;
   onSelectDepartment: (id: Id<"departments"> | null) => void;
   onSelectCompany?: (id: Id<"companies">) => void;
-  onSelectPosition?: (id: Id<"positions"> | null) => void;
 }
 
-/** Kişiler sol paneli: Şirket → Departman ağacı ve altında Pozisyonlar. */
+/** Kişiler sol paneli: Şirket → Departman ağacı. Pozisyonlar kişi formundaki listeden eklenir. */
 export default function DepartmentTree(props: DepartmentTreeProps) {
   const { projectId } = useActiveProject();
   return (
     <div className="flex w-full min-w-0 shrink-0 flex-col gap-3 min-[1100px]:w-[220px]">
       <OrgTree key={`org-${projectId ?? "none"}`} {...props} />
-      {props.onSelectPosition && (
-        <PositionPanel key={`positions-${projectId ?? "none"}`} selected={props.selectedPosition} onSelect={props.onSelectPosition} />
-      )}
     </div>
   );
 }
@@ -273,92 +264,6 @@ function OrgTree({
         companies={companies}
         onOpenChange={(open) => { if (!open) close(); }}
         onMove={moveDepartmentToCompany}
-      />
-    </>
-  );
-}
-
-type PositionDialog = { type: "add" } | { type: "rename"; position: Position } | { type: "delete"; position: Position };
-
-function PositionPanel({ selected, onSelect }: { selected?: string; onSelect: (id: Id<"positions"> | null) => void }) {
-  const { positions: rows, isLoading, addPosition, renamePosition, deletePosition } = usePositions();
-  const positions = [...rows].sort((a, b) => a.name.localeCompare(b.name, "tr"));
-  const [dialog, setDialog] = useState<PositionDialog | null>(null);
-  const close = () => setDialog(null);
-  return (
-    <>
-      <TreePanel
-        id="employee-positions"
-        label="Pozisyonlar"
-        summary={positions.find((position) => position._id === selected)?.name ?? "Tüm pozisyonlar"}
-        header={<TreePanelHeader title="Pozisyonlar" addLabel="Pozisyon ekle" onAddClick={() => setDialog({ type: "add" })} />}
-      >
-        <ul className="space-y-0.5">
-          <li>
-            <button type="button" className={treeFixedItemClass} aria-pressed={!selected} onClick={() => onSelect(null)}>
-              <Briefcase aria-hidden="true" className="mx-[3px] h-3.5 w-3.5 shrink-0" />
-              Tüm pozisyonlar
-            </button>
-          </li>
-        </ul>
-        <div role="presentation" className="border-t" />
-        {isLoading ? (
-          <SectionSkeleton label="Pozisyonlar yükleniyor" />
-        ) : positions.length === 0 ? (
-          <p className="px-2 py-3 text-xs text-muted-foreground">Henüz pozisyon yok. Eklemek için + düğmesini kullanın.</p>
-        ) : (
-          <ul className="space-y-0.5">
-            {positions.map((position) => {
-              const isSelected = selected === position._id;
-              return (
-                <li key={position._id}>
-                  <div className={cn("group flex min-w-0 items-center rounded-sm", isSelected ? "bg-selected text-primary" : "hover:bg-muted")}>
-                    <span aria-hidden="true" className="w-5 shrink-0" />
-                    <button type="button" className={cn(TREE_NAME_BUTTON, isSelected && "font-medium")} aria-pressed={isSelected} onClick={() => onSelect(position._id)}>
-                      {position.name}
-                    </button>
-                    <div className={TREE_ROW_ACTIONS}>
-                      <RowActions label={`${position.name} işlemleri`}>
-                        <DropdownMenuItem onSelect={() => setDialog({ type: "rename", position })}>Yeniden adlandır</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setDialog({ type: "delete", position })}>Sil</DropdownMenuItem>
-                      </RowActions>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </TreePanel>
-      <AddDepartmentDialog
-        key={dialog?.type === "rename" ? dialog.position._id : "add-position"}
-        isOpen={dialog?.type === "add" || dialog?.type === "rename"}
-        onOpenChange={(open) => { if (!open) close(); }}
-        title={dialog?.type === "rename" ? "Pozisyonu yeniden adlandır" : "Yeni pozisyon"}
-        description={dialog?.type === "rename" ? dialog.position.name : "Pozisyonun adını girin"}
-        fieldLabel="Pozisyon adı"
-        initialName={dialog?.type === "rename" ? dialog.position.name : ""}
-        successMessage={dialog?.type === "rename" ? "Pozisyon adı güncellendi" : "Pozisyon eklendi"}
-        errorMessage={dialog?.type === "rename" ? "Pozisyon adı güncellenemedi" : "Pozisyon eklenemedi"}
-        submitLabel={dialog?.type === "rename" ? "Kaydet" : "Ekle"}
-        busyLabel={dialog?.type === "rename" ? "Kaydediliyor…" : "Ekleniyor…"}
-        onAdd={async (name) => {
-          if (dialog?.type === "rename") await renamePosition(dialog.position._id, name);
-          else await addPosition(name);
-        }}
-      />
-      <ConfirmDestructive
-        open={dialog?.type === "delete"}
-        onOpenChange={(open) => { if (!open) close(); }}
-        confirmLabel="Pozisyonu sil"
-        title="Pozisyon silinsin mi?"
-        objectName={dialog?.type === "delete" ? dialog.position.name : ""}
-        effects={["Pozisyon kalıcı silinir.", "Bu pozisyonda kişi varsa işlem engellenir; önce kişilerin pozisyonunu değiştirin."]}
-        onConfirm={async () => {
-          if (dialog?.type !== "delete") return;
-          await deletePosition(dialog.position._id);
-          if (selected === dialog.position._id) onSelect(null);
-        }}
       />
     </>
   );

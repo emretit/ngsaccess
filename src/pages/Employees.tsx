@@ -61,7 +61,6 @@ function EmployeePage() {
   const q = privateQuery ?? safeSearchParam(params.get("q") ?? "");
   const department = params.get("department") ?? "";
   const company = params.get("company") ?? "";
-  const position = params.get("position") ?? "";
   const status = ["active", "inactive", "terminated"].includes(params.get("status") ?? "")
     ? (params.get("status") ?? "all")
     : "all";
@@ -91,8 +90,8 @@ function EmployeePage() {
   }, [location.state, location.pathname, location.search, projectId, isLoading, employees, navigate]);
   const previousProject = useRef(projectId);
   const filtered = useMemo(
-    () => filterAndSortEmployees(employees, q, department, status, sort, { company, position }),
-    [employees, q, department, status, sort, company, position],
+    () => filterAndSortEmployees(employees, q, department, status, sort, { company }),
+    [employees, q, department, status, sort, company],
   );
   const page = clampPage(
     Number(params.get("page") ?? 1),
@@ -153,7 +152,7 @@ function EmployeePage() {
     );
   if (!projectId)
     return <EmptyState title="Personelleri görmek için proje seçin." />;
-  const hasFilters = !!q || !!department || !!company || !!position || status !== "all";
+  const hasFilters = !!q || !!department || !!company || status !== "all";
   const exportTooLarge = filtered.length > EMPLOYEE_EXPORT_MAX_ROWS;
   const activeCount = employees.filter((employee) => employee.isActive).length;
   const statusCounts = {
@@ -170,10 +169,8 @@ function EmployeePage() {
       <MasterDetailListLayout sidebar={<DepartmentTree
           selectedValue={department}
           selectedCompany={company}
-          selectedPosition={position}
           onSelectDepartment={(id) => update({ department: id ?? "", company: "" })}
           onSelectCompany={(id) => update({ company: id, department: "" })}
-          onSelectPosition={(id) => update({ position: id ?? "" })}
         />}>
         <EmployeeFilters
           searchQuery={q}
@@ -189,7 +186,7 @@ function EmployeePage() {
           hasFilters={hasFilters}
           onClear={() => {
             setPrivateQuery(null);
-            update({ q: "", department: "", company: "", position: "", status: "" });
+            update({ q: "", department: "", company: "", status: "" });
           }}
         />
         {(canManage || canExport) && <div className="flex flex-wrap items-center gap-2">
@@ -199,7 +196,7 @@ function EmployeePage() {
           {exportError && <span role="alert" className="text-sm text-destructive">{exportError}</span>}
         </div>}
         <EmployeeTable
-          key={`${projectId}/${q}/${department}/${company}/${position}/${status}/${sort}/${page}/${size}`}
+          key={`${projectId}/${q}/${department}/${company}/${status}/${sort}/${page}/${size}`}
           loading={isLoading}
           emptyState={
             employees.length === 0 ? (
@@ -212,18 +209,17 @@ function EmployeePage() {
                 title={
                   q
                     ? "Aramanızla eşleşen personel yok"
-                    : department && !position && status === "all"
+                    : department && status === "all"
                       ? "Bu departmanda doğrudan bağlı kişi yok"
-                      : company && !position && status === "all"
+                      : company && status === "all"
                         ? "Bu şirkette kişi yok"
                         : "Seçili filtrelerle eşleşen personel yok"
                 }
-                description="Aramayı veya şirket, departman ve pozisyon seçimini değiştirin."
+                description="Aramayı veya şirket ve departman seçimini değiştirin."
                 action={{
                   label:
                     (department || company) &&
                     !q &&
-                    !position &&
                     status === "all"
                       ? "Tüm personele dön"
                       : "Filtreleri temizle",
@@ -233,7 +229,6 @@ function EmployeePage() {
                       q: "",
                       department: "",
                       company: "",
-                      position: "",
                       status: "",
                     });
                   },

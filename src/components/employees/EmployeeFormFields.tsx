@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import type { EmployeeFormData } from "./hooks/useEmployeeFormData";
 import { usePermissions } from "@/hooks/usePermissions";
+import { PositionPicker, type PositionActions } from "./PositionPicker";
 interface Option {
   id: string;
   name: string;
@@ -33,6 +34,8 @@ interface Props {
   isEditing?: boolean;
   originalDepartmentId?: EmployeeFormData["departmentId"];
   memberships?: { _id: string; name: string; isActive?: boolean }[];
+  /** Verilirse pozisyon listesinde ekle/düzenle/sil çıkar. */
+  positionActions?: PositionActions;
 }
 export function DepartmentShiftWarning({ isEditing, originalDepartmentId, departmentId }: {
   isEditing: boolean; originalDepartmentId: EmployeeFormData["departmentId"]; departmentId: EmployeeFormData["departmentId"];
@@ -54,6 +57,7 @@ export default function EmployeeFormFields({
   isEditing = false,
   originalDepartmentId = null,
   memberships,
+  positionActions,
 }: Props) {
   const { can } = usePermissions();
   const canManageAccessRules = can("accessRules.manage");
@@ -136,18 +140,30 @@ export default function EmployeeFormFields({
     key: "companyId" | "departmentId" | "positionId" | "accessRuleId",
     label: string,
     options: Option[],
-  ) => (
+  ) => {
+    const describedBy = [
+      options.length === 0 && `employee-${key}-empty`,
+      key === "accessRuleId" && !canManageAccessRules && "employee-accessRuleId-permission",
+    ].filter(Boolean).join(" ") || undefined;
+    return (
     <div>
       <Label htmlFor={`employee-${key}`}>{label}</Label>
+      {key === "positionId" ? (
+        <PositionPicker
+          id={`employee-${key}`}
+          value={formData.positionId}
+          positions={options}
+          onChange={(id) => changeSelect("positionId", id ?? "")}
+          actions={positionActions}
+          aria-describedby={describedBy}
+        />
+      ) : (
       <NativeSelect
         id={`employee-${key}`}
         name={key}
         className="mt-1 max-sm:min-h-11 w-full min-w-0"
         disabled={key === "accessRuleId" && !canManageAccessRules}
-        aria-describedby={[
-          options.length === 0 && `employee-${key}-empty`,
-          key === "accessRuleId" && !canManageAccessRules && "employee-accessRuleId-permission",
-        ].filter(Boolean).join(" ") || undefined}
+        aria-describedby={describedBy}
         value={formData[key] ?? ""}
         onChange={(e) => changeSelect(key, e.target.value)}
       >
@@ -160,6 +176,7 @@ export default function EmployeeFormFields({
           </option>
         ))}
       </NativeSelect>
+      )}
       {key === "accessRuleId" && !canManageAccessRules && (
         <p id="employee-accessRuleId-permission" className="mt-1 text-xs text-muted-foreground">
           Kural eklemek için erişim kurallarını yönetme yetkisi gerekir.
@@ -170,13 +187,14 @@ export default function EmployeeFormFields({
           {{
             companyId: "Henüz şirket tanımlı değil.",
             departmentId: "Henüz departman tanımlı değil.",
-            positionId: "Henüz pozisyon tanımlı değil.",
+            positionId: positionActions ? "Henüz pozisyon yok; listeden \"Pozisyon ekle\"yi seçin." : "Henüz pozisyon tanımlı değil.",
             accessRuleId: "Etkin erişim kuralı yok.",
           }[key]}
         </p>
       )}
     </div>
-  );
+    );
+  };
   const section = (title: string, children: ReactNode) => (
     <fieldset className="min-w-0 space-y-3 border-t">
       <legend className="pr-2 text-sm font-semibold">{title}</legend>

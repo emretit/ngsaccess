@@ -1,9 +1,10 @@
 import { FormFeedback } from "@/components/shared/FormFeedback";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { useEffect, useState, type RefObject } from "react";
 import { Employee } from "@/types/employee";
 import PhotoUpload from "./PhotoUpload";
@@ -57,6 +58,9 @@ export default function EmployeeForm({
   const memberships = rules?.filter((rule) =>
     rule.groupMembers.some((member) => member.employeeId === employee?._id),
   );
+  const createPosition = useMutation(api.positions.create);
+  const updatePosition = useMutation(api.positions.update);
+  const removePosition = useMutation(api.positions.remove);
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<string, string>>
   >({});
@@ -193,6 +197,11 @@ export default function EmployeeForm({
               departments={departments}
               accessRules={accessRules}
               positions={positions}
+              positionActions={projectId && can("employees.manage") ? {
+                add: (name) => createPosition({ projectId, name }),
+                rename: (positionId, name) => updatePosition({ positionId: positionId as Id<"positions">, name }),
+                remove: (positionId) => removePosition({ positionId: positionId as Id<"positions"> }),
+              } : undefined}
               photo={
                 <>
                   <div className="flex items-center gap-4">

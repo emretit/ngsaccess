@@ -7,7 +7,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import EmployeeForm from "./EmployeeForm";
 const mocks = vi.hoisted(() => ({ query: vi.fn(), current: undefined as unknown, stages: [] as string[], saved: undefined as { employeeId: Id<"employees"> } | undefined, loading: false, uploading: false, clicks: new Map<string, () => void>(), remoteChanged: false, reload: vi.fn(), confirm: undefined as (() => void) | undefined }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p" }) }));
-vi.mock("convex/react", () => ({ useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => { const name = getFunctionName(ref); mocks.query(name, args); return name === "employees:getById" ? mocks.current : []; } }));
+vi.mock("convex/react", () => ({ useMutation: () => async () => null, useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => { const name = getFunctionName(ref); mocks.query(name, args); return name === "employees:getById" ? mocks.current : []; } }));
 vi.mock("./hooks/useEmployeeFormData", () => ({ useEmployeeFormData: () => ({ formData: {}, initialData: mocks.remoteChanged ? "old" : undefined, remoteChanged: mocks.remoteChanged, reloadLatest: mocks.reload, departments: [], companies: [], accessRules: [], positions: [], optionsLoading: true }) }));
 vi.mock("./hooks/useEmployeeFormSubmit", () => ({ useEmployeeFormSubmit: () => ({ stages: mocks.stages, isLoading: mocks.loading, savedResult: mocks.saved }) }));
 vi.mock("./hooks/usePhotoUpload", () => ({ usePhotoUpload: () => ({ isLoading: mocks.uploading }) }));
