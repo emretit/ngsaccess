@@ -44,7 +44,7 @@ Güncelleme 2026-11-03: genel audit sonrası 21 satır düzeltildi (docs/genel-a
 | Min. Work Hours → Absent | Sabit ve esnekte `minWorkMinutes` (esnekte `requiredNetMinutes` yalnız eksik/fazla süre hesaplar, devamsız yapmaz) | ✅ | `8f57a2d9` sabit; esnek 2026-10-26 (eksik çıkışta İncelenecek) |
 | Day Change Settings (gün dönüm saati) | `nightShiftDayMode`: vardiya başlangıcı / gece yarısı böl | 🟡 | Serbest saat seçilemiyor |
 | Manuel / otomatik hesap zamanı + yeniden hesapla | Her sorguda canlı hesap | ➕ | Yeniden hesaplama gerekmiyor |
-| Hafta sonu tanımı (Define Weekends) | Hafta tatili tarihli vardiya planından | ✅ | Haftalık planda seçilmeyen gün hafta tatili; eski Çalışma günleri ayarı kaldırıldı (audit anında commit’siz). PDK-001/010 riskleri raporda. `convex/lib/shiftPlan.ts:35`; `src/components/pdks/settings/PdksSettingsPanel.tsx:17`. |
+| Hafta sonu tanımı (Define Weekends) | Hafta tatili tarihli vardiya planından | ✅ | Haftalık planda seçilmeyen gün hafta tatili; eski Çalışma günleri ayarı kaldırıldı (4a7c1004, CANLI 2026-11-04). PDK-001/010 riskleri raporda. `convex/lib/shiftPlan.ts:35`; `src/components/pdks/settings/PdksSettingsPanel.tsx:17`. |
 
 ### 2.3 Vardiya (Timetable / Shift / Schedule)
 
