@@ -2,8 +2,10 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { addWorkDate } from "./pdksWorkDay";
 
-export type PdksCheckpoint = Pick<Doc<"pdksCheckpointSelections">, "targetType" | "deviceId" | "doorId" | "ioId" | "readerId" | "pointType"> & { hikReaderNo?: number };
+export type PdksCheckpoint = Pick<Doc<"pdksCheckpointSelections">, "targetType" | "deviceId" | "doorId" | "ioId" | "readerId" | "pointType" | "hikReaderNo"> & { addressUncertain?: boolean };
 export type PdksDayPolicy = {
+  /** Legacy reader targets use today's mapping; their historical address is unknown. */
+  checkpointAddressUncertain?: boolean;
   calculationMode?: "firstLast" | "eachPunch";
   minPunchIntervalMinutes?: number;
   punchMode: "legacy" | "requirements";
@@ -58,18 +60,23 @@ export async function loadPdksRulePolicy(ctx: QueryCtx | MutationCtx, projectId:
   const versions = await Promise.all([...before, ...within].map(async version => {
     const targets = version.checkpointMode === "all" ? [] : await ctx.db.query("pdksCheckpointSelections").withIndex("by_ruleVersionId", q => q.eq("ruleVersionId", version._id)).take(501);
     if (targets.length > 500) throw new Error("PDKS kural sürümü en fazla 500 hedef içerebilir");
-    const resolvedTargets = await Promise.all(targets.map(async target => {
-      if (target.targetType !== "reader" || !target.readerId) return target;
+    const resolvedTargets = await Promise.all(targets.map(async (target): Promise<PdksCheckpoint> => {
+      if (target.targetType !== "reader") return target;
+      // Both IDE IO and Hik reader numbers belong to the published version.
+      // Editing, moving or deleting the live reader must not rewrite history.
+      if (target.ioId !== undefined || target.hikReaderNo !== undefined) return target;
+      if (!target.readerId) return { ...target, addressUncertain: true };
       let pending = readerCache.get(target.readerId);
       if (!pending) { pending = ctx.db.get(target.readerId); readerCache.set(target.readerId, pending); }
       const reader = await pending;
       if (!reader || reader.projectId !== projectId || reader.deviceId !== target.deviceId || reader.doorId !== target.doorId) {
-        return { ...target, ioId: undefined };
+        return { ...target, addressUncertain: true };
       }
-      // An IDE selection snapshots IO; incidental Hik metadata must not override it.
-      return { ...target, hikReaderNo: target.ioId === undefined ? reader.hikReaderNo : undefined };
+      // Preserve the old fallback without presenting today's address as historical proof.
+      return { ...target, hikReaderNo: reader.hikReaderNo, addressUncertain: true };
     }));
-    return { ...version, targets: resolvedTargets };
+    return { ...version, targets: resolvedTargets,
+      ...(resolvedTargets.some(target => target.addressUncertain) ? { checkpointAddressUncertain: true } : {}) };
   }));
   return Object.assign(createPdksRulePolicy(versions), { historyStart: before[0]?.effectiveFrom });
 }

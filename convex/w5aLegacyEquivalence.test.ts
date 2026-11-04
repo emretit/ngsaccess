@@ -18,6 +18,29 @@ afterEach(() => vi.useRealTimers());
 // metadata queries and additive DTO fields are excluded from the legacy comparison.
 // Faz 3A intentionally updates the report/SGK snapshots: bounded manual reads,
 // accurate reliability text and explicitly marked APHB draft with overtime.
+// RAP-002 reviewed snapshot changes (not a blanket snapshot update):
+// - sgkReport: 9 raw hours -> 8 net hours; daily 8h shortcut removed, overtime 1h -> 0.
+// - overtimeReport: the former 1h row disappears; totalOvertimeHours 1 -> 0 (pay stays 0).
+// - departmentReport: the former 1h/zero-cost row disappears for the same weekly45 result.
+// - sgk: XML overtime 1.0 -> 0.0; premium days, missing days, warnings and identity unchanged.
+// - Three report reliability notes now describe shared payroll breaks/period settlement.
+// - sgkReport trace 6 -> 16: adds payroll readings (preceding ISO week + overnight tail),
+//   first-record probe, employees, two holiday scopes, employee leaves, rates, manual
+//   by_date, permission scope and settings; its existing shift resolver is reused.
+// - sgk trace 9 -> 18: same additions except employees (preloaded); resolver also reused.
+// - overtimeReport/departmentReport traces each 6 -> 12: replace the legacy adapter,
+//   extend readings to Sep 28–Nov 1, load payroll holidays/leaves/rates/first-record probe,
+//   change manual lookup to payroll by_date and add payroll scope validation;
+//   bounded assignment lower bound Sep 24 -> Sep 27 follows the settlement range.
+// Inherited collect reads remain PDK-014, explicitly deferred by the coordinator;
+// bounded shift resolution and the 20-row first-record probe remain visible in this trace.
+// N-02 reviewed trace-only changes (manual edits, no -u):
+// - sgkReport 16 -> 14: one shared by_project_access_time take(20001) scan
+//   Sep 23–Nov 1 replaces two overlapping scans; payroll reuses discovered employees.
+// - sgk 18 -> 17: the same shared bounded reading scan replaces two scans.
+// - All four payroll reports replace global pdksRecords.by_date collect with
+//   employee + Sep 28–Oct 31 by_employee_date take(1001); no numeric DTO changes.
+// The shared 8-day prefix covers the longest ISO-week + split + flexible boundary.
 // Other query outputs and cross-project isolation remain strict.
 it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır", async () => {
   const t = convexTest(schema, modules);

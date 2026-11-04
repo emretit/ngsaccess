@@ -115,7 +115,8 @@ it("D3: yeni sürümün ilk sabahındaki çıkış önceki legacy iş gününde 
   const table = await f.table("2026-10-22");
   expect(table[0]?.days[0]).toMatchObject({ status: "present", firstEntry: "22:00", lastExit: "06:00", rawTotalMinutes: 480 });
   const report = await f.caller.query(api.reports.getSgkMonthlyReport, { projectId: f.projectId, year: 2026, month: 10 });
-  expect(report.rows[0]).toMatchObject({ calismaGunu: 1, toplamSaat: 8 });
+  // RAP-002: 22–06 is 8 raw hours; payroll deducts the same 1-hour break here.
+  expect(report.rows[0]).toMatchObject({ calismaGunu: 1, toplamSaat: 7 });
   const workDates = await f.t.run(async ctx => {
     const report = await loadRuleReportDays(ctx, [f.projectId], "2026-10-01", "2026-10-31");
     return report.readings.map(reading => report.workDate(reading));

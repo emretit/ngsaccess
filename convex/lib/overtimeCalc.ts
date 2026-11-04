@@ -140,7 +140,9 @@ export function calculatePeriodOvertime(
     for (const segment of day.overtimeSegments) {
       let minutes = segment.dailyOvertimeMinutes;
       if (options.overtimeBasis !== "dailyShift") {
-        if (segment.classification === "weekend" || segment.classification === "holiday") {
+        // halfDayHoliday segments contain only minutes after the holiday boundary;
+        // their preceding normal portion is emitted separately as workday/weekend.
+        if (segment.classification === "weekend" || segment.classification === "holiday" || segment.classification === "halfDayHoliday") {
           minutes = segment.netMinutes;
         } else {
           const monday = weekStartIsoForDate(segment.calendarDate ?? day.date);

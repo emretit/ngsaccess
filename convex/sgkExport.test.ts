@@ -27,3 +27,22 @@ it("6: SGK excludes cycle Wednesday rest and unassigned dates, while absent Mond
   const holiday = await caller.query(api.sgkExport.buildAphbForMonth, { projectId: ids.projectId, year: 2026, month: 6 });
   expect(holiday.xml).toContain("<eksikGunSayisi>0</eksikGunSayisi>");
 });
+
+it("RAP-003: aktif ziyaretçi APHB ve bordro çalışan kümesine girmez", async () => {
+  const t = convexTest(schema, import.meta.glob("./**/*.ts"));
+  const ids = await t.run(async ctx => {
+    const projectId = await ctx.db.insert("projects", { name: "Ziyaretçi sınırı" });
+    const userId = await ctx.db.insert("users", { role: "super_admin" });
+    const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 86400000 });
+    const shiftId = await ctx.db.insert("shifts", { projectId, name: "Plan", startTime: "09:00", endTime: "18:00", createdAt: "", updatedAt: "" });
+    const visitorId = await ctx.db.insert("employees", { projectId, firstName: "Misafir", lastName: "Kişi", email: "", cardNumber: "V", isActive: true, isVisitor: true, tcNo: "12345678901" });
+    await ctx.db.insert("shiftAssignments", { projectId, employeeId: visitorId, shiftId, startDate: "2026-06-01", endDate: "2026-06-30", createdAt: "", updatedAt: "" });
+    return { projectId, userId, sessionId };
+  });
+  const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
+  const args = { projectId: ids.projectId, year: 2026, month: 6 };
+  const aphb = await caller.query(api.sgkExport.buildAphbForMonth, args);
+  expect(aphb.employees).toEqual([]);
+  expect(aphb.xml).not.toContain("Misafir");
+  expect((await caller.query(api.cardReadings.getMonthlyPayrollSheet, args)).rows).toEqual([]);
+});

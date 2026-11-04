@@ -77,7 +77,7 @@ export const listCheckpointTargets = authedQuery({
     };
   },
 });
-/** PDKS Ayarları uyarısı: yürürlükteki/gelecek kuralda seçili okuyucu artık okumalarla eşleşmiyorsa.
+/** PDKS Ayarları uyarısı: güncel/gelecek okuyucu eşlemesi ve son 20 geçmiş sürümün adres belirsizliği.
  * Okumalar bugünden önceki 7 günden okunur; bugünün okutmaları sorguyu her kart okutmada yeniden çalıştırmasın. */
 export const getCheckpointWarnings = authedQuery({
   args: { projectId: v.id("projects") },
@@ -86,20 +86,41 @@ export const getCheckpointWarnings = authedQuery({
     await requirePermission(ctx, ctx.user, projectId, "schedule.manage");
     const today = trTodayKey();
     const [current, future] = await Promise.all([
-      ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).lte("effectiveFrom", today)).order("desc").take(1),
+      ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).lte("effectiveFrom", today)).order("desc").take(21),
       ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).gt("effectiveFrom", today)).take(65),
     ]);
     if (future.length > 64) throw new Error("64'ten fazla gelecek PDKS sürümü var");
     // Each version's snapshot is checked on its own: a valid future target must not hide a broken current one.
-    const targets = (await Promise.all([...current, ...future].filter(version => version.checkpointMode === "selected").map(async version =>
+    const targets = (await Promise.all([...current.slice(0, 1), ...future].filter(version => version.checkpointMode === "selected").map(async version =>
       (await selections(ctx, version._id)).map(target => ({ target, effectiveFrom: version.effectiveFrom }))))).flat()
       .filter(({ target }) => target.targetType === "reader" && target.readerId);
     const warnings = new Map<string, string>();
+    // At most 20 historical versions × 500 selections; never load traffic or
+    // today's reader mappings merely to identify an uncertain old snapshot.
+    for (const version of current.slice(1)) {
+      if (version.checkpointMode !== "selected") continue;
+      const historical = await selections(ctx, version._id);
+      if (historical.some(target => target.targetType === "reader" && target.hikReaderNo === undefined && target.ioId === undefined)) {
+        warnings.set("history:uncertain", "Eski bir kural sürümünde okuyucu numarası kayıtlı değil; okuyucu değiştiyse geçmiş günler etkilenebilir.");
+        break;
+      }
+    }
     const hikDevices = new Map<Id<"devices">, Doc<"devices">>();
+    const savedReaderNumbers = new Map<Id<"devices">, Set<number>>();
     for (const { target, effectiveFrom } of targets) {
       if (!target.readerId) continue;
-      const [reader, device] = await Promise.all([ctx.db.get(target.readerId), ctx.db.get(target.deviceId)]);
+      const device = await ctx.db.get(target.deviceId);
       const deviceName = device && device.projectId === projectId ? device.name : "Cihaz";
+      if (target.ioId !== undefined) continue;
+      if (target.hikReaderNo !== undefined) {
+        const numbers = savedReaderNumbers.get(target.deviceId) ?? new Set<number>();
+        numbers.add(target.hikReaderNo);
+        savedReaderNumbers.set(target.deviceId, numbers);
+        if (device?.projectId === projectId) hikDevices.set(device._id, device);
+        continue;
+      }
+      warnings.set(`uncertain:${target.readerId}:${effectiveFrom}`, `${deviceName}: ${effectiveFrom} tarihli kuralın eski sürümünde okuyucu numarası kayıtlı değil; okuyucu değiştiyse geçmiş günler etkilenebilir.`);
+      const reader = await ctx.db.get(target.readerId);
       if (!reader || reader.projectId !== projectId || reader.deviceId !== target.deviceId || reader.doorId !== target.doorId) {
         warnings.set(`moved:${target.readerId}:${effectiveFrom}`, `${deviceName}: ${effectiveFrom} tarihli kuralda seçili bir okuyucu silinmiş ya da başka kapıya taşınmış; okumalar bu okuyucu seçimiyle eşleşmiyor. Kuralı yeniden yayınlayın.`);
       } else if (target.ioId === undefined && device?.brand !== "ide_smart") {
@@ -115,7 +136,8 @@ export const getCheckpointWarnings = authedQuery({
         ctx.db.query("readers").withIndex("by_device", q => q.eq("deviceId", device._id)).take(201),
       ]);
       if (readers.length > 200) return; // Eksik okuyucu listesiyle yanlış "tanımsız numara" uyarısı vermeyelim.
-      const known = new Set(readers.filter(reader => reader.projectId === projectId).map(reader => reader.hikReaderNo));
+      const known = new Set([...readers.filter(reader => reader.projectId === projectId).map(reader => reader.hikReaderNo),
+        ...(savedReaderNumbers.get(device._id) ?? [])]);
       const unknown = [...new Set(recent.filter(reading => reading.projectId === projectId && reading.hikCardReaderNo !== undefined && !known.has(reading.hikCardReaderNo))
         .map(reading => reading.hikCardReaderNo))].sort((a, b) => (a ?? 0) - (b ?? 0));
       if (unknown.length) warnings.set(`unknown:${device._id}`, `${device.name}: bugün hariç son 7 günde ${unknown.join(", ")} numaralı okuyucudan okuma geldi ama bu numarada tanımlı okuyucu yok. Cihazlar sayfasında kapı numarasını kontrol edin; bu okumalar seçili okuyucularla eşleşmiyor.`);
@@ -161,7 +183,7 @@ export const publishRuleVersion = authedMutation({
         if (readerAddresses.has(address)) throw new Error("Aynı fiziksel okuyucu eşlemesi birden fazla seçilemez");
         readerAddresses.add(address);
         return { targetType: selection.targetType, deviceId: device._id, doorId: door._id, readerId: reader._id,
-          pointType: selection.pointType, ...(device.brand === "ide_smart" ? { ioId: reader.ioId } : {}) };
+          pointType: selection.pointType, ...(device.brand === "ide_smart" ? { ioId: reader.ioId } : { hikReaderNo: reader.hikReaderNo }) };
       }
       const linked = await ctx.db.query("doors").withIndex("by_device", q => q.eq("deviceId", device._id)).take(501);
       if (linked.length > 500) throw new Error("Cihaz kapı sınırı aşıldı");

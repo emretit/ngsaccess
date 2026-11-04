@@ -5,16 +5,25 @@ import { describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { resolveDirection } from "./cardReadingProcess";
 import { DEFAULT_FLEXIBLE } from "./pdksFlexible";
+import { groupPdksWorkDays, pdksWorkDay } from "./pdksWorkDay";
 import type { Doc } from "../_generated/dataModel";
 const modules = import.meta.glob("../**/*.ts");
 
-type ShiftSeed = Pick<Doc<"shifts">, "startTime" | "endTime" | "scheduleType" | "flexible">;
+type ShiftSeed = Pick<Doc<"shifts">, "startTime" | "endTime" | "scheduleType" | "flexible" | "validWindow">;
 const night: ShiftSeed = { startTime: "22:00", endTime: "06:00" };
 const day: ShiftSeed = { startTime: "08:00", endTime: "17:00" };
+const extendedDay: ShiftSeed = { startTime: "09:00", endTime: "18:00", validWindow: {
+  checkInStart: "08:00", checkInEnd: "10:00", checkOutStart: "17:00", checkOutEnd: "02:00", checkOutEndDayOffset: 1,
+} };
 const flexible: ShiftSeed = { startTime: "00:00", endTime: "00:00", scheduleType: "flexible", flexible: { ...DEFAULT_FLEXIBLE, checkOutEnd: "06:00" } };
 
 describe("both okuyucu vardiyaya bağlı yönü", () => {
   it.each([
+    ["2026-06-01T09:00:00+03:00", "2026-06-02T09:00:00+03:00", "entry", { ...extendedDay, validWindow: { checkInStart: "08:00", checkInEnd: "10:00", checkOutStart: "17:00", checkOutEndDayOffset: 1, ...extendedDay.validWindow, checkOutEnd: "10:00" } }, "entry"],
+    ["2026-06-01T09:00:00+03:00", "2026-06-02T01:00:00+03:00", "entry", extendedDay, "exit"],
+    ["2026-06-01T09:00:00+03:00", "2026-06-02T02:00:00+03:00", "entry", extendedDay, "exit"],
+    ["2026-06-01T09:00:00+03:00", "2026-06-02T02:01:00+03:00", "entry", extendedDay, "entry"],
+    ["2026-06-01T18:00:00+03:00", "2026-06-02T01:00:00+03:00", "exit", extendedDay, "entry"],
     ["2026-06-01T22:00:00+03:00", "2026-06-02T06:00:00+03:00", "entry", night, "exit"],
     ["2026-06-01T22:00:00+03:00", "2026-06-02T06:00:00+03:00", "entry", undefined, "entry"],
     ["2026-06-01T22:00:00+03:00", "2026-06-02T08:00:00+03:00", "entry", day, "entry"],
@@ -57,6 +66,45 @@ describe("both okuyucu vardiyaya bağlı yönü", () => {
         }
       });
     }
+  });
+
+  it.each([["09:00", "exit"], ["12:00", "entry"]] as const)("N3-01: today's dated shift decides overlap at %s", async (time, expected) => {
+    const t = convexTest(schema, modules);
+    await t.run(async ctx => {
+      const projectId = await ctx.db.insert("projects", { name: "Test" });
+      const deviceId = await ctx.db.insert("devices", { projectId, name: "Cihaz", accessDirection: "both", createdAt: "", updatedAt: "" });
+      const previousId = await ctx.db.insert("shifts", { projectId, name: "Dün", ...extendedDay, validWindow: { checkInStart: "08:00", checkInEnd: "10:00", checkOutStart: "17:00", checkOutEnd: "14:00", checkOutEndDayOffset: 1 }, createdAt: "", updatedAt: "" });
+      const currentId = await ctx.db.insert("shifts", { projectId, name: "Bugün", startTime: "12:00", endTime: "20:00", validWindow: { checkInStart: "11:00", checkInEnd: "13:00", checkOutStart: "19:00", checkOutEnd: "21:00", checkOutEndDayOffset: 0 }, createdAt: "", updatedAt: "" });
+      const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Test", lastName: "Kişi", email: "test@example.test", cardNumber: "123", isActive: true });
+      for (const [date, shiftId] of [["2026-06-01", previousId], ["2026-06-02", currentId]] as const) await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: date, endDate: date, createdAt: "", updatedAt: "" });
+      await ctx.db.insert("cardReadings", { projectId, employeeId, deviceId, cardNo: "123", accessTime: "2026-06-01T06:00:00.000Z", direction: "entry", accessStatus: "izin_verildi" });
+      expect(await resolveDirection(ctx, { device: await ctx.db.get(deviceId), employeeId, nowISO: `2026-06-02T${time}:00+03:00` })).toBe(expected);
+    });
+  });
+
+  it("PDK-007: tarihli gündüz çıkış penceresi açık oturumu önceki iş gününde kapatır", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async ctx => {
+      const projectId = await ctx.db.insert("projects", { name: "Test" });
+      const deviceId = await ctx.db.insert("devices", { projectId, name: "Cihaz", accessDirection: "both", createdAt: "", updatedAt: "" });
+      // Today's definition no longer crosses midnight; yesterday's snapshot does.
+      const shiftId = await ctx.db.insert("shifts", { ...day, projectId, name: "Gündüz", versionedUntil: "2026-06-01", createdAt: "", updatedAt: "" });
+      await ctx.db.insert("shiftVersions", { shiftId, validUntil: "2026-06-01", rules: extendedDay, createdAt: "" });
+      const employeeId = await ctx.db.insert("employees", { projectId, shiftId, firstName: "Test", lastName: "Kişi", email: "test@example.com", cardNumber: "123", isActive: true });
+      await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-06-01", endDate: "2026-06-02", createdAt: "", updatedAt: "" });
+      const entry = { accessTime: "2026-06-01T06:00:00.000Z", direction: "entry" as const };
+      await ctx.db.insert("cardReadings", { ...entry, projectId, employeeId, deviceId, cardNo: "123", accessStatus: "izin_verildi" });
+      const accessTime = "2026-06-01T22:00:00.000Z"; // June 2, 01:00 in Turkey
+      const direction = await resolveDirection(ctx, { device: await ctx.db.get(deviceId), employeeId, nowISO: accessTime });
+      expect(direction).toBe("exit");
+      const current = await ctx.db.get(shiftId);
+      if (!current) throw new Error("Vardiya bulunamadı");
+      const resolve = (_id: typeof employeeId, date: string) => date === "2026-06-01" ? { ...current, ...extendedDay } : current;
+      expect(pdksWorkDay(accessTime, employeeId, resolve, direction)).toBe("2026-06-01");
+      const grouped = groupPdksWorkDays([entry, { accessTime, direction }], employeeId, resolve);
+      expect([...grouped.keys()]).toEqual(["2026-06-01"]);
+      expect(grouped.get("2026-06-01")).toHaveLength(2);
+    });
   });
 
   it("cihaz değişiminde aynı proje oturumu korunur; yabancı proje ve başka çalışan dışlanır", async () => {

@@ -31,4 +31,16 @@ describe("PDKS yön kanıtı", () => {
   it("legacy tek çıkışı bugünkü gibi giriş kabul eder", () => {
     expect(resolveAttendanceEvidence([exit], undefined, LEGACY_PDKS_POLICY)).toMatchObject({ firstISO: exit.accessTime, lastISO: null, decision: "present", durationMeasured: false });
   });
+  it("legacy manuel giriş ile karşı yöndeki tek ham çıkışı birleştirir", () => {
+    expect(resolveAttendanceEvidence([exit], { entryISO: entry.accessTime }, LEGACY_PDKS_POLICY))
+      .toMatchObject({ firstISO: entry.accessTime, lastISO: exit.accessTime, durationMeasured: true, punchQuality: "ok" });
+  });
+  it.each(["entry", undefined] as const)("legacy manuel giriş tek %s kaydını çıkışa çevirmez", direction => {
+    expect(resolveAttendanceEvidence([{ ...exit, direction }], { entryISO: entry.accessTime }, LEGACY_PDKS_POLICY))
+      .toMatchObject({ lastISO: null, durationMeasured: false, punchQuality: "missingExit" });
+  });
+  it("legacy manuel girişten önceki tek çıkış süre üretmez", () => {
+    expect(resolveAttendanceEvidence([{ ...entry, direction: "exit" }], { entryISO: exit.accessTime }, LEGACY_PDKS_POLICY))
+      .toMatchObject({ lastISO: null, durationMeasured: false, punchQuality: "missingExit" });
+  });
 });

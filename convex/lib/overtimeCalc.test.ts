@@ -30,6 +30,15 @@ const shift = (startTime: string, endTime: string, extra: Partial<Doc<"shifts">>
   ({ startTime, endTime, overtimeStartToleranceMinutes: 0, ...extra }) as Doc<"shifts">;
 
 describe("project overtime settlement", () => {
+  it("settles half-day holiday portions independently of the weekly threshold", () => {
+    const day = entry("2026-06-24", 480);
+    day.overtimeSegments = [segment(180), segment(300, { classification: "halfDayHoliday", multiplier: 2, dailyOvertimeMinutes: 300 })];
+    for (const overtimeBasis of ["weekly45", "dailyShift"] as const) {
+      expect(calculatePeriodOvertime([day], { ...period, overtimeBasis }))
+        .toMatchObject({ overtimeMinutes: 300, overtimePayTRY: 1000 });
+    }
+  });
+
   it.each([
     [[9, 9, 9, 9, 8], 0, 0],
     [[10, 10, 10, 10, 10], 300, 750],

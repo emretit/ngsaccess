@@ -43,10 +43,12 @@ export function resolveAttendanceEvidence(
   }
   if (policy.punchMode === "legacy") {
     const firstISO = manual?.entryISO ?? readings[0]?.accessTime ?? null;
-    const singleFlexibleExit = options?.scheduleType === "flexible" && manual?.entryISO && readings.length === 1
+    // A manual entry and one later, explicitly directed exit are a complete pair,
+    // on fixed schedules as well as flexible ones. Two raw punches retain legacy inference.
+    const singleManualExit = manual?.entryISO && readings.length === 1
       && readings[0]?.direction === "exit" && Date.parse(readings[0].accessTime) > Date.parse(manual.entryISO)
       ? readings[0].accessTime : null;
-    const lastISO = manual?.exitISO ?? singleFlexibleExit ?? (readings.length > 1 ? readings[readings.length - 1]?.accessTime ?? null : null);
+    const lastISO = manual?.exitISO ?? singleManualExit ?? (readings.length > 1 ? readings[readings.length - 1]?.accessTime ?? null : null);
     const attendanceCredit = !!firstISO || !!lastISO;
     return { firstISO, lastISO, durationMeasured: !!firstISO && !!lastISO, punchQuality: firstISO && lastISO ? "ok" : firstISO ? "missingExit" : lastISO ? "missingEntry" : "noPunch", attendanceCredit, decision: attendanceCredit ? "present" : "absent" };
   }

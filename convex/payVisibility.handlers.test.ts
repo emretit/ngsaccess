@@ -141,9 +141,10 @@ describe.each(roles)("%s public pay responses", (role) => {
   });
   it("monthly payroll masks every cell, row rate and total; manager salary fallback remains", async () => {
     const result = await invoke<FunctionReturnType<typeof api.cardReadings.getMonthlyPayrollSheet>>(getMonthlyPayrollSheet, fixture(role), period);
-    expect(result.rows).toHaveLength(5);
+    // RAP-003: the visitor with a dated assignment is still not an employee.
+    expect(result.rows).toHaveLength(4);
     result.rows.forEach(row => {
-      const hasPay = row.employeeId === "hourly" || row.employeeId === "salary" || row.employeeId === "visitor";
+      const hasPay = row.employeeId === "hourly" || row.employeeId === "salary";
       if (!visible || !hasPay) {
         expect(row.hourlyRate).toBeNull();
         expect(row.totals.overtimePayTRY).toBeNull();
@@ -163,17 +164,20 @@ describe.each(roles)("%s public pay responses", (role) => {
   it("overtime summary masks every pay and total while preserving manager math", async () => {
     const result = await invoke<FunctionReturnType<typeof api.reports.getOvertimeSummaryReport>>(getOvertimeSummaryReport, fixture(role), period);
     expect(result.rows).toHaveLength(4);
-    expect(result.totalOvertimePayTRY).toBe(visible ? 2250 : null);
+    // RAP-002: 13h raw - 1h break, daily shift tolerance => 3.75h paid overtime.
+    // Ada 562.50 + salary 1125; missing/zero rates contribute no monetary total.
+    expect(result.totalOvertimePayTRY).toBe(visible ? 1687.5 : null);
     const hourly = result.rows.find(row => row.name === "Ada Test");
-    expect(hourly?.overtimePayTRY).toBe(visible ? 750 : null);
+    expect(hourly?.overtimePayTRY).toBe(visible ? 562.5 : null);
     if (!visible) result.rows.forEach(row => expect(row.overtimePayTRY).toBeNull());
   });
   it("department report masks fallback/cost and orders users alphabetically, managers by cost", async () => {
     const result = await invoke<FunctionReturnType<typeof api.reports.getDepartmentCostReport>>(getDepartmentCostReport, fixture(role), { ...period, hourlyRate: 50 });
     expect(result.hourlyRate).toBe(visible ? 50 : null);
     expect(result.rows.map(row => row.department)).toEqual(visible
-      ? ["Ziraat", "Arge", "Sıfır", "Belirsiz"] : ["Arge", "Belirsiz", "Sıfır", "Ziraat"]);
-    expect(result.rows.map(row => row.cost)).toEqual(visible ? [1500, 750, 375, 375] : [null, null, null, null]);
+      ? ["Ziraat", "Arge", "Belirsiz", "Sıfır"] : ["Arge", "Belirsiz", "Sıfır", "Ziraat"]);
+    // Same 3.75h with 1.5 weight: 200/100/50/50 rates; equal costs follow payroll name order.
+    expect(result.rows.map(row => row.cost)).toEqual(visible ? [1125, 562.5, 281.25, 281.25] : [null, null, null, null]);
   });
   it("list/report endpoints still reject a foreign selected project", async () => {
     for (const fn of [employeesList, visitorsListPage, getPdksTableData, getMonthlyPayrollSheet, getOvertimeSummaryReport, getDepartmentCostReport]) {

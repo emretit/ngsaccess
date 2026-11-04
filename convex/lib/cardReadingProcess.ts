@@ -12,8 +12,9 @@ import { trDateKey, trDayRangeISO } from "./trDate";
 import { createShiftResolver, readDepartmentPlans } from "./shiftResolver";
 import { loadShiftVersions } from "./shiftVersions";
 import { planShiftIds } from "./shiftPlan";
-import { addWorkDate } from "./pdksWorkDay";
-import { clockMinute, flexibleExitEnd, flexibleSchedule } from "./pdksFlexible";
+import { addWorkDate, exitMayCrossMidnight } from "./pdksWorkDay";
+import { validFixedPunch } from "./pdksFixedRules";
+import { clockMinute, flexibleExitEnd, flexibleSchedule, relativeMinute, validFlexibleEntry } from "./pdksFlexible";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
@@ -43,7 +44,7 @@ const OVERNIGHT_EXIT_GRACE_MS = 4 * 60 * 60 * 1000;
 const DIRECTION_ASSIGNMENT_LIMIT = 100;
 
 /** Only the cross-day entry branch loads assignments; no shift-table scan. */
-async function directionShift(ctx: MutationCtx, employeeId: Id<"employees">, date: string): Promise<Doc<"shifts"> | null> {
+async function directionShift(ctx: MutationCtx, employeeId: Id<"employees">, date: string, currentEntry = false): Promise<Doc<"shifts"> | null> {
   const employee = await ctx.db.get(employeeId);
   if (!employee) return null;
   const assignments = await ctx.db.query("shiftAssignments")
@@ -63,7 +64,7 @@ async function directionShift(ctx: MutationCtx, employeeId: Id<"employees">, dat
   const versions = await loadShiftVersions(ctx, shifts, date);
   const resolver = createShiftResolver([employee], shifts, [applicable], departmentData.departments, departmentData.assignments, versions);
   const plan = resolver.resolvePlan(employeeId, date);
-  if (plan.kind !== "none") return plan.shifts[plan.shifts.length - 1] ?? null;
+  if (plan.kind !== "none") return plan.shifts[currentEntry ? 0 : plan.shifts.length - 1] ?? null;
   // Raw access direction keeps its legacy overnight toggle; this is not PDKS eligibility.
   return employee.shiftId ? resolver.shiftAt?.(employee.shiftId, date) ?? null : null;
 }
@@ -122,7 +123,22 @@ export async function resolveDirection(
     } else {
       const start = clockMinute(shift.startTime);
       const end = clockMinute(shift.endTime);
-      if (end >= start) return "entry";
+      if (end >= start) {
+        // A daytime shift can keep its open session into tomorrow. Its dated
+        // exit window is exact; the legacy overnight grace must not extend it.
+        if (!exitMayCrossMidnight(shift) || !shift.validWindow ||
+          !validFixedPunch(shift.validWindow, lastDate, params.nowISO, "exit")) return "entry";
+        // A missed exit must not consume today's valid entry. Resolve today's
+        // dated plan independently: it can differ from yesterday's shift.
+        const current = await directionShift(ctx, employeeId, currentDate, true);
+        const currentFlex = flexibleSchedule(current);
+        const canOpenCurrent = current && (currentFlex
+          ? validFlexibleEntry(currentFlex, relativeMinute(currentDate, params.nowISO))
+          : current.validWindow
+            ? validFixedPunch(current.validWindow, currentDate, params.nowISO, "entry")
+            : relativeMinute(currentDate, params.nowISO) >= clockMinute(current.startTime));
+        return canOpenCurrent ? "entry" : "exit";
+      }
       endMinute = 1440 + end;
     }
   } catch {

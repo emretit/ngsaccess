@@ -60,8 +60,10 @@ const reportReadings: Doc<"cardReadings">[] = ["06:00", "19:00"].map((time, i) =
 }));
 function readingContext(readings: Doc<"cardReadings">[]) {
   const user = { _id: "admin", role: "super_admin" };
+  // Bounded payroll resolution reads the same assigned shift by ID.
+  const shift = { _id: "s", projectId, name: "Plan", startTime: "09:00", endTime: "18:00" };
   const query = (table: string) => {
-    const rows = table === "cardReadings" ? readings : table === "employees" ? [reportEmployee] : table === "shifts" ? [{ _id: "s", projectId, name: "Plan", startTime: "09:00", endTime: "18:00" }] : table === "shiftAssignments" ? [{ employeeId, shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", updatedAt: "" }] : [];
+    const rows = table === "cardReadings" ? readings : table === "employees" ? [reportEmployee] : table === "shifts" ? [shift] : table === "shiftAssignments" ? [{ employeeId, shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", updatedAt: "" }] : [];
     const chain = {
       withIndex: () => chain, filter: () => chain, order: () => chain, take: async () => rows,
       [Symbol.asyncIterator]: async function* () { yield* rows; },
@@ -74,7 +76,7 @@ function readingContext(readings: Doc<"cardReadings">[]) {
     auth: { getUserIdentity: async () => ({ subject: "admin|session" }) },
     db: { query, get: async (id: string) => id === "session"
       ? { _id: "session", userId: "admin", expirationTime: Date.now() + 60_000 }
-      : id === employeeId ? reportEmployee : id === "admin" ? user : null },
+      : id === employeeId ? reportEmployee : id === "admin" ? user : id === "s" ? shift : null },
   } as unknown as QueryCtx;
 }
 async function invoke(fn: unknown, ctx: QueryCtx, args: object) {

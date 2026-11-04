@@ -65,7 +65,8 @@ it.each([false, true])("version boundary keeps old day unchanged and pairs new d
   expect(detail?.days.find(d => d.date === "2026-10-23")).toMatchObject({ totalMinutes: 420, exitNextDay: night });
   expect(payroll.rows[0]?.cells.find(d => d.date === "2026-10-23")).toMatchObject({ totalMinutes: 420, status: "present" });
   expect(report.rows[0]?.incompleteDays).toBe(0);
-  expect(sgk.rows[0]?.toplamSaat).toBe(night ? 14 : 16);
+  // RAP-002: firstLast day is 8 net hours (9 raw - 1 break), eachPunch day is 7.
+  expect(sgk.rows[0]?.toplamSaat).toBe(night ? 14 : 15);
 });
 it("open final pair propagates review to table, payroll and attendance report", async () => {
   const f = await fixture();

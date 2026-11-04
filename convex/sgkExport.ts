@@ -7,7 +7,7 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { loadRuleReportDays } from "./lib/reportAttendance";
 import { APHB_DRAFT_WARNING, buildAphbXml, sgkCodeForLeaveType } from "./lib/sgkCodes";
 import { calculateSgkEksikGun } from "./lib/sgkEksikGun";
-import { legacyAttendanceDays, legacyOvertimeMinutes } from "./lib/legacyOvertime";
+import { legacyAttendanceDays, loadPayrollReportReadings, loadPayrollReport } from "./lib/legacyOvertime";
 
 export const buildAphbForMonth = authedQuery({
   args: {
@@ -56,7 +56,9 @@ export const buildAphbForMonth = authedQuery({
     const holidayMap = new Map(
       [...globalHolidays, ...projectHolidays].map((holiday) => [holiday.date, holiday]),
     );
-    const ruleReport = await loadRuleReportDays(ctx, [targetProjectId], startDate, endDate, { preloadedEmployees: projectEmployees });
+    const sharedReadings = await loadPayrollReportReadings(ctx, [targetProjectId], startDate, endDate);
+    const ruleReport = await loadRuleReportDays(ctx, [targetProjectId], startDate, endDate, { preloadedEmployees: projectEmployees, preloadedReadings: sharedReadings });
+    const payrollRows = await loadPayrollReport(ctx, [targetProjectId], startDate, endDate, { employees: projectEmployees, planResolvers: ruleReport.planResolvers, readings: sharedReadings });
     const empIds = new Set(projectEmployees.map((employee) => employee._id));
     const employeesWithReadings = new Set<Id<"employees">>();
     const readingsByEmployee = new Map<Id<"employees">, typeof ruleReport.readings>();
@@ -72,7 +74,7 @@ export const buildAphbForMonth = authedQuery({
     const plannedDates = (employee: typeof projectEmployees[number]) => employedDates(employee).filter(date => ruleReport.hasPlan(employee, date));
     // SGK bildirimi istihdama bağlıdır: vardiyasız gün devamsızlık sayılmaz, prim gününden düşülmez.
     const employees = projectEmployees.filter(
-      (employee) => employedDuring(employee, startDate, endDate) || employeesWithReadings.has(employee._id),
+      (employee) => employee.isVisitor !== true && (employedDuring(employee, startDate, endDate) || employeesWithReadings.has(employee._id)),
     );
     const warnings: string[] = [APHB_DRAFT_WARNING];
     for (const employee of employees) {
@@ -92,11 +94,13 @@ export const buildAphbForMonth = authedQuery({
       );
       const ruleDays = ruleReport.ruleRows.get(employee._id)?.days ?? [];
       const reviewDays = ruleDays.filter(day => day.status === "incomplete" || day.status === "noData").map(day => day.date);
-      const legacyDays = legacyAttendanceDays(readingsByEmployee.get(employee._id) ?? [], ruleReport.legacyManualRecords.get(employee._id), ruleReport.workDate);
-      for (const date of legacyDays.keys()) {
-        if (employee.employmentEndDate && !employedOn(employee, date)) legacyDays.delete(date);
-      }
-      const workedDays = new Set(legacyDays.keys());
+      const payroll = payrollRows.get(employee._id);
+      const attendanceDates = new Set([
+        ...(readingsByEmployee.get(employee._id) ?? []).map(ruleReport.workDate),
+        ...(ruleReport.legacyManualRecords.get(employee._id) ?? []).filter(record => record.entryTime || record.exitTime).map(record => record.date),
+      ]);
+      const legacyDays = legacyAttendanceDays(payroll?.cells ?? [], attendanceDates);
+      const workedDays = new Set([...legacyDays.keys()].filter(date => !employee.employmentEndDate || employedOn(employee, date)));
       for (const day of ruleDays) {
         workedDays.delete(day.date);
         if (day.status === "present" || day.status === "late") workedDays.add(day.date);
@@ -123,7 +127,7 @@ export const buildAphbForMonth = authedQuery({
         cumulativeWorkdays: employee.employmentEndDate && employee.employmentEndDate < endDate
           ? Math.max(0, Math.min(30, employedDates(employee).length) - result.eksikGunSayisi)
           : result.primGunu,
-        totalOvertimeHours: (legacyOvertimeMinutes(legacyDays) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0)) / 60,
+        totalOvertimeHours: (payroll?.totals.overtimeMinutes ?? 0) / 60,
         eksikGunSayisi: result.eksikGunSayisi,
         eksikGunNedeni: result.eksikGunNedeni,
       };

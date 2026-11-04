@@ -38,22 +38,23 @@ async function fixture(checkpointMode: "all" | "selected" = "selected") {
 it("warns about reader numbers the device sends but no reader owns, within the last 7 days before today", async () => {
   const f = await fixture();
   const warnings = await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId });
-  expect(warnings).toHaveLength(1);
-  expect(warnings[0].key).toBe(`unknown:${f.deviceId}`);
-  expect(warnings[0].message).toContain("3, 4 numaralı okuyucudan");
-  expect(warnings[0].message).toContain("bugün hariç son 7 günde");
+  // This legacy selection has no saved address: uncertainty is separate from unknown traffic.
+  expect(warnings.map(w => w.key)).toEqual([`uncertain:${f.readerId}:2026-10-01`, `unknown:${f.deviceId}`]);
+  const unknown = warnings.find(w => w.key === `unknown:${f.deviceId}`);
+  expect(unknown?.message).toContain("3, 4 numaralı okuyucudan");
+  expect(unknown?.message).toContain("bugün hariç son 7 günde");
 });
 
 it("warns when a selected reader is deleted, moved or has no number", async () => {
   const f = await fixture();
   await f.t.run(async ctx => { await ctx.db.patch(f.readerId, { hikReaderNo: undefined }); });
-  expect((await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId })).map(w => w.key)).toEqual([`number:${f.readerId}`]);
+  expect((await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId })).map(w => w.key)).toEqual([`uncertain:${f.readerId}:2026-10-01`, `number:${f.readerId}`]);
   await f.t.run(async ctx => { await ctx.db.patch(f.readerId, { hikReaderNo: 2, doorId: await ctx.db.insert("doors", { projectId: f.projectId, deviceId: f.deviceId, name: "Yan kapı" }) }); });
-  expect((await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId })).map(w => w.key)).toEqual([`moved:${f.readerId}:2026-10-01`]);
+  expect((await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId })).map(w => w.key)).toEqual([`uncertain:${f.readerId}:2026-10-01`, `moved:${f.readerId}:2026-10-01`]);
   await f.t.run(async ctx => { await ctx.db.delete(f.readerId); });
   const warnings = await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId });
-  expect(warnings.map(w => w.key)).toEqual([`moved:${f.readerId}:2026-10-01`]);
-  expect(warnings[0].message).toContain("silinmiş ya da başka kapıya taşınmış");
+  expect(warnings.map(w => w.key)).toEqual([`uncertain:${f.readerId}:2026-10-01`, `moved:${f.readerId}:2026-10-01`]);
+  expect(warnings.find(w => w.key.startsWith("moved:"))?.message).toContain("silinmiş ya da başka kapıya taşınmış");
 });
 
 it("stays silent when no reader is selected", async () => {
@@ -84,6 +85,30 @@ it("other devices' traffic and other projects' readers do not hide an unknown nu
     await ctx.db.insert("readers", { projectId: foreign, deviceId: f.deviceId, doorId: foreignDoor, name: "Yabancı", direction: "entry", hikReaderNo: 3, createdAt: "", updatedAt: "" });
   });
   const warnings = await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId });
-  expect(warnings.map(w => w.key)).toEqual([`unknown:${f.deviceId}`]);
-  expect(warnings[0].message).toContain("3, 4 numaralı okuyucudan");
+  expect(warnings.map(w => w.key)).toEqual([`uncertain:${f.readerId}:2026-10-01`, `unknown:${f.deviceId}`]);
+  expect(warnings.find(w => w.key.startsWith("unknown:"))?.message).toContain("3, 4 numaralı okuyucudan");
+});
+
+
+it("N3-02: warns once for addressless historical versions even when the current rule selects all", async () => {
+  const f = await fixture();
+  await f.t.run(async ctx => {
+    await ctx.db.insert("pdksRuleVersions", { projectId: f.projectId, effectiveFrom: "2026-10-20", punchMode: "legacy", checkpointMode: "all", createdAt: "", createdBy: f.userId });
+    await ctx.db.delete(f.readerId);
+  });
+  const warnings = await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId });
+  expect(warnings).toEqual([{ key: "history:uncertain", message: expect.stringContaining("geçmiş günler") }]);
+});
+
+
+it("N3-02: historical saved addresses remain certain after reader deletion", async () => {
+  const f = await fixture();
+  await f.t.run(async ctx => {
+    const old = await ctx.db.query("pdksCheckpointSelections").first();
+    if (!old) throw new Error("Seçim bulunamadı");
+    await ctx.db.patch(old._id, { hikReaderNo: 2 });
+    await ctx.db.insert("pdksRuleVersions", { projectId: f.projectId, effectiveFrom: "2026-10-20", punchMode: "legacy", checkpointMode: "all", createdAt: "", createdBy: f.userId });
+    await ctx.db.delete(f.readerId);
+  });
+  expect(await f.caller.query(api.pdksRules.getCheckpointWarnings, { projectId: f.projectId })).toEqual([]);
 });

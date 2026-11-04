@@ -7,6 +7,7 @@ import { legalBreakMinutes } from "./breakDeduction";
 import { minutesBetweenISO } from "./pdksCalc";
 import {
   DEFAULT_OVERTIME_RATES,
+  HALF_DAY_HOLIDAY_START_MINUTES,
   isoTimeToTRMinutes,
   multiplierForClassification,
   parseHHMM,
@@ -132,14 +133,13 @@ export function computePdksDay(params: {
     evidence.attendanceCredit = false;
     evidence.lastISO = null;
   }
-  const firstISO = evidence ? evidence.firstISO : manual?.entryTime
-    ? (manualTimes.entryISO ?? null)
-    : (rawEntry ?? null);
-  const lastISO = evidence ? evidence.lastISO :
-    manualTimes.exitISO ??
-    (readings.length > 1
-      ? (readings[readings.length - 1]?.accessTime ?? null)
-      : null);
+  // Legacy uses the shared endpoints, while retaining its existing undefined
+  // attendance decision (the table's legacy absence rules depend on that).
+  const endpoints = evidence ?? resolveAttendanceEvidence(readings, {
+    entryISO: manual?.entryTime ? manualTimes.entryISO : undefined,
+    exitISO: manualTimes.exitISO,
+  }, params.policy ?? LEGACY_PDKS_POLICY);
+  const { firstISO, lastISO } = endpoints;
   const origin = new Date(`${date}T00:00:00.000+03:00`).getTime();
   const entry = firstISO
     ? Math.floor((new Date(firstISO).getTime() - origin) / 60000)
@@ -204,13 +204,14 @@ export function computePdksDay(params: {
   };
   const wholeMinutes = eachPunch ? Math.floor : Math.round;
   const holidayFor = (holiday: Doc<"holidays"> | null | undefined) => shift?.holidayWorkRequired ? undefined : holiday;
-  // shiftStart anchors classification; splitAtMidnight uses the following date's plan.
+  // The cell keeps its day classification; payable portions can have different classes.
   const classify = (dayKind: "rest" | "work" | undefined, holiday: Doc<"holidays"> | null | undefined) => {
     const effectiveHoliday = holidayFor(holiday);
     return effectiveHoliday ? effectiveHoliday.isHalfDay ? "halfDayHoliday" as const : "holiday" as const
       : dayKind === "rest" ? "weekend" as const : "workday" as const;
   };
   const classification = classify(params.dayKind, params.holiday);
+  const holidayOn = (calendarDate: string) => holidayFor(calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate));
   const requiredNetMinutes = flex ? params.hasLeave || classification === "weekend" || classification === "holiday" ? 0 : classification === "halfDayHoliday" ? flex.requiredNetMinutes / 2 : flex.requiredNetMinutes : undefined;
   const shiftStart = parseHHMM(shift?.startTime ?? workSettings.workStartTime);
   const shiftEnd =
@@ -244,15 +245,29 @@ export function computePdksDay(params: {
   }
   for (let midnight = (Math.floor(interval.start / 1440) + 1) * 1440;
     midnight < interval.end; midnight += 1440) addBoundary(midnight);
+  // Half holidays are calendar windows, never an entire shift-start day.
+  // Honor their actual date even when ordinary night shifts use shiftStart.
+  const splitAtMidnight = rates.nightShiftDayMode === "splitAtMidnight";
+  for (let offset = Math.floor(interval.start / 1440); offset * 1440 < interval.end; offset++) {
+    if (!holidayOn(addWorkDate(date, offset))?.isHalfDay) continue;
+    addBoundary(offset * 1440 + HALF_DAY_HOLIDAY_START_MINUTES);
+  }
   const points = [...boundaries].sort((a, b) => a - b);
   const portions = points.slice(1).map((end, index) => {
     const start = points[index];
     const window = { start, end };
     const calendarDate = addWorkDate(date, Math.floor(start / 1440));
-    const cls = rates.nightShiftDayMode === "splitAtMidnight"
-      ? classify(calendarDate === date ? params.dayKind : params.nextDayKind, calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate))
+    const dayKind = calendarDate === date ? params.dayKind : params.nextDayKind;
+    const calendarHoliday = holidayOn(calendarDate);
+    const portionHoliday = calendarHoliday?.isHalfDay && start - Math.floor(start / 1440) * 1440 < HALF_DAY_HOLIDAY_START_MINUTES
+      ? undefined : calendarHoliday;
+    // A half-holiday start day expires at midnight. An upcoming half holiday
+    // overrides shiftStart only in its afternoon window, never in its morning.
+    const splitCalendarDay = splitAtMidnight || classification === "halfDayHoliday" || portionHoliday?.isHalfDay === true;
+    const cls = splitCalendarDay
+      ? classify(dayKind, portionHoliday)
       : classification;
-    const premium = cls === "weekend" || cls === "holiday";
+    const premium = cls === "weekend" || cls === "holiday" || cls === "halfDayHoliday";
     const isNight = nightWindows.some((night) => overlap(window, night) > 0);
     const dayMultiplier = multiplierForClassification(cls, rates);
     // Round cumulative boundaries, rather than each portion independently, so
@@ -277,7 +292,7 @@ export function computePdksDay(params: {
         : dayMultiplier,
       eligible: shift?.overtimeEnabled !== false,
       // A split shift's post-midnight minutes belong to that calendar week.
-      calendarDate: rates.nightShiftDayMode === "splitAtMidnight" ? calendarDate : date,
+      calendarDate: splitCalendarDay ? calendarDate : date,
       isNight,
     };
   });
@@ -323,6 +338,9 @@ export function computePdksDay(params: {
     (fixedRules?.absentAfterLateMinutes !== undefined && lateMinutes > fixedRules.absentAfterLateMinutes) ||
     (shift.minWorkMinutes !== undefined && (evidence?.durationMeasured ?? (!!firstISO && !!lastISO)) && totalMinutes < shift.minWorkMinutes)
   );
+  const requirementMinutes = flex && classification === "halfDayHoliday"
+    ? portions.reduce((sum, portion) => sum + (portion.classification === "workday" || portion.classification === "weekend" ? portion.netMinutes : 0), 0)
+    : totalMinutes;
   const attendanceDecision = fixedEvidence?.outsideWindow ? "incomplete" as const
     : absentByFixedRule && evidence ? "absent" as const : evidence?.decision;
   return {
@@ -331,8 +349,8 @@ export function computePdksDay(params: {
     ...(flex ? {
       scheduleType: "flexible" as const,
       requiredNetMinutes,
-      shortfallMinutes: evidence?.durationMeasured ? Math.max(0, (requiredNetMinutes ?? 0) - totalMinutes) : requiredNetMinutes === 0 ? 0 : null,
-      excessMinutes: evidence?.durationMeasured ? Math.max(0, totalMinutes - (requiredNetMinutes ?? 0)) : 0,
+      shortfallMinutes: evidence?.durationMeasured ? Math.max(0, (requiredNetMinutes ?? 0) - requirementMinutes) : requiredNetMinutes === 0 ? 0 : null,
+      excessMinutes: evidence?.durationMeasured ? Math.max(0, requirementMinutes - (requiredNetMinutes ?? 0)) : 0,
       pendingUntil: flexiblePendingUntil(flex, date, firstISO),
       leaveWorkWarning: !!params.hasLeave && (!!firstISO || !!lastISO),
     } : {}),

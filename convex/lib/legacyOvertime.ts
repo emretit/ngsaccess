@@ -1,59 +1,51 @@
-import { bucketWeeklyOvertime } from "./overtimeCalc";
-import { addWorkDate, manualPdksTimes } from "./pdksWorkDay";
-import { trDateKey } from "./trDate";
+import type { Doc, Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
+import type { ShiftResolver } from "./shiftResolver";
+import { loadPayrollPeriod, type PayrollReadings } from "./pdksPayrollQuery";
 
-type LegacyReading = { accessTime: string; direction?: string };
-type ManualDay = { date: string; entryTime?: string; exitTime?: string };
+import { addWorkDate, pdksWorkDayRange } from "./pdksWorkDay";
 
-/** Legacy first/last duration, with each supplied manual time overriding that endpoint. */
-export function legacyAttendanceDays<T extends LegacyReading>(
-  readings: readonly T[],
-  manual: readonly ManualDay[] = [],
-  workDate: (reading: T) => string = reading => trDateKey(reading.accessTime),
-): Map<string, number> {
-  const byDate = new Map<string, T[]>();
-  for (const reading of readings) {
-    const date = workDate(reading);
-    const times = byDate.get(date) ?? [];
-    times.push(reading);
-    byDate.set(date, times);
-  }
-  const overrides = new Map(manual.map(record => [record.date, record]));
-  for (const record of manual) {
-    if (record.entryTime || record.exitTime) {
-      if (!byDate.has(record.date)) byDate.set(record.date, []);
-    }
-  }
-  return new Map([...byDate].map(([date, times]) => {
-    times.sort((a, b) => Date.parse(a.accessTime) - Date.parse(b.accessTime));
-    const record = overrides.get(date);
-    const manualTimes = manualPdksTimes(date, record, null);
-    // Legacy manual pairs have no assigned shift to supply their midnight rollover.
-    if (record?.entryTime && record.exitTime && record.exitTime <= record.entryTime) {
-      manualTimes.exitISO = `${addWorkDate(date, 1)}T${record.exitTime}:00.000+03:00`;
-    }
-    const single = times.length === 1 ? times[0] : undefined;
-    // A lone raw punch may supply only the opposite manual endpoint. Unknown
-    // direction is usable when its timestamp unambiguously follows/precedes it.
-    const rawEntry = single && manualTimes.exitISO && !manualTimes.entryISO
-      ? single.direction !== "exit" && Date.parse(single.accessTime) < Date.parse(manualTimes.exitISO) ? single.accessTime : undefined
-      : times[0]?.accessTime;
-    const rawExit = single && manualTimes.entryISO && !manualTimes.exitISO
-      ? single.direction !== "entry" && Date.parse(single.accessTime) > Date.parse(manualTimes.entryISO) ? single.accessTime : undefined
-      : times.length > 1 ? times[times.length - 1]?.accessTime : undefined;
-    const first = manualTimes.entryISO ?? rawEntry;
-    const last = manualTimes.exitISO ?? rawExit;
-    const duration = first && last ? Math.floor((Date.parse(last) - Date.parse(first)) / 60000) : 0;
-    return [date, Number.isFinite(duration) ? Math.max(0, duration) : 0];
-  }));
+/** One bounded raw project scan shared by the SGK day and payroll adapters.
+ * Eight preceding days cover ISO-week settlement, split Sunday and flexible entry.
+ * Each consumer still applies its own date and policy boundaries. */
+export async function loadPayrollReportReadings(ctx: QueryCtx, projectIds: Id<"projects">[], startDate: string, endDate: string): Promise<PayrollReadings> {
+  const range = pdksWorkDayRange(addWorkDate(startDate, -8), endDate);
+  const lists = await Promise.all(projectIds.map(projectId => ctx.db.query("cardReadings")
+    .withIndex("by_project_access_time", q => q.eq("projectId", projectId).gte("accessTime", range.startISO).lte("accessTime", range.endISO)).take(20001)));
+  if (lists.some(readings => readings.length > 20000)) throw new Error("Rapor okuma sınırı aşıldı; tarih aralığını daraltın");
+  return { ...range, readings: lists.flat() };
 }
 
-/** Dates are Europe/Istanbul calendar dates; partial weeks retain the full 45-hour threshold. */
-export function legacyOvertimeMinutes(days: ReadonlyMap<string, number>, singleDayStandard = true): number {
-  if (singleDayStandard && days.size <= 1) {
-    return Math.max(0, [...days.values()].reduce((sum, minutes) => sum + minutes, 0) - 8 * 60);
-  }
-  // Legacy days have no holiday premium classification. Only their calendar week matters.
-  return bucketWeeklyOvertime([...days].map(([date, netMinutes]) => ({ date, netMinutes, classification: "workday" })))
-    .reduce((sum, week) => sum + week.overtimeMinutes, 0);
+type PayrollRow = Awaited<ReturnType<typeof loadPayrollPeriod>>["rows"][number];
+
+/** Legacy report membership is retained, but durations come from payroll's net cells.
+ * No report-specific break, daily threshold or weekly settlement is applied here. */
+export function legacyAttendanceDays(
+  cells: readonly Pick<PayrollRow["cells"][number], "date" | "noShift" | "totalMinutes">[],
+  attendanceDates: ReadonlySet<string>,
+): Map<string, number> {
+  const byDate = new Map(cells.filter(cell => !cell.noShift).map(cell => [cell.date, cell.totalMinutes]));
+  return new Map([...attendanceDates].map(date => [date, byDate.get(date) ?? 0]));
+}
+
+/** One settlement per project and period, also for annual summaries spanning month boundaries. */
+export async function loadPayrollReport(
+  ctx: QueryCtx & { user: Doc<"users"> }, projectIds: Id<"projects">[], startDate: string, endDate: string,
+  preloaded: { employees?: Doc<"employees">[]; planResolvers?: ReadonlyMap<Id<"projects">, ShiftResolver>; readings?: PayrollReadings } = {},
+) {
+  const rows = (await Promise.all(projectIds.map(async projectId => {
+    const result = await loadPayrollPeriod(ctx, { projectId, startDate, endDate }, undefined, {
+      employees: preloaded.employees?.filter(employee => employee.projectId === projectId),
+      shiftResolver: preloaded.planResolvers?.get(projectId),
+      readings: preloaded.readings,
+    });
+    return result.rows.map(row => ({ ...row, projectId }));
+  }))).flat();
+  return new Map(rows.map(row => [row.employeeId, row]));
+}
+
+/** An optional report rate changes only the hourly amount, never the engine's weights. */
+export function payrollOvertimeCost(row: PayrollRow, hourlyRate: number | null): number | null {
+  if (hourlyRate === null) return null;
+  return row.cells.reduce((sum, cell) => sum + cell.overtimeMinutes * cell.multiplier / 60 * hourlyRate, 0);
 }

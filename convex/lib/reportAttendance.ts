@@ -216,6 +216,15 @@ export function toReportTransactionRow(
 /** Versioned report adapter. Legacy report rows keep their existing aggregations. */
 export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects">[], startDate: string, endDate: string, options: { includeLegacyReadings?: boolean; preloadedEmployees?: Doc<"employees">[]; shiftResolver?: ShiftResolver; preloadedReadings?: { readings: readonly Doc<"cardReadings">[]; startISO: string; endISO: string } } = {}) {
   const policies = await loadPdksPolicies(ctx, projectIds, addWorkDate(startDate, -7), addWorkDate(endDate, 1));
+  const readLegacyRange = async (ids: Id<"projects">[], from: string, to: string) => {
+    const preloaded = options.preloadedReadings;
+    if (preloaded && preloaded.startISO <= from && preloaded.endISO >= to) {
+      const raw = preloaded.readings.filter(reading => reading.projectId !== undefined && ids.includes(reading.projectId)
+        && reading.accessTime >= from && reading.accessTime <= to);
+      return filterPdksReadings(raw, undefined, reading => policies(reading.projectId, trDateKey(reading.accessTime)));
+    }
+    return readReportReadings(ctx, ids, from, to, { policies, workDate: r => trDateKey(r.accessTime) });
+  };
   const dates = buildPeriodDateKeys(startDate, endDate);
   const activeProjects = projectIds.filter(id => hasVersionedPdksPolicy(policies, id, addWorkDate(startDate, -1), endDate));
   const ruleEmployees = new Map<Id<"employees">, Doc<"employees">>();
@@ -246,7 +255,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
   const legacyProjects = projectIds.filter(id => !managedProjects.includes(id));
   if (options.includeLegacyReadings !== false && legacyProjects.length) {
     const { startISO, endISO } = trDayRangeISO(startDate, endDate);
-    const readings = await readReportReadings(ctx, legacyProjects, startISO, endISO, { policies, workDate: r => trDateKey(r.accessTime) });
+    const readings = await readLegacyRange(legacyProjects, startISO, endISO);
     for (const id of legacyProjects) readingsByProject.set(id, readings.filter(r => r.projectId === id));
     for (const projectId of legacyProjects) {
       const employees = discoveryEmployees.get(projectId) ?? await ctx.db.query("employees")
@@ -276,7 +285,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     if (!planned && !flexible && !fixedRules && !activeProjects.includes(projectId)) {
       if (options.includeLegacyReadings !== false) {
         const legacyRange = trDayRangeISO(startDate, endDate);
-        const readings = await readReportReadings(ctx, [projectId], legacyRange.startISO, legacyRange.endISO, { policies, workDate: r => trDateKey(r.accessTime) });
+        const readings = await readLegacyRange([projectId], legacyRange.startISO, legacyRange.endISO);
         readingsByProject.set(projectId, readings);
         for (const employee of allEmployees.filter(e => employedDuring(e, startDate, endDate))) {
           rememberLegacyManual(employee, earlyManual?.get(employee._id) ?? await readReportManualRecords(ctx, employee._id, startDate, endDate));
@@ -389,7 +398,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     const employee = reading.employeeId ? planById.get(reading.employeeId) : planByCard.get(`${reading.projectId}__${reading.cardNo}`);
     return employee !== undefined && hasPlan(employee, dateFor(reading));
   });
-  return { policies, workDate: dateFor, managesReading, hasPlan, planResolvers,
+  return { policies, workDate: dateFor, managesReading, hasPlan, planResolvers, employees: planEmployees,
     manualEntryFor: (id: Id<"employees">, date: string) => manualEntriesByEmployee.get(`${id}__${date}`)?.entryTime,
     legacyManualRecords, reportEmployees: new Map([...legacyEmployees, ...ruleEmployees]),
     ruleRows: result, ruleEmployees, readings: plannedReadings };

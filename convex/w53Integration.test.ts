@@ -194,7 +194,7 @@ it("projectId'siz esnek tanımı keşif kapısından geçer; tablo/rapor/mobil a
   expect((await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date })).totals.pdksPresentDays).toBe(1);
 });
 
-it("aynı legacy projedeki sabit vardiyanın takvim günleri ve brüt eski SGK hesabı korunur", async () => {
+it("aynı legacy projedeki sabit gece vardiyası SGK süresini net bordro hesabından alır", async () => {
   const f = await fixture(false);
   await f.add("09:00", "entry");
   await f.add("16:00", "exit");
@@ -207,7 +207,9 @@ it("aynı legacy projedeki sabit vardiyanın takvim günleri ve brüt eski SGK h
   const sgk = await f.caller.query(api.reports.getSgkMonthlyReport, { projectId: f.projectId, year: 2026, month: 6 });
   expect(sgk.rows).toHaveLength(2);
   expect(sgk.rows.find(row => row.adSoyad === "Ada Test")).toMatchObject({ calismaGunu: 1, toplamSaat: 6 });
-  expect(sgk.rows.find(row => row.adSoyad === "Sabit Test")).toMatchObject({ calismaGunu: 2, toplamSaat: 0 });
+  // RAP-002: payroll pairs 22–06 on its work date: 8 raw hours - 1 break = 7 net.
+  // Legacy attendance membership stays unchanged; RAP-004 is outside this change.
+  expect(sgk.rows.find(row => row.adSoyad === "Sabit Test")).toMatchObject({ calismaGunu: 2, toplamSaat: 7 });
 });
 
 it("legacy manuel kayıtlar sınırlı okunur; esnekte yalnız gerekli indeksli yüklemeler", async () => {

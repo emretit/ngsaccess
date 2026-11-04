@@ -52,6 +52,9 @@ export const DEFAULT_OVERTIME_RATES: EffectiveOvertimeRates = {
 
 export const DEFAULT_WEEKEND_DAYS = ["Cumartesi", "Pazar"];
 
+// 2429 sayılı Kanun: 28 Ekim ve bayram arifelerinde tatil Türkiye saatiyle 13:00'te başlar.
+export const HALF_DAY_HOLIDAY_START_MINUTES = 13 * 60;
+
 export async function getEffectiveWorkSettings(
   ctx: QueryCtx | MutationCtx,
   projectId: Id<"projects"> | undefined

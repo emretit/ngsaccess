@@ -141,12 +141,15 @@ export function createShiftResolver(employees: Doc<"employees">[], allShifts: Do
         : filled.every(slot => slot.length === first.length && slot.every(id => first.includes(id))) ? first : [];
       const context = contextIds.map(id => shiftAt(id, date));
       const shifts = context.some(shift => shift === undefined) ? []
-        : context.filter((shift): shift is Doc<"shifts"> => shift !== undefined);
+        : context.filter((shift): shift is Doc<"shifts"> => shift !== undefined)
+          .sort((a, b) => a.startTime.localeCompare(b.startTime));
       return { kind: "rest", shifts, ...source, calendar: "plan", origin };
     }
     const shifts = ids.map(id => shiftAt(id, date));
     if (shifts.some(shift => shift === undefined)) return null;
-    return { kind: "shifts", shifts: shifts.filter((shift): shift is Doc<"shifts"> => shift !== undefined), ...source,
+    // Stored order can predate a timing change; sort only after resolving this date's versions.
+    return { kind: "shifts", shifts: shifts.filter((shift): shift is Doc<"shifts"> => shift !== undefined)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime)), ...source,
       calendar: "plan", origin };
   }
   function uncached(employeeId: Id<"employees">, date: string): DayPlan {

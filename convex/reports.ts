@@ -5,16 +5,10 @@ import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { resolveReportScope, reportPeriod, resolveScheduleScope } from "./lib/reportScope";
 import { loadAttendanceReport, loadRuleReportDays } from "./lib/reportAttendance";
-import {
-  getEffectiveWorkSettings,
-  resolveHourlyRate,
-  overtimePayTRY,
-} from "./lib/pdksHelpers";
-
 import { buildPeriodDateKeys } from "./lib/pdksCalc";
-import { legacyAttendanceDays, legacyOvertimeMinutes } from "./lib/legacyOvertime";
+import { legacyAttendanceDays, loadPayrollReportReadings, loadPayrollReport, payrollOvertimeCost } from "./lib/legacyOvertime";
 
-const LEGACY_REPORT_RELIABILITY_NOTE = "Güvenilirlik sınırı: Bu rapor okuma ve manuel PDKS kayıtlarından üretilir; kayıtsız personel bu özete dahil değildir. Eski kurallı günlerde ilk–son süre kullanılır: tek günlük veride 8 saat, birden çok günde takvim haftası başına 45 saat eşiği uygulanır; dönem dışındaki günler hesaba katılmaz. Bordro doğrulaması yerine kullanılmamalıdır.";
+const LEGACY_REPORT_RELIABILITY_NOTE = "Güvenilirlik sınırı: Süre ve fazla mesai, bordroyla aynı mola ve dönem hesabından üretilir. Eksik veya inceleme bekleyen kayıtlar bildirimden önce doğrulanmalıdır; bu özet resmi SGK bildirimi değildir.";
 
 /**
  * SGK aylık döküm raporu - çalışan başına toplam gün, saat, fazla mesai, izin
@@ -36,21 +30,28 @@ export const getSgkMonthlyReport = authedQuery({
 
 
     const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
-    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
+    const sharedReadings = await loadPayrollReportReadings(ctx, projectIds, startDate, endDate);
+    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate, { preloadedReadings: sharedReadings });
+    const payrollRows = await loadPayrollReport(ctx, projectIds, startDate, endDate, { employees: ruleReport.employees, planResolvers: ruleReport.planResolvers, readings: sharedReadings });
     const readings = ruleReport.readings;
 
     readings.sort(
       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
     );
 
+    const employeesById = new Map(ruleReport.employees.map(employee => [employee._id, employee]));
+    const employeesByCard = new Map(ruleReport.employees.map(employee => [`${employee.projectId}:${employee.cardNumber}`, employee]));
     const employeeMap = new Map<string, typeof readings>();
     for (const r of readings) {
+      const employee = r.employeeId ? employeesById.get(r.employeeId) : employeesByCard.get(`${r.projectId}:${r.cardNo}`);
+      if (employee?.isVisitor === true) continue;
       const key = `${r.projectId}:${r.employeeId ?? r.cardNo}`;
       if (!employeeMap.has(key)) employeeMap.set(key, []);
       employeeMap.get(key)?.push(r);
     }
 
     for (const [id, employee] of ruleReport.reportEmployees) {
+      if (employee.isVisitor === true) continue;
       const key = `${employee.projectId}:${id}`;
       if (!employeeMap.has(key)) employeeMap.set(key, []);
     }
@@ -63,6 +64,7 @@ export const getSgkMonthlyReport = authedQuery({
         const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
         const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
         const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
+        if (employee?.isVisitor === true) return null;
         const foundDepartment = employee?.departmentId
           ? await ctx.db.get(employee.departmentId)
           : null;
@@ -90,14 +92,18 @@ export const getSgkMonthlyReport = authedQuery({
 
         const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
 
-        const dayReadingsMap = legacyAttendanceDays(granted, empId ? ruleReport.legacyManualRecords.get(empId) : [], ruleReport.workDate);
-        let totalMinutes = [...dayReadingsMap.values()].reduce((sum, minutes) => sum + minutes, 0);
-
+        const payroll = empId ? payrollRows.get(empId) : undefined;
+        const attendanceDates = new Set([
+          ...granted.map(ruleReport.workDate),
+          ...(empId ? ruleReport.legacyManualRecords.get(empId) ?? [] : [])
+            .filter(record => record.entryTime || record.exitTime).map(record => record.date),
+        ]);
+        const dayReadingsMap = legacyAttendanceDays(payroll?.cells ?? [], attendanceDates);
         const ruleDays = empId ? ruleReport.ruleRows.get(empId)?.days ?? [] : [];
-        totalMinutes += ruleDays.reduce((sum, day) => sum + day.totalMinutes, 0);
+        const totalMinutes = payroll?.totals.totalMinutes ?? 0;
         const incompleteDays = ruleDays.filter(day => day.status === "incomplete").length;
         const workDays = dayReadingsMap.size + ruleDays.filter(day => day.status === "present" || day.status === "late").length;
-        const overtimeMinutes = legacyOvertimeMinutes(dayReadingsMap) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
+        const overtimeMinutes = payroll?.totals.overtimeMinutes ?? 0;
 
         const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
         const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
@@ -123,7 +129,7 @@ export const getSgkMonthlyReport = authedQuery({
       month,
       startDate,
       endDate,
-      rows: reportRows.sort((a, b) => a.adSoyad.localeCompare(b.adSoyad)),
+      rows: reportRows.filter((row): row is NonNullable<typeof row> => row !== null).sort((a, b) => a.adSoyad.localeCompare(b.adSoyad)),
     };
   },
 });
@@ -152,73 +158,23 @@ export const getOvertimeSummaryReport = authedQuery({
       : `${year}-12-31`;
 
 
-    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
-    const readings = ruleReport.readings;
-
-    const employeeMap = new Map<string, typeof readings>();
-    for (const r of readings) {
-      const key = `${r.projectId}:${r.employeeId ?? r.cardNo}`;
-      if (!employeeMap.has(key)) employeeMap.set(key, []);
-      employeeMap.get(key)?.push(r);
-    }
-
-
-    for (const [id, employee] of ruleReport.reportEmployees) {
-      const key = `${employee.projectId}:${id}`;
-      if (!employeeMap.has(key)) employeeMap.set(key, []);
-    }
+    const payrollRows = await loadPayrollReport(ctx, projectIds, startDate, endDate);
     let totalOvertimeHours = 0;
     let totalOvertimePayTRY = 0;
-    const rows: {
-      employeeId: string;
-      name: string;
-      department: string;
-      overtimeHours: number;
-      overtimePayTRY: number | null;
-    }[] = [];
-
-    for (const [empKey, empReadings] of employeeMap) {
-      const fallback = [...ruleReport.reportEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
-      const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
-      const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
-      const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
-      const foundDepartment = employee?.departmentId
-        ? await ctx.db.get(employee.departmentId)
-        : null;
-      const department = foundDepartment?.projectId === first.projectId ? foundDepartment : null;
-      const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
-
-      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
-      const dayReadingsMap = legacyAttendanceDays(granted, employee ? ruleReport.legacyManualRecords.get(employee._id) : [], ruleReport.workDate);
-
-      const ruleDays = employee ? ruleReport.ruleRows.get(employee._id)?.days ?? [] : [];
-      const overtimeMinutes = legacyOvertimeMinutes(dayReadingsMap) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
-      const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
+    const rows = [...payrollRows.values()].map(row => {
+      const overtimeHours = Math.round(row.totals.overtimeMinutes / 60 * 10) / 10;
+      const pay = row.totals.overtimePayTRY;
+      const payRounded = pay === null ? null : Math.round(pay * 100) / 100;
       totalOvertimeHours += overtimeHours;
-
-      const empHourlyRate = await canSeePayInProject(ctx, ctx.user, first.projectId) && employee
-        ? resolveHourlyRate({
-            hourlyRate: employee.hourlyRate,
-            monthlySalary: employee.monthlySalary,
-            monthlyHoursBase: workSettings.monthlyHoursBase,
-          })
-        : null;
-      const payTRY = overtimePayTRY({
-        overtimeMinutes,
-        multiplier: workSettings.overtimeMultiplier,
-        hourlyRate: empHourlyRate,
-      });
-      const payRounded = payTRY !== null ? Math.round(payTRY * 100) / 100 : null;
-      if (payRounded !== null) totalOvertimePayTRY += payRounded;
-
-      rows.push({
-        employeeId: empKey,
-        name: first.employeeName ?? (employee ? `${employee.firstName} ${employee.lastName}` : "Bilinmiyor"),
-        department: department?.name ?? "Bilinmiyor",
+      totalOvertimePayTRY += payRounded ?? 0;
+      return {
+        employeeId: `${row.projectId}:${row.employeeId}`,
+        name: row.name,
+        department: row.department,
         overtimeHours,
         overtimePayTRY: payRounded,
-      });
-    }
+      };
+    });
 
     return {
       scopeLabel,
@@ -267,69 +223,24 @@ export const getDepartmentCostReport = authedQuery({
     const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
     const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(new Date(args.year, args.month, 0).getDate()).padStart(2, "0")}`;
 
-    const ruleReport = await loadRuleReportDays(ctx, projectIds, startDate, endDate);
-    const readings = ruleReport.readings;
-
-    const employeeMap = new Map<string, typeof readings>();
-    for (const r of readings) {
-      const key = `${r.projectId}:${r.employeeId ?? r.cardNo}`;
-      if (!employeeMap.has(key)) employeeMap.set(key, []);
-      employeeMap.get(key)?.push(r);
-    }
-
-    for (const [id, employee] of ruleReport.reportEmployees) {
-      const key = `${employee.projectId}:${id}`;
-      if (!employeeMap.has(key)) employeeMap.set(key, []);
-    }
+    const payrollRows = await loadPayrollReport(ctx, projectIds, startDate, endDate);
     const fallbackRate = args.hourlyRate;
     const byDept = new Map<
       string,
       { overtimeHours: number; cost: number; employeeCount: number; payVisible: boolean }
     >();
-
-    for (const [empKey, empReadings] of employeeMap) {
-      const fallback = [...ruleReport.reportEmployees.values()].find(e => `${e.projectId}:${e._id}` === empKey);
-      const first = empReadings[0] ?? { employeeId: fallback?._id, projectId: fallback?.projectId, cardNo: fallback?.cardNumber ?? "", employeeName: undefined };
-      const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
-      const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
-      const foundDepartment = employee?.departmentId
-        ? await ctx.db.get(employee.departmentId)
-        : null;
-      const department = foundDepartment?.projectId === first.projectId ? foundDepartment : null;
-      const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
-      const deptName = department?.name ?? "Belirtilmemiş";
-
-      const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi" && !ruleReport.managesReading(r));
-      const dayReadingsMap = legacyAttendanceDays(granted, employee ? ruleReport.legacyManualRecords.get(employee._id) : [], ruleReport.workDate);
-
-      const ruleDays = employee ? ruleReport.ruleRows.get(employee._id)?.days ?? [] : [];
-      const overtimeMinutes = legacyOvertimeMinutes(dayReadingsMap) + ruleDays.reduce((sum, day) => sum + day.overtimeMinutes, 0);
-      const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
-
-      if (overtimeHours > 0) {
-        const rowPayVisible = await canSeePayInProject(ctx, ctx.user, first.projectId);
-        const empRate = rowPayVisible ? (
-          (employee
-            ? resolveHourlyRate({
-                hourlyRate: employee.hourlyRate,
-                monthlySalary: employee.monthlySalary,
-                monthlyHoursBase: workSettings.monthlyHoursBase,
-              })
-            : null) ?? fallbackRate ?? null) : null;
-        const payTRY = overtimePayTRY({
-          overtimeMinutes,
-          multiplier: workSettings.overtimeMultiplier,
-          hourlyRate: empRate,
-        });
-
-        const existing =
-          byDept.get(deptName) ?? { overtimeHours: 0, cost: 0, employeeCount: 0, payVisible: true };
-        existing.payVisible = existing.payVisible && rowPayVisible;
-        existing.overtimeHours += overtimeHours;
-        existing.cost += payTRY ?? 0;
-        existing.employeeCount += 1;
-        byDept.set(deptName, existing);
-      }
+    for (const row of payrollRows.values()) {
+      const overtimeHours = Math.round(row.totals.overtimeMinutes / 60 * 10) / 10;
+      if (overtimeHours <= 0) continue;
+      const rowPayVisible = await canSeePayInProject(ctx, ctx.user, row.projectId);
+      const empRate = rowPayVisible ? row.hourlyRate ?? fallbackRate ?? null : null;
+      const payTRY = payrollOvertimeCost(row, empRate);
+      const existing = byDept.get(row.department) ?? { overtimeHours: 0, cost: 0, employeeCount: 0, payVisible: true };
+      existing.payVisible = existing.payVisible && rowPayVisible;
+      existing.overtimeHours += overtimeHours;
+      existing.cost += payTRY ?? 0;
+      existing.employeeCount += 1;
+      byDept.set(row.department, existing);
     }
 
     const rows = Array.from(byDept.entries()).map(([name, data]) => ({
