@@ -9,7 +9,7 @@
 - [x] Koordinatör sentezi (bu dosya)
 
 ### Faz 1 — Emre kararları (BİTTİ 2026-11-04)
-- [x] K-A Hero h1 → **Hibrit** (h1 içinde küçük kategori satırı + "Kapıdaki her geçiş, Canlı İzleme'de.")
+- [x] K-A Hero h1 → ~~Hibrit ("Kapıdaki her geçiş, Canlı İzleme'de.")~~ **GERİ ALINDI (f72382bf): Emre istemedi; h1 = "Bulut PDKS ve Geçiş Kontrol Sistemi". Yeni başlık önerme.**
 - [x] K-B Hover → **140 ms yalnız renk/zemin**, transform yok, reduced-motion 0 ms
 - [x] K-C Gölge → **ekle** (ProductShot + canlı kart, tek rest token), önce/sonra ekran görüntüsüyle Emre bakar
 - [x] K-D Model adları → **HAYIR**, yalnız logolar
@@ -20,7 +20,7 @@
 - [x] U3 Hareketi gerçekten tek yap: Sheet overlay fade kapat, FAQ statik +/−
 - [x] U4 Donanım şeridi: kutusuz, renkli, optik eşit, `/#iletisim` bağlantısı
 - [x] U5 Küçük metinler 13-14 px + iletişimde 3 tekrar → 1
-- [x] U6 Hero h1 + lead 2 cümle (K-A'ya göre)
+- [x] U6 Lead 2 cümle (h1 hibrit kısmı f72382bf ile geri alındı)
 - [x] U7 Final CTA: "NGS Plus hesabınızı oluşturun." + ikincil "Bize yazın"
 - [x] Kapılar: tsc 0, eslint 0, tam vitest 5571/5571 (koordinatör koştu), görsel tur + denetim MUST 0 (`fable-audit.md`), SHOULD/NIT düzeltildi
 - [x] Lighthouse mobil (aynı makine, 3 koşu): eski canlı 82cf883c perf 85-87 / CLS 0 → yeni 62c63ea5 perf 88 / CLS 0 / a11y 100 (font-swap CLS 0.036 bulundu, 62c63ea5 ile düzeltildi)
@@ -58,3 +58,10 @@
 ## P1 (sonraki tur)
 FAQ'de ilk açık soru "Mevcut kart okuyucularımı kullanabilir miyim?" · güvenlik maddelerine çerçevesiz 20 px ikon ·
 üç adıma ortak üst çizgi · footer'da telefon/aydınlatma talebini ayırma · `text-wrap: balance/pretty`.
+
+## Audit turu 2 (2026-11-04, f72382bf)
+- [x] Fable `audit2-fable.md` (MUST 0 / SHOULD 3 / NIT 7) · Astra `audit2-astra.md` (MUST 1 / SHOULD 3 / NIT 1)
+- [ ] M1 Canlı İzleme görselinde "Biyometrik · PDKS dışı" etiketi (pazarlama yasağı) → canli kırpımı yeniden üret
+- [ ] S1 601-1100 px mobil kaynaklı görseller dev → max-width + ortala · S2 320 px iletişim 1 px taşma · S3 320 px h1 4 satır
+- [ ] S4 320 px canlı kart üst şeridi 2 satır · S5 mobil menü Kapat opacity geçişi · NIT: lead 60ch, SSS ilk soru cihaz, menü ayırıcı, footer
+- [ ] Kapılar + Lighthouse (güncel üretim build'i)

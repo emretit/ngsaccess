@@ -156,13 +156,13 @@ export const marketingFacts = {
   faqHelp: 'Cevabını bulamadığınız soruları bize yazın:',
   faq: [
     {
-      question: 'Hesap oluşturduğumda ne olur?',
-      answer: 'Bu işlem bir kullanıcı hesabı oluşturur. Satış talebi göndermez ve ücretli plan satın almaz.',
-    },
-    {
       question: 'Mevcut kart okuyucularımı kullanabilir miyim?',
       answer:
         'Hikvision, Dahua, IDE Smart ve Mavisoft entegrasyonları desteklenir. Modelinizin ve bağlantı yönteminizin uygunluğunu kurulumdan önce bizimle değerlendirin.',
+    },
+    {
+      question: 'Hesap oluşturduğumda ne olur?',
+      answer: 'Bu işlem bir kullanıcı hesabı oluşturur. Satış talebi göndermez ve ücretli plan satın almaz.',
     },
     {
       question: 'QR ile giriş nasıl çalışır?',

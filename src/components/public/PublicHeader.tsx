@@ -60,7 +60,7 @@ export function PublicHeader({ tone = 'light' }: PublicHeaderProps) {
               overlayClassName="data-[state=open]:animate-none data-[state=closed]:animate-none"
               id="public-mobile-menu"
               aria-describedby={undefined}
-              className="w-[min(340px,100vw)] border-line bg-canvas text-text shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none [&>button]:size-11"
+              className="w-[min(340px,100vw)] border-line bg-canvas text-text shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none [&>button]:size-11 [&>button]:transition-none [&>button]:duration-0 [&>button]:opacity-100"
             >
               <SheetTitle className="text-text">{copy.menuLabel}</SheetTitle>
               <nav
@@ -72,6 +72,7 @@ export function PublicHeader({ tone = 'light' }: PublicHeaderProps) {
                     {link.label}
                   </Link>
                 ))}
+                <div className="pub-mobile-divider" aria-hidden="true" />
                 {accountActions}
               </nav>
             </SheetContent>

@@ -8,8 +8,8 @@ type FeaturePresentation = Pick<ProductShotProps, 'src' | 'srcSet' | 'width' | '
   layout: FeatureLayout;
 };
 
-const fullSizes = '(max-width: 600px) calc(100vw - 40px), (max-width: 1264px) calc(100vw - 64px), 1200px';
-const pairSizes = '(max-width: 600px) calc(100vw - 40px), (max-width: 1100px) calc(100vw - 64px), (max-width: 1264px) calc((100vw - 94px) / 2), 585px';
+const fullSizes = '(max-width: 600px) calc(100vw - 40px), (max-width: 1023px) min(640px, calc(100vw - 64px)), (max-width: 1264px) calc(100vw - 64px), 1200px';
+const pairSizes = '(max-width: 600px) calc(100vw - 40px), (max-width: 1100px) min(640px, calc(100vw - 64px)), (max-width: 1264px) calc((100vw - 94px) / 2), 585px';
 const presentation: Record<Feature['shot'], FeaturePresentation> = {
   'canli-izleme': {
     layout: 'full',
