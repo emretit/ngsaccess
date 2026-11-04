@@ -5,9 +5,10 @@ export const marketingFacts = {
     'Plan kapsamı, çalışan kapasitesi ve ücretlendirme kuruluşunuzun ihtiyaçlarına göre netleştirilir.',
   mobileDescription:
     'Mobil uygulama yakında. Şimdilik işyerinizin web QR girişini kullanın; erişim için yöneticinize başvurun.',
-  heroTitle: 'Bulut PDKS ve <br>Geçiş\u00a0Kontrol Sistemi',
+  heroCategory: 'Bulut PDKS ve Geçiş Kontrol',
+  heroTitle: "Kapıdaki her geçiş, Canlı İzleme'de.",
   heroDescription:
-    'Kart, terminal ve QR ile yapılan giriş-çıkışlar puantaja dönüşür; kapı yetkileri, vardiya ve izinler aynı bulut hesapta.',
+    'Kart, terminal ve QR okutmaları puantaja dönüşür. Kapı yetkisi, vardiya ve izin aynı hesapta.',
   heroCaption: 'Ana Sayfa: günün özeti ve son kart okutmaları. Ekranlardaki veriler örnektir.',
   liveFeed: {
     title: 'Canlı İzleme',
@@ -147,8 +148,7 @@ export const marketingFacts = {
     },
   ],
   contactTitle: 'İşyerinize uygun<br>kapsamı konuşalım.',
-  contactNote: 'Plan ve kullanım koşulları için bize ulaşın.',
-  contactHelp: 'Cihaz uyumluluğu ve kurulum için de yazabilirsiniz.',
+  contactHelp: 'Çalışan sayınızı, işyeri sayınızı ve cihaz modelinizi paylaşabilirsiniz.',
   contactLabels: { email: 'E-posta', phone: 'Telefon', location: 'Konum' },
   email: 'info@ngsteknoloji.com',
   phone: '0 (212) 577 35 72',
@@ -185,7 +185,8 @@ export const marketingFacts = {
         'Plan kapsamı, çalışan kapasitesi ve ücretlendirme için info@ngsteknoloji.com adresine yazın veya 0 (212) 577 35 72 numarasını arayın.',
     },
   ],
-  finalTitle: 'Projenizi açın,<br>ilk kapıyı bağlayın.',
+  finalTitle: 'NGS Plus hesabınızı oluşturun.',
+  contactCta: 'Bize yazın',
   footerDescription: 'Personel ve geçiş yönetimi. NGS Plus, NGS Teknoloji ürünüdür.',
   footerLocation: 'Kadıköy, İstanbul',
   footerPrivacy: 'Bilgi ve aydınlatma metni talepleri:',

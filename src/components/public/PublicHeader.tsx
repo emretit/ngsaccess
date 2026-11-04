@@ -57,6 +57,7 @@ export function PublicHeader({ tone = 'light' }: PublicHeaderProps) {
               </button>
             </SheetTrigger>
             <SheetContent
+              overlayClassName="data-[state=open]:animate-none data-[state=closed]:animate-none"
               id="public-mobile-menu"
               aria-describedby={undefined}
               className="w-[min(340px,100vw)] border-line bg-canvas text-text shadow-none duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none [&>button]:size-11"
@@ -64,7 +65,7 @@ export function PublicHeader({ tone = 'light' }: PublicHeaderProps) {
               <SheetTitle className="text-text">{copy.menuLabel}</SheetTitle>
               <nav
                 aria-label="Mobil menü"
-                className="mt-8 flex flex-col [&>a]:flex [&>a]:min-h-12 [&>a]:items-center [&>a]:px-3 [&>a]:text-[15px]"
+                className="pub-mobile-nav mt-8 flex flex-col [&>a]:flex [&>a]:min-h-12 [&>a]:items-center [&>a]:px-3 [&>a]:text-[15px]"
               >
                 {copy.nav.map((link) => (
                   <Link key={link.href} to={link.href} onClick={close}>

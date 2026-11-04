@@ -88,6 +88,19 @@ export default function LiveFeedDemo() {
           <span aria-hidden="true" />
           {copy.badge}
         </span>
+        <div className="pub-feed-controls">
+          <span className="pub-feed-sample">{copy.sample}</span>
+          {reducedMotion !== true && (
+            <button
+              className="pub-feed-toggle"
+              type="button"
+              aria-pressed={paused}
+              onClick={() => setControl(paused ? 'playing' : 'paused')}
+            >
+              {paused ? copy.resume : copy.pause}
+            </button>
+          )}
+        </div>
       </div>
       <ul className="pub-feed-rows" aria-hidden="true">
         {feedRows(copy.events, step, 4).map((row) => (
@@ -106,19 +119,6 @@ export default function LiveFeedDemo() {
           </li>
         ))}
       </ul>
-      <div className="pub-feed-footer">
-        {reducedMotion !== true && (
-          <button
-            className="pub-feed-toggle"
-            type="button"
-            aria-pressed={paused}
-            onClick={() => setControl(paused ? 'playing' : 'paused')}
-          >
-            {paused ? copy.resume : copy.pause}
-          </button>
-        )}
-        <span>{copy.sample}</span>
-      </div>
     </div>
   );
 }

@@ -52,6 +52,9 @@ describe('LiveFeedDemo SSR', () => {
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain('type="button" aria-pressed="false"');
     expect(html).toContain('Örnek veri');
+    expect(html.indexOf('Örnek veri')).toBeLessThan(html.indexOf('<ul'));
+    expect(html.indexOf('type="button"')).toBeLessThan(html.indexOf('<ul'));
+    expect(html).not.toContain('pub-feed-footer');
     expect(html).toContain('Reddedildi');
     expect(html).toContain('İzin verildi');
     expect(html).not.toContain('aria-live');

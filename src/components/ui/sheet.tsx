@@ -69,7 +69,9 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-  VariantProps<typeof sheetVariants> { }
+  VariantProps<typeof sheetVariants> {
+  overlayClassName?: string
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
@@ -80,6 +82,7 @@ const SheetContent = React.forwardRef<
       side = "right",
       size = "default",
       className,
+      overlayClassName,
       children,
       "aria-describedby": ariaDescribedBy,
       ...props
@@ -87,7 +90,7 @@ const SheetContent = React.forwardRef<
     ref,
   ) => (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content
         ref={ref}
         className={cn(sheetVariants({ side, size }), className)}

@@ -10,7 +10,6 @@ export default function PricingSection() {
           <LandingTitle text={copy.contactTitle} />
         </h2>
         <p>{copy.planDescription}</p>
-        <p className="pub-small">{copy.contactNote}</p>
       </div>
       <div className="pub-contact-card">
         <a className="pub-contact-row" href={`mailto:${copy.email}`}>

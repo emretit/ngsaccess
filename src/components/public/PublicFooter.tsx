@@ -21,11 +21,11 @@ export function PublicFooter() {
       </div>
       <div className="pub-footer-bottom">
         <p>© {new Date().getFullYear()} NGS Plus</p>
-        <p>
+        <p className="pub-footer-privacy">
           <span>{copy.footerPrivacy}</span>
           <a href={`mailto:${copy.email}`}>{copy.email}</a>
-          <a href={copy.phoneHref}>{copy.phone}</a>
         </p>
+        <p className="pub-footer-phone"><a href={copy.phoneHref}>{copy.phone}</a></p>
       </div>
     </footer>
   );

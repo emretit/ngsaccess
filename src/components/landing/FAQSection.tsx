@@ -1,4 +1,3 @@
-import { Plus } from 'lucide-react';
 import Section from '@/components/public/Section';
 import { marketingFacts as copy } from './marketingFacts';
 export default function FAQSection() {
@@ -16,7 +15,8 @@ export default function FAQSection() {
             <summary>
               <span>{item.question}</span>
               <span className="pub-faq-icon" aria-hidden="true">
-                <Plus size={18} />
+                <span className="pub-faq-plus">+</span>
+                <span className="pub-faq-minus">−</span>
               </span>
             </summary>
             <p>{item.answer}</p>

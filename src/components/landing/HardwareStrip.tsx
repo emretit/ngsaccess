@@ -1,12 +1,13 @@
+import { Link } from 'react-router-dom';
 import { marketingFacts as copy } from './marketingFacts';
 
 type Brand = (typeof copy.hardwareBrands)[number];
 
 const brandLogos: Record<Brand, { src: string; width: number; height: number; displayHeight: number }> = {
-  Hikvision: { src: '/brands/hikvision-logo.svg', width: 1024, height: 137, displayHeight: 22 },
-  Dahua: { src: '/brands/dahua-logo.svg', width: 1024, height: 318, displayHeight: 34 },
-  'IDE Smart': { src: '/brands/ide-smart-logo.png', width: 251, height: 96, displayHeight: 52 },
-  Mavisoft: { src: '/brands/mavisoft-logo.png', width: 300, height: 33, displayHeight: 18 },
+  Hikvision: { src: '/brands/hikvision-logo.svg', width: 1024, height: 137, displayHeight: 20 },
+  Dahua: { src: '/brands/dahua-logo.svg', width: 1024, height: 318, displayHeight: 30 },
+  'IDE Smart': { src: '/brands/ide-smart-logo.png', width: 251, height: 96, displayHeight: 40 },
+  Mavisoft: { src: '/brands/mavisoft-logo.png', width: 300, height: 33, displayHeight: 20 },
 };
 
 export default function HardwareStrip() {
@@ -15,7 +16,7 @@ export default function HardwareStrip() {
       <div className="pub-hardware">
         <div className="pub-hardware-head">
           <p className="pub-hardware-title">{copy.hardware[0]}</p>
-          <p>{copy.hardware[1]}</p>
+          <Link to="/#iletisim">{copy.hardware[1]}</Link>
         </div>
         <ul className="pub-hardware-brands">
           {copy.hardwareBrands.map((brand) => {
@@ -28,7 +29,7 @@ export default function HardwareStrip() {
                   width={logo.width}
                   height={logo.height}
                   loading="lazy"
-                  style={{ height: logo.displayHeight }}
+                  style={{ maxHeight: logo.displayHeight }}
                 />
               </li>
             );

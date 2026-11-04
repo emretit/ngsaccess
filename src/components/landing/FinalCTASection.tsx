@@ -14,6 +14,9 @@ export default function FinalCTASection() {
           <Link className="pub-btn" to="/register">
             {copy.accountCta}
           </Link>
+          <a className="pub-text-link" href={`mailto:${copy.email}`}>
+            {copy.contactCta}
+          </a>
         </div>
       </div>
     </section>

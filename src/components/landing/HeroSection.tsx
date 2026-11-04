@@ -3,7 +3,6 @@ import ProductShot from '@/components/public/ProductShot';
 import { marketingFacts as copy } from './marketingFacts';
 import LiveFeedDemo from './LiveFeedDemo';
 import HardwareStrip from './HardwareStrip';
-import { LandingTitle } from './LandingTitle';
 export default function HeroSection() {
   return (
     <>
@@ -11,7 +10,9 @@ export default function HeroSection() {
         <div className="pub-wrap pub-hero-copy">
           <div>
             <h1>
-              <LandingTitle text={copy.heroTitle} />
+              <span className="pub-hero-category">{copy.heroCategory}</span>
+              <span className="sr-only">. </span>
+              <span className="pub-hero-title">{copy.heroTitle}</span>
             </h1>
             <p className="pub-lead">{copy.heroDescription}</p>
             <div className="pub-actions">

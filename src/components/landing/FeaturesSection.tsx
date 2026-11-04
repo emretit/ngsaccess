@@ -9,7 +9,7 @@ type FeaturePresentation = Pick<ProductShotProps, 'src' | 'srcSet' | 'width' | '
 };
 
 const fullSizes = '(max-width: 600px) calc(100vw - 40px), (max-width: 1264px) calc(100vw - 64px), 1200px';
-const pairSizes = '(max-width: 600px) calc(100vw - 40px), (max-width: 1264px) calc((100vw - 94px) / 2), 585px';
+const pairSizes = '(max-width: 600px) calc(100vw - 40px), (max-width: 1100px) calc(100vw - 64px), (max-width: 1264px) calc((100vw - 94px) / 2), 585px';
 const presentation: Record<Feature['shot'], FeaturePresentation> = {
   'canli-izleme': {
     layout: 'full',
@@ -19,7 +19,7 @@ const presentation: Record<Feature['shot'], FeaturePresentation> = {
     height: 735,
     sizes: fullSizes,
     mobile: {
-      media: '(max-width: 600px)',
+      media: '(max-width: 1023px)',
       src: '/marketing/crop-canli-m-1400.webp',
       srcSet: '/marketing/crop-canli-m-700.webp 700w, /marketing/crop-canli-m-1400.webp 1400w',
       width: 1400,
@@ -34,7 +34,7 @@ const presentation: Record<Feature['shot'], FeaturePresentation> = {
     height: 1029,
     sizes: pairSizes,
     mobile: {
-      media: '(max-width: 600px)',
+      media: '(max-width: 1100px)',
       src: '/marketing/crop-pdks-m-1400.webp',
       srcSet: '/marketing/crop-pdks-m-700.webp 700w, /marketing/crop-pdks-m-1400.webp 1400w',
       width: 1400,
@@ -49,7 +49,7 @@ const presentation: Record<Feature['shot'], FeaturePresentation> = {
     height: 780,
     sizes: pairSizes,
     mobile: {
-      media: '(max-width: 600px)',
+      media: '(max-width: 1100px)',
       src: '/marketing/crop-gecis-m-1400.webp',
       srcSet: '/marketing/crop-gecis-m-700.webp 700w, /marketing/crop-gecis-m-1400.webp 1400w',
       width: 1400,
@@ -64,7 +64,7 @@ const presentation: Record<Feature['shot'], FeaturePresentation> = {
     height: 789,
     sizes: fullSizes,
     mobile: {
-      media: '(max-width: 600px)',
+      media: '(max-width: 1023px)',
       src: '/marketing/crop-vardiya-m-1400.webp',
       srcSet: '/marketing/crop-vardiya-m-700.webp 700w, /marketing/crop-vardiya-m-1400.webp 1400w',
       width: 1400,
