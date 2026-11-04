@@ -45,7 +45,7 @@ describe("KVKK rızaları", () => {
     expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ revokedAt: expect.any(String) });
     expect(await f.t.run(ctx => ctx.db.query("auditLog").collect())).toHaveLength(2);
   });
-  it.each(["biometric_face", "biometric_fingerprint"] as const)("%s iptalinde yalnız parmak izi purge planlar, tekrarlı iptal etkisizdir", async consentType => {
+  it.each(["biometric_face", "biometric_fingerprint"] as const)("%s iptalinde parmak izi ve yüz kuyrukları ayrıdır, tekrarlı iptal etkisizdir", async consentType => {
     const f = await fixture();
     const id = await f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType });
     const enrollmentId = await f.t.run(ctx => ctx.db.insert("deviceFingerprintEnrollments", { employeeId: f.employeeId, deviceId: f.deviceId, fingerNo: 2, enrolledAt: "now", enrolledBy: f.userId }));
@@ -190,4 +190,56 @@ it.each([
   await expect(f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "photo", documentStorageId: storageId })).rejects.toThrow();
   expect((await f.t.run(ctx => ctx.db.get(id)))?.documentStorageId).toBeUndefined();
   expect(await f.t.run(ctx => ctx.db.query("pendingUploads").collect())).toHaveLength(pending ? 1 : 0);
+});
+
+describe("HSP-03 / KIS-005 yüz rızası iptali", () => {
+  it.each(["gateway", "localBridge"] as const)("%s için şablonu ve dosyayı kaldırır, yalnız yüz siler ve ekleme kuyruğunu iptal eder", async hikTransport => {
+    const f = await fixture();
+    const consent = await f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "biometric_face" });
+    const { face, storage, addition, otherAddition } = await f.t.run(async ctx => {
+      await ctx.db.patch(f.deviceId, { hikTransport, hikDevIndex: "device" });
+      const storage = await ctx.storage.store(new Blob(["face"]));
+      const face = await ctx.db.insert("employeeFaces", { employeeId: f.employeeId, projectId: f.projectId, pictureStorageId: storage, addedAt: Date.now() });
+      const addition = await ctx.db.insert("hikPendingOperations", { deviceId: f.deviceId, projectId: f.projectId, operation: "addFace", payload: { employeeId: f.employeeId, faceStorageId: storage }, status: "pending", attemptCount: 0, createdAt: Date.now() });
+      const otherAddition = await ctx.db.insert("hikPendingOperations", { deviceId: f.deviceId, projectId: f.projectId, operation: "addFace", payload: { employeeId: f.otherEmployeeId }, status: "pending", attemptCount: 0, createdAt: Date.now() });
+      await ctx.db.insert("devices", { projectId: (await ctx.db.get(f.otherEmployeeId))?.projectId, name: "Other", brand: "hikvision", isActive: true, createdAt: "now", updatedAt: "now" });
+      return { face, storage, addition, otherAddition };
+    });
+    await f.caller.mutation(api.employeeConsents.revoke, { id: consent });
+    await f.t.run(async ctx => {
+      expect(await ctx.db.get(face)).toBeNull();
+      expect(await ctx.storage.get(storage)).toBeNull();
+      expect(await ctx.db.get(f.employeeId)).not.toBeNull();
+      expect(await ctx.db.get(addition)).toMatchObject({ status: "failed", attemptCount: 5 });
+      expect(await ctx.db.get(otherAddition)).toMatchObject({ status: "pending" });
+      const ops = await ctx.db.query("hikPendingOperations").take(10);
+      const removals = ops.filter(op => op.operation.startsWith("delete"));
+      expect(removals).toHaveLength(1);
+      expect(removals[0]).toMatchObject({ deviceId: f.deviceId, operation: "deleteFace", payload: { employeeId: f.employeeId, cardNumber: "123", employeeNo: "123" }, status: hikTransport === "localBridge" ? "pending" : "failed", attemptCount: 0 });
+    });
+    await f.caller.mutation(api.employeeConsents.revoke, { id: consent });
+    expect((await f.t.run(ctx => ctx.db.query("hikPendingOperations").take(10))).filter(op => op.operation === "deleteFace")).toHaveLength(1);
+  });
+  it("merkezi şablon olmasa da eski cihaz kopyası için yüz silme işi oluşturur", async () => {
+    const f = await fixture();
+    const id = await f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "biometric_face" });
+    await f.caller.mutation(api.employeeConsents.revoke, { id });
+    expect(await f.t.run(ctx => ctx.db.query("hikPendingOperations").take(10))).toEqual([expect.objectContaining({ operation: "deleteFace", deviceId: f.deviceId })]);
+  });
+  it("ayrı fotoğraf amaçlı ortak dosyayı korur ve bu sonucu denetim kaydında açıklar", async () => {
+    const f = await fixture();
+    const id = await f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "biometric_face" });
+    const { face, storage } = await f.t.run(async ctx => {
+      const storage = await ctx.storage.store(new Blob(["profile"]));
+      await ctx.db.patch(f.employeeId, { photoStorageId: storage });
+      const face = await ctx.db.insert("employeeFaces", { employeeId: f.employeeId, pictureStorageId: storage, addedAt: Date.now() });
+      return { face, storage };
+    });
+    await f.caller.mutation(api.employeeConsents.revoke, { id });
+    await f.t.run(async ctx => {
+      expect(await ctx.db.get(face)).toBeNull();
+      expect(await ctx.storage.get(storage)).not.toBeNull();
+      expect((await ctx.db.query("auditLog").take(10)).some(row => row.note?.includes("fotoğraf amacıyla korunan dosya: 1"))).toBe(true);
+    });
+  });
 });

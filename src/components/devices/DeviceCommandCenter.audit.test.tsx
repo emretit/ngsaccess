@@ -1,4 +1,4 @@
-vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => (permission === "doors.open" ? mocks.doors : mocks.admin), loading: false }) }));
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => (permission === "doors.open" ? mocks.doors : permission === "employees.manage" ? mocks.employees : mocks.admin), loading: false }) }));
 vi.mock("@/hooks/useProjectAccess", () => ({
   useProjectAccess: () => ({ canManage: mocks.admin }),
 }));
@@ -10,6 +10,7 @@ import { DeviceCommandCenter } from "./DeviceCommandCenter";
 const mocks = vi.hoisted(() => ({
   admin: true,
   doors: true,
+  employees: true,
   capped: false,
   limited: false,
   device: {} as Device,
@@ -73,6 +74,7 @@ it.each([
 
 it("project_user yalnız kapı açma komutunu görür", () => {
   mocks.admin = false;
+  mocks.employees = false;
   mocks.device = {
     _id: "d" as Id<"devices">,
     name: "Panel",
@@ -96,6 +98,7 @@ it("project_user yalnız kapı açma komutunu görür", () => {
   ])
     expect(html).not.toContain(label);
   mocks.admin = true;
+  mocks.employees = true;
 });
 it("komut kuyruğunu göstermez, liste sınırını bir uyarıyla gösterir", () => {
   mocks.capped = true;
@@ -120,4 +123,14 @@ it("cihaz yöneticisi kapı açma yetkisi kaldırıldığında açma düğmesini
   expect(html).not.toContain("Kapıyı aç");
   expect(html).toContain("Yeniden başlat");
   mocks.doors = true;
+});
+
+ it.each([[true, false], [false, true], [true, true], [false, false]])("CIH-11 capture follows employees.manage (devices=%s employees=%s)", (devices, employees) => {
+  mocks.admin = devices;
+  mocks.employees = employees;
+  mocks.device = { _id: "d" as Id<"devices">, name: "Panel", brand: "hikvision", hikTransport: "gateway", hikDevIndex: "index" };
+  const html = renderToStaticMarkup(<DeviceCommandCenter deviceId={mocks.device._id} />);
+  expect(html.includes("Kart okut")).toBe(employees);
+  mocks.admin = true;
+  mocks.employees = true;
 });

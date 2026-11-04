@@ -134,9 +134,18 @@ export function ideUserEndFromAccessEnd(endMs: number | undefined): number {
 }
 
 export function ideUserAccessWindow(employee: { accessStartsAt?: string; accessExpiresAt?: string; employmentEndDate?: string }, now: number) {
-  const end = ideUserEndFromAccessEnd(accessEndsAtMs(employee));
+  const endMs = accessEndsAtMs(employee);
+  const startIso = employee.accessStartsAt ? toUtcISO(employee.accessStartsAt) : undefined;
+  const end = ideUserEndFromAccessEnd(endMs);
   const start = ideUserStartFromAccessStart(employee.accessStartsAt, now);
-  return { start: start > 0 && end > 0 && start >= end ? 0 : start, end };
+  const empty = (startIso !== undefined && endMs !== undefined && Date.parse(startIso) >= endMs)
+    || (start > 0 && end > 0 && start >= end);
+  if (empty && endMs !== undefined) {
+    // Zero means unlimited; a fixed past end denies access even if the panel
+    // clock is minutes behind the server at synchronization time.
+    return { start: 0, end: 1 };
+  }
+  return { start, end };
 }
 
 /**
@@ -175,12 +184,14 @@ async function upsertPanelUser(
   deviceId: Id<"devices">,
   card: string,
   projectId: Id<"projects"> | undefined,
+  managedByNgsplus: boolean,
 ): Promise<void> {
   const existing = await ctx.db
     .query("idePanelUsers")
     .withIndex("by_uuid_card", (q) => q.eq("ideUuid", ideUuid).eq("cardNumber", card))
     .first();
   if (existing) {
+    // A seed or later update must not turn imported/unknown users into cleanup targets.
     await ctx.db.patch(existing._id, { deviceId, projectId, syncedAt: Date.now() });
   } else {
     await ctx.db.insert("idePanelUsers", {
@@ -188,6 +199,7 @@ async function upsertPanelUser(
       deviceId,
       cardNumber: card,
       projectId,
+      managedByNgsplus,
       syncedAt: Date.now(),
     });
   }
@@ -551,8 +563,8 @@ export const markSent = internalMutation({
 /**
  * idePanelUsers'ı panelden okunan gerçek roster'la doldurur (tek seferlik seed / yeniden eşitleme).
  * `rawCards` panelin döndürdüğü user.id listesi (LAN'dan get_data sayfalama ile okunur). Tablo
- * yeni özellikten önce var olan hayalet kartları içermediğinden, mevcut paneller için bir kez
- * çalıştırılır → sonraki "Güncelle"de reconcilePanelRosterIde fazlalıkları söker.
+ * yerel kişiler yalnız fark olarak görünür; seed otomatik silme sahipliği vermez.
+ * Daha önce ngsplus tarafından oluşturulduğu kanıtlanmış kayıtların sahipliği korunur.
  */
 export const seedPanelUsers = internalMutation({
   args: { deviceId: v.id("devices"), rawCards: v.array(v.union(v.number(), v.string())) },
@@ -564,7 +576,7 @@ export const seedPanelUsers = internalMutation({
     for (const raw of args.rawCards) {
       const card = normalizeIdeCard(raw);
       if (!card) continue;
-      await upsertPanelUser(ctx, device.ideUuid, args.deviceId, card, device.projectId);
+      await upsertPanelUser(ctx, device.ideUuid, args.deviceId, card, device.projectId, false);
       n++;
     }
     return n;
@@ -627,7 +639,8 @@ export const markAck = internalMutation({
           const card = normalizeIdeCard(rawId);
           if (card) {
             if (op.opType === "upsertUser") {
-              await upsertPanelUser(ctx, device.ideUuid, op.deviceId, card, op.projectId);
+              // already_exists → update does not prove that ngsplus created the panel user.
+              await upsertPanelUser(ctx, device.ideUuid, op.deviceId, card, op.projectId, payload.mode !== "update");
             } else {
               await removePanelUser(ctx, device.ideUuid, card);
             }

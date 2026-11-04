@@ -2,10 +2,14 @@
 
 // Node-only sync implementation: import only from actions/hikvisionSync.ts.
 // Employee and week-plan sync share plan caches and deletion helpers here.
+import { gatewayApiCallChecked } from "./gateway/core";
 import { accessEndsAtMs } from "./accessEnd";
+import { toUtcISO } from "./trDate";
+
+
 import type { GrantResult } from "./grantStatus";
 import type { FunctionReturnType } from "convex/server";
-import { buildDoorPlans, hikValidBeginFromAccessStart, hikValidEndFromAccessEnd } from "./gateway/persons";
+import { buildDoorPlans, hikValidBeginFromAccessStart, hikValidEndFromAccessEnd, hikValidityWindow } from "./gateway/persons";
 import { internal } from "../_generated/api";
 import { isProjectAllowed } from "./auth";
 import { filterHikvisionDevices, defaultRuleSchedule } from "./hikSync";
@@ -18,6 +22,17 @@ import {
   setWeekPlanOnDevice,
   setPlanTemplate,
 } from "./hikGateway";
+
+/** Preserve ordinary payloads; explicitly deliver an expired window for empty access. */
+function employeeAccessWindow(employee: { accessStartsAt?: string; accessExpiresAt?: string; employmentEndDate?: string }, now: number) {
+  const start = employee.accessStartsAt ? toUtcISO(employee.accessStartsAt) : undefined;
+  const end = accessEndsAtMs(employee);
+  const beginTime = hikValidBeginFromAccessStart(employee.accessStartsAt, now);
+  const endTime = hikValidEndFromAccessEnd(end);
+  const empty = start !== undefined && end !== undefined && Date.parse(start) >= end;
+  const window = hikValidityWindow(empty ? endTime : beginTime, endTime, now);
+  return window.adjusted ? { beginTime: window.beginTime, endTime: window.endTime } : { beginTime, endTime };
+}
 
 /**
  * Proje kapsam denetimi. Scheduler/internal tetikli çağrılar `allowedProjectIds`
@@ -206,6 +221,7 @@ export async function syncEmployeeDevices(
         };
       }
 
+      const validity = employeeAccessWindow(employee, Date.now());
       const scopes: { planTemplateNo: number; doorNos?: number[] }[] = [];
       for (const { rule, doorNos } of t.rules) {
         const planNo = resolveWeekPlanNo(rule);
@@ -260,8 +276,7 @@ export async function syncEmployeeDevices(
           cardNumber: employee.cardNumber, name: `${employee.firstName} ${employee.lastName}`,
           planTemplateNo: doorPlans[0]?.planTemplateNos[0], doorCount: doorCountFor(t.device),
           doorRights: doorPlans.map(p => p.doorNo),
-          beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt, Date.now()),
-          endTime: hikValidEndFromAccessEnd(accessEndsAtMs(employee)),
+          ...validity,
         }, args.runId);
         return { ok: true as const, device: t.device };
       }
@@ -276,8 +291,7 @@ export async function syncEmployeeDevices(
         employeeNo: employee.cardNumber,
         name: `${employee.firstName} ${employee.lastName}`,
         doorPlans,
-        beginTime: hikValidBeginFromAccessStart(employee.accessStartsAt, Date.now()),
-        endTime: hikValidEndFromAccessEnd(accessEndsAtMs(employee)),
+        ...validity,
       });
       if (!personResult.ok) {
         return {
@@ -576,4 +590,48 @@ export async function syncWeekPlanDevices(
     await ctx.runMutation(internal.accessGrantStatus.recordGrantResults, { results: shared.grantResults.slice(offset, offset + 500) });
   }
   return { synced, failed, errors, employeesSynced };
+}
+
+/** Door edits never remove the person, card, face or fingerprints, even at zero rights. */
+export async function syncEmployeeDoorRights(
+  ctx: ActionCtx,
+  args: { employeeId: Id<"employees">; cardNumber: string; device: HikDeviceRef; runId?: Id<"deviceSyncRuns"> },
+): Promise<{ ok: boolean; removed?: boolean; error?: string }> {
+  const { device } = args;
+  const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: args.employeeId });
+  if (!data || data.employee.projectId !== device.projectId || data.employee.cardNumber !== args.cardNumber) return { ok: false, error: "Kişinin kartı veya projesi değişti; kapı yetkisi doğrulanamadı" };
+  // The bridge consumer does not implement an empty-rights update. Keep a visible
+  // retryable failure instead of falling back to deleting the person or granting all doors.
+  if (isLocalBridgeDevice(device)) return { ok: false, error: "Bu cihaz bağlantısında kişiyi koruyan kapı yetkisi güncellemesi desteklenmiyor" };
+  if (!device.hikDevIndex) return { ok: false, error: "Cihaz bağlantısı bulunamadı" };
+  const rules = data.employee.isActive === false ? [] : data.deviceRules.filter(entry => entry.device._id === device._id);
+  const scopes = [];
+  for (const { rule, doorNos } of rules) {
+    const planTemplateNo = rule.hikWeekPlanNo ?? await ctx.runMutation(internal.hikvisionSync.assignWeekPlanNo, { accessRuleId: rule._id });
+    const week = await setWeekPlanOnDevice(device.hikDevIndex, planTemplateNo, defaultRuleSchedule(rule));
+    if (!week.ok) return week;
+    const template = await setPlanTemplate(device.hikDevIndex, planTemplateNo, { weekPlanNo: planTemplateNo, templateName: rule.name ?? `Rule ${planTemplateNo}` });
+    if (!template.ok) return template;
+    scopes.push({ planTemplateNo, doorNos });
+  }
+  const { doorPlans, warnings } = buildDoorPlans(doorCountFor(device), scopes);
+  if (warnings.length) return { ok: false, error: warnings.join("; ") };
+  // Recheck identity after plan I/O, just like the ordinary person sender.
+  const current = await ctx.runQuery(internal.hikvisionSync.getEmployeeDeliveryState, { employeeId: args.employeeId });
+  if (!current || current.terminationType === "transfer" || current.projectId !== device.projectId || current.cardNumber !== args.cardNumber || current.isActive !== data.employee.isActive) return { ok: false, error: "Kişi bilgileri gönderim sırasında değişti" };
+  if (!doorPlans.length) {
+    const result = await gatewayApiCallChecked("/ISAPI/AccessControl/UserInfo/SetUp", "PUT", {
+      UserInfo: { employeeNo: args.cardNumber, doorRight: "", RightPlan: [] },
+    }, device.hikDevIndex);
+    return { ...result, removed: result.ok };
+  }
+  const validity = employeeAccessWindow(data.employee, Date.now());
+  const result = await upsertPersonToDevice(device.hikDevIndex, {
+    employeeNo: args.cardNumber, name: `${data.employee.firstName} ${data.employee.lastName}`, doorPlans,
+    ...validity,
+  });
+  if (!result.ok) return result;
+  if (data.employee.hikCardless === true) return { ok: true };
+  const card = await addCardToDevice(device.hikDevIndex, { employeeNo: args.cardNumber, cardNo: args.cardNumber });
+  return { ok: card.ok || card.alreadyExists === true, error: card.error };
 }

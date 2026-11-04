@@ -1,6 +1,7 @@
 "use node";
 
 import { gatewayApiCall, DEFAULT_SEARCH_PAGE_SIZE } from "./core";
+import { isapiRecord, validateIsapiResult } from "./isapiResult";
 
 // ---------------------------------------------------------------------------
 // AcsEvent — geçmiş erişim olayları (PR2: backfill)
@@ -44,6 +45,8 @@ export interface SearchAcsEventsResult {
    * Firmware totalMatches döndürmese bile güvenli döngü sonu için kullan.
    */
   hasMore: boolean;
+  /** Malformed rows skipped; pagination still uses the raw device row count. */
+  skipped?: number;
   error?: string;
 }
 
@@ -55,7 +58,9 @@ function eventText(value: unknown): string | undefined {
 }
 function eventNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  return typeof value === "string" && /^\d+$/.test(value) ? Number(value) : undefined;
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
 }
 
 /**
@@ -99,46 +104,58 @@ export async function searchAcsEventsOnDevice(
     devIndex,
   );
 
-  if (result.status !== 200) {
-    return {
-      ok: false,
-      events: [],
-      total: 0,
-      numMatches: 0,
-      nextPosition: opts.position,
-      hasMore: false,
-      error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}`,
-    };
+  const failure = (error: string): SearchAcsEventsResult => ({
+    ok: false, events: [], total: 0, numMatches: 0,
+    nextPosition: opts.position, hasMore: false, error,
+  });
+  const validated = validateIsapiResult(result, "AcsEvent");
+  if (!validated.ok) return failure(validated.error);
+  const acsEvent = isapiRecord(validated.data.AcsEvent);
+  if (!acsEvent) return failure("Cihaz yanıtında olay sonucu bulunamadı");
+  const numOfMatches = eventNumber(acsEvent.numOfMatches);
+  const totalMatches = acsEvent.totalMatches === undefined ? 0 : eventNumber(acsEvent.totalMatches);
+  const rawList = acsEvent.InfoList;
+  if (numOfMatches === undefined || !Number.isSafeInteger(numOfMatches) || numOfMatches < 0 ||
+      totalMatches === undefined || !Number.isSafeInteger(totalMatches) || totalMatches < 0 ||
+      (rawList !== undefined && !Array.isArray(rawList)) ||
+      (Array.isArray(rawList) ? rawList.length !== numOfMatches : numOfMatches !== 0)) {
+    return failure("Cihazın olay sayfası eksik veya geçersiz");
   }
-
-  const data = result.data as Record<string, unknown> | undefined;
-  const acsEvent = data?.AcsEvent as Record<string, unknown> | undefined;
-
-  const totalMatches = (acsEvent?.totalMatches as number | undefined) ?? 0;
-  const numOfMatches = (acsEvent?.numOfMatches as number | undefined) ?? 0;
   const maxResults = opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE;
-  const responseStatusStrg = acsEvent?.responseStatusStrg as string | undefined;
+  const responseStatusStrg = acsEvent.responseStatusStrg;
+  if (responseStatusStrg !== undefined && !["OK", "MORE", "NO MATCH"].includes(String(responseStatusStrg))) {
+    return failure("Cihazın olay arama durumu geçersiz");
+  }
   const hasMore = responseStatusStrg === "MORE" || numOfMatches >= maxResults;
+  if (hasMore && numOfMatches === 0) return failure("Cihazın olay imleci ilerlemedi");
 
-  // InfoList toleranslı oku — alan yoksa ya da boş array varsa boş dön
-  const rawList = acsEvent?.InfoList;
   const infoList: AcsEventRow[] = [];
+  let skipped = 0;
 
   if (Array.isArray(rawList)) {
     for (const item of rawList) {
-      if (typeof item !== "object" || item === null) continue;
-      const row = item as Record<string, unknown>;
-      // serialNo zorunlu; yoksa bu satırı dedup'lanamayacağından skip et
-      const serialNo = row.serialNo as number | undefined;
-      if (typeof serialNo !== "number") continue;
+      const row = isapiRecord(item);
+      if (!row) { skipped++; continue; }
+      const serialNo = eventNumber(row.serialNo);
+      const major = eventNumber(row.major);
+      const minor = eventNumber(row.minor);
+      if (typeof serialNo !== "number" || !Number.isSafeInteger(serialNo) || serialNo < 0 ||
+          typeof row.time !== "string" || !Number.isFinite(Date.parse(row.time))) {
+        skipped++;
+        continue;
+      }
+      if (major === undefined || minor === undefined || !Number.isSafeInteger(major) || !Number.isSafeInteger(minor)) {
+        skipped++;
+        continue;
+      }
       infoList.push({
         time: eventText(row.time) ?? "",
         cardNo: eventText(row.cardNo) ?? "",
         cardType: eventText(row.cardType),
         name: eventText(row.name),
         employeeNoString: eventText(row.employeeNoString),
-        major: eventNumber(row.major) ?? 0,
-        minor: eventNumber(row.minor) ?? 0,
+        major,
+        minor,
         doorNo: eventNumber(row.doorNo),
         cardReaderNo: eventNumber(row.cardReaderNo),
         currentVerifyMode: eventText(row.currentVerifyMode),
@@ -152,6 +169,7 @@ export async function searchAcsEventsOnDevice(
   return {
     ok: true,
     events: infoList,
+    skipped,
     total: totalMatches,
     numMatches: numOfMatches,
     nextPosition: opts.position + numOfMatches,

@@ -64,7 +64,7 @@ export function AdminDeviceDialog({
   device: openingDevice,
 }: AdminDeviceDialogProps) {
   const registerDevice = useMutation(api.adminDevices.register);
-  const claimDevice = useMutation(api.devices.claimDevice);
+  const reserveDevice = useMutation(api.adminDevices.reserve);
   const reassignDevice = useMutation(api.devices.reassignDevice);
   const projects = useQuery(api.projects.list, open ? {} : "skip");
 
@@ -131,7 +131,7 @@ export function AdminDeviceDialog({
             projectId === NO_PROJECT
               ? undefined
               : (adminDeviceId) =>
-                  claimDevice({
+                  reserveDevice({
                     adminDeviceId,
                     expectedAssignedProjectId: null,
                     projectId: projectId as Id<"projects">,
@@ -142,7 +142,7 @@ export function AdminDeviceDialog({
         notify.success(
           projectId === NO_PROJECT
             ? "Cihaz envantere eklendi"
-            : "Cihaz eklendi ve projeye atandı",
+            : "Cihaz eklendi ve projeye ayrıldı",
         );
         onSuccess();
       } catch (error) {
@@ -164,8 +164,8 @@ export function AdminDeviceDialog({
     try {
       const target =
         projectId === NO_PROJECT ? undefined : (projectId as Id<"projects">);
-      if (!isHik && !device.assignedDeviceId && target) {
-        await claimDevice({
+      if (!device.assignedDeviceId) {
+        await reserveDevice({
           adminDeviceId: device._id,
           expectedAssignedProjectId: device.assignedProjectId ?? null,
           projectId: target,
@@ -232,7 +232,7 @@ export function AdminDeviceDialog({
               </SheetTitle>
             <SheetDescription className="mt-1 text-sm text-muted-foreground">
               {isEdit
-                ? isHik ? "Cihaz adını değiştirin." : "İsmi ve proje atamasını değiştirin. Proje değişimi atanmış cihazda kapıları siler; okuma geçmişi korunur."
+                ? isHik && device?.assignedDeviceId ? "Cihaz adını değiştirin." : device?.assignedDeviceId ? "İsmi ve proje atamasını değiştirin. Proje değişimi atanmış cihazda kapıları siler; okuma geçmişi korunur." : "Cihazı bir projeye ayırın. Projenin cihaz yöneticisi daha sonra cihazı alabilir."
                 : "Cihaz envantere eklendikten sonra Cihazlar sayfasından projeye atanabilir."}
             </SheetDescription>
             </SheetHeader>
@@ -288,7 +288,7 @@ export function AdminDeviceDialog({
                 <div role="status" className="rounded-md border p-3 text-sm">
                   <p>
                     {assignmentError
-                      ? "Cihaz kaydedildi, projeye atanamadı. Cihaz havuzda tutuluyor."
+                      ? "Cihaz kaydedildi, projeye ayrılamadı. Cihaz havuzda tutuluyor."
                       : "Cihaz envantere kaydedildi."}
                   </p>
                   {assignmentError && (
@@ -315,7 +315,7 @@ export function AdminDeviceDialog({
                 <Select
                   value={projectId}
                   onValueChange={setProjectId}
-                  disabled={isHik || submitting || projects === undefined}
+                  disabled={(isHik && !!device?.assignedDeviceId) || submitting || projects === undefined}
                 >
                   <SelectTrigger id="admin-device-project">
                     <SelectValue placeholder="Projeye atamadan envantere ekle" />
@@ -332,9 +332,9 @@ export function AdminDeviceDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  {isHik
+                  {isHik && device?.assignedDeviceId
                     ? "Hikvision cihazının projesi değiştirilemez. Cihazı bu projeden silip hedef projede yeniden ekleyin; eklerken cihazdaki eski kişiler temizlenir."
-                    : "Proje seçilirse cihaz doğrudan atanır; boş bırakılırsa havuzda kalır."}
+                    : device?.assignedDeviceId ? "Proje değişirse cihaz hedef projeye atanır." : "Havuz cihazı seçilen projeye ayrılır. Projenin cihaz yöneticisi daha sonra cihazı alabilir."}
                 </p>
               </div>
             </div>

@@ -155,14 +155,16 @@ describe("devices mutation HEAD characterization", () => {
     expect(s.devices.map(payload)).toEqual([{ name: "Hik", ...scope, brand: "hikvision", deviceType: "Controller", hikTransport: "localBridge", deviceSerial: "serial", deviceIp: "192.0.2.1", deviceUsername: "user", devicePassword: "pass", ehomeID: "id", ehomeKey: "key", hikPort: 8000, accessDirection: "entry", hikDoorCount: 2, isActive: false, status: "inactive", zoneId: result.zoneId, adminDeviceId: s.adminDevices[0]._id, ...timestamps }]);
     expect(s.adminDevices.map(payload)).toEqual([{ name: "Hik", brand: "hikvision", deviceSerial: "serial", assignedDeviceId: result.deviceId, ...(orphan ? {} : { assignedProjectId: f.projectId }), createdFromDevice: true, ...timestamps }]);
   });
-  it.each(["admin", "super_admin"] as const)("claim full fields as %s", async role => {
+  it.each(["admin", "super_admin"] as const)("claim full fields as %s keeps server-held pool credentials", async role => {
     const f = await fixture(role);
     const { adminDeviceId } = await pool(f);
-    const result = await f.as.mutation(api.devices.claimDevice, { adminDeviceId, projectId: f.projectId, expectedAssignedProjectId: null, newZoneName: "Zone", name: " Claimed ", ideUser: " custom ", idePassword: " password " });
+    // Project admins now need a reservation; topology and credential expectations stay identical.
+    if (role === "admin") await f.t.run(ctx => ctx.db.patch(adminDeviceId, { assignedProjectId: f.projectId }));
+    const result = await f.as.mutation(api.devices.claimDevice, { adminDeviceId, projectId: f.projectId, expectedAssignedProjectId: role === "admin" ? f.projectId : null, newZoneName: "Zone", name: " Claimed ", ideUser: " custom ", idePassword: " password " });
     const s = await topology(f, result, f.projectId);
     expect(result).toEqual({ deviceId: s.devices[0]._id, zoneId: s.zones[0]._id, doorIds: s.doors.map(d => d._id) });
-    expect(s.devices.map(payload)).toEqual([{ name: "Claimed", projectId: f.projectId, brand: "ide_smart", deviceType: "Erişim Paneli", ideUuid: "123456789012345", ideUser: "custom", idePassword: "password", ideHttpPort: 80, ideDoorCount: 1, isActive: true, status: "active", adminDeviceId, zoneId: result.zoneId, ...timestamps }]);
-    expect(s.adminDevices.map(payload)).toEqual([{ name: "Pool", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "custom", idePassword: "password", ideDoorCount: 1, assignedDeviceId: result.deviceId, assignedProjectId: f.projectId, ...timestamps }]);
+    expect(s.devices.map(payload)).toEqual([{ name: "Claimed", projectId: f.projectId, brand: "ide_smart", deviceType: "Erişim Paneli", ideUuid: "123456789012345", ideUser: "user", idePassword: "pass", ideHttpPort: 80, ideDoorCount: 1, isActive: true, status: "active", adminDeviceId, zoneId: result.zoneId, ...timestamps }]);
+    expect(s.adminDevices.map(payload)).toEqual([{ name: "Pool", brand: "ide_smart", ideUuid: "123456789012345", ideUser: "user", idePassword: "pass", ideDoorCount: 1, assignedDeviceId: result.deviceId, assignedProjectId: f.projectId, ...timestamps }]);
   });
   it.each(["claimDevice", "reassignDevice"] as const)("%s preserves stale assignment error payload", async mutation => {
     const f = await fixture("super_admin");

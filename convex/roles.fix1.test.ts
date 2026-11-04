@@ -31,9 +31,10 @@ it("Y-1: old platform admin cannot write rules after project demotion; technicia
 });
 it("Y-1: admin invite keeps a fresh account normal and puts admin only on membership", async () => {
   const f = await setup();
+  const creator = await f.member("admin");
   const userId = await f.t.run(async ctx => {
     const id = await ctx.db.insert("users", { email: "fresh@example.com", verified: false });
-    await ctx.db.insert("invites", { token: "token", email: "fresh@example.com", role: "admin", projectId: f.projectId, type: "invite", used: false, createdBy: id, createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() });
+    await ctx.db.insert("invites", { token: "token", email: "fresh@example.com", role: "admin", projectId: f.projectId, type: "invite", used: false, createdBy: creator.userId, createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() });
     return id;
   });
   const sessionId = await f.t.run(ctx => ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 86400000 }));

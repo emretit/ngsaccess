@@ -1,12 +1,35 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FunctionReturnType } from "convex/server";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { getFunctionName } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { AdminDeviceDialog } from "./AdminDeviceDialog";
 
-vi.mock("convex/react", () => ({ useMutation: () => vi.fn(), useQuery: () => [] }));
+const mocks = vi.hoisted(() => ({ states: [] as unknown[], cursor: 0, actions: [] as (() => Promise<void>)[], reserve: vi.fn(), other: vi.fn() }));
+vi.mock("react", async original => ({
+  ...await original<typeof import("react")>(),
+  useState: (initial: unknown) => {
+    const index = mocks.cursor++;
+    if (!(index in mocks.states)) mocks.states[index] = initial;
+    return [mocks.states[index], (value: unknown) => { mocks.states[index] = value; }];
+  },
+  useEffect: () => {},
+}));
+vi.mock("convex/react", () => ({ useMutation: (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref) === "adminDevices:reserve" ? mocks.reserve : mocks.other, useQuery: () => [] }));
+vi.mock("@/hooks/useAsyncAction", () => ({ useAsyncAction: (run: () => Promise<void>) => {
+  mocks.actions.push(run);
+  return { run, pending: false };
+} }));
+vi.mock("@/lib/notify", () => ({ notify: { success: vi.fn() }, errorMessage: (error: unknown) => String(error) }));
+beforeEach(() => {
+  mocks.states = [];
+  mocks.cursor = 0;
+  mocks.actions = [];
+  mocks.reserve.mockReset();
+  mocks.other.mockReset();
+});
 vi.mock("./hooks/useAdminFormGuard", () => ({ useAdminFormGuard: () => ({ requestClose: vi.fn(), dialog: null }) }));
 vi.mock("@/components/shared/ConfirmDestructive", () => ({ ConfirmDestructive: () => null }));
 vi.mock("@/components/ui/sheet", () => {
@@ -43,4 +66,22 @@ describe("Hik device editing", () => {
     expect(html).not.toMatch(/<fieldset[^>]*disabled/);
     expect(html).not.toContain("Hikvision cihazının projesi değiştirilemez.");
   });
+});
+
+it.each(["ide_smart", "hikvision", "other"] as const)("reserves an unclaimed %s device without claiming it", async brand => {
+  mocks.states = [{ ...device, brand, assignedDeviceId: undefined }, "", "Pool", "target"];
+  const html = renderToStaticMarkup(<AdminDeviceDialog open onClose={vi.fn()} onSuccess={vi.fn()} />);
+  expect(html).toContain("Havuz cihazı seçilen projeye ayrılır.");
+  expect(html).not.toMatch(/<fieldset[^>]*disabled/);
+  await mocks.actions[1]();
+  expect(mocks.reserve).toHaveBeenCalledExactlyOnceWith({ adminDeviceId: "admin", expectedAssignedProjectId: "project", projectId: "target", name: "Pool" });
+  expect(mocks.other).not.toHaveBeenCalled();
+});
+it("registers a new IDE device and reserves it without creating project topology", async () => {
+  mocks.states = [undefined, "123456789012345", "Pool", "target"];
+  mocks.other.mockResolvedValueOnce("new-pool");
+  renderToStaticMarkup(<AdminDeviceDialog open onClose={vi.fn()} onSuccess={vi.fn()} />);
+  await mocks.actions[0]();
+  expect(mocks.other).toHaveBeenCalledExactlyOnceWith({ ideUuid: "123456789012345", name: "Pool", brand: "ide_smart" });
+  expect(mocks.reserve).toHaveBeenCalledExactlyOnceWith({ adminDeviceId: "new-pool", expectedAssignedProjectId: null, projectId: "target", name: "Pool" });
 });

@@ -1,6 +1,7 @@
 "use node";
 
 import { digestFetch } from "../digestAuth";
+import { gatewayLogPath, redactGatewayLog } from "../logRedact";
 
 /**
  * Hik Device Gateway client.
@@ -88,9 +89,9 @@ export async function gatewayApiCall(
         (data as { statusCode?: number }).statusCode !== 1));
   if (failed || process.env.HIK_GATEWAY_DEBUG === "1") {
     console.log(
-      `[hikGateway] ${method} ${path} devIndex=${devIndex ?? "-"} status=${result.status}` +
+      `[hikGateway] ${method} ${gatewayLogPath(path)} devIndex=${devIndex ?? "-"} status=${result.status}` +
         (/fingerprint/i.test(path) ? "" :
-          `\n  REQ: ${reqBody ?? "(none)"}\n  RES: ${responseStr.slice(0, 2000)}`),
+          `\n  REQ: ${JSON.stringify(redactGatewayLog(body))}\n  RES: ${JSON.stringify(redactGatewayLog(data)).slice(0, 2000)}`),
     );
   }
   return { status: result.status, data, raw: result.body };

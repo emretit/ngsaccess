@@ -280,16 +280,11 @@ export const deleteIdeUserFromPanels = internalAction({
     for (const deviceId of args.deviceIds) {
       if (seen.has(deviceId)) continue;
       seen.add(deviceId);
-      const panel = await ctx.runQuery(internal.devices.getByIdInternal, { id: deviceId });
-      if (!panel || panel.brand !== "ide_smart" || !panel.ideUuid) continue;
-      await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
-        deviceId,
-        runId: args.runId,
-        projectId: panel.projectId ?? args.projectId,
-        opType: "deleteUser",
-        payload: { employeeId: args.employeeId, ideUserId: cardNo },
+      const enqueued = await ctx.runMutation(internal.accessRules.enqueueIdeUserRemoval, {
+        deviceId, employeeId: args.employeeId, cardNumber: args.cardNumber,
+        runId: args.runId, projectId: args.projectId,
       });
-      queued++;
+      if (enqueued) queued++;
     }
     return { ok: true, queued };
   },

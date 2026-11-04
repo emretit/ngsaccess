@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalQuery } from "./_generated/server";
 
 /**
@@ -18,6 +18,15 @@ export const getStorageRef = internalQuery({
       .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
       .first();
     if (!face) return null;
+    // Missing consent preserves legacy behavior; a new grant supersedes a withdrawal.
+    let recorded = false;
+    let granted = false;
+    for await (const consent of ctx.db.query("employeeConsents")
+      .withIndex("by_employee_type", q => q.eq("employeeId", args.employeeId).eq("consentType", "biometric_face"))) {
+      recorded = true;
+      if (!consent.revokedAt) { granted = true; break; }
+    }
+    if (recorded && !granted) throw new ConvexError("Yüz tanıma rızası iptal edilmiş. Yüz eklemek için yeniden rıza alın.");
     return {
       _id: face._id,
       pictureStorageId: face.pictureStorageId,

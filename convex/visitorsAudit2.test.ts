@@ -21,7 +21,7 @@ async function fixture(role: "admin" | "viewer" | "technician" = "admin", platfo
     const visitorId = await ctx.db.insert("employees", { email: "", projectId, accessRuleId: ruleId,
       firstName: "İpek", lastName: "Yıldız", cardNumber: "12345678", isVisitor: true, isActive: true,
       visitorStatus: "checkedIn", accessExpiresAt: future, visitorPhone: "5551234567", notes: "Özel not", visitPurpose: "Görüşme" });
-    return { projectId, userId, sessionId, visitorId };
+    return { projectId, userId, sessionId, visitorId, ruleId };
   });
   return { t, ...ids, caller: t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` }) };
 }
@@ -103,4 +103,53 @@ describe("visitor audit 2 bounded reads", () => {
     expect(second.page).toMatchObject([{ _id: f.visitorId }]);
     expect(second.isDone).toBe(true);
   });
+});
+
+it("ZIY-01 hides the target ID from 24 card reconstruction probes", async () => {
+  const f = await fixture("viewer");
+  const probes = [
+    ...Array.from({ length: 10 }, (_, i) => `${i}5678`),
+    ...Array.from({ length: 10 }, (_, i) => `${i}45678`),
+    "02345678", "12345678", "22345678", "32345678",
+  ];
+  expect(probes).toHaveLength(24);
+  for (const search of probes) {
+    const result = await f.caller.query(api.visitors.listPage, { projectId: f.projectId, search, paginationOpts: { numItems: 25, cursor: null } });
+    expect(result.page.map(row => row._id)).not.toContain(f.visitorId);
+  }
+  expect((await f.caller.query(api.visitors.listPage, { projectId: f.projectId, search: "İpek", paginationOpts: { numItems: 25, cursor: null } })).page).toHaveLength(1);
+});
+it("ZIY-01 permits card search to a sensitive-field reader", async () => {
+  const f = await fixture();
+  expect((await f.caller.query(api.visitors.listPage, { projectId: f.projectId, search: "12345678", paginationOpts: { numItems: 25, cursor: null } })).page.map(row => row._id)).toEqual([f.visitorId]);
+});
+it.each(["2026-10-28T10:00:00Z", "2026-10-28T12:00:00Z"])("ZIY-02 rejects reversed/equal effective ranges on create/update: %s", async accessExpiresAt => {
+  const f = await fixture();
+  const accessStartsAt = "2026-10-28T15:00:00+03:00";
+  await expect(f.caller.mutation(api.visitors.create, { projectId: f.projectId, firstName: "Yeni", lastName: "Ziyaretçi", cardNumber: "98765432", presetRuleId: f.ruleId, accessStartsAt, accessExpiresAt })).rejects.toThrow("başlangıcı bitişten önce");
+  await f.t.run(ctx => ctx.db.patch(f.visitorId, { accessStartsAt, accessExpiresAt: "2026-10-29T12:00:00Z" }));
+  await expect(f.caller.mutation(api.visitors.update, { visitorId: f.visitorId, accessExpiresAt })).rejects.toThrow("başlangıcı bitişten önce");
+  expect((await f.t.run(ctx => ctx.db.get(f.visitorId)))?.accessExpiresAt).toBe("2026-10-29T12:00:00Z");
+});
+it("KIS-001 rejects a mixed visitor/employee batch atomically", async () => {
+  const f = await fixture();
+  const ids = await f.t.run(async ctx => ({
+    departmentId: await ctx.db.insert("departments", { projectId: f.projectId, name: "Yeni" }),
+    employeeId: await ctx.db.insert("employees", { projectId: f.projectId, firstName: "Ada", lastName: "Test", email: "", cardNumber: "456789" }),
+  }));
+  await expect(f.caller.mutation(api.employees.bulkUpdateDepartment, { employeeIds: [ids.employeeId, f.visitorId], departmentId: ids.departmentId })).rejects.toThrow("Ziyaretçi");
+  expect((await f.t.run(ctx => ctx.db.get(ids.employeeId)))?.departmentId).toBeUndefined();
+  expect((await f.t.run(ctx => ctx.db.get(f.visitorId)))?.departmentId).toBeUndefined();
+  await expect(f.caller.mutation(api.employees.bulkUpdateDepartment, { employeeIds: [ids.employeeId], departmentId: ids.departmentId })).resolves.toEqual({ updatedCount: 1 });
+});
+it("ALM-001 viewer permissions govern actual event serialization", async () => {
+  const f = await fixture("viewer");
+  await f.t.run(async ctx => {
+    await ctx.db.insert("projectRolePermissions", { projectId: f.projectId, role: "viewer", permissions: ["reports.view"], updatedAt: now, updatedBy: f.userId });
+    await ctx.db.insert("deviceEvents", { projectId: f.projectId, source: "hikvision", eventTime: future, category: "alarm", severity: "warning", label: "Alarm", cardNo: "12345678", rawData: "private", createdAt: future, updatedAt: future });
+  });
+  const result = await f.caller.query(api.alarms.list, { projectId: f.projectId, category: "alarm", status: "all", paginationOpts: { numItems: 25, cursor: null } });
+  expect(result.page).toHaveLength(1);
+  expect(result.page[0]).not.toHaveProperty("cardNo");
+  expect(result.page[0]).not.toHaveProperty("rawData");
 });

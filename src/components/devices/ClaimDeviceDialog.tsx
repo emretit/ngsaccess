@@ -93,12 +93,14 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
     setSelectedId(id);
     setName(dev?.name ?? "");
     setDoorCount(dev?.ideDoorCount ?? 4);
-    setIdeUser(dev?.ideUser ?? "");
-    setIdePassword(dev?.idePassword ?? "");
+    setIdeUser("");
+    setIdePassword("");
     setNewZoneName("");
   };
 
-  const isIde = selected?.brand === "ide_smart";
+  const isIde = !!selected && (selected.brand ?? "ide_smart") === "ide_smart";
+  const needsIdeUser = isIde && !selected?.hasIdeUser;
+  const needsIdePassword = isIde && !selected?.hasIdePassword;
 
   // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
@@ -109,7 +111,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
     !!selectedId &&
     !!targetProjectId &&
     // IDE Smart paneller MQTT login için kullanıcı+şifre ister; boşsa sync sonsuza pending kalır.
-    (!isIde || (ideUser.trim().length > 0 && idePassword.trim().length > 0)) &&
+    (!needsIdeUser || ideUser.trim().length > 0) &&
+    (!needsIdePassword || idePassword.trim().length > 0) &&
     (zoneChoice === NEW_ZONE ? newZoneName.trim().length > 0 && newZoneName.trim().toLocaleLowerCase("tr-TR") !== name.trim().toLocaleLowerCase("tr-TR") : true);
 
   const { run: handleSubmit, pending: submitting } = useAsyncAction(async () => {
@@ -119,9 +122,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
         projectId: targetProjectId,
         name: name.trim() || undefined,
         ideDoorCount: doorCount,
-        ...(isIde
-          ? { ideUser: ideUser.trim(), idePassword: idePassword.trim() }
-          : {}),
+        ...(needsIdeUser ? { ideUser: ideUser.trim() } : {}),
+        ...(needsIdePassword ? { idePassword: idePassword.trim() } : {}),
         ...(zoneChoice === NEW_ZONE
           ? { newZoneName: newZoneName.trim() }
           : { zoneId: zoneChoice as Id<"zones"> }),
@@ -135,8 +137,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   const errors = [
     ...(!targetProjectId ? [{ id: "claim-project", message: "Proje seçin." }] : []),
     ...(!selectedId ? [{ id: "claim-device", message: "Atanacak cihazı seçin." }] : []),
-    ...(isIde && !ideUser.trim() ? [{ id: "claim-user", message: "Panel kullanıcı adı gereklidir." }] : []),
-    ...(isIde && !idePassword.trim() ? [{ id: "claim-password", message: "Panel şifresi gereklidir." }] : []),
+    ...(needsIdeUser && !ideUser.trim() ? [{ id: "claim-user", message: "Panel kullanıcı adı gereklidir." }] : []),
+    ...(needsIdePassword && !idePassword.trim() ? [{ id: "claim-password", message: "Panel şifresi gereklidir." }] : []),
     ...(zoneChoice === NEW_ZONE && (!newZoneName.trim() || newZoneName.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")) ? [{ id: "claim-zone-name", message: !newZoneName.trim() ? "Yeni bölge adı girin veya mevcut bir bölge seçin." : "Bölge adı cihaz adıyla aynı olamaz." }] : []),
   ];
   const fieldError = (id: string) => attempted ? errors.find(error => error.id === id)?.message : undefined;
@@ -166,8 +168,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
             ) : empty ? (
               <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
                 <Inbox className="h-8 w-8" />
-                <p className="text-sm">Atanabilecek cihaz yok.</p>
-                <p className="text-xs">Yeni cihazlar Admin → Cihaz Yönetimi'nde UUID ile eklenir.</p>
+                <p className="text-sm">Projenize ayrılmış cihaz yok.</p>
+                <p className="text-xs">Sistem yöneticisi cihazı projenize ayırdığında burada görünür.</p>
               </div>
             ) : (
               <form onSubmit={event => { event.preventDefault(); submit(); }} noValidate>
@@ -281,7 +283,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
 
                 {isIde && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <FormFieldWrapper
+                    {selected?.hasIdePassword && <p className="sm:col-span-2 text-sm text-muted-foreground">Havuzdaki panel bilgileri kullanılacak</p>}
+                    {needsIdeUser && <FormFieldWrapper
                       htmlFor="claim-user"
                       label="Panel kullanıcı adı"
                       error={fieldError("claim-user")}
@@ -293,8 +296,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                         placeholder="admin"
                         autoComplete="off"
                       />
-                    </FormFieldWrapper>
-                    <FormFieldWrapper
+                    </FormFieldWrapper>}
+                    {needsIdePassword && <FormFieldWrapper
                       htmlFor="claim-password"
                       label="Panel şifresi"
                       error={fieldError("claim-password")}
@@ -306,11 +309,10 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                         placeholder="Panel şifresi"
                         autoComplete="off"
                       />
-                    </FormFieldWrapper>
-                    <p className="sm:col-span-2 text-xs text-muted-foreground">
-                      Panelin MQTT giriş bilgisi. Boş bırakılırsa cihaza
-                      komut gönderilemez ve senkronizasyon takılı kalır.
-                    </p>
+                    </FormFieldWrapper>}
+                    {(needsIdeUser || needsIdePassword) && <p className="sm:col-span-2 text-xs text-muted-foreground">
+                      Havuzda eksik olan cihaz giriş bilgilerini tamamlayın.
+                    </p>}
                   </div>
                 )}
 

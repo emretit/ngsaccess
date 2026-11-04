@@ -86,14 +86,17 @@ describe("device permissions follow project roles and current overrides", () => 
     expect((await technician.as.query(api.devices.list, {}))[0]?.devicePassword).toBeUndefined();
   });
 
-  it("claim pool secrets require devices.manage in at least one project", async () => {
+  it("CIH-02: claim pool requires devices.manage but never returns credentials", async () => {
     const f = await setup();
     const technician = await f.member("technician");
     const viewer = await f.member("viewer");
     const admin = await f.member("admin");
-    await f.t.run(ctx => ctx.db.insert("adminDevices", { name: "Havuz paneli", idePassword: "pool-secret", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+    await f.t.run(ctx => ctx.db.insert("adminDevices", { name: "Havuz paneli", assignedProjectId: f.projectId, ideUser: "pool-user", idePassword: "pool-secret", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
     await expect(viewer.as.query(api.adminDevices.listForClaim, {})).rejects.toThrow("Bu işlem için yetkiniz yok");
-    expect(await technician.as.query(api.adminDevices.listForClaim, {})).toMatchObject([{ idePassword: "pool-secret" }]);
+    const rows = await technician.as.query(api.adminDevices.listForClaim, {});
+    expect(rows).toMatchObject([{ name: "Havuz paneli" }]);
+    expect(rows[0]).not.toHaveProperty("idePassword");
+    expect(rows[0]).not.toHaveProperty("ideUser");
     await admin.as.mutation(api.roles.setRolePermissions, { projectId: f.projectId, role: "technician", permissions: ROLE_DEFAULTS.technician.filter(p => p !== "devices.manage") });
     await expect(technician.as.query(api.adminDevices.listForClaim, {})).rejects.toThrow("Bu işlem için yetkiniz yok");
     await expect(admin.as.query(api.ideDefaults.get, {})).rejects.toThrow("süper admin");

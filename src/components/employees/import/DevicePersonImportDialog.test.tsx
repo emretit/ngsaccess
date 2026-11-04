@@ -193,7 +193,7 @@ function render(props: Partial<ComponentProps<typeof DevicePersonImportDialog>> 
   );
 }
 function seedPreview(selected = ["1", "2", "3", "4"], consent = false) {
- mocks.states = ["", false, preview, selected, consent, null, null, null];
+ mocks.states = ["", false, preview, selected, consent, false, null, null, null];
 }
 function confirm(kind: "import" | "history") {
   const action = mocks.confirmations.find(
@@ -240,6 +240,7 @@ it("biyometri yetkisi yokken not gösterir ve rızasız aktarır", async () => {
     deviceId: "device",
     employeeNos: ["1", "2", "3", "4"],
     biometricConsentConfirmed: false,
+    grantFullDeviceAccess: false,
   });
 });
 it("seçim azaltıldığında ara durum görünür ve aktarım payload'ından çıkar", async () => {
@@ -250,6 +251,7 @@ it("seçim azaltıldığında ara durum görünür ve aktarım payload'ından ç
     deviceId: "device",
     employeeNos: ["1", "3", "4"],
     biometricConsentConfirmed: false,
+    grantFullDeviceAccess: false,
   });
 });
 it("aktarımı hata ile sonuçlanırsa seçimi korur", async () => {
@@ -320,7 +322,7 @@ it("önizlemeyi okur, dört yeni kişiyi seçer; kayıtlı/çakışan kutuları 
 });
 it("aktarım sürerken ilerleme penceresi görünür", () => {
   seedPreview(["1", "2", "3", "4"], true);
-  mocks.states[5] = "import";
+  mocks.states[6] = "import";
   const html = render();
   expect(html).toContain("Kişiler aktarılıyor");
   expect(html).toContain("4 kişi için aktarım");
@@ -343,6 +345,7 @@ it("rıza ile aktarır; bitince diyalog kapanır ve sonuç bildirimde görünür
     deviceId: "device",
     employeeNos: ["1", "2", "3", "4"],
     biometricConsentConfirmed: true,
+    grantFullDeviceAccess: false,
   });
   expect(mocks.preview).toHaveBeenCalledTimes(1);
   expect(close).toHaveBeenCalledWith(false);
@@ -361,7 +364,7 @@ it("eksik parmak izi olan kayıtlı kişiyi seçer ve rıza ile aktarır", async
   expect(html).toContain("Parmak izi ngsplus&#x27;a aktarılacak");
   expect(html).not.toMatch(/aria-label="Mevcut Kişi seç"[^>]*disabled=""/);
   await confirm("import");
-  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["5"], biometricConsentConfirmed: true });
+  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["5"], biometricConsentConfirmed: true, grantFullDeviceAccess: false });
   expect(mocks.success).toHaveBeenCalledWith("Aktarım tamamlandı", "1 parmak izi kaydedildi · 1 rıza kaydı");
 });
 it("biyometri kapalıysa uyarı gösterir ve rıza göndermez", async () => {
@@ -371,5 +374,33 @@ it("biyometri kapalıysa uyarı gösterir ve rıza göndermez", async () => {
   expect(html).toContain("Bu projede biyometri modülü kapalı; parmak izleri aktarılmaz (Ayarlar → Gizlilik)");
   expect(html).not.toContain("Seçilen kişilerin parmak izi açık rızası alınmıştır");
   await confirm("import");
-  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["1"], biometricConsentConfirmed: false });
+  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["1"], biometricConsentConfirmed: false, grantFullDeviceAccess: false });
+});
+
+
+it("kapı, plan ve Türkiye saatindeki tarihleri gösterir; varsayılan onay yeni erişim vermez", async () => {
+  seedPreview(["1"]);
+  mocks.states[2] = { ...preview, rows: [{ ...preview.rows[0], doorRight: "1", rightPlans: [{ doorNo: 1, planTemplateNo: "7" }], valid: { enable: true, beginTime: "2026-01-01T06:00:00Z", endTime: "2026-11-01T15:00:00Z" } }] };
+  const html = render();
+  expect(html).toContain("Kapılar: 1");
+  expect(html).toContain("Kapı planları: 1: 7");
+  expect(html).toContain("09:00");
+  expect(html).toContain("18:00");
+  expect(html).not.toContain('aria-label="Tüm kapılara erişim ver"');
+  expect(mocks.confirmations[0].description).toContain("Yeni erişim verilmeyecek");
+  await confirm("import");
+  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["1"], biometricConsentConfirmed: false, grantFullDeviceAccess: false });
+});
+
+it("erişim yöneticisi açıkça seçince genişlemeyi onayda söyler ve seçimi sunucuya gönderir", async () => {
+  seedPreview(["1"]);
+  mocks.permissions.push("accessRules.manage");
+  expect(render()).toContain('aria-label="Tüm kapılara erişim ver"');
+  expect(mocks.confirmations[0].description).toContain("Yeni erişim verilmeyecek");
+  mocks.checks.get("Tüm kapılara erişim ver")?.(true);
+  render();
+  expect(mocks.confirmations[0].description).toContain("kapı ve saat kısıtları genişletilecek");
+  expect(mocks.confirmations[0].description).toContain("tüm kapılarında haftanın 7 günü 00:00–23:59");
+  await confirm("import");
+  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["1"], biometricConsentConfirmed: false, grantFullDeviceAccess: true });
 });

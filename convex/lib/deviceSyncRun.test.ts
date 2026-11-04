@@ -245,13 +245,13 @@ describe("durable diff dispatch", () => {
     expect(f.tables.deviceSyncRuns.find(row => row._id === id)).toMatchObject({ ruleId: "rule", startedBy: "admin", counts: { queued: 2, skipped: 1 } });
   });
 
-  function actionFixture(brand: "hikvision" | "ide_smart", hasAccess = true) {
+  function actionFixture(brand: "hikvision" | "ide_smart", hasAccess = true, ideRoster = { authorizedCards: [] as string[], orphanCards: [] as string[], removableOrphanCards: [] as string[] }) {
     const device = { _id: "device", projectId: "project", name: "Panel", brand, hikDevIndex: "index", ideUuid: "u", ideUser: "a", idePassword: "p" };
     const runQuery = vi.fn(async (ref: Ref, args: { employeeId?: string }) => {
       switch (getFunctionName(ref)) {
         case "deviceSyncRuns:loadTarget": return { device, run: { _id: "run", projectId: "project", startedAt: Date.now() }, target: { _id: "target", status: "queued" } };
         case "hikvisionSync:getAccessRuleWithDevices": return { rule: { projectId: "project", isActive: true }, devices: [device] };
-        case "deviceSyncRuns:diffIdeContext": return { authorizedCards: [], orphanCards: [] };
+        case "deviceSyncRuns:diffIdeContext": return ideRoster;
         case "hikvisionSync:getEmployeeWithDevices": return { employee: { _id: args.employeeId, projectId: "project", cardNumber: "123", isActive: true }, deviceRules: hasAccess ? [{ device }] : [] };
         default: throw new Error(getFunctionName(ref));
       }
@@ -277,6 +277,19 @@ describe("durable diff dispatch", () => {
     expect(args).toMatchObject({ runId: "run" });
     if (brand === "hikvision") expect(args).toMatchObject({ snapshot: { cardNumber: "123", devices: [{ _id: "device" }] } });
     else expect(args).toMatchObject({ cardNumber: "123", deviceIds: ["device"] });
+  });
+  it("CIH-07: tracked excess cleanup sends only proven managed cards", async () => {
+    const f = actionFixture("ide_smart", false, { authorizedCards: [], orphanCards: ["100", "200", "300"], removableOrphanCards: ["200"] });
+    await invoke(runs.executeRuleDiffTarget, f, { ...f.args, syncMembers: [], reconcileRoster: true });
+    expect(f.runAction).toHaveBeenCalledOnce();
+    expect(getFunctionName(f.runAction.mock.calls[0][0])).toBe("actions/ideGatewayDevice:deleteIdeUserFromPanels");
+    expect(f.runAction.mock.calls[0][1]).toMatchObject({ cardNumber: "200", deviceIds: ["device"] });
+  });
+  it("CIH-07: tracked targeted employee revocation remains deliverable for an imported card", async () => {
+    const f = actionFixture("ide_smart", false, { authorizedCards: [], orphanCards: ["123"], removableOrphanCards: [] });
+    await invoke(runs.executeRuleDiffTarget, f, { ...f.args, syncMembers: [], removed: ["old"], reconcileRoster: true });
+    expect(f.runAction).toHaveBeenCalledOnce();
+    expect(f.runAction.mock.calls[0][1]).toMatchObject({ employeeId: "old", cardNumber: "123", deviceIds: ["device"] });
   });
   it("sends a missing plan without resending unchanged people", async () => {
     const f = actionFixture("hikvision");
@@ -349,7 +362,9 @@ describe("diff operation correlation at the action boundary", () => {
     const runMutation = vi.fn(async (_ref: Ref, _args: object) => "op");
     const runQuery = vi.fn(async () => ({ _id: "ide", brand: "ide_smart", ideUuid: "u", projectId: "project" }));
     await invoke(deleteIdeUserFromPanels, { runQuery, runMutation }, { cardNumber: "123", deviceIds: ["ide"], runId: "run" });
-    expect(runMutation.mock.calls[0][1]).toMatchObject({ deviceId: "ide", runId: "run", opType: "deleteUser", payload: { ideUserId: 123 } });
+    // N3-03: the run id travels into the transactional removal that enqueues deleteUser.
+    expect(getFunctionName(runMutation.mock.calls[0][0])).toBe("accessRules:enqueueIdeUserRemoval");
+    expect(runMutation.mock.calls[0][1]).toMatchObject({ deviceId: "ide", runId: "run", cardNumber: "123" });
   });
 });
 

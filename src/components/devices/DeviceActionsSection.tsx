@@ -84,13 +84,6 @@ export function DeviceActionsSection({
             onClick: handleReconcile,
           },
           {
-            key: "captureCard",
-            label: deviceLabels.captureCard,
-            icon: <ScanLine className="h-4 w-4" />,
-            supported: adapter.supported.capabilities,
-            onClick: handleCaptureCard,
-          },
-          {
             key: "reboot",
             label: deviceLabels.reboot,
             icon: <RotateCw className="h-4 w-4" />,
@@ -110,6 +103,14 @@ export function DeviceActionsSection({
           ]
         : [];
   const actions: DeviceAction[] = [
+    ...(device.brand === "hikvision" && can("employees.manage") ? [{
+      key: "captureCard",
+      busyKey: "captureCard",
+      label: deviceLabels.captureCard,
+      icon: <ScanLine className="h-4 w-4" />,
+      supported: adapter.supported.capabilities,
+      onClick: handleCaptureCard,
+    }] : []),
     ...(can("doors.open") ? overview.doors : []).map((door) => ({
       key: `openDoor:${door._id}`,
       busyKey: `openDoor:${door._id}`,

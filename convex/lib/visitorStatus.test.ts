@@ -31,7 +31,7 @@ describe("ziyaretçi erişim sözleşmesi", () => {
   });
   it("Türkçe ad, tam ad, şirket ve gerçek kartla arar; kartı maskeler", () => {
     const visitor = { firstName: "IŞIL", lastName: "İnce", visitorCompany: "ŞİRKET", cardNumber: "12345678" };
-    for (const term of [" ışıl ", "ışıl ince", "şirket", "12345678"]) expect(visitorMatchesSearch(visitor, term)).toBe(true);
+    for (const term of [" ışıl ", "ışıl ince", "şirket", "12345678"]) expect(visitorMatchesSearch(visitor, term, true)).toBe(true);
     expect(visitorMatchesSearch(visitor, "başka")).toBe(false);
     expect(maskedVisitorCard(visitor.cardNumber)).toBe("•••• 5678");
     expect(maskedVisitorCard("IADE:12345678:some-id")).toBe("İade edildi");

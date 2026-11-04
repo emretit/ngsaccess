@@ -4,7 +4,7 @@ import { hasPermission, requirePermission } from "./lib/permissions";
 import { doorStatusPlanValidator, normalizeDoorStatusPlan, normalizeVerifyPlan, verifyPlanValidator, holidayPlanValidator, holidayRanges, holidaySupportFromSnapshot } from "./lib/doorStatusPlan";
 
 import { ConvexError, v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -16,6 +16,9 @@ import { deleteGroupDoorsForDoor } from "./lib/deviceHelpers";
 import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
 import { ruleDiffSyncPlan } from "./lib/accessRuleDiff";
 import { createRuleDiffRun } from "./deviceSyncRuns";
+import { assertDoorTarget, assertDeviceDoorTargets } from "./lib/doorTarget";
+import { snapshotDoorTarget, syncChangedDoorTarget } from "./lib/doorTargetSync";
+import { upsertGrantStatus } from "./lib/grantStatus";
 
 type ReaderDirection = "entry" | "exit" | "both";
 
@@ -217,6 +220,7 @@ export const create = authedMutation({
         throw new ConvexError("Seçilen cihaz bu kapının projesinde değil");
       }
     }
+    await assertDoorTarget(ctx, { device: targetDevice, hikDoorNo: args.hikDoorNo, ioId: args.ioId });
     const hikDoorStatusPlan = args.hikDoorStatusPlan ? normalizeDoorStatusPlan(args.hikDoorStatusPlan) : undefined;
     const now = new Date().toISOString();
     const doorId = await ctx.db.insert("doors", {
@@ -295,13 +299,17 @@ export const update = authedMutation({
       }
     }
     const deviceId = args.deviceId ?? door.deviceId;
+    const device = deviceId ? await ctx.db.get(deviceId) : null;
     if (deviceId) {
-      const device = await ctx.db.get(deviceId);
       if (!device) throw new Error("Cihaz bulunamadı");
       if (device.projectId !== door.projectId) {
         throw new Error("Seçilen cihaz bu kapının projesinde değil");
       }
     }
+    const targetChanged = (args.hikDoorNo !== undefined && args.hikDoorNo !== door.hikDoorNo) ||
+      (args.deviceId !== undefined && args.deviceId !== door.deviceId) ||
+      (args.ioId !== undefined && args.ioId !== door.ioId);
+    if (targetChanged) await assertDoorTarget(ctx, { device, doorId: door._id, hikDoorNo: args.hikDoorNo ?? door.hikDoorNo, ioId: args.ioId ?? door.ioId });
     const { doorId, ...updates } = args;
     if (updates.name !== undefined) updates.name = updates.name.trim();
     const renamedDoorName = updates.name !== undefined && updates.name !== door.name
@@ -313,8 +321,7 @@ export const update = authedMutation({
     if (updates.hikDoorStatusPlan) updates.hikDoorStatusPlan = normalizeDoorStatusPlan(updates.hikDoorStatusPlan);
     if (updates.hikVerifyPlan) updates.hikVerifyPlan = normalizeVerifyPlan(updates.hikVerifyPlan);
     const now = new Date().toISOString();
-    const targetChanged = (args.hikDoorNo !== undefined && args.hikDoorNo !== door.hikDoorNo) ||
-      (args.deviceId !== undefined && args.deviceId !== door.deviceId);
+    const targetSnapshot = targetChanged ? await snapshotDoorTarget(ctx, door, deviceId) : null;
     const plansChanged = updates.hikDoorStatusPlan !== undefined || updates.hikVerifyPlan !== undefined;
     await ctx.db.patch(doorId, { ...updates, updatedAt: now, ...(plansChanged ? {
       hikPlanSavedAt: now, hikPlanRevision: (door.hikPlanRevision ?? 0) + 1,
@@ -324,7 +331,11 @@ export const update = authedMutation({
       hikPlanResults: undefined, hikPlanApplyError: undefined, hikPlanAppliedAt: undefined,
       hikPlanSavedAt: undefined, hikDoorHolidaySlots: undefined, hikVerifyPlanReaderNos: undefined,
     } : {}) });
-    if (args.hikDoorNo !== undefined || renamedDoorName !== undefined) {
+    if (targetSnapshot) {
+      const after = await ctx.db.get(doorId);
+      if (after) await syncChangedDoorTarget(ctx, targetSnapshot, after, ctx.user._id);
+    }
+    if (targetChanged || args.hikDoorNo !== undefined || renamedDoorName !== undefined) {
       const readers = await ctx.db
         .query("readers")
         .withIndex("by_door", (q) => q.eq("doorId", doorId))
@@ -336,9 +347,11 @@ export const update = authedMutation({
           const name = renamedDoorName !== undefined && suffix !== undefined
             ? `${renamedDoorName}${suffix}`
             : undefined;
-          if (name === undefined && args.hikDoorNo === undefined) return;
+          if (name === undefined && args.hikDoorNo === undefined && !targetChanged) return;
           await ctx.db.patch(reader._id, {
             ...(name !== undefined ? { name } : {}),
+            ...(args.deviceId !== undefined ? { deviceId } : {}),
+            ...(args.ioId !== undefined && (reader.ioId === door.ioId || reader.ioId === undefined) ? { ioId: args.ioId } : {}),
             ...(args.hikDoorNo !== undefined ? {
               hikReaderNo: deriveHikReaderNoFromDoorNo(args.hikDoorNo, reader.direction),
             } : {}),
@@ -567,7 +580,16 @@ export const readerStatus = authedQuery({
 export const getByIdInternal = internalQuery({
   args: { id: v.id("doors") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
+    const door = await ctx.db.get(args.id);
+    // Public actions load the target before their own permission check. Do not
+    // expose conflict names from another project through the validation error.
+    if (door && await ctx.auth.getUserIdentity()) {
+      const allowedProjectIds = await getProjectIdsForUser(ctx);
+      if (!isProjectAllowed(allowedProjectIds, door.projectId)) throw new ConvexError("Bu kapıya erişim yetkiniz yok");
+    }
+    const device = door?.deviceId ? await ctx.db.get(door.deviceId) : null;
+    if (device && door) await assertDeviceDoorTargets(ctx, device, door);
+    return door;
   },
 });
 
@@ -749,5 +771,74 @@ export const recordVerifyReaderBinding = internalMutation({
     if (args.linked) readers.add(args.readerNo);
     else readers.delete(args.readerNo);
     await ctx.db.patch(door._id, { hikVerifyPlanReaderNos: [...readers] });
+  },
+});
+
+/** Frozen credential and target for a rights-only queue entry. */
+export const getDoorRightsOperation = internalQuery({
+  args: { operationId: v.id("hikPendingOperations") },
+  handler: async (ctx, { operationId }) => {
+    const op = await ctx.db.get(operationId);
+    const payload: unknown = op?.payload;
+    if (!op || op.operation !== "updatePerson" || !payload || typeof payload !== "object" || !("rightsOnly" in payload) || payload.rightsOnly !== true || !("employeeId" in payload) || typeof payload.employeeId !== "string" || !("cardNumber" in payload) || typeof payload.cardNumber !== "string") return null;
+    const employeeId = ctx.db.normalizeId("employees", payload.employeeId);
+    if (!employeeId) return null;
+    const device = await ctx.db.get(op.deviceId);
+    if (!device || device.projectId !== op.projectId) return null;
+    await assertDeviceDoorTargets(ctx, device);
+    return { op, device, employeeId, cardNumber: payload.cardNumber };
+  },
+});
+
+export const finishDoorRightsOperation = internalMutation({
+  args: { operationId: v.id("hikPendingOperations"), ok: v.boolean(), removed: v.optional(v.boolean()), error: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const op = await ctx.db.get(args.operationId);
+    if (!op || op.status === "done") return;
+    const payload: unknown = op.payload;
+    if (!payload || typeof payload !== "object" || !("rightsOnly" in payload) || payload.rightsOnly !== true || !("employeeId" in payload) || typeof payload.employeeId !== "string") return;
+    const employeeId = ctx.db.normalizeId("employees", payload.employeeId);
+    await ctx.db.patch(op._id, { status: args.ok ? "done" : "failed", completedAt: args.ok ? Date.now() : undefined, attemptCount: op.attemptCount + 1, lastError: args.ok ? undefined : args.error ?? "Kapı yetkisi gönderilemedi" });
+    if (!employeeId || !op.projectId) return;
+    const grant = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employeeId).eq("deviceId", op.deviceId)).unique();
+    if (grant?.lastOperationId !== op._id) return;
+    await upsertGrantStatus(ctx, { projectId: op.projectId, employeeId, deviceId: op.deviceId, state: args.ok ? args.removed ? "removed" : "effective" : "failed", lastRunId: op.runId, lastOperationId: op._id, lastError: args.error });
+  },
+});
+
+/** A shared rule plan replaces per-person work in the interactive door mutation. */
+export const syncDoorBlanketRule = internalAction({
+  args: { ruleId: v.id("accessRules"), deviceId: v.id("devices"), targetId: v.id("deviceSyncRunTargets"), runId: v.id("deviceSyncRuns") },
+  handler: async (ctx, args): Promise<void> => {
+    const loaded = await ctx.runQuery(internal.deviceSyncRuns.loadTarget, { targetId: args.targetId });
+    if (!loaded || loaded.target.status !== "queued") return;
+    let failure: string | undefined;
+    try {
+      if (loaded.device.brand === "ide_smart") {
+        const result = await ctx.runAction(internal.actions.ideGatewayDevice.syncPermissionToIdePanels, { accessRuleId: args.ruleId, targetDeviceIds: [args.deviceId], runId: args.runId });
+        if (!result.ok || result.skipped.length) failure = result.error ?? result.skipped.join("; ");
+      } else {
+        const result = await ctx.runAction(internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: args.ruleId, targetDeviceIds: [args.deviceId], runId: args.runId });
+        if (result.failed || result.errors.length) failure = result.errors.join("; ") || "Kural gönderilemedi";
+      }
+    } catch (error: unknown) {
+      failure = error instanceof Error ? error.message : "Kural gönderilemedi";
+    }
+    await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: args.targetId, failure, directSent: loaded.device.brand === "hikvision" });
+  },
+});
+
+/** Keep the run open until all IDE user operations have actually been enqueued. */
+export const syncDoorIdeTarget = internalAction({
+  args: { employeeIds: v.array(v.id("employees")), deviceId: v.id("devices"), targetId: v.id("deviceSyncRunTargets"), runId: v.id("deviceSyncRuns") },
+  handler: async (ctx, args): Promise<void> => {
+    const errors: string[] = [];
+    for (const employeeId of args.employeeIds) {
+      try {
+        const result = await ctx.runAction(internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId, targetDeviceIds: [args.deviceId], runId: args.runId });
+        if (!result.ok || !result.queued || result.skipped.length) errors.push(result.error ?? "Kişi yetkisi cihaza gönderilemedi");
+      } catch { errors.push("Kişi yetkisi cihaza gönderilemedi"); }
+    }
+    await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: args.targetId, ...(errors.length ? { failure: errors.join("; ").slice(0, 2000) } : {}) });
   },
 });

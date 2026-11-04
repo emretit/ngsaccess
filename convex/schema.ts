@@ -1,3 +1,4 @@
+import { hikBackfillPendingValidator } from "./lib/gateway/backfillState";
 import { shiftPlanValidator, shiftPlanFields } from "./lib/shiftPlan";
 import { doorStatusPlanValidator, verifyPlanValidator, holidayPlanValidator } from "./lib/doorStatusPlan";
 import { inviteRoleValidator, permissionValidator, projectRoleValidator } from "./lib/roleCatalog";
@@ -294,6 +295,8 @@ export default defineSchema({
     deviceId: v.id("devices"),
     doorId: v.optional(v.id("doors")),
     ioId: v.optional(v.number()),
+    // PDK-003: Hik okuyucu no sürümle saklanır; okuyucu sonradan değişse de geçmiş eşleşme korunur.
+    hikReaderNo: v.optional(v.number()),
   }).index("by_ruleVersionId", ["ruleVersionId"]),
 
   doors: defineTable({
@@ -445,6 +448,8 @@ export default defineSchema({
     hikBackfillCursor: v.optional(v.number()),
     // AcsEvent backfill: son başarılı run'ın epoch ms zamanı.
     hikLastBackfillAt: v.optional(v.number()),
+    // AcsEvent backfill: yarım kalan pencerenin devam kaydı; pencere bitince temizlenir (CIH-04).
+    hikBackfillPending: v.optional(hikBackfillPendingValidator),
     hikWorkStatus: v.optional(
       v.object({
         updatedAt: v.number(),
@@ -943,6 +948,8 @@ export default defineSchema({
     cardNumber: v.string(), // normalize: String(Number(employee.cardNumber))
     projectId: v.optional(v.id("projects")),
     syncedAt: v.number(),
+    // true = ngsplus yazdı (upsert ack); false/undefined = panelden içeri alınmış/belirsiz → otomatik söküm yok.
+    managedByNgsplus: v.optional(v.boolean()),
   })
     .index("by_uuid", ["ideUuid"])
     .index("by_uuid_card", ["ideUuid", "cardNumber"]),

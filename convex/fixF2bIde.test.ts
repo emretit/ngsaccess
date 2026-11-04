@@ -56,8 +56,8 @@ describe("IDE user access end", () => {
     [{}, 0, 0],
     [{ accessExpiresAt: "2026-10-27T12:34:56.999Z" }, 0, Date.parse("2026-10-27T12:34:56Z") / 1000],
     [{ employmentEndDate: "2026-10-31" }, 0, Date.parse("2026-10-31T20:59:59Z") / 1000],
-    [{ accessStartsAt: "2026-10-28T10:00:00Z", accessExpiresAt: "2026-10-27T10:00:00Z" }, 0, Date.parse("2026-10-27T10:00:00Z") / 1000],
-    [{ accessStartsAt: "2026-10-27T10:00:00Z", accessExpiresAt: "2026-10-27T10:00:00Z" }, 0, Date.parse("2026-10-27T10:00:00Z") / 1000],
+    [{ accessExpiresAt: "2026-10-25T10:00:00Z" }, 0, Date.parse("2026-10-25T10:00:00Z") / 1000],
+    [{ employmentEndDate: "2026-10-25" }, 0, Date.parse("2026-10-25T20:59:59Z") / 1000],
     [{ accessStartsAt: "2026-10-27T10:00:00Z", accessExpiresAt: "2026-10-28T10:00:00Z" }, Date.parse("2026-10-27T10:00:00Z") / 1000, Date.parse("2026-10-28T10:00:00Z") / 1000],
   ])("employee sync writes the full access window %j", async (window, start, end) => {
     const f = await fixture();
@@ -336,4 +336,24 @@ describe("visitor removal and expiry-only sync", () => {
     await expect(admin.caller.mutation(api.visitors.update, { visitorId: admin.employeeId, projectId: admin.otherProjectId, accessExpiresAt: "2026-10-27T12:00:00Z" })).rejects.toThrow();
     expect(await admin.jobs()).toEqual([]);
   });
+});
+
+it.each([
+  ["2026-10-28T10:00:00Z", "2026-10-27T10:00:00Z"],
+  ["2026-10-27T10:00:00Z", "2026-10-27T10:00:00Z"],
+  ["2026-10-25T10:00:00Z", "2026-10-25T10:00:00Z"],
+  ["2026-10-27T10:00:00.100Z", "2026-10-27T10:00:00.900Z"],
+])("ZIY-02 IDE sends expired access for interval %s..%s", async (accessStartsAt, accessExpiresAt) => {
+  const f = await fixture();
+  await f.t.run(ctx => ctx.db.patch(f.employeeId, { accessStartsAt, accessExpiresAt }));
+  expect(await f.t.action(internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId: f.employeeId })).toMatchObject({ ok: true });
+  // N-03: 1 is expired even when the panel clock is five minutes behind.
+  const expectedEnd = 1;
+  expect(expectedEnd).toBeLessThan((Date.now() - 5 * 60_000) / 1000);
+  expect(ideUserAccessWindow({ accessStartsAt, accessExpiresAt }, Date.now())).toEqual({ start: 0, end: expectedEnd });
+  const ops = await f.t.run(ctx => ctx.db.query("idePendingOperations").take(10));
+  expect(ops.find(op => op.opType === "upsertUser")).toMatchObject({ status: "pending", payload: { userRecord: { start: 0, end: expectedEnd } } });
+});
+it("IDE expired denial never uses the unlimited end sentinel", () => {
+  expect(ideUserAccessWindow({ accessStartsAt: "1970-01-01T00:00:00Z", accessExpiresAt: "1970-01-01T00:00:00Z" }, Date.now())).toEqual({ start: 0, end: 1 });
 });

@@ -516,6 +516,7 @@ export const bulkUpdateDepartment = authedMutation({
       if (!emp) throw new Error("Çalışan bulunamadı; hiçbir kayıt değiştirilmedi");
       if (!emp.projectId || !allowed.includes(emp.projectId)) throw new Error("Bu çalışana erişim yetkiniz yok");
       assertSameProject(emp.projectId, dept.projectId);
+      assertEmployeeRecord(emp);
     }
     for (const emp of employees) {
       if (emp) await ctx.db.patch(emp._id, { departmentId: dept._id, updatedAt: new Date().toISOString() });

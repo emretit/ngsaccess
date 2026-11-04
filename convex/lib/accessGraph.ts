@@ -216,7 +216,8 @@ export async function resolvePanelAuthorizedCards(
 
 /**
  * Bir IDE panelinin roster'ını kuralla EŞİTLER: panelde olup (idePanelUsers) artık hiçbir aktif
- * kuralla yetkisi olmayan kartları söker (deleteUser). "Güncelle"de çağrılır → re-claim veya
+ * kuralla yetkisi olmayan, ngsplus'ın oluşturduğu kartları söker (deleteUser).
+ * Yerel/kaynağı belirsiz kayıtlar fark olarak korunur. "Güncelle"de çağrılır → re-claim veya
  * eski düzenlemelerden kalan hayalet kartları temizler. Yetki kümesi cihaz VEYA kapı bağıyla
  * kurulur (resolvePanelAuthorizedCards) — yalnız kapı bağıyla yetkili üye hayalet sayılmaz.
  *
@@ -244,7 +245,7 @@ export async function reconcilePanelRosterIde(
     .withIndex("by_uuid", (q) => q.eq("ideUuid", ideUuid))
     .collect();
   for (const row of onPanel) {
-    if (authorized.has(row.cardNumber)) continue;
+    if (row.managedByNgsplus !== true || authorized.has(row.cardNumber)) continue;
     await ctx.scheduler.runAfter(
       0,
       internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,

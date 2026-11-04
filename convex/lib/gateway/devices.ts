@@ -1,6 +1,7 @@
 "use node";
 
 import { gatewayApiCall, gatewayApiCallChecked, parseHikJsonStatus } from "./core";
+import { validateIsapiResult } from "./isapiResult";
 
 // Device lifecycle (gateway-local registry)
 export interface AddDeviceArgs {
@@ -110,10 +111,8 @@ export async function deleteDeviceFromGateway(
     null,
     devIndex,
   );
-  if (result.status !== 200) {
-    return { ok: false, error: `HTTP ${result.status}: ${result.raw}` };
-  }
-  return { ok: true };
+  const validated = validateIsapiResult(result);
+  return validated.ok ? { ok: true } : validated;
 }
 
 export interface GatewayDeviceStatus {
@@ -296,8 +295,8 @@ export async function remoteDoorControl(
     { RemoteControlDoor: { cmd } },
     devIndex,
   );
-  if (result.status === 200) return { ok: true };
-  return { ok: false, error: `HTTP ${result.status}: ${result.raw}` };
+  const validated = validateIsapiResult(result);
+  return validated.ok ? { ok: true } : validated;
 }
 
 export async function openDoor(

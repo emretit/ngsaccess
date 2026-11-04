@@ -38,7 +38,7 @@ const setupStateHandler = (setupAccountState as unknown as {
   _handler: (ctx: QueryCtx, args: { token: string }) => Promise<unknown>;
 })._handler;
 const resetClaimedHandler = (resetClaimedAccount as unknown as {
-  _handler: (ctx: MutationCtx, args: { userId: Id<'users'> }) => Promise<null>;
+  _handler: (ctx: MutationCtx, args: { userId: Id<'users'>; token: string }) => Promise<null>;
 })._handler;
 const claimHandler = (claimSetupAccount as unknown as {
   _handler: (ctx: ActionCtx, args: { token: string; password: string }) => Promise<{ flow: 'signUp' | 'signIn' }>;
@@ -96,7 +96,7 @@ function fixture(options: {
   const get = vi.fn(async (id: Id<'users'> | Id<'authSessions'>) => {
     if (id === sessionId) return sessionExists ? { _id: sessionId, userId: identity, expirationTime: Date.now() + 60_000 } : null;
     if (id === userId) return options.missingUser ? null : user;
-    if (id === attackerId) return { _id: attackerId, email: 'inviter@example.test', role: 'project_admin' };
+    if (id === attackerId) return { _id: attackerId, email: 'inviter@example.test', role: 'project_admin', verified: true };
     return null;
   });
   const patch = vi.fn(async (id: string, changes: Record<string, unknown>) => {
@@ -110,7 +110,7 @@ function fixture(options: {
     return 'new-membership';
   });
   const query = (table: string) => makeQuery(
-    table === 'invites' ? (options.missingInvite ? [] : [invite]) : table === 'userProjects' ? memberships : []);
+    table === 'invites' ? (options.missingInvite ? [] : [invite]) : table === 'userProjects' ? [{ userId: attackerId, projectId, role: 'admin' }, ...memberships] : []);
   const ctx = {
     auth: { getUserIdentity: async () => identity === null ? null : {
       subject: `${identity}|session`, issuer: 'https://auth.example.test', tokenIdentifier: `auth|${identity}`,
@@ -142,7 +142,7 @@ function setupFixture(options: {
   const authAccounts = options.account === false ? [] : [{ provider: 'password', providerAccountId: args.email, userId }];
   const get = vi.fn(async (id: Id<'users'> | Id<'authSessions'>) => id === sessionId
     ? { _id: sessionId, userId, expirationTime: Date.now() + 60_000 }
-    : id === userId ? user : null);
+    : id === userId ? user : id === attackerId ? { _id: attackerId, role: "super_admin", verified: true } : null);
   const patch = vi.fn(async (id: string, changes: Record<string, unknown>) => {
     if (id === userId) user = { ...user, ...changes };
     else if (id === invite._id) Object.assign(invite, changes);
@@ -203,14 +203,14 @@ describe('invites.setupAccountState', () => {
 describe('invites.resetClaimedAccount', () => {
   it('rechecks claimability and does not patch protected accounts', async () => {
     const f = setupFixture({ user: { verified: true } });
-    await expect(resetClaimedHandler(f.mutationCtx, { userId })).rejects.toMatchObject({
+    await expect(resetClaimedHandler(f.mutationCtx, { userId, token: args.token })).rejects.toMatchObject({
       data: { code: 'INVITE_ACCOUNT_EXISTS' },
     });
     expect(f.patch).not.toHaveBeenCalled();
   });
   it('clears stale signup fields while preserving role and verification', async () => {
     const f = setupFixture();
-    await resetClaimedHandler(f.mutationCtx, { userId });
+    await resetClaimedHandler(f.mutationCtx, { userId, token: args.token });
     expect(f.patch).toHaveBeenCalledWith(userId, expect.objectContaining({
       firstCompanyName: undefined, name: undefined, setupToken: undefined,
       tokenExpiresAt: undefined, updatedAt: expect.any(String),
@@ -230,7 +230,7 @@ describe('invites.claimSetupAccount', () => {
     const f = setupFixture();
     const ctx = {
       runQuery: vi.fn(async () => setupStateHandler(f.queryCtx, { token: args.token })),
-      runMutation: vi.fn(async () => { order.push('reset'); return resetClaimedHandler(f.mutationCtx, { userId }); }),
+      runMutation: vi.fn(async () => { order.push('reset'); return resetClaimedHandler(f.mutationCtx, { userId, token: args.token }); }),
     } as unknown as ActionCtx;
     vi.mocked(modifyAccountCredentials).mockImplementationOnce(async () => { order.push('modify'); });
     vi.mocked(invalidateSessions).mockImplementationOnce(async () => { order.push('invalidate'); });
@@ -256,7 +256,7 @@ describe('invites.claimSetupAccount', () => {
     const f = setupFixture();
     const runMutation = vi.fn(async () => {
       f.user().verified = true;
-      return resetClaimedHandler(f.mutationCtx, { userId });
+      return resetClaimedHandler(f.mutationCtx, { userId, token: args.token });
     });
     const ctx = {
       runQuery: vi.fn(async () => setupStateHandler(f.queryCtx, { token: args.token })),
@@ -428,7 +428,7 @@ function createFixture(options: {
     : [];
   if (options.resetAccount) memberships.push({ userId, projectId });
   const invites: Record<string, unknown>[] = (options.existingEmails ?? []).map((email, index) => ({
-    _id: `old-${index}` as Id<'invites'>, email, used: false,
+    _id: `old-${index}` as Id<'invites'>, email, projectId, used: false,
   }));
   const inserted: Record<string, unknown>[] = [];
   const patched: Record<string, unknown>[] = [];
@@ -512,7 +512,7 @@ describe('invites.create internal authorization', () => {
     });
     expect(f.inserted).toHaveLength(0);
   });
-  it('marks all previous unused invitations for the email as used', async () => {
+  it('marks previous unused legacy invites for the same email and project as used', async () => {
     const f = createFixture({ existingEmails: ['new.user@example.test', 'new.user@example.test'] });
     await createHandler(f.ctx, input(f.callerId));
     expect(f.patched).toHaveLength(2);
@@ -532,4 +532,22 @@ describe('invites.list response contract', () => {
     expect(result[0]).toMatchObject({ _id: 'invite-a', email: 'a@example.test', projectId, role: 'project_user' });
     for (const key of ['token', 'type', 'createdBy', '_creationTime']) expect(result[0]).not.toHaveProperty(key);
   });
+});
+
+it('Y-10 rechecks creator authority after setup state before credential modification', async () => {
+  vi.mocked(modifyAccountCredentials).mockClear();
+  vi.mocked(invalidateSessions).mockClear();
+  const f = setupFixture();
+  const ctx = {
+    runQuery: vi.fn(async () => setupStateHandler(f.queryCtx, { token: args.token })),
+    runMutation: vi.fn(async () => {
+      const original = f.get.getMockImplementation();
+      f.get.mockImplementation(async id => id === attackerId ? null : original ? original(id) : null);
+      return resetClaimedHandler(f.mutationCtx, { userId, token: args.token });
+    }),
+  } as unknown as ActionCtx;
+  await expect(claimHandler(ctx, { token: args.token, password: 'Strongpass1' })).rejects.toMatchObject({ data: { code: 'INVITE_INVALID' } });
+  expect(f.patch).not.toHaveBeenCalled();
+  expect(modifyAccountCredentials).not.toHaveBeenCalled();
+  expect(invalidateSessions).not.toHaveBeenCalled();
 });

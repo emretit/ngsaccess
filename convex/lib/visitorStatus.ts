@@ -49,9 +49,9 @@ export function visitorUpdateExpiryError(
   return activating || changed ? visitorExpiryValidation(patch.accessExpiresAt ?? current.accessExpiresAt, now) : null;
 }
 
-export function visitorMatchesSearch(input: { firstName: string; lastName: string; visitorCompany?: string; cardNumber: string }, search?: string): boolean {
+export function visitorMatchesSearch(input: { firstName: string; lastName: string; visitorCompany?: string; cardNumber: string }, search?: string, canRead = false): boolean {
   const needle = search?.trim().toLocaleLowerCase("tr") ?? "";
-  return !needle || [input.firstName, input.lastName, `${input.firstName} ${input.lastName}`, input.visitorCompany ?? "", input.cardNumber]
+  return !needle || [input.firstName, input.lastName, `${input.firstName} ${input.lastName}`, input.visitorCompany ?? "", ...(canRead ? [input.cardNumber] : [])]
     .some(value => value.toLocaleLowerCase("tr").includes(needle));
 }
 
@@ -80,4 +80,13 @@ export function visitorQueryNow(clientNow: number | undefined, serverNow = Date.
   if (!Number.isFinite(requested)) throw new Error("Geçersiz sorgu zamanı");
   const tolerance = 5 * 60 * 1000;
   return Math.min(serverNow + tolerance, Math.max(serverNow - tolerance, requested));
+}
+
+/** A defined visitor access start must precede the effective end. */
+export function visitorAccessRangeError(start: string | undefined, end: string | undefined): string | null {
+  if (start === undefined) return null;
+  const startTime = visitorTime(start);
+  const endTime = visitorTime(end);
+  return !Number.isFinite(startTime) || !Number.isFinite(endTime) || startTime >= endTime
+    ? "Erişim başlangıcı bitişten önce olmalıdır" : null;
 }

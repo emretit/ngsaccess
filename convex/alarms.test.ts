@@ -6,7 +6,7 @@ import type { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { list, summary, acknowledge, getSettings, saveSettings, emailPayload } from "./alarms";
 
-const mocks = vi.hoisted(() => ({ projects: ["p1"], user: { _id: "u1", role: "project_admin" }, events: [] as Array<Record<string, unknown>>, devices: new Map<string, Record<string, unknown>>(), settings: null as Record<string, unknown> | null, audit: vi.fn(async () => undefined) }));
+const mocks = vi.hoisted(() => ({ projects: ["p1"], user: { _id: "u1", role: "project_admin" }, events: [] as Array<Record<string, unknown>>, devices: new Map<string, Record<string, unknown>>(), settings: null as Record<string, unknown> | null, canReadEmployees: true, audit: vi.fn(async () => undefined) }));
 vi.mock("./lib/customFunctions", () => {
   const register = (admin: boolean) => (definition: { handler: unknown }) => ({ _handler: (ctx: { user: { role: string } }, args: unknown) => {
     if (admin && ctx.user.role === "project_user") throw new Error("Bu işlem için yetkiniz yok");
@@ -15,7 +15,7 @@ vi.mock("./lib/customFunctions", () => {
   return { authedQuery: register(false), authedMutation: register(false), };
 });
 vi.mock("./lib/auth", () => ({ getProjectIdsForUser: async () => mocks.projects, isProjectAllowed: (projects: string[], id: string | undefined) => Boolean(id && projects.includes(id)) }));
-vi.mock("./lib/permissions", () => ({ requirePermission: async (_ctx: unknown, user: { role: string }, projectId: string) => {
+vi.mock("./lib/permissions", () => ({ hasPermission: async () => mocks.canReadEmployees, requirePermission: async (_ctx: unknown, user: { role: string }, projectId: string) => {
   if (user.role === "project_user" || !mocks.projects.includes(projectId)) throw new Error("Bu işlem için yetkiniz yok");
 } }));
 vi.mock("./lib/audit", () => ({ writeAudit: mocks.audit }));
@@ -27,9 +27,10 @@ vi.mock("convex-helpers/server/stream", () => ({
         const query: IndexQuery = {
           eq(field, value) { constraints.push(["eq", field, value]); return query; },
           gte(field, value) { constraints.push(["gte", field, value]); return query; },
+          lte(field, value) { constraints.push(["lte", field, value]); return query; },
         };
         build(query);
-        const rows = mocks.events.filter(row => constraints.every(([operator, field, value]) => operator === "eq" ? row[field] === value : String(row[field]) >= String(value)));
+        const rows = mocks.events.filter(row => constraints.every(([operator, field, value]) => operator === "eq" ? row[field] === value : operator === "lte" ? String(row[field]) <= String(value) : String(row[field]) >= String(value)));
         return {
         order: () => ({
           filterWith: (predicate: (row: Record<string, unknown>) => Promise<boolean>) => ({
@@ -57,6 +58,7 @@ vi.mock("convex-helpers/server/stream", () => ({
 type IndexQuery = {
   eq: (field: string, value: unknown) => IndexQuery;
   gte: (field: string, value: unknown) => IndexQuery;
+  lte: (field: string, value: unknown) => IndexQuery;
 };
 
 function event(id: string, overrides: Record<string, unknown> = {}) {
@@ -64,14 +66,14 @@ function event(id: string, overrides: Record<string, unknown> = {}) {
 }
 function makeCtx() {
   const records = new Map(mocks.events.map(row => [String(row._id), row]));
-  const selectRows = (table: string, constraints: Array<[string, string, unknown]>) => (table === "deviceEvents" ? mocks.events : []).filter(row => constraints.every(([operator, field, value]) => operator === "eq" ? row[field] === value : String(row[field]) >= String(value)));
+  const selectRows = (table: string, constraints: Array<[string, string, unknown]>) => (table === "deviceEvents" ? mocks.events : []).filter(row => constraints.every(([operator, field, value]) => operator === "eq" ? row[field] === value : operator === "lte" ? String(row[field]) <= String(value) : String(row[field]) >= String(value)));
   const db = {
     get: vi.fn(async (id: string) => records.get(id) ?? mocks.devices.get(id) ?? null),
     patch: vi.fn(async (id: string, changes: Record<string, unknown>) => { const row = records.get(id); if (row) Object.assign(row, changes); }),
     insert: vi.fn(async (_table: string, row: Record<string, unknown>) => { mocks.settings = row; return "settings-id"; }),
     query: vi.fn((table: string) => ({ withIndex: (_name: string, build: (query: IndexQuery) => unknown) => {
       const constraints: Array<[string, string, unknown]> = [];
-      const query: IndexQuery = { eq(field, value) { constraints.push(["eq", field, value]); return query; }, gte(field, value) { constraints.push(["gte", field, value]); return query; } };
+      const query: IndexQuery = { eq(field, value) { constraints.push(["eq", field, value]); return query; }, gte(field, value) { constraints.push(["gte", field, value]); return query; }, lte(field, value) { constraints.push(["lte", field, value]); return query; } };
       build(query);
       const rows = selectRows(table, constraints);
       return { order: () => ({ take: async (limit: number) => rows.slice(0, limit) }), unique: async () => table === "alarmSettings" ? mocks.settings : null, take: async (limit: number) => rows.slice(0, limit) };
@@ -83,7 +85,7 @@ function handler<T>(fn: unknown): T { return (fn as { _handler: T })._handler; }
 const projectId = "p1" as Id<"projects">;
 const baseArgs = { projectId, category: "alarm" as const, status: "open" as const, paginationOpts: { numItems: 2, cursor: null } };
 
-beforeEach(() => { mocks.projects = ["p1"]; mocks.user = { _id: "u1", role: "project_admin" }; mocks.events = []; mocks.devices.clear(); mocks.settings = null; mocks.audit.mockClear(); });
+beforeEach(() => { mocks.canReadEmployees = true; mocks.projects = ["p1"]; mocks.user = { _id: "u1", role: "project_admin" }; mocks.events = []; mocks.devices.clear(); mocks.settings = null; mocks.audit.mockClear(); });
 
 describe("alarm handlers", () => {
   it("lists only authorized projects", async () => {
@@ -145,4 +147,38 @@ describe("alarm handlers", () => {
     expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ targetTable: "alarmSettings", newValue: { emailEnabled: true, minSeverity: "warning", recipientCount: 1 } }));
     expect(JSON.stringify(mocks.audit.mock.calls)).not.toContain("private@example.com");
   });
+});
+
+it("ALM-001 omits personal event fields without employees.view", async () => {
+  mocks.events = [event("secret", { cardNo: "12345678", rawData: "private", alarmEmailRecipients: ["private@example.com"] })];
+  const fn = handler<(ctx: QueryCtx, args: FunctionArgs<typeof api.alarms.list>) => Promise<FunctionReturnType<typeof api.alarms.list>>>(list);
+  mocks.canReadEmployees = false;
+  const restricted = (await fn(makeCtx() as unknown as QueryCtx, baseArgs)).page[0];
+  expect(restricted).not.toHaveProperty("cardNo");
+  expect(restricted).not.toHaveProperty("rawData");
+  expect(restricted).not.toHaveProperty("alarmEmailRecipients");
+  mocks.canReadEmployees = true;
+  expect((await fn(makeCtx() as unknown as QueryCtx, baseArgs)).page[0]).toMatchObject({ cardNo: "12345678", rawData: "private" });
+});
+it.each([undefined, "2026-10-01T00:00:00.000Z"])("ALM-012 bounds the index before scanning (from %s)", async from => {
+  mocks.events = [...Array.from({ length: 2001 }, (_, i) => event(`new-${i}`, { eventTime: "2026-11-01T00:00:00.000Z" })), event("target")];
+  const fn = handler<(ctx: QueryCtx, args: FunctionArgs<typeof api.alarms.list>) => Promise<FunctionReturnType<typeof api.alarms.list>>>(list);
+  const result = await fn(makeCtx() as unknown as QueryCtx, { ...baseArgs, from, to: "2026-10-19T10:00:00.000Z" });
+  expect(result.page.map(row => row._id)).toEqual(["target"]);
+  expect(result.scannedCount).toBe(1);
+});
+
+it.each([true, false])("Y-09 safe offline duration is available with employees.view=%s", async canRead => {
+  mocks.canReadEmployees = canRead;
+  const rawData = JSON.stringify({ offlineFrom: 1000, offlineTo: 121000, durationMs: 120000, secret: "hidden" });
+  mocks.events = [event("offline", { rawData, resolvedAt: "2026-10-19T10:02:00Z" })];
+  const fn = handler<(ctx: QueryCtx, args: FunctionArgs<typeof api.alarms.list>) => Promise<FunctionReturnType<typeof api.alarms.list>>>(list);
+  const result = await fn(makeCtx() as unknown as QueryCtx, baseArgs);
+  expect(result.page[0]).toMatchObject({ offlineDurationMs: 120000 });
+  if (!canRead) expect(result.page[0]).not.toHaveProperty("rawData");
+});
+it.each(["broken", JSON.stringify({ durationMs: 2 }), JSON.stringify({ offlineFrom: 2, offlineTo: 1, durationMs: -1 }), JSON.stringify({ offlineFrom: 1, offlineTo: 2, durationMs: 10 })])("Y-09 invalid connectivity period has no safe duration: %s", async rawData => {
+  mocks.events = [event("offline", { rawData })];
+  const fn = handler<(ctx: QueryCtx, args: FunctionArgs<typeof api.alarms.list>) => Promise<FunctionReturnType<typeof api.alarms.list>>>(list);
+  expect((await fn(makeCtx() as unknown as QueryCtx, baseArgs)).page[0]?.offlineDurationMs).toBeUndefined();
 });

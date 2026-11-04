@@ -500,15 +500,20 @@ export const deleteOfflineHikBatch = internalAction({
 
 export const diffIdeContext = internalQuery({
   args: { deviceId: v.id("devices"), reconcileRoster: v.boolean() },
-  handler: async (ctx, args): Promise<{ authorizedCards: string[]; orphanCards: string[] }> => {
+  handler: async (ctx, args): Promise<{ authorizedCards: string[]; orphanCards: string[]; removableOrphanCards: string[] }> => {
     const panel = await ctx.db.get(args.deviceId);
-    if (!panel?.ideUuid || panel.brand !== "ide_smart") return { authorizedCards: [], orphanCards: [] };
+    if (!panel?.ideUuid || panel.brand !== "ide_smart") return { authorizedCards: [], orphanCards: [], removableOrphanCards: [] };
     const ideUuid = panel.ideUuid;
     const { authorized } = await resolvePanelAuthorizedCards(ctx, args.deviceId);
     const roster = args.reconcileRoster ? await ctx.db.query("idePanelUsers")
       .withIndex("by_uuid", q => q.eq("ideUuid", ideUuid)).take(MAX_OPS + 1) : [];
     if (roster.length > MAX_OPS) throw new ConvexError("Panel kullanıcı sınırı aşıldı (2000); sonuç doğrulanamadı");
-    return { authorizedCards: [...authorized], orphanCards: roster.filter(row => !authorized.has(row.cardNumber)).map(row => row.cardNumber) };
+    const orphans = roster.filter(row => !authorized.has(row.cardNumber));
+    return {
+      authorizedCards: [...authorized],
+      orphanCards: orphans.map(row => row.cardNumber),
+      removableOrphanCards: orphans.filter(row => row.managedByNgsplus === true).map(row => row.cardNumber),
+    };
   },
 });
 
@@ -562,10 +567,11 @@ export const executeRuleDiffTarget = internalAction({
         });
         if (result.failed || result.removed + result.queued + (result.superseded ?? 0) !== 1) failures.push(result.errors.join("; ") || "Kişi cihazdan silinemedi");
       }
-      const ideContext: { authorizedCards: string[]; orphanCards: string[] } = device.brand === "ide_smart"
+      const ideContext: { authorizedCards: string[]; orphanCards: string[]; removableOrphanCards: string[] } = device.brand === "ide_smart"
         ? await ctx.runQuery(internal.deviceSyncRuns.diffIdeContext, { deviceId: device._id, reconcileRoster: args.reconcileRoster && (currentRuleTarget || args.wasRuleTarget) })
-        : { authorizedCards: [], orphanCards: [] };
-      const deleteCards = new Set(ideContext.orphanCards);
+        : { authorizedCards: [], orphanCards: [], removableOrphanCards: [] };
+      // General excess cleanup requires provenance; explicit employee revocations below remain targeted.
+      const deleteCards = new Set(ideContext.removableOrphanCards);
       const deleteEmployeesByCard = new Map<string, Id<"employees">>();
       for (const employeeId of new Set([...args.removed, ...args.syncMembers])) {
         checkTimeout();

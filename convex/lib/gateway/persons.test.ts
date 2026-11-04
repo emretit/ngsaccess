@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildDoorPlans, buildPersonPayload, hikValidBeginFromAccessStart, hikValidEndFromAccessEnd } from "./persons";
 import { parseHikJsonStatus } from "./core";
 
@@ -71,8 +71,19 @@ describe("Hik access end validity", () => {
     expect(hikValidEndFromAccessEnd(Date.parse("2026-10-26T15:00:00.999Z"))).toBe("2026-10-26T18:00:00");
     expect(hikValidEndFromAccessEnd(Date.parse("2026-10-31T20:59:59.999Z"))).toBe("2026-10-31T23:59:59");
   });
-  it.each([undefined, "2026-01-01T00:00:00", "2026-01-02T00:00:00"])("moves begin %s one minute before an expired or equal end", beginTime => {
+  it.each(["2026-01-01T00:00:00", "2026-01-02T00:00:00"])("sends an expired window for reversed/equal begin %s", beginTime => {
     const valid = buildPersonPayload({ ...person, beginTime, endTime: "2026-01-01T00:00:00", planTemplateNo: 4, doorCount: 1 }).Valid;
+    expect(valid).toMatchObject({ beginTime: "2000-01-01T00:00:00", endTime: "2000-01-01T00:01:00" });
+  });
+  it("N-03 denies a reversed future window even with a slow device clock", () => {
+    vi.spyOn(Date, "now").mockReturnValueOnce(Date.parse("2026-11-03T09:00:00Z"));
+    const valid = buildPersonPayload({ ...person, beginTime: "2026-11-05T10:00:00", endTime: "2026-11-04T12:00:00", planTemplateNo: 4, doorCount: 1 }).Valid;
+    expect(valid).toMatchObject({ beginTime: "2000-01-01T00:00:00", endTime: "2000-01-01T00:01:00" });
+    expect(Date.parse(`${valid.endTime}+03:00`)).toBeLessThan(Date.now() - 5 * 60_000);
+    vi.restoreAllMocks();
+  });
+  it("preserves the original past end when no explicit begin is supplied", () => {
+    const valid = buildPersonPayload({ ...person, beginTime: undefined, endTime: "2026-01-01T00:00:00", planTemplateNo: 4, doorCount: 1 }).Valid;
     expect(valid).toMatchObject({ beginTime: "2025-12-31T23:59:00", endTime: "2026-01-01T00:00:00" });
   });
   it("preserves an explicit begin earlier than end", () => {

@@ -9,6 +9,7 @@ import {
   bridgeDedupeKey,
   removeScopedPerson,
   syncEmployeeDevices,
+  syncEmployeeDoorRights,
   syncWeekPlanDevices,
 } from "../lib/hikSyncEmployee";
 import type { Id } from "../_generated/dataModel";
@@ -358,5 +359,23 @@ export const deleteEmployeeFingerprintFromDevicesInternal = internalAction({
     if (!data || !makeProjectGuard(args.allowedProjectIds)(data.employee.projectId)) return { removed: 0, failed: 0, errors: [] };
     await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: args.employeeId, employeeNo: data.employee.cardNumber, fingerNo: args.fingerPrintID });
     return { removed: 0, failed: 0, errors: [] };
+  },
+});
+
+/** Initial delivery and retries share the same no-deletion implementation. */
+export const syncDoorRightsOperation = internalAction({
+  args: { operationId: v.id("hikPendingOperations"), retrying: v.optional(v.boolean()) },
+  handler: async (ctx, args): Promise<{ ok: boolean; error?: string }> => {
+    const loaded = await ctx.runQuery(internal.doors.getDoorRightsOperation, { operationId: args.operationId });
+    if (!loaded) return { ok: false, error: "Kapı yetkisi işi bulunamadı" };
+    if (loaded.op.status === "done") return { ok: true };
+    let result: { ok: boolean; removed?: boolean; error?: string };
+    try {
+      result = await syncEmployeeDoorRights(ctx, { employeeId: loaded.employeeId, cardNumber: loaded.cardNumber, device: loaded.device, runId: loaded.op.runId });
+    } catch { result = { ok: false, error: "Kapı yetkisi cihazda güncellenemedi" }; }
+    // Retry worker records failures itself. Successful completion is written here
+    // so its generic markOpDone is a no-op and cannot call a zero-rights grant effective.
+    if (result.ok || !args.retrying) await ctx.runMutation(internal.doors.finishDoorRightsOperation, { operationId: args.operationId, ...result });
+    return result;
   },
 });

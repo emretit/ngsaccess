@@ -39,7 +39,7 @@ function historyContext() {
   return { ctx, device, deviceId, runQuery, runMutation, runAfter };
 }
 
-it("C-07 caps each run at 1500 events, records the event time and resumes the same search", async () => {
+it("C-07 caps each run at 1500 events, preserves completed time and resumes the same search", async () => {
   vi.useFakeTimers();
   const startedAt = Date.parse("2026-10-26T12:00:00Z");
   vi.setSystemTime(startedAt);
@@ -54,8 +54,8 @@ it("C-07 caps each run at 1500 events, records the event time and resumes the sa
   const result = await runBackfillAllDevicesEvents(f.ctx);
   expect(result).toMatchObject({ devices: 1, errors: [expect.stringContaining("kısmen")] });
   expect(search).toHaveBeenCalledTimes(50);
-  expect(getFunctionName(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[0] as Parameters<typeof getFunctionName>[0])).toBe("devices:setHikBackfillProgress");
-  expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toEqual({ deviceId: f.deviceId, cursor: 1500, at: Date.parse(eventTime) });
+  expect(f.runMutation.mock.calls.some(([ref]) => getFunctionName(ref) === "devices:setHikBackfillProgress")).toBe(false);
+  expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toMatchObject({ pending: { position: 1500, lastEventAt: Date.parse(eventTime) } });
   expect(warning).toHaveBeenCalledTimes(1);
   const scheduled = f.runAfter.mock.calls[0];
   expect(getFunctionName(scheduled[1])).toBe("actions/hikQueueWorker:continueHikBackfill");
@@ -71,7 +71,7 @@ it("C-07 caps each run at 1500 events, records the event time and resumes the sa
     startTime: continuation.startTime, endTime: new Date(startedAt).toISOString(),
   });
   expect(getFunctionName(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[0] as Parameters<typeof getFunctionName>[0])).toBe("devices:setHikBackfillProgress");
-  expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toEqual({ deviceId: f.deviceId, cursor: 1501, at: startedAt });
+  expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toMatchObject({ deviceId: f.deviceId, cursor: 1501, at: startedAt, searchID: continuation.searchID, position: 1501 });
   expect(f.runAfter).toHaveBeenCalledTimes(1);
 });
 
@@ -83,14 +83,15 @@ it.each([1, 50])("completes an exhausted search at %i pages without scheduling m
   expect(await runBackfillAllDevicesEvents(f.ctx)).toEqual({ devices: 1, errors: [] });
   expect(searchAcsEventsOnDevice).toHaveBeenCalledTimes(pages);
   expect(f.runAfter).not.toHaveBeenCalled();
-  expect(f.runMutation).toHaveBeenCalledTimes(1);
+  expect(f.runMutation.mock.calls.filter(([ref]) => getFunctionName(ref) === "devices:setHikBackfillProgress")).toHaveLength(1);
 });
 
 it("does not advance progress or schedule a continuation when the device search fails", async () => {
   const f = historyContext();
   vi.mocked(searchAcsEventsOnDevice).mockReset().mockResolvedValue({ ok: false, events: [], total: 0, numMatches: 0, nextPosition: 0, hasMore: false, error: "Bağlantı yok" });
   expect(await runBackfillAllDevicesEvents(f.ctx)).toMatchObject({ errors: ["device: Bağlantı yok"] });
-  expect(f.runMutation).not.toHaveBeenCalled();
+  expect(f.runMutation.mock.calls.some(([ref]) => getFunctionName(ref) === "devices:setHikBackfillProgress")).toBe(false);
+  expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toMatchObject({ pending: { position: 0 } });
   expect(f.runAfter).not.toHaveBeenCalled();
 });
 
@@ -136,7 +137,8 @@ it("returns a visible partial result for authorized manual backfill, including d
   vi.spyOn(console, "warn").mockImplementation(() => {});
   const result = await runBackfillDeviceEvents({ ...f.ctx, user: { _id: "user" } as Doc<"users"> }, { deviceId: f.deviceId, maxPages: 1 });
   expect(result).toMatchObject({ ok: false, partial: true, scanned: 1, skipped: 1, error: expect.stringContaining("devam işi planlandı") });
-  expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toMatchObject({ at: eventAt });
+  expect(f.runMutation.mock.calls.some(([ref]) => getFunctionName(ref) === "devices:setHikBackfillProgress")).toBe(false);
+  expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toMatchObject({ pending: { position: 1, lastEventAt: eventAt } });
   expect(f.runAfter).toHaveBeenCalledTimes(1);
 });
 
@@ -177,9 +179,8 @@ it.each(["cursor", "events"])("stops without scheduling when %s does not advance
   });
   expect(searchAcsEventsOnDevice).toHaveBeenCalledTimes(1);
   expect(f.runAfter).not.toHaveBeenCalled();
-  expect(f.runMutation).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
-    deviceId: f.deviceId, cursor: undefined, at: f.device.hikLastBackfillAt,
-  });
+  expect(f.runMutation.mock.calls.some(([ref]) => getFunctionName(ref) === "devices:setHikBackfillProgress")).toBe(false);
+  expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toMatchObject({ pending: { position: 30 } });
   expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("ilerlemediği"));
 });
 

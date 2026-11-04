@@ -254,3 +254,57 @@ describe("bridge HTTP → markAck error contract", () => {
     expect(await f.t.run(ctx => ctx.db.query("idePanelUsers").collect())).toEqual([]);
   });
 });
+
+it.each(["update", "setIdeUuid"] as const)("CIH-01: %s cannot take a deleted panel's foreign roster", async method => {
+  const f = await fixture();
+  const oldDeviceId = await create(f);
+  await roster(f, oldDeviceId);
+  await f.as.mutation(api.devices.remove, { deviceId: oldDeviceId });
+  const deviceId = await f.as.mutation(api.devices.create, {
+    name: "B panel", projectId: f.otherProjectId, brand: "ide_smart", ideUuid: otherUuid,
+  });
+  const before = await snapshot(f);
+  const args = { deviceId, ideUuid: ` ${uuid} ` };
+  await expect(method === "update"
+    ? f.as.mutation(api.devices.update, args)
+    : f.t.mutation(internal.devices.setIdeUuid, args))
+    .rejects.toMatchObject({ data: { code: "IDE_DEVICE_MOVE_UNSUPPORTED" } });
+  expect(await snapshot(f)).toEqual(before);
+});
+
+it("Y-04: unchanged UUID with a legacy foreign roster row still saves other fields", async () => {
+  const f = await fixture();
+  const deviceId = await create(f);
+  await f.t.run(ctx => ctx.db.insert("idePanelUsers", { ideUuid: uuid, deviceId, projectId: f.otherProjectId, cardNumber: "123", syncedAt: Date.now() }));
+  await f.as.mutation(api.devices.update, { deviceId, name: "Renamed", ideUuid: uuid });
+  expect(await f.t.run(ctx => ctx.db.get(deviceId))).toMatchObject({ name: "Renamed", ideUuid: uuid });
+});
+
+it("CIH-02: claim copies pool credentials on the server without exposing them", async () => {
+  const f = await fixture("project_user");
+  const adminDeviceId = await f.t.run(ctx => ctx.db.insert("adminDevices", {
+    name: "Pool", assignedProjectId: f.projectId, brand: "ide_smart", ideUuid: uuid, ideUser: "pool-user", idePassword: "pool-password", ...timestamps,
+  }));
+  const rows = await f.as.query(api.adminDevices.listForClaim, {});
+  expect(rows[0]).toMatchObject({ hasIdeUser: true, hasIdePassword: true });
+  expect(rows[0]).not.toHaveProperty("ideUser");
+  expect(rows[0]).not.toHaveProperty("idePassword");
+  const { deviceId } = await f.as.mutation(api.devices.claimDevice, { adminDeviceId, projectId: f.projectId });
+  expect(await f.t.run(ctx => ctx.db.get(deviceId))).toMatchObject({ ideUser: "pool-user", idePassword: "pool-password" });
+});
+
+it("CIH-02: claim requires missing credentials and accepts manual values only for missing fields", async () => {
+  const f = await fixture("project_user");
+  const adminDeviceId = await f.t.run(ctx => ctx.db.insert("adminDevices", {
+    name: "Pool", assignedProjectId: f.projectId, brand: "ide_smart", ideUuid: uuid, ideUser: "pool-user", ...timestamps,
+  }));
+  const rows = await f.as.query(api.adminDevices.listForClaim, {});
+  expect(rows[0]).toMatchObject({ hasIdeUser: true, hasIdePassword: false });
+  const before = await snapshot(f);
+  await expect(f.as.mutation(api.devices.claimDevice, { adminDeviceId, projectId: f.projectId })).rejects.toThrow("şifresi");
+  expect(await snapshot(f)).toEqual(before);
+  const { deviceId } = await f.as.mutation(api.devices.claimDevice, {
+    adminDeviceId, projectId: f.projectId, ideUser: "ignored", idePassword: " manual-secret ",
+  });
+  expect(await f.t.run(ctx => ctx.db.get(deviceId))).toMatchObject({ ideUser: "pool-user", idePassword: "manual-secret" });
+});

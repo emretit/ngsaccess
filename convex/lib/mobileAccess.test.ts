@@ -31,3 +31,20 @@ describe("employeeWithinAccessEpoch employment end (QR/mobil/check-in)", () => {
     expect(employeeWithinAccessEpoch(employee({}), Number.NaN)).toBe(false);
   });
 });
+
+import { mobileRuleAllows } from "./mobileAccess";
+import { isRuleOpenAt } from "./ruleSchedule";
+
+describe("mobile/card final minute contract", () => {
+  const rule = { isActive: true, days: ["Monday"], startTime: "09:00", endTime: "18:00" } as Doc<"accessRules">;
+  it.each([ ["18:00:00", true], ["18:00:30", true], ["18:00:59", true], ["18:01:00", false] ])("agrees at %s Turkey time", (time, allowed) => {
+    const now = Date.parse(`2026-11-02T${time}+03:00`);
+    expect(mobileRuleAllows(rule, now)).toBe(allowed);
+    expect(mobileRuleAllows(rule, now)).toBe(isRuleOpenAt(rule, now));
+  });
+  it("retains fail-closed schedule validation", () => {
+    expect(mobileRuleAllows({ ...rule, days: [] }, Date.now())).toBe(false);
+    expect(mobileRuleAllows({ ...rule, startTime: "22:00", endTime: "06:00" }, Date.now())).toBe(false);
+    expect(mobileRuleAllows(rule, NaN)).toBe(false);
+  });
+});

@@ -1,7 +1,8 @@
 "use node";
 
 import { accessEndsAtMs } from "../lib/accessEnd";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import { hikBackfillContinuationFields } from "../lib/gateway/backfillState";
 import { runBackfillContinuation } from "../lib/gatewayBackfill";
 import { internalAction, type ActionCtx } from "../_generated/server";
 import { sendStoredDoorStatusPlan, sendStoredVerifyPlan } from "../lib/gatewayCommand";
@@ -69,7 +70,12 @@ async function processQueue(ctx: ActionCtx, issueId?: Id<"hikPendingOperations">
         try {
           const r = await executeOperation(ctx, c);
           return { id: c._id, ok: r.ok, error: r.error, superseded: r.superseded };
-        } catch { return { id: c._id, ok: false, error: "Cihaz işlemi tamamlanamadı" }; }
+        } catch (error: unknown) {
+          const data: unknown = error instanceof ConvexError ? error.data : undefined;
+          const message = data && typeof data === "object" && "code" in data && data.code === "DOOR_TARGET_CONFLICT"
+            && "message" in data && typeof data.message === "string" ? data.message : "Cihaz işlemi tamamlanamadı";
+          return { id: c._id, ok: false, error: message };
+        }
       }),
     );
 
@@ -139,6 +145,7 @@ async function executeOperation(
   switch (c.operation) {
     case "addPerson":
     case "updatePerson": {
+      if (payload.rightsOnly === true) return await ctx.runAction(internal.actions.hikvisionSync.syncDoorRightsOperation, { operationId: c._id, retrying: true });
       const employee = c.employee;
       if (!employee?.cardNumber) return { ok: false, error: "Çalışan veya kart numarası yok" };
       const planTemplateNo = payload.planTemplateNo;
@@ -182,8 +189,8 @@ async function executeOperation(
       return await deleteCardFromDevice(devIndex, cardNo);
     }
     case "deleteFace": {
-      const employeeNo = c.employee?.cardNumber;
-      if (!employeeNo) return { ok: false, error: "Çalışan veya kart numarası yok" };
+      const employeeNo = payload.employeeNo ?? payload.cardNumber ?? c.employee?.cardNumber;
+      if (typeof employeeNo !== "string" || !employeeNo.trim()) return { ok: false, error: "Çalışan veya kart numarası yok" };
       return await deleteFaceFromDevice(devIndex, employeeNo);
     }
     case "addFingerprint": {
@@ -252,10 +259,8 @@ async function executeOperation(
 /** Continue the same bounded AcsEvent search without re-reading its first pages. */
 export const continueHikBackfill = internalAction({
   args: {
-    deviceId: v.id("devices"), devIndex: v.string(), searchID: v.string(),
-    position: v.number(), startedAt: v.number(), maxPages: v.number(),
-    startTime: v.optional(v.string()), lastEventAt: v.optional(v.number()),
-    maxSerialNo: v.optional(v.number()), lastPageKey: v.optional(v.string()),
+    deviceId: v.id("devices"),
+    ...hikBackfillContinuationFields,
     // Eski planlı işler için kabul edilir; artık kullanılmıyor.
     observedSerialNo: v.optional(v.number()),
     hop: v.optional(v.number()),

@@ -11,6 +11,7 @@ import { assertAccessSchedule, assertAccessScheduleUpdate } from "./lib/accessRu
 import { createRuleDiffRun } from "./deviceSyncRuns";
 
 import { internal } from "./_generated/api";
+import { normalizeIdeCard } from "./ideSync";
 import { ConvexError, v, type Infer } from "convex/values";
 import { retainedDiffDoorIds, applyRelationDiff, assertLegacyRuleReplacement, ruleDiffSyncPlan, RULE_DETAILS_MEMBER_LIMIT, RULE_DETAILS_RELATION_LIMIT } from "./lib/accessRuleDiff";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
@@ -19,6 +20,8 @@ import {
   resolveRuleIdeDeviceIds,
   reconcileRemovedEmployeeIde,
   reconcilePanelRosterIde,
+  resolvePanelAuthorizedCards,
+  resolveEmployeeIdeDeviceIds,
 } from "./lib/accessGraph";
 import { diffIds, staleGroupDoorIds } from "./lib/reconcileMath";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -28,6 +31,97 @@ import { internalMutation } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 const HIK_RECONCILE_BATCH = 25;
+
+/** Keep both employee revocation and managed-roster cleanup out of the UI mutation. */
+export const reconcileIdeRemovalBatch = internalMutation({
+  args: { ruleId: v.id("accessRules"), projectId: v.id("projects"), panels: v.array(v.id("devices")), employeeIds: v.array(v.id("employees")) },
+  handler: async (ctx, args): Promise<void> => {
+    for (const employeeId of args.employeeIds.slice(0, 100)) {
+      const employee = await ctx.db.get(employeeId);
+      if (employee?.projectId !== args.projectId) continue;
+      await reconcileRemovedEmployeeIde(ctx, { employeeId, projectId: args.projectId, candidatePanels: args.panels });
+    }
+    if (args.employeeIds.length > 100) {
+      await ctx.scheduler.runAfter(0, internal.accessRules.reconcileIdeRemovalBatch, { ...args, employeeIds: args.employeeIds.slice(100) });
+    } else if (args.panels.length) {
+      await ctx.scheduler.runAfter(0, internal.accessRules.reconcileIdeRosterPage, { projectId: args.projectId, panels: args.panels, cursor: null });
+    }
+  },
+});
+
+export const reconcileIdeRosterPage = internalMutation({
+  args: { projectId: v.id("projects"), panels: v.array(v.id("devices")), cursor: v.union(v.string(), v.null()), authorizedCards: v.optional(v.array(v.string())) },
+  handler: async (ctx, args): Promise<void> => {
+    const [deviceId, ...rest] = args.panels;
+    if (!deviceId) return;
+    const panel = await ctx.db.get(deviceId);
+    if (panel?.projectId === args.projectId && panel.brand === "ide_smart" && panel.ideUuid) {
+      const ideUuid = panel.ideUuid;
+      // Bound scheduled arguments to ~100 KiB for normalized IDE cards. Very
+      // large graphs use the audit's 500-row alternative without carrying a set.
+      if (args.authorizedCards && (args.authorizedCards.length > 4000 || args.authorizedCards.some(card => card.length > 20))) throw new Error("Cihaz yetki listesi sınırı aşıldı");
+      const authorized = args.authorizedCards ? new Set(args.authorizedCards) : (await resolvePanelAuthorizedCards(ctx, deviceId)).authorized;
+      const snapshot = authorized.size <= 4000 && [...authorized].every(card => card.length <= 20) ? [...authorized] : undefined;
+      const page = await ctx.db.query("idePanelUsers").withIndex("by_uuid", q => q.eq("ideUuid", ideUuid)).paginate({ cursor: args.cursor, numItems: snapshot ? 100 : 500 });
+      for (const row of page.page) {
+        if (row.managedByNgsplus !== true || authorized.has(row.cardNumber)) continue;
+        await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.deleteIdeUserFromPanels, { cardNumber: row.cardNumber, deviceIds: [deviceId], projectId: args.projectId });
+      }
+      if (!page.isDone) {
+        await ctx.scheduler.runAfter(0, internal.accessRules.reconcileIdeRosterPage, { ...args, cursor: page.continueCursor, authorizedCards: snapshot });
+        return;
+      }
+    }
+    if (rest.length) await ctx.scheduler.runAfter(0, internal.accessRules.reconcileIdeRosterPage, { ...args, panels: rest, cursor: null, authorizedCards: undefined });
+  },
+});
+
+/** Recheck and enqueue atomically so reactivation cannot slip between them. */
+export const enqueueIdeUserRemoval = internalMutation({
+  args: {
+    employeeId: v.optional(v.id("employees")), cardNumber: v.string(),
+    runId: v.optional(v.id("deviceSyncRuns")), deviceId: v.id("devices"), projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    const panel = await ctx.db.get(args.deviceId);
+    // Targeted revocation follows the card even after a panel moved; roster cleanup stays project-bound.
+    if (!panel || panel.brand !== "ide_smart" || !panel.ideUuid || (!args.employeeId && args.projectId && panel.projectId !== args.projectId)) return false;
+    const cardNo = Number(args.cardNumber);
+    if (!Number.isSafeInteger(cardNo) || cardNo < 1) return false;
+    const card = String(cardNo);
+    // Employee-targeted revocation also covers deleted employees / old cards.
+    // Roster cleanup alone must prove that ngsplus created this panel record.
+    if (!args.employeeId) {
+      const row = await ctx.db.query("idePanelUsers").withIndex("by_uuid_card", q => q.eq("ideUuid", panel.ideUuid ?? "").eq("cardNumber", card)).unique();
+      if (row?.managedByNgsplus !== true) return false;
+    }
+    // Resolve only this card's people through the existing card index. Looking
+    // up padded forms preserves legacy identities without rescanning the panel's
+    // entire rule/member graph for every removal on a roster page.
+    const variants = new Set([args.cardNumber, card]);
+    for (let length = card.length; length <= 20; length++) variants.add(card.padStart(length, "0"));
+    const candidates = new Map<Id<"employees">, Doc<"employees">>();
+    if (args.employeeId) {
+      const employee = await ctx.db.get(args.employeeId);
+      if (employee && normalizeIdeCard(employee.cardNumber) === card) candidates.set(employee._id, employee);
+    }
+    for (const variant of variants) {
+      const people = await ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", variant)).take(101);
+      if (people.length > 100) throw new Error("Kartın cihaz yetkisi denetlenemedi; silme durduruldu");
+      for (const employee of people) candidates.set(employee._id, employee);
+    }
+    for (const employee of candidates.values()) {
+      if (employee.projectId !== panel.projectId || employee.isActive === false) continue;
+      const remaining = await resolveEmployeeIdeDeviceIds(ctx, employee._id, panel.projectId);
+      if (remaining.includes(panel._id)) return false;
+    }
+    await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+      deviceId: panel._id, runId: args.runId, projectId: panel.projectId ?? args.projectId,
+      opType: "deleteUser", payload: { employeeId: args.employeeId, ideUserId: cardNo },
+    });
+    return true;
+  },
+});
 
 async function ruleHikDevices(ctx: MutationCtx, rule: Doc<"accessRules">): Promise<HikSnapshot["devices"]> {
   return (await resolveRuleDeviceTargets(ctx, rule, false)).filter(({ device }) => device.brand === "hikvision").map(({ device }) => ({
@@ -760,11 +854,12 @@ export const update = authedMutation({
     // syncPermissionToIdePanels permission kaydını günceller ama fiziksel kartı kaldırmaz.
     if (updates.isActive === false) {
       const idePanels = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
-      await Promise.all(
-        idePanels.map((panelId) =>
-          reconcilePanelRosterIde(ctx, { deviceId: panelId, projectId: rule.projectId }),
-        ),
-      );
+      // Explicit employee revocation must also cover imported/legacy panel users.
+      if (idePanels.length > 0) {
+        await ctx.scheduler.runAfter(0, internal.accessRules.reconcileIdeRemovalBatch, {
+          ruleId, projectId: rule.projectId, panels: idePanels, employeeIds: hikMembers.map(member => member.employeeId),
+        });
+      }
     }
     // Kural yeniden aktif edildiğinde üye kartlarını IDE panellerine GERİ YAZ — deaktivasyon
     // dalıyla simetrik. syncPermissionToIdePanels yalnız permission RECORD'unu yazar; bunun
@@ -1099,7 +1194,7 @@ async function saveWithGroups(
     // Kalan üyeler: güncel kuralla yeniden sync + (varsa) çıkarılan cihazlardan orphan reconcile.
     // Yalnız üye listesi değiştiğinde veya bir IDE paneli çıkarıldığında gerek var (sadece
     // saat/gün değişiminde syncPermissionToIdePanels yeterli).
-    if (relationDiff || employeeIds !== undefined || removedIdePanels.length > 0) {
+    if (relationDiff || employeeIds !== undefined || removedIdePanels.length > 0 || updates.isActive === false) {
       for (const empId of relationDiff ? diffPlan.syncMembers : survivingMemberIds) {
         syncJobs.push(
           ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
@@ -1108,7 +1203,7 @@ async function saveWithGroups(
           reconcileRemovedEmployeeIde(ctx, {
             employeeId: empId,
             projectId: rule.projectId,
-            candidatePanels: relationDiff && diffPlan.reconcileRoster ? ruleIdePanelsBefore : removedIdePanels,
+            candidatePanels: updates.isActive === false || (relationDiff && diffPlan.reconcileRoster) ? ruleIdePanelsBefore : removedIdePanels,
           }),
         );
       }

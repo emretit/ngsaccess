@@ -69,6 +69,12 @@ export async function claimDeviceCore(
       message: "Hikvision cihazının projesi değiştirilemez. Cihazı bu projeden silip hedef projede yeniden ekleyin; eklerken cihazdaki eski kişiler temizlenir.",
     });
   }
+  if (ctx.user.role !== "super_admin" && adminDevice.assignedProjectId !== args.projectId) {
+    throw new ConvexError({
+      code: "DEVICE_NOT_RESERVED",
+      message: "Bu cihaz projenize ayrılmamış. Cihazı projenize ayırması için sistem yöneticisiyle iletişime geçin.",
+    });
+  }
   await assertIdeAssignmentAllowed(ctx, adminDevice, args.projectId);
   if (adminDevice.assignedDeviceId) {
     throw new Error("Bu cihaz zaten bir projeye atanmış");

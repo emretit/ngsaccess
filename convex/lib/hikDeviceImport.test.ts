@@ -1,9 +1,18 @@
 import { expect, it } from "vitest";
 import type { Id } from "../_generated/dataModel";
-import { classifyImportPerson, splitDevicePersonName, selectImportFingerprints } from "./hikDeviceImport";
+import { classifyImportPerson, importedValidity, splitDevicePersonName, selectImportFingerprints } from "./hikDeviceImport";
 import { hikWallClockToUtcISO, toUtcISO } from "./trDate";
 const projectId = "p" as Id<"projects">;
 const person = { employeeNo: "1", name: "Okan ISMAN", cards: [], fingerCount: 1 };
+it("preserves UTC/local validity, expires old people, and fails closed on missing or invalid dates", () => {
+  const now = Date.parse("2026-11-03T12:00:00Z");
+  expect(importedValidity({ enable: true, timeType: "UTC", beginTime: "2026-01-01T09:00:00", endTime: "2027-01-01T18:00:00" }, now)).toEqual({ isActive: true, accessStartsAt: "2026-01-01T09:00:00.000Z", accessExpiresAt: "2027-01-01T18:00:00.000Z" });
+  expect(importedValidity({ beginTime: "2020-01-01T09:00:00", endTime: "2021-01-01T18:00:00" }, now)).toEqual({ isActive: false, accessStartsAt: "2020-01-01T06:00:00.000Z", accessExpiresAt: "2021-01-01T15:00:00.000Z" });
+  expect(importedValidity(undefined, now).isActive).toBe(false);
+  expect(importedValidity({ beginTime: "bad", endTime: "2027-01-01T18:00:00" }, now).isActive).toBe(false);
+  expect(importedValidity({ enable: false }, now).isActive).toBe(true);
+  expect(importedValidity({ enable: false, beginTime: "2020-01-01T09:00:00", endTime: "2021-01-01T18:00:00" }, now)).toEqual({ isActive: true });
+});
 it("classifies exact project matches, cross project and padded conflicts, multiple and mismatching cards", () => {
   const employee = { _id: "e" as Id<"employees">, projectId, cardNumber: "1" };
   expect(classifyImportPerson(person, projectId, [employee]).status).toBe("matched");

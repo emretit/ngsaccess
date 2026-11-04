@@ -1,3 +1,4 @@
+import { hikBackfillPendingValidator, type HikBackfillPending } from "./lib/gateway/backfillState";
 import { requirePermission, hasPermission } from "./lib/permissions";
 import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS, hasFreshIsupStatus } from "./lib/deviceConnection";
 import { internal } from "./_generated/api";
@@ -21,7 +22,7 @@ import { toPatch } from "./lib/nullablePatch";
 import { validateDeviceDoor, deviceActive } from "./lib/deviceUx";
 import { claimDeviceCore, reassignDeviceCore, releaseDeviceCore } from "./lib/deviceAssignment";
 import { deviceIdentityError } from "./lib/deviceIdentity";
-import { assertIdeUuidAvailable, assertEhomeIdAvailable, createCore, createIdePanelCore, createHikDeviceCore } from "./lib/deviceProvision";
+import { assertIdeRosterMovable, assertIdeUuidAvailable, assertEhomeIdAvailable, createCore, createIdePanelCore, createHikDeviceCore } from "./lib/deviceProvision";
 import {
   resolveAuthorizedEmployeeIds,
   rosterCardNumbersWithBiometric,
@@ -250,6 +251,10 @@ export const update = authedMutation({
       const error = deviceIdentityError(ideUuid, args.brand ?? device.brand);
       if (error) throw new ConvexError(error);
       await assertIdeUuidAvailable(ctx, ideUuid, { exceptDeviceId: deviceId });
+      // ehomeID gibi yalnız değişince: eski taşımalardan kalan roster satırları ad/IP kaydını kilitlemesin.
+      if (ideUuid !== (device.ideUuid ?? "").trim()) {
+        await assertIdeRosterMovable(ctx, ideUuid, device.projectId);
+      }
       clean.ideUuid = ideUuid;
       // Keep the linked pool identity consistent for release and later claims.
       if (device.adminDeviceId) {
@@ -501,6 +506,9 @@ export const setIdeUuid = internalMutation({
     const error = deviceIdentityError(ideUuid);
     if (error) throw new ConvexError(error);
     await assertIdeUuidAvailable(ctx, ideUuid, { exceptDeviceId: args.deviceId });
+    if (ideUuid !== (device.ideUuid ?? "").trim()) {
+      await assertIdeRosterMovable(ctx, ideUuid, device.projectId);
+    }
     if (device.adminDeviceId) {
       const poolDevice = await ctx.db.get(device.adminDeviceId);
       if (poolDevice?.assignedDeviceId === device._id) {
@@ -726,6 +734,7 @@ export const listOnlineGatewayDevicesForBackfill = internalQuery({
       hikDevIndex: string;
       hikBackfillCursor?: number;
       hikLastBackfillAt?: number;
+      hikBackfillPending?: HikBackfillPending;
     }>
   > => {
     const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
@@ -745,6 +754,7 @@ export const listOnlineGatewayDevicesForBackfill = internalQuery({
         hikDevIndex: d.hikDevIndex as string,
         hikBackfillCursor: d.hikBackfillCursor,
         hikLastBackfillAt: d.hikLastBackfillAt,
+        hikBackfillPending: d.hikBackfillPending,
       }));
   },
 });
@@ -829,18 +839,52 @@ export const setHikLastRebootAt = internalMutation({
   },
 });
 
+/** Compare-and-set prevents overlapping cron/manual jobs from rewinding a page. */
+export const setHikBackfillPending = internalMutation({
+  args: {
+    deviceId: v.id("devices"), pending: hikBackfillPendingValidator,
+    expectedSearchID: v.optional(v.string()), expectedPosition: v.optional(v.number()),
+    expectedFailCount: v.optional(v.number()), restart: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device || device.hikTransport !== "gateway" || device.hikDevIndex !== args.pending.devIndex) return false;
+    const previous = device.hikBackfillPending;
+    if (args.expectedSearchID !== undefined) {
+      if (!previous || previous.searchID !== args.expectedSearchID || previous.position !== args.expectedPosition ||
+          previous.devIndex !== args.pending.devIndex ||
+          (args.expectedFailCount !== undefined && (previous.failCount ?? 0) !== args.expectedFailCount)) return false;
+      if (args.restart) {
+        // Replace atomically: an old scheduled job can never reclaim the checkpoint.
+        if (args.pending.searchID === previous.searchID || args.pending.position !== 0) return false;
+      } else if (previous.searchID !== args.pending.searchID || previous.startedAt !== args.pending.startedAt ||
+          previous.startTime !== args.pending.startTime || args.pending.position < previous.position) return false;
+    } else if (previous?.devIndex === device.hikDevIndex) return false;
+    await ctx.db.patch(args.deviceId, { hikBackfillPending: args.pending });
+    return true;
+  },
+});
+
 export const setHikBackfillProgress = internalMutation({
   args: {
     deviceId: v.id("devices"),
     cursor: v.optional(v.number()),
     at: v.number(),
+    searchID: v.optional(v.string()), position: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<boolean> => {
+    const device = await ctx.db.get(args.deviceId);
+    const pending = device?.hikBackfillPending;
+    // Legacy calls without an owning search cannot finalize another run.
+    if (!device || !pending || pending.searchID !== args.searchID || pending.position !== args.position ||
+        device.hikDevIndex !== pending.devIndex || device.hikTransport !== "gateway") return false;
     await ctx.db.patch(args.deviceId, {
       ...(args.cursor !== undefined ? { hikBackfillCursor: args.cursor } : {}),
-      hikLastBackfillAt: args.at,
+      hikLastBackfillAt: Math.max(device.hikLastBackfillAt ?? 0, args.at),
+      hikBackfillPending: undefined,
       updatedAt: new Date().toISOString(),
     });
+    return true;
   },
 });
 

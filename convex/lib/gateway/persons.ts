@@ -95,6 +95,27 @@ function defaultValidBegin(): string {
 // 2037-12-31 universal güvenli.
 const DEFAULT_VALID_END = "2037-12-31T23:59:59";
 
+/** Empty windows must overwrite old device access with a window that has already ended. */
+export function hikValidityWindow(begin?: string, end?: string, now = Date.now()) {
+  const beginTime = begin ?? defaultValidBegin();
+  const endTime = end ?? DEFAULT_VALID_END;
+  if (endTime <= beginTime) {
+    const localNow = new Date(now + 3 * 60 * 60 * 1000).toISOString().slice(0, 19);
+    // An ordinary expired person can retain the original end, with a valid
+    // one-minute interval. Explicit empty/reversed intervals use a fixed denial
+    // so a device clock running behind cannot briefly grant access after sync.
+    if (begin === undefined && endTime < localNow) {
+      return {
+        beginTime: new Date(Date.parse(`${endTime}Z`) - 60_000).toISOString().slice(0, 19),
+        endTime,
+        adjusted: true,
+      };
+    }
+    return { beginTime: "2000-01-01T00:00:00", endTime: "2000-01-01T00:01:00", adjusted: true };
+  }
+  return { beginTime, endTime, adjusted: false };
+}
+
 export function buildPersonPayload(p: PersonRecord) {
   let doorPlans = p.doorPlans;
   if (doorPlans === undefined) {
@@ -107,12 +128,7 @@ export function buildPersonPayload(p: PersonRecord) {
     if (!Number.isInteger(plan.doorNo) || plan.doorNo < 1 || !plan.planTemplateNos.length ||
         plan.planTemplateNos.some(no => !Number.isInteger(no) || no < 1)) throw new Error("Invalid door plan");
   }
-  const endTime = p.endTime ?? DEFAULT_VALID_END;
-  let beginTime = p.beginTime ?? defaultValidBegin();
-  // Expired people must remain expired; Hik rejects a reversed validity interval.
-  if (endTime <= beginTime) {
-    beginTime = new Date(Date.parse(`${endTime}Z`) - 60 * 1000).toISOString().slice(0, 19);
-  }
+  const { beginTime, endTime } = hikValidityWindow(p.beginTime, p.endTime);
   return {
     employeeNo: p.employeeNo,
     name: p.name,
@@ -208,8 +224,9 @@ export interface SearchPersonResult {
     employeeNo: string;
     name?: string;
     userType?: string;
-    Valid?: { beginTime?: string; endTime?: string };
+    Valid?: { enable?: boolean; beginTime?: string; endTime?: string; timeType?: string };
     doorRight?: string;
+    RightPlan?: { doorNo: number; planTemplateNo: string }[];
   }>;
   nextPosition?: number;
   error?: string;

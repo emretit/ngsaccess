@@ -30,7 +30,7 @@ beforeEach(() => {
   gateway.fetchHikCapabilitySnapshot.mockResolvedValue({ version: 1, updatedAt: Date.now(), probes: [] });
   gateway.getAcsWorkStatus.mockResolvedValue({ ok: true, status: {} });
   gateway.fetchCardReaderSnapshot.mockResolvedValue({ version: 1, readerNo: 1, updatedAt: Date.now(), summary: { readerNo: 1 }, results: [] });
-  gateway.searchAcsEventsOnDevice.mockResolvedValue({ ok: true, events: [], numMatches: 0, totalMatches: 0, hasMore: false });
+  gateway.searchAcsEventsOnDevice.mockResolvedValue({ ok: true, events: [], numMatches: 0, total: 0, nextPosition: 0, hasMore: false });
   gateway.addDeviceToGateway.mockResolvedValue({ ok: false, error: "Gateway kapalı" });
   gateway.deleteDeviceFromGateway.mockResolvedValue({ ok: true });
   gateway.linkDoorStatusPlan.mockResolvedValue({ ok: true });

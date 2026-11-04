@@ -1,8 +1,29 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import { cardNumericKey } from "./cardIdentity";
 import { MAX_FINGERPRINTS_PER_EMPLOYEE } from "./fingerprintSlots";
+import { toUtcISO } from "./trDate";
 
-export type ImportPerson = { employeeNo: string; name: string; cards: string[]; fingerCount: number };
+export type ImportPerson = {
+  employeeNo: string; name: string; cards: string[]; fingerCount: number;
+  valid?: { enable?: boolean; beginTime?: string; endTime?: string; timeType?: string };
+  doorRight?: string;
+  rightPlans?: { doorNo: number; planTemplateNo: string }[];
+};
+
+/** Preserve device validity; missing/malformed enabled intervals fail closed. */
+export function importedValidity(valid: ImportPerson["valid"], now: number) {
+  // Disabled validity means the device ignores its (often stale) date fields.
+  if (valid?.enable === false) return { isActive: true };
+  const utc = (value?: string) => value ? toUtcISO(valid?.timeType === "UTC" && !/(Z|[+-]\d{2}:?\d{2})$/i.test(value) ? `${value}Z` : value) : undefined;
+  const accessStartsAt = utc(valid?.beginTime);
+  const accessExpiresAt = utc(valid?.endTime);
+  const intervalValid = !!accessStartsAt && !!accessExpiresAt && accessStartsAt < accessExpiresAt;
+  return {
+    isActive: intervalValid && Date.parse(accessExpiresAt) > now,
+    ...(accessStartsAt ? { accessStartsAt } : {}),
+    ...(accessExpiresAt ? { accessExpiresAt } : {}),
+  };
+}
 export type ImportRow = ImportPerson & { status: "new" | "matched" | "conflict" | "manual"; matchedEmployeeId?: Id<"employees">; storedFingerCount?: number; reason?: string };
 export function classifyImportPerson(person: ImportPerson, projectId: Id<"projects">, duplicates: readonly Pick<Doc<"employees">, "_id" | "cardNumber" | "projectId">[]): ImportRow {
   const identities = [person.employeeNo, ...person.cards];

@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { DoorStatusPlan } from "./lib/doorStatusPlan";
@@ -12,6 +12,19 @@ vi.mock("./lib/gateway/core", () => ({ gatewayApiCallChecked: wire.send,
   } })),
 }));
 const modules = import.meta.glob("./**/*.ts");
+// Convex loads handlers lazily. Compile the gateway's dependency graph in setup,
+// so a cold import cannot time out a test while its async action keeps running
+// and contaminates the next test's shared gateway mock.
+beforeAll(async () => {
+  await Promise.all([
+    import("./actions/hikGatewayDevice"),
+    import("./actions/hikQueueWorker"),
+    import("./doors"),
+    import("./devices"),
+    import("./users"),
+    import("./roles"),
+  ]);
+});
 const legacy: DoorStatusPlan = {
   enabled: true,
   beginTime: "08:00:00",
@@ -225,4 +238,20 @@ describe("kapı durum planı gateway zinciri", () => {
       }),
     ).rejects.toThrow("Saat");
   });
+});
+
+it.each(["status", "verify", "retry"] as const)("GK-04: %s refuses legacy duplicate doors before sending", async route => {
+  const f = await fixture(weekly);
+  await f.t.run(async ctx => {
+    await ctx.db.insert("doors", { projectId: f.projectId, deviceId: f.deviceId, name: "Diğer kapı", hikDoorNo: 2 });
+    await ctx.db.patch(f.doorId, { hikVerifyPlan: { enabled: false, verifyMode: "card", beginTime: "00:00", endTime: "24:00" } });
+  });
+  if (route === "retry") {
+    const operationId = await f.t.run(ctx => ctx.db.insert("hikPendingOperations", { projectId: f.projectId, deviceId: f.deviceId, operation: "syncDoorStatusPlan", payload: { doorId: f.doorId }, status: "failed", attemptCount: 0, createdAt: Date.now() }));
+    await f.t.action(internal.actions.hikQueueWorker.processHikOperation, { issueId: operationId });
+    expect(await f.t.run(ctx => ctx.db.get(operationId))).toMatchObject({ status: "failed", lastError: expect.stringContaining("Diğer kapı") });
+  } else {
+    await expect(f.caller.action(route === "status" ? api.actions.hikGatewayDevice.applyDoorStatusPlan : api.actions.hikGatewayDevice.applyVerifyPlan, { doorId: f.doorId })).rejects.toThrow(/Kapı.*Diğer kapı/);
+  }
+  expect(wire.send).not.toHaveBeenCalled();
 });

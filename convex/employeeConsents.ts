@@ -6,6 +6,7 @@ import { writeAudit } from "./lib/audit";
 import { requireEmployeeAccess } from "./lib/auth";
 
 import { assertUploadOwner } from "./lib/peopleScope";
+import { purgeFaceConsent } from "./lib/faceConsentPurge";
 import { scheduleFingerprintPurge } from "./lib/employeeCardChange";
 
 const CONSENT_TYPES = [
@@ -127,14 +128,15 @@ export const revoke = authedMutation({
       purgeCount = enrollments.length;
       await scheduleFingerprintPurge(ctx, existing.employeeId, employee.cardNumber, { deleteTemplates: true });
     }
+    const facePurge = existing.consentType === "biometric_face" ? await purgeFaceConsent(ctx, employee) : null;
     await writeAudit(ctx, {
       user: ctx.user,
       projectId: employee?.projectId ?? null,
       action: "update",
       targetTable: "employeeConsents",
       targetId: args.id,
-      newValue: { revokedAt: now },
-      note: `KVKK rıza iptal: ${existing.consentType}${existing.consentType === "biometric_fingerprint" ? `; cihaz parmak izleri silme kuyruğuna alındı (${purgeCount})` : ""}`,
+      newValue: { revokedAt: now, ...(facePurge ? { facePurge } : {}) },
+      note: `KVKK rıza iptal: ${existing.consentType}${existing.consentType === "biometric_fingerprint" ? `; cihaz parmak izleri silme kuyruğuna alındı (${purgeCount})` : ""}${facePurge ? `; yüz şablonları silindi (${facePurge.deletedFaces}); silinen dosya: ${facePurge.deletedFiles}; fotoğraf amacıyla korunan dosya: ${facePurge.retainedPhotoFiles}; cihaz yüz silme kuyruğu: ${facePurge.queued}` : ""}`,
     });
   },
 });

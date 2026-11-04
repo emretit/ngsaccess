@@ -6,7 +6,7 @@ import schema from "./schema";
 import { addCardToDevice, setWeekPlanOnDevice } from "./lib/hikGateway";
 import { buildPersonPayload, type PersonRecord } from "./lib/gateway/persons";
 
-const wire = vi.hoisted(() => ({ person: vi.fn(async (_dev: string, _person: PersonRecord) => ({ ok: true })) }));
+const wire = vi.hoisted(() => ({ person: vi.fn(async (_dev: string, person: PersonRecord) => { buildPersonPayload(person); return { ok: true }; }) }));
 vi.mock("./lib/hikGateway", async original => ({
   ...await original<typeof import("./lib/hikGateway")>(),
   upsertPersonToDevice: wire.person,
@@ -38,18 +38,21 @@ const cases: [string, AccessEnd, string][] = [
   ["terminated", { employmentEndDate: "2026-10-31" }, "2026-10-31T23:59:59"],
   ["earliest", { accessExpiresAt: "2026-10-26T15:00:00Z", employmentEndDate: "2026-10-31" }, "2026-10-26T18:00:00"],
   ["expired", { accessExpiresAt: "2026-10-25T15:00:00Z" }, "2026-10-25T18:00:00"],
+  ["expiredEmployment", { employmentEndDate: "2026-10-25" }, "2026-10-25T23:59:59"],
 ];
 
 describe("F2b Hik access end propagation", () => {
   it.each(cases)("gateway sync writes %s validity", async (_label, end, expected) => {
     const f = await fixture(end);
     expect((await f.t.query(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: f.employeeId }))?.employee).toMatchObject(end);
-    expect(await f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId })).toMatchObject({ synced: 1, failed: 0 });
+    const result = await f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId });
+    expect(result).toMatchObject({ synced: 1, failed: 0 });
     const person = wire.person.mock.calls[0]?.[1];
     if (!person) throw new Error("Person payload missing");
     const valid = buildPersonPayload(person).Valid;
     expect(valid.endTime).toBe(expected);
     expect(valid.beginTime < valid.endTime).toBe(true);
+    if (_label.startsWith("expired")) expect(Date.parse(`${valid.endTime}Z`) - Date.parse(`${valid.beginTime}Z`)).toBe(60_000);
   });
   it.each(cases)("retry rebuilds %s validity from current employee fields", async (_label, end, expected) => {
     const f = await fixture(end);
@@ -57,13 +60,16 @@ describe("F2b Hik access end propagation", () => {
       projectId: f.projectId, deviceId: f.deviceId, operation: "addPerson", status: "failed", attemptCount: 1, createdAt: Date.now(),
       payload: { employeeId: f.employeeId, planTemplateNo: 4, endTime: "2037-12-31T23:59:59" },
     }));
-    expect(await f.t.action(internal.actions.hikQueueWorker.processHikQueue, {})).toMatchObject({ retried: 1, ok: 1, failed: 0 });
+    const result = await f.t.action(internal.actions.hikQueueWorker.processHikQueue, {});
+    expect(result).toMatchObject({ retried: 1, ok: 1, failed: 0 });
     const person = wire.person.mock.calls[0]?.[1];
     if (!person) throw new Error("Retry payload missing");
-    expect(buildPersonPayload(person).Valid.endTime).toBe(expected);
+    const valid = buildPersonPayload(person).Valid;
+    expect(valid.endTime).toBe(expected);
+    if (_label.startsWith("expired")) expect(Date.parse(`${valid.endTime}Z`) - Date.parse(`${valid.beginTime}Z`)).toBe(60_000);
     expect(await f.t.run(ctx => ctx.db.get(opId))).toMatchObject({ status: "done" });
   });
-  it.each(cases.slice(1, 4))("Windows bridge queues %s endTime", async (_label, end, expected) => {
+  it.each(cases.slice(1))("Windows bridge queues %s endTime", async (_label, end, expected) => {
     const f = await fixture(end, "localBridge");
     expect(await f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId })).toMatchObject({ synced: 1, failed: 0 });
     const ops = await f.t.run(ctx => ctx.db.query("hikPendingOperations").take(10));
@@ -82,4 +88,30 @@ it("re-reads the employee after plan HTTP and skips person/card additions when t
   expect(wire.person).not.toHaveBeenCalled();
   expect(addCardToDevice).not.toHaveBeenCalled();
   expect((await f.t.run(ctx => ctx.db.query("accessGrantStatus").collect())).some(row => row.state === "effective")).toBe(false);
+});
+
+it.each(["gateway", "localBridge"] as const)("ZIY-02 %s replaces invalid historical/future intervals with expired access", async transport => {
+  for (const [accessStartsAt, accessExpiresAt] of [
+    ["2026-10-28T10:00:00Z", "2026-10-27T10:00:00Z"],
+    ["2026-10-27T10:00:00Z", "2026-10-27T10:00:00Z"],
+    ["2026-10-25T10:00:00Z", "2026-10-25T10:00:00Z"],
+    ["2026-10-25T11:00:00Z", "2026-10-25T10:00:00Z"],
+    ["2026-10-27T10:00:00.100Z", "2026-10-27T10:00:00.900Z"],
+  ]) {
+    const f = await fixture({ accessExpiresAt }, transport);
+    await f.t.run(ctx => ctx.db.patch(f.employeeId, { accessStartsAt }));
+    wire.person.mockClear();
+    expect(await f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId })).toMatchObject({ synced: 1, failed: 0 });
+    const ops = await f.t.run(ctx => ctx.db.query("hikPendingOperations").take(10));
+    const payload = transport === "gateway" ? wire.person.mock.calls[0]?.[1] : ops.find(op => op.operation === "addPerson")?.payload;
+    if (!payload || typeof payload.beginTime !== "string" || typeof payload.endTime !== "string") throw new Error("Validity missing");
+    const begin = Date.parse(`${payload.beginTime}+03:00`);
+    const end = Date.parse(`${payload.endTime}+03:00`);
+    expect(payload).toMatchObject({ beginTime: "2000-01-01T00:00:00", endTime: "2000-01-01T00:01:00" });
+    expect(begin).toBe(end - 60_000);
+    expect(end).toBeLessThan(Date.now() - 5 * 60_000);
+    expect(end).toBeLessThanOrEqual(Date.now());
+    expect(end).toBeLessThanOrEqual(Date.parse(accessExpiresAt));
+    expect(ops.filter(op => op.status === "failed")).toEqual([]);
+  }
 });

@@ -29,6 +29,15 @@ async function getOpenInvite(ctx: QueryCtx | MutationCtx, token: string) {
   return invite;
 }
 
+/** Davet ve sıfırlama yetkisi, bağlantı tüketilirken hâlâ geçerli olmalıdır. */
+async function requireInviteCreator(ctx: QueryCtx | MutationCtx, invite: Doc<"invites">) {
+  const creator = await ctx.db.get(invite.createdBy);
+  if (!creator || creator.verified === false || accessBlockReason(creator, Date.now()) !== null ||
+      !(await hasPermission(ctx, creator, invite.projectId, "admin.manage"))) {
+    throw new ConvexError({ code: "INVITE_INVALID" });
+  }
+}
+
 async function getOpenSetupInvite(ctx: QueryCtx | MutationCtx, token: string) {
   const invite = await getOpenInvite(ctx, token);
   if (invite.type === "reset") throw new ConvexError({ code: "INVITE_WRONG_TYPE" });
@@ -110,9 +119,11 @@ export const create = internalMutation({
       throws: true,
     });
 
-    // Aynı email için kullanılmamış TÜM davetleri iptal et (kayıtlar normalize tutulur)
+    // Yalnız aynı proje ve amaçtaki bağlantıyı yenile; eski türsüz kayıt normal davettir.
     for await (const existing of ctx.db.query("invites").withIndex("by_email", (q) => q.eq("email", email))) {
-      if (existing.used !== true) await ctx.db.patch(existing._id, { used: true });
+      if (existing.used !== true && existing.projectId === args.projectId && (existing.type ?? "invite") === type) {
+        await ctx.db.patch(existing._id, { used: true });
+      }
     }
 
     const token = crypto.randomUUID();
@@ -179,6 +190,7 @@ export const setupAccountState = internalQuery({
   ),
   handler: async (ctx, args) => {
     const invite = await getOpenSetupInvite(ctx, args.token);
+    await requireInviteCreator(ctx, invite);
 
     const account = await ctx.db
       .query("authAccounts")
@@ -197,10 +209,13 @@ export const setupAccountState = internalQuery({
 
 /** Yeniden kontrol ve güvenli profil temizliği; hesabı silmez veya doğrulamaz. */
 export const resetClaimedAccount = internalMutation({
-  args: { userId: v.id("users") },
+  args: { userId: v.id("users"), token: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const invite = await getOpenSetupInvite(ctx, args.token);
+    await requireInviteCreator(ctx, invite);
     const user = await ctx.db.get(args.userId);
+    if (user?.email?.toLowerCase() !== invite.email) throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH" });
     if (!user || !(await isFreshSetupAccount(ctx, user))) {
       throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS" });
     }
@@ -231,7 +246,7 @@ export const claimSetupAccount = action({
     if (state.state === "taken") throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS" });
     // Recheck/cleanup commits before changing credentials. This avoids changing a password
     // if the account became privileged after setupAccountState; cleanup clears stale signup data.
-    await ctx.runMutation(internal.invites.resetClaimedAccount, { userId: state.userId });
+    await ctx.runMutation(internal.invites.resetClaimedAccount, { userId: state.userId, token: args.token });
     await modifyAccountCredentials(ctx, {
       provider: "password",
       account: { id: state.email, secret: args.password },
@@ -263,11 +278,7 @@ export const consume = mutation({
         throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH" });
       }
       const user = await getResetAccount(ctx, invite.email, invite.projectId);
-      const creator = await ctx.db.get(invite.createdBy);
-      if (!creator || creator.verified === false || accessBlockReason(creator, Date.now()) !== null ||
-          !(await hasPermission(ctx, creator, invite.projectId, "admin.manage"))) {
-        throw new ConvexError({ code: "INVITE_INVALID" });
-      }
+      await requireInviteCreator(ctx, invite);
       const passwordError = getPasswordError(args.password ?? "");
       if (passwordError || args.password === undefined) {
         throw new ConvexError({ code: "INVITE_WEAK_PASSWORD", message: passwordError ?? "Yeni şifrenizi girin." });
@@ -302,6 +313,7 @@ export const consume = mutation({
       throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH" });
     }
 
+    await requireInviteCreator(ctx, invite);
     const projectRole = legacyRoleToProjectRole(invite.role);
     if (await isFreshSetupAccount(ctx, user)) {
       await ctx.db.patch(user._id, {
@@ -350,6 +362,7 @@ export const listExpired = superAdminQuery({
       email: v.string(),
       projectId: v.id("projects"),
       role: inviteRoleValidator,
+      type: v.union(v.literal("invite"), v.literal("reset")),
       expiresAt: v.string(),
     })
   ),
@@ -370,6 +383,7 @@ export const listExpired = superAdminQuery({
       email: r.email,
       projectId: r.projectId,
       role: r.role,
+      type: r.type ?? "invite",
       expiresAt: r.expiresAt,
     }));
   },

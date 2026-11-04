@@ -7,7 +7,7 @@ import { adminDeviceRow, adminPaginationOptions, adminSearch } from "./lib/admin
 import { deviceConnection } from "./lib/deviceConnection";
 import { deviceIdentityError } from "./lib/deviceIdentity";
 import { assertIdeUuidAvailable } from "./lib/deviceProvision";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { superAdminQuery, superAdminMutation, authedQuery } from "./lib/customFunctions";
 import { purgeDeviceCascade } from "./lib/deviceHelpers";
@@ -35,7 +35,7 @@ export const list = superAdminQuery({
 
 /**
  * Claim picker için: sadece atanmamış (assignedDeviceId yok) ve havuzdan gelen cihazlar.
- * authedQuery: project administrator da kendi projesine claim yapabilir.
+ * Proje yöneticisi yalnız devices.manage yetkisi olan projelerine ayrılmış cihazları görür.
  */
 export const listForClaim = authedQuery({
   args: {},
@@ -47,27 +47,54 @@ export const listForClaim = authedQuery({
         v.union(v.literal("ide_smart"), v.literal("hikvision"), v.literal("other"))
       ),
       ideUuid: v.optional(v.string()),
-      ideUser: v.optional(v.string()),
-      idePassword: v.optional(v.string()),
+      hasIdeUser: v.boolean(),
+      hasIdePassword: v.boolean(),
       ideDoorCount: v.optional(v.number()),
       lastSeen: v.optional(v.string()),
     })
   ),
   handler: async (ctx) => {
-    if (ctx.user.role !== "super_admin" && !(await getProjectIdsWithPermission(ctx, ctx.user, "devices.manage")).length) throw new Error("Bu işlem için yetkiniz yok");
-    const rows = await ctx.db.query("adminDevices").collect();
-    return rows
-      .filter((d) => !d.assignedDeviceId && !d.createdFromDevice)
-      .map((d) => ({
+    const isSuperAdmin = ctx.user.role === "super_admin";
+    const projectIds = isSuperAdmin ? [] : await getProjectIdsWithPermission(ctx, ctx.user, "devices.manage");
+    if (!isSuperAdmin && !projectIds.length) throw new Error("Bu işlem için yetkiniz yok");
+    const rows = await stream(ctx.db, schema).query("adminDevices")
+      .withIndex("by_assigned_device", q => q.eq("assignedDeviceId", undefined))
+      .filterWith(async (d) => !d.createdFromDevice && (isSuperAdmin || (d.assignedProjectId !== undefined && projectIds.includes(d.assignedProjectId))))
+      .take(500);
+    return rows.map((d) => ({
         _id: d._id,
         name: d.name,
         brand: d.brand,
         ideUuid: d.ideUuid,
-        ideUser: d.ideUser,
-        idePassword: d.idePassword,
+        hasIdeUser: !!d.ideUser?.trim(),
+        hasIdePassword: !!d.idePassword?.trim(),
         ideDoorCount: d.ideDoorCount,
         lastSeen: d.lastSeen,
       }));
+  },
+});
+
+/** Havuz cihazını henüz almadan bir projeye ayırır. */
+export const reserve = superAdminMutation({
+  args: {
+    adminDeviceId: v.id("adminDevices"),
+    projectId: v.optional(v.id("projects")),
+    expectedAssignedProjectId: v.union(v.id("projects"), v.null()),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const device = await ctx.db.get(args.adminDeviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    if ((device.assignedProjectId ?? null) !== args.expectedAssignedProjectId) {
+      throw new ConvexError({ code: "DEVICE_ASSIGNMENT_CHANGED", message: "Cihazın ataması başka bir oturumda değişti. Listeyi yenileyip tekrar deneyin." });
+    }
+    if (device.assignedDeviceId) throw new Error("Bu cihaz zaten bir projeye atanmış");
+    if (args.projectId && !await ctx.db.get(args.projectId)) throw new Error("Proje bulunamadı");
+    await ctx.db.patch(device._id, {
+      assignedProjectId: args.projectId,
+      ...(args.name?.trim() ? { name: args.name.trim() } : {}),
+      updatedAt: new Date().toISOString(),
+    });
   },
 });
 

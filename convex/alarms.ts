@@ -1,4 +1,4 @@
-import { requirePermission } from "./lib/permissions";
+import { hasPermission, requirePermission } from "./lib/permissions";
 import { paginationOptsValidator } from "convex/server";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
@@ -8,6 +8,21 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { writeAudit } from "./lib/audit";
+
+/** Only validated connectivity duration crosses the employee-data permission boundary. */
+function offlineDuration(rawData: string | undefined): number | undefined {
+  if (!rawData) return;
+  try {
+    const value: unknown = JSON.parse(rawData);
+    if (typeof value !== "object" || value === null ||
+      !("offlineFrom" in value) || !("offlineTo" in value) || !("durationMs" in value)) return;
+    const { offlineFrom, offlineTo, durationMs } = value;
+    if (typeof offlineFrom !== "number" || typeof offlineTo !== "number" || typeof durationMs !== "number" ||
+      !Number.isFinite(offlineFrom) || !Number.isFinite(offlineTo) || !Number.isFinite(durationMs) ||
+      offlineTo <= offlineFrom || durationMs !== offlineTo - offlineFrom) return;
+    return durationMs;
+  } catch { return; }
+}
 
 const category = v.union(v.literal("alarm"), v.literal("exception"));
 const severity = v.union(v.literal("info"), v.literal("warning"), v.literal("critical"));
@@ -27,15 +42,16 @@ export const list = authedQuery({
       const device = await ctx.db.get(args.deviceId);
       if (device?.projectId !== args.projectId) throw new Error("Cihaz seçili projede bulunamadı");
     }
+    const canReadEmployees = await hasPermission(ctx, ctx.user, args.projectId, "employees.view");
     const indexed = stream(ctx.db, schema).query("deviceEvents").withIndex("by_project_category_event_time", q => {
       const prefix = q.eq("projectId", args.projectId).eq("category", args.category);
-      return from ? prefix.gte("eventTime", from) : prefix;
+      const lower = from ? prefix.gte("eventTime", from) : prefix;
+      return to ? lower.lte("eventTime", to) : lower;
     }).order("desc");
     let scannedCount = 0;
     const result = await indexed.filterWith(async event => {
       scannedCount += 1;
-      return (to === undefined || event.eventTime <= to)
-        && (args.deviceId === undefined || event.deviceId === args.deviceId)
+      return (args.deviceId === undefined || event.deviceId === args.deviceId)
         && (args.severity === undefined || event.severity === args.severity)
         && (args.status === "all" || (args.status === "acked" ? event.ackedAt !== undefined : event.ackedAt === undefined));
     }).paginate({ ...args.paginationOpts, numItems: Math.min(100, Math.max(1, Math.floor(args.paginationOpts.numItems))), maximumRowsRead: 2000, maximumBytesRead: 2_000_000 });
@@ -43,8 +59,8 @@ export const list = authedQuery({
     const devices = (await Promise.all(deviceIds.map(id => ctx.db.get(id)))).filter((device): device is NonNullable<typeof device> => device !== null);
     const deviceMap = new Map(devices.map(device => [device._id, device]));
     return { ...result, page: result.page.map(event => {
-      const { alarmEmailRecipients: _recipients, ...safeEvent } = event;
-      return { ...safeEvent, deviceName: event.deviceId ? deviceMap.get(event.deviceId)?.name ?? "Cihaz bulunamadı" : "—" };
+      const { alarmEmailRecipients: _recipients, cardNo, rawData, ...safeEvent } = event;
+      return { ...safeEvent, offlineDurationMs: offlineDuration(rawData), ...(canReadEmployees ? { cardNo, rawData } : {}), deviceName: event.deviceId ? deviceMap.get(event.deviceId)?.name ?? "Cihaz bulunamadı" : "—" };
     }), scannedCount, scanLimitReached: result.pageStatus === "SplitRequired" };
   },
 });

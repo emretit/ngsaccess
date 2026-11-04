@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { importedValidity } from "../../../../convex/lib/hikDeviceImport";
 import { useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { ServerDevice } from "@/types/device";
@@ -70,7 +71,7 @@ export function DevicePersonImportDialog({ open, onOpenChange }: { open: boolean
               {eligible.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
             </NativeSelect>
           </label>
-          {open && device && <PersonImport key={device._id} device={device} connected={deviceConnection(device, now) === "online"} canBiometrics={can("biometrics.manage")} onPendingChange={(value) => { pending.current = value; setIsPending(value); }}
+          {open && device && <PersonImport key={device._id} device={device} connected={deviceConnection(device, now) === "online"} canBiometrics={can("biometrics.manage")} canManageAccess={can("accessRules.manage")} onPendingChange={(value) => { pending.current = value; setIsPending(value); }}
             onImported={(result) => {
               // Aktarım bitti: ilerleme penceresi ve bu diyalog birlikte kapanır, sonuç bildirimde görünür.
               pending.current = false; setIsPending(false); setSelectedId("");
@@ -91,8 +92,8 @@ const statuses = {
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Beklenmeyen bir hata oluştu.";
 
-function PersonImport({ device, connected, canBiometrics, onPendingChange, onImported }: {
-device: ServerDevice; connected: boolean; canBiometrics: boolean; onPendingChange: (pending: boolean) => void;
+function PersonImport({ device, connected, canBiometrics, canManageAccess, onPendingChange, onImported }: {
+device: ServerDevice; connected: boolean; canBiometrics: boolean; canManageAccess: boolean; onPendingChange: (pending: boolean) => void;
 onImported: (result: DeviceImportResult) => void;
 }) {
   const previewPersons = useAction(
@@ -104,6 +105,7 @@ onImported: (result: DeviceImportResult) => void;
   const [preview, setPreview] = useState<DeviceImportPreview | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [consent, setConsent] = useState(false);
+  const [grantFullDeviceAccess, setGrantFullDeviceAccess] = useState(false);
   const [busy, setBusy] = useState<"preview" | "import" | null>(
     null,
   );
@@ -131,6 +133,7 @@ onImported: (result: DeviceImportResult) => void;
     setPreview(result);
     setSelected(defaultPersonSelection(result));
     setConsent(false);
+    setGrantFullDeviceAccess(false);
   }
   async function showPreview() {
     if (disabled || running.current) return;
@@ -157,6 +160,7 @@ onImported: (result: DeviceImportResult) => void;
       const result = await importPersons({
         deviceId: device._id,
         ...importSelection,
+        grantFullDeviceAccess: canManageAccess && grantFullDeviceAccess,
       });
       setConfirmation(null);
       onImported(result);
@@ -260,6 +264,13 @@ onImported: (result: DeviceImportResult) => void;
                         </TableCell>
                         <TableCell className="break-words px-1">
                           {row.name}
+                          <p className="mt-1 text-xs text-muted-foreground">Kapılar: {row.doorRight || "Bilgi yok"}</p>
+                          <p className="text-xs text-muted-foreground">Kapı planları: {row.rightPlans?.map(plan => `${plan.doorNo}: ${plan.planTemplateNo}`).join("; ") || "Bilgi yok"}</p>
+                          <p className="text-xs text-muted-foreground">Geçerlilik: {row.valid?.enable === false ? "Tarih sınırı kapalı" : (() => {
+                            const dates = importedValidity(row.valid, Date.now());
+                            const format = (value?: string) => value ? new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "Bilgi yok";
+                            return `${format(dates.accessStartsAt)} – ${format(dates.accessExpiresAt)} (Türkiye saati)`;
+                          })()}</p>
                         </TableCell>
                         <TableCell className="break-all px-1">
                           {row.cards.length ? row.cards.join(", ") : "Kartsız"}
@@ -321,6 +332,11 @@ onImported: (result: DeviceImportResult) => void;
                   )}
                 </div>
               )}
+              <p className="text-sm text-muted-foreground">Yeni kişiler erişim kuralı olmadan kaydedilir. Cihazdaki kapı ve saat izinleri değiştirilmez; geçerlilik tarihleri korunur. Tarih bilgisi eksik veya süresi dolmuş kişiler pasif kaydedilir.</p>
+              {canManageAccess && <label className="flex items-start gap-2 text-sm">
+                <Checkbox aria-label="Tüm kapılara erişim ver" checked={grantFullDeviceAccess} disabled={disabled} onCheckedChange={checked => setGrantFullDeviceAccess(checked === true)} />
+                Yeni kişilere bu cihazın tüm kapılarında haftanın 7 günü 00:00–23:59 erişim ver. Mevcut kapı ve saat kısıtları genişletilir; geçerlilik tarihleri korunur.
+              </label>}
               <Button
                 disabled={disabled || selectedNos.length === 0}
                 onClick={() => setConfirmation("import")}
@@ -347,7 +363,7 @@ onImported: (result: DeviceImportResult) => void;
           if (!open && !busy) setConfirmation(null);
         }}
         title="Kişiler aktarılsın mı?"
-        description={`${selectedNos.length} kişi için aktarım yapılacak; yeni kişiler '${device.name ?? "Cihaz"} mevcut kişiler' erişim kuralına bağlanacak. Cihazdaki kişiler silinmez.`}
+        description={`${selectedNos.length} kişi aktarılacak. ${canManageAccess && grantFullDeviceAccess ? "Yeni kişilerin kapı ve saat kısıtları genişletilecek: bu cihazın tüm kapılarında haftanın 7 günü 00:00–23:59 erişim kuralı oluşturulacak ve cihaza gönderilecek. Geçerlilik tarihleri korunur; pasif kişiler etkinleştirilmez." : "Yeni erişim verilmeyecek; cihazdaki kapı, saat ve tarih kısıtları değiştirilmeyecek. Yeni kişiler erişim kuralı olmadan kaydedilecek."} Cihazdaki kişiler silinmez.`}
         confirmLabel="Aktar"
         onConfirm={() => {
           // Onay penceresi hemen kapanır; ilerleme ayrı pencerede görünür.

@@ -38,7 +38,7 @@ type Filters = Pick<
   FunctionArgs<typeof api.users.adminList>,
   "search" | "role" | "project"
 >;
-function ExpiredInvites({
+export function ExpiredInvites({
   projects,
 }: {
   projects: ReturnType<typeof useUserManagement>["projects"];
@@ -54,26 +54,27 @@ function ExpiredInvites({
           email: invite.email,
           projectId: invite.projectId,
           role: legacyRoleToProjectRole(invite.role),
+          type: invite.type,
         });
         if (!result.success)
-          throw new Error(result.error ?? "Davet gönderilemedi.");
+          throw new Error(result.error ?? "Bağlantı gönderilemedi.");
       } catch (error) {
         setFailed({ id: invite._id, message: errorMessage(error) });
         throw error;
       }
     },
-    { success: "Davet yeniden gönderildi" },
+    { success: "Bağlantı yeniden gönderildi" },
   );
   return (
     <section className="min-w-0 space-y-3">
-      <h3 className="text-base font-semibold">Süresi dolan davetler</h3>
+      <h3 className="text-base font-semibold">Süresi dolan bağlantılar</h3>
       <p className="text-xs text-muted-foreground">
-        En yeni 50 kullanılmamış davet gösterilir.
+        En yeni 50 kullanılmamış davet ve şifre sıfırlama bağlantısı gösterilir.
       </p>
       {invites === undefined ? (
-        <SectionSkeleton label="Süresi dolan davetler yükleniyor" />
+        <SectionSkeleton label="Süresi dolan bağlantılar yükleniyor" />
       ) : invites.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Süresi dolan davet yok</p>
+        <p className="text-sm text-muted-foreground">Süresi dolan bağlantı yok</p>
       ) : (
         <ul className="divide-y rounded-md border">
           {invites.map((invite) => (
@@ -84,7 +85,7 @@ function ExpiredInvites({
               <div className="min-w-0 flex-1 basis-48 space-y-1">
                 <p className="break-all text-sm font-medium">{invite.email}</p>
                 <p className="break-words text-xs text-muted-foreground">
-                  {roleLabel(invite.role)} ·{" "}
+                  {invite.type === "reset" ? "Şifre sıfırlama" : "Proje daveti"} · {roleLabel(invite.role)} ·{" "}
                   {projects.find((project) => project._id === invite.projectId)
                     ?.name ?? "Proje bilgisi yok"}{" "}
                   · {adminDate(invite.expiresAt)}
@@ -299,7 +300,7 @@ export function AdminUsersContent() {
         }}
       />
       {superAdmin && (
-        <AdminDataBoundary label="Süresi dolan davetler">
+        <AdminDataBoundary label="Süresi dolan bağlantılar">
           <ExpiredInvites projects={management.projects} />
         </AdminDataBoundary>
       )}

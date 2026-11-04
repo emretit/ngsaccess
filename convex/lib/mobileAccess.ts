@@ -5,6 +5,7 @@ import { accessScheduleError } from "./accessRuleUx";
 import { employmentEnded } from "./employment";
 import { trDateKey } from "./trDate";
 import { isVirtualReader } from "./virtualReader";
+import { isRuleOpenAt } from "./ruleSchedule";
 
 const GRAPH_LIMIT = 500;
 export type MobileTransport = "ide_mqtt" | "hik_local_bridge" | "hik_gateway" | "unsupported";
@@ -32,14 +33,7 @@ export function accessError(code: string) {
 /** Legacy overnight/malformed schedules fail closed, matching the write validator. */
 export function mobileRuleAllows(rule: Doc<"accessRules">, now: number): boolean {
   if (rule.isActive === false || accessScheduleError(rule)) return false;
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Istanbul", weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).formatToParts(new Date(now));
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(value => value.type === type)?.value;
-  if (!rule.days?.includes(part("weekday") ?? "")) return false;
-  if (!rule.startTime && !rule.endTime) return true;
-  const time = `${part("hour")}:${part("minute")}`;
-  return Boolean(rule.startTime && rule.endTime && time >= rule.startTime && time < rule.endTime);
+  return isRuleOpenAt(rule, now);
 }
 
 export function employeeWithinAccessEpoch(employee: Doc<"employees">, now: number): boolean {

@@ -102,11 +102,15 @@ describe("mobile access with real employee authentication and persisted transact
     expect(await t.run(ctx => ctx.db.query("idePendingOperations").take(20))).toEqual([]);
   });
 
-  it("uses Istanbul weekdays and half-open time ranges", async () => {
+  it("uses Istanbul weekdays and includes the complete final minute", async () => {
     const { t, ruleId } = await fixture();
     await t.run(ctx => ctx.db.patch(ruleId, { startTime: "12:00", endTime: "13:00" }));
     expect((await t.query(api.mobileAccess.listTargets, { sessionToken: "session-a" }))[0]?.canOpen).toBe(true);
-    vi.setSystemTime(new Date("2026-10-19T10:00:00.000Z"));
+    for (const time of ["10:00:00", "10:00:30", "10:00:59"]) {
+      vi.setSystemTime(new Date(`2026-10-19T${time}.000Z`));
+      expect((await t.query(api.mobileAccess.listTargets, { sessionToken: "session-a" }))[0]?.canOpen).toBe(true);
+    }
+    vi.setSystemTime(new Date("2026-10-19T10:01:00.000Z"));
     expect((await t.query(api.mobileAccess.listTargets, { sessionToken: "session-a" }))[0]).toMatchObject({ canOpen: false, reason: "SCHEDULE_DENIED" });
   });
 

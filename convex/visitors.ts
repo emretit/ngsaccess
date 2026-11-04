@@ -5,7 +5,7 @@ import { visitorQueryNow } from "./lib/visitorStatus";
 import { mergedStream, stream } from "convex-helpers/server/stream";
 import schema from "./schema";
 import { paginationOptsValidator } from "convex/server";
-import { visitorTimeISO, visitorSensitiveFields, maskedVisitorCard, visitorMatchesSearch, visitorStatus, visitorTime, visitorExpiryValidation, visitorUpdateExpiryError } from "./lib/visitorStatus";
+import { visitorAccessRangeError, visitorTimeISO, visitorSensitiveFields, maskedVisitorCard, visitorMatchesSearch, visitorStatus, visitorTime, visitorExpiryValidation, visitorUpdateExpiryError } from "./lib/visitorStatus";
 import { resolveProjectScope } from "./lib/projectScope";
 import { assertAccessProjectUnchanged } from "./lib/accessScope";
 import { validateVisitorAccessRelations } from "./lib/accessScopeRelations";
@@ -236,7 +236,7 @@ export const listPage = authedQuery({
         ], ["accessExpiresAt"])
         : source.withIndex("by_project_visitor", q => q.eq("projectId", args.projectId).eq("isVisitor", true)).order("desc");
     const result = await indexed
-      .filterWith(async visitor => (!args.status || visitorStatus(visitor, now) === args.status) && visitorMatchesSearch(visitor, args.search))
+      .filterWith(async visitor => (!args.status || visitorStatus(visitor, now) === args.status) && visitorMatchesSearch(visitor, args.search, canManage))
       .paginate({ ...args.paginationOpts, maximumRowsRead: 200, maximumBytesRead: 128 * 1024 });
     return {
       ...result,
@@ -371,7 +371,8 @@ export const create = authedMutation({
     await validateVisitorAccessRelations(ctx, args.projectId, args.presetRuleId, args.hostEmployeeId);
     const inAllowed = (projectId: Id<"projects"> | undefined) => projectId === args.projectId;
 
-    const validationError = visitorDetailsError(args, Date.now(), false) ?? visitorExpiryValidation(args.accessExpiresAt);
+    const validationError = visitorDetailsError(args, Date.now(), false) ?? visitorExpiryValidation(args.accessExpiresAt)
+      ?? visitorAccessRangeError(args.accessStartsAt ?? new Date().toISOString(), args.accessExpiresAt);
     if (validationError) throw new Error(validationError);
     const cardNumber = args.cardNumber.trim();
     if (!cardNumber) throw new Error("Kart numarası zorunludur");
@@ -497,7 +498,8 @@ export const update = authedMutation({
       const validationError = visitorDetailsError(effective, Date.now(), false);
       if (validationError) throw new Error(validationError);
     }
-    const expiryError = visitorUpdateExpiryError(visitor, args);
+    const expiryError = visitorUpdateExpiryError(visitor, args)
+      ?? visitorAccessRangeError(effective.accessStartsAt, effective.accessExpiresAt);
     if (expiryError) throw new Error(expiryError);
     if (args.firstName !== undefined && !args.firstName.trim()) throw new Error("Ad alanı zorunludur");
     if (args.lastName !== undefined && !args.lastName.trim()) throw new Error("Soyad alanı zorunludur");

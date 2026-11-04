@@ -32,10 +32,14 @@ export async function claimAdminDeviceCore(
   const { adminDevice, now } = opts;
   const doorCount = Math.max(1, Math.min(opts.ideDoorCount ?? adminDevice.ideDoorCount ?? 4, 8));
   const panelName = opts.name?.trim() || adminDevice.name;
-  // Girilen kimlik bilgisi öncelikli; boşsa havuz kaydındakine düş.
+  // Havuzdaki kimlik bilgileri sunucuda kalır; yalnız eksik alanlar elle tamamlanır.
   // Bridge MQTT login için device.ideUser/idePassword okur — boş kalırsa op sonsuza pending'de bekler.
-  const ideUser = opts.ideUser?.trim() || adminDevice.ideUser;
-  const idePassword = opts.idePassword?.trim() || adminDevice.idePassword;
+  const ideUser = adminDevice.ideUser?.trim() ? adminDevice.ideUser : opts.ideUser?.trim();
+  const idePassword = adminDevice.idePassword?.trim() ? adminDevice.idePassword : opts.idePassword?.trim();
+  if ((adminDevice.brand ?? "ide_smart") === "ide_smart") {
+    if (!ideUser) throw new Error("Cihaz kullanıcı adı gereklidir");
+    if (!idePassword) throw new Error("Cihaz şifresi gereklidir");
+  }
 
   // devices tablosuna ekle (projectId + adminDeviceId geri bağlantısı ile)
   const deviceId = await ctx.db.insert("devices", {

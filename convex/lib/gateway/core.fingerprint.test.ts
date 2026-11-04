@@ -21,11 +21,11 @@ describe("fingerprint taşıma katmanı log gizliliği", () => {
     expect(spy.mock.calls.every(call => !JSON.stringify(call).includes(privateValue))).toBe(true);
     expect(spy.mock.calls.every(call => !JSON.stringify(call).includes("REQ:"))).toBe(true);
   });
-  it("fingerprint dışındaki mevcut logları korur", async () => {
+  it("fingerprint dışındaki loglarda gövde biçimini korur, serbest yanıt metnini gizler", async () => {
     const spy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     digest.mockResolvedValue({ status: 500, body: "failure" });
     await gatewayApiCall("/ISAPI/Other", "POST", { sample: "test" }, "dev");
     expect(spy.mock.calls[0][0]).toContain("REQ:");
-    expect(spy.mock.calls[0][0]).toContain("RES: failure");
+    expect(spy.mock.calls[0][0]).toContain('RES: "***"');
   });
 });
