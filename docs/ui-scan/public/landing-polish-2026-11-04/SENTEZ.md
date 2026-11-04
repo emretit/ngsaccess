@@ -23,8 +23,9 @@
 - [x] U6 Hero h1 + lead 2 cümle (K-A'ya göre)
 - [x] U7 Final CTA: "NGS Plus hesabınızı oluşturun." + ikincil "Bize yazın"
 - [x] Kapılar: tsc 0, eslint 0, tam vitest 5571/5571 (koordinatör koştu), görsel tur + denetim MUST 0 (`fable-audit.md`), SHOULD/NIT düzeltildi
-- [ ] Lighthouse mobil ≥ 89 (yayın öncesi)
-- [ ] Emre görsel onayı (gölge: `/tmp/landing-polish/shadow-compare.png`) → pathspec commit
+- [x] Lighthouse mobil (aynı makine, 3 koşu): eski canlı 82cf883c perf 85-87 / CLS 0 → yeni 62c63ea5 perf 88 / CLS 0 / a11y 100 (font-swap CLS 0.036 bulundu, 62c63ea5 ile düzeltildi)
+- [x] Commit 2ee2babe + 62c63ea5 (Emre "devam edelim")
+- [ ] Push + Netlify yayını (ayrı onay; export /tmp/ngs-pub-62c63ea5/dist hazır)
 
 ## İkisinin de kabul ettiği (karar gerekmez)
 
