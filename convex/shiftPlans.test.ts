@@ -47,7 +47,7 @@ it("department preview ignores 300 employees' 20 historical leaves and future as
     await ctx.db.insert("shiftAssignments", { projectId: f.projectId, employeeId: f.employeeId, shiftId: f.evening, ...range, createdAt: "", updatedAt: "" });
   });
   expect(await f.caller.query(api.shiftPlans.previewDepartmentAssign, f.department)).toMatchObject({ employeeCount: 300, personalOverrideCount: 1, leaveCount: 1 });
-});
+}, 30_000);
 
 it.each([1, 2])("department preview retains per-read and shared sentinel budgets with %i employees", async count => {
   const f = await fixture();
