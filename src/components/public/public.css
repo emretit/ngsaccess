@@ -796,6 +796,10 @@ a.pub-contact-row:hover .pub-contact-icon {
     font-size: 16px;
     margin-bottom: 16px;
   }
+  /* Keeps the title at three lines in both Overpass and its fallback; at ~405-425 px the two fonts wrap differently and the font swap shifted the live feed (CLS). */
+  .pub-hero-title {
+    max-width: 350px;
+  }
   .pub-hero .pub-small {
     font-size: 13px;
   }
