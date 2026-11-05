@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -56,8 +56,6 @@ export default function CreateRuleDialog({
   ]
     .filter(Boolean)
     .join(" · ");
-  const [step, setStep] = useState(0);
-  const [stepError, setStepError] = useState("");
   const guard = useUnsavedChangesGuard(isDirty);
   const { projectId: currentProjectId } = useActiveProject();
   const projectChanged = currentProjectId !== projectId;
@@ -72,49 +70,9 @@ export default function CreateRuleDialog({
       guard.requestClose(onClose);
     }
   }, [currentProjectId, guard, onClose]);
-  const go = (next: number) => {
-    setStep(next);
-    setStepError("");
-    requestAnimationFrame(() =>
-      document.getElementById("rule-step-heading")?.focus(),
-    );
-  };
-  const advance = () => {
-    if (step === 0 && !formData.name.trim()) {
-      setStepError("Lütfen kural adı girin.");
-      document.getElementById("name")?.focus();
-      return;
-    }
-    if (
-      step === 0 &&
-      formData.target_type === "individual" &&
-      formData.selected_employees.length === 0
-    ) {
-      setStepError("En az bir kişi seçin.");
-      return;
-    }
-    go(step + 1);
-  };
   const submit: typeof handleSubmit = async (event) => {
     event.preventDefault();
     if (submittingRef.current || isSubmitting || projectChanged) return;
-    if (!formData.name.trim()) {
-      go(0);
-      setStepError("Lütfen kural adı girin.");
-      return;
-    }
-    if (
-      formData.target_type === "individual" &&
-      formData.selected_employees.length === 0
-    ) {
-      go(0);
-      setStepError("En az bir kişi seçin.");
-      return;
-    }
-    if (step !== 1) {
-      advance();
-      return;
-    }
     submittingRef.current = true;
     try {
       await handleSubmit(event);
@@ -132,7 +90,7 @@ export default function CreateRuleDialog({
         }}
       >
         <DialogContent
-          className="w-[calc(100%-2rem)] max-w-3xl max-h-[calc(100dvh-2rem)] flex flex-col p-0 gap-0 min-w-0"
+          className="w-[calc(100%-2rem)] max-w-5xl max-h-[calc(100dvh-2rem)] flex flex-col p-0 gap-0 min-w-0"
           onEscapeKeyDown={(event) => {
             if (isSubmitting) event.preventDefault();
           }}
@@ -148,91 +106,76 @@ export default function CreateRuleDialog({
               Kaydedince cihazlara gönderilir.
             </DialogDescription>
           </DialogHeader>
-          <nav
-            aria-label="Kural adımları"
-            className="flex flex-wrap gap-1 border-b p-3"
-          >
-            {["Kimler", "Nerede / Ne zaman"].map((label, index) => (
-              <Button
-                key={label}
-                type="button"
-                size="sm"
-                variant={step === index ? "default" : "ghost"}
-                aria-current={step === index ? "step" : undefined}
-                disabled={isSubmitting || (!editingRule && index > step)}
-                onClick={() => go(index)}
-              >
-                {index + 1}. {label}
-              </Button>
-            ))}
-          </nav>
           <form
             id={FORM_ID}
             noValidate
             onSubmit={submit}
-            className="flex-1 min-h-0 min-w-0 overflow-y-auto px-4 py-4 space-y-4"
+            className="flex-1 min-h-0 min-w-0 overflow-y-auto px-4 py-4"
           >
-            <h2 id="rule-step-heading" tabIndex={-1} className="font-semibold">
-              {["Kimler erişebilir?", "Nerede ve ne zaman?"][step]}
-            </h2>
             {projectChanged ? (
               <p role="alert">
                 Proje değişti. Taslak önceki projeye aittir; devam etmek için
                 önceki projeyi yeniden seçin veya vazgeçin.
               </p>
             ) : (
-              <fieldset disabled={isSubmitting} className="space-y-4 min-w-0">
-                {step === 0 && (
-                  <RuleBasicInfo
-                    formData={formData}
-                    setFormData={setFormData}
-                    errors={{
-                      ...errors,
-                      ...(!formData.name.trim() && stepError
-                        ? { name: stepError }
-                        : {}),
-                    }}
-                  />
-                )}
-                {step === 0 && (
-                  <div
-                    id="rule-employees"
-                    tabIndex={-1}
-                    role="group"
-                    aria-label="Kişi seçimi"
-                    aria-invalid={!!errors.selectedEmployees}
-                    aria-describedby={
-                      errors.selectedEmployees
-                        ? "rule-employees-error"
-                        : undefined
-                    }
+              <fieldset disabled={isSubmitting} className="space-y-5 min-w-0">
+                <RuleBasicInfo
+                  formData={formData}
+                  setFormData={setFormData}
+                  errors={errors}
+                />
+                <div className="grid gap-6 lg:grid-cols-2 min-w-0">
+                  <section
+                    aria-labelledby="rule-who-heading"
+                    className="space-y-3 min-w-0"
                   >
-                    {formData.target_type === "visitor" ? (
-                      <p>
-                        Ziyaretçi şablonu: mevcut üyelikler korunur.
-                        Ziyaretçiler bu şablona Ziyaretçiler ekranından eklenir.
-                      </p>
-                    ) : (
-                      <QuerySectionBoundary resetKey={projectId ?? "none"}>
-                        <DepartmentTree
-                          formData={formData}
-                          setFormData={setFormData}
-                        />
-                      </QuerySectionBoundary>
-                    )}
-                    {errors.selectedEmployees && (
-                      <p
-                        id="rule-employees-error"
-                        role="alert"
-                        className="text-danger"
-                      >
-                        {errors.selectedEmployees}
-                      </p>
-                    )}
-                  </div>
-                )}
-                {step === 1 && (
-                  <>
+                    <h2 id="rule-who-heading" className="font-semibold">
+                      Kimler erişebilir?
+                    </h2>
+                    <div
+                      id="rule-employees"
+                      tabIndex={-1}
+                      role="group"
+                      aria-label="Kişi seçimi"
+                      aria-invalid={!!errors.selectedEmployees}
+                      aria-describedby={
+                        errors.selectedEmployees
+                          ? "rule-employees-error"
+                          : undefined
+                      }
+                    >
+                      {formData.target_type === "visitor" ? (
+                        <p>
+                          Ziyaretçi şablonu: mevcut üyelikler korunur.
+                          Ziyaretçiler bu şablona Ziyaretçiler ekranından
+                          eklenir.
+                        </p>
+                      ) : (
+                        <QuerySectionBoundary resetKey={projectId ?? "none"}>
+                          <DepartmentTree
+                            formData={formData}
+                            setFormData={setFormData}
+                          />
+                        </QuerySectionBoundary>
+                      )}
+                      {errors.selectedEmployees && (
+                        <p
+                          id="rule-employees-error"
+                          role="alert"
+                          className="text-danger"
+                        >
+                          {errors.selectedEmployees}
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                  <section
+                    aria-labelledby="rule-where-heading"
+                    className="space-y-3 min-w-0 lg:border-l lg:pl-6"
+                  >
+                    <h2 id="rule-where-heading" className="font-semibold">
+                      Nerede ve ne zaman?
+                    </h2>
                     <div
                       id="rule-devices"
                       tabIndex={-1}
@@ -266,14 +209,9 @@ export default function CreateRuleDialog({
                       setFormData={setFormData}
                       errors={errors}
                     />
-                  </>
-                )}
+                  </section>
+                </div>
               </fieldset>
-            )}
-            {stepError && (
-              <p role="alert" className="text-danger text-xs">
-                {stepError}
-              </p>
             )}
           </form>
           <div className="px-4 py-2 border-t text-xs text-muted-foreground break-words">
@@ -292,36 +230,13 @@ export default function CreateRuleDialog({
             >
               Vazgeç
             </Button>
-            {step > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isSubmitting}
-                onClick={() => go(step - 1)}
-              >
-                Geri
-              </Button>
-            )}
-            {/* Ayrı key: aynı DOM düğmesi tıklama sırasında type="submit"e dönüp formu göndermesin. */}
-            {step < 1 ? (
-              <Button
-                key="next"
-                type="button"
-                disabled={isSubmitting || projectChanged}
-                onClick={advance}
-              >
-                İleri
-              </Button>
-            ) : (
-              <Button
-                key="submit"
-                type="submit"
-                form={FORM_ID}
-                disabled={isSubmitting || projectChanged}
-              >
-                {isSubmitting ? "Kaydediliyor…" : "Kuralı kaydet"}
-              </Button>
-            )}
+            <Button
+              type="submit"
+              form={FORM_ID}
+              disabled={isSubmitting || projectChanged}
+            >
+              {isSubmitting ? "Kaydediliyor…" : "Kuralı kaydet"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

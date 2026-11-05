@@ -77,8 +77,6 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
       else next.add(id);
       return next;
     });
-  const allDoorIds = availableDoors.map((door) => door._id);
-  const allDoorlessIds = doorless.map((device) => device._id);
   const renderZone = (
     zoneId?: string,
     name = "Bölgesi olmayan kapılar / cihazlar",
@@ -248,26 +246,6 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
   const hasResults = renderedZones.some((zone) => zone !== null);
   return (
     <div role="group" aria-label="Kapı ve cihaz seçimi" className="space-y-3 min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-auto min-h-9 max-w-full whitespace-normal"
-          disabled={isLoading || loading || (disableDoorless && allDoorIds.length === 0)}
-          onClick={() =>
-            changeScope(
-              allDoorIds,
-              allDoorlessIds,
-              state(allDoorIds, allDoorlessIds) !== true,
-            )
-          }
-        >
-          {state(allDoorIds, allDoorlessIds) === true
-            ? "Projedeki tüm seçimleri kaldır"
-            : "Projedeki tüm kapıları ve cihazları seç"}
-        </Button>
-      </div>
       <p className="text-xs text-muted-foreground">
         {effective.length} kapı, {formData.selected_devices.length} cihaz
         seçili. Bölge seçimi yalnız o bölgenin kapılarını kapsar.

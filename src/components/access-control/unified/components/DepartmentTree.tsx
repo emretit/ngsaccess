@@ -180,28 +180,8 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
   const hasResults =
     renderedDepartments.some((department) => department !== null) ||
     visibleOrphans.length > 0;
-  const allIds = employees.map((employee) => employee._id);
   return (
     <div role="group" aria-label="Kişi seçimi" className="space-y-3 min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-auto min-h-9 max-w-full whitespace-normal"
-          disabled={employeesLoading}
-          onClick={() =>
-            change(
-              allIds,
-              selectionState(allIds, formData.selected_employees) !== true,
-            )
-          }
-        >
-          {selectionState(allIds, formData.selected_employees) === true
-            ? "Projedeki tüm seçimleri kaldır"
-            : "Projedeki tüm kişileri seç"}
-        </Button>
-      </div>
       <div className="flex items-center gap-2">
         <Checkbox
           id={`${prefix}-descendants`}
