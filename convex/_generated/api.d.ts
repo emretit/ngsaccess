@@ -175,7 +175,6 @@ import type * as lib_passwordPolicy from "../lib/passwordPolicy.js";
 import type * as lib_payVisibility from "../lib/payVisibility.js";
 import type * as lib_pdksAvailability from "../lib/pdksAvailability.js";
 import type * as lib_pdksCalc from "../lib/pdksCalc.js";
-import type * as lib_pdksChart from "../lib/pdksChart.js";
 import type * as lib_pdksDay from "../lib/pdksDay.js";
 import type * as lib_pdksDetail from "../lib/pdksDetail.js";
 import type * as lib_pdksEvidence from "../lib/pdksEvidence.js";
@@ -444,7 +443,6 @@ declare const fullApi: ApiFromModules<{
   "lib/payVisibility": typeof lib_payVisibility;
   "lib/pdksAvailability": typeof lib_pdksAvailability;
   "lib/pdksCalc": typeof lib_pdksCalc;
-  "lib/pdksChart": typeof lib_pdksChart;
   "lib/pdksDay": typeof lib_pdksDay;
   "lib/pdksDetail": typeof lib_pdksDetail;
   "lib/pdksEvidence": typeof lib_pdksEvidence;

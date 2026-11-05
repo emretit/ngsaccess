@@ -5,6 +5,11 @@ import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:ngsplusapp/widgets/app_bottom_navigation.dart';
 
+import '../helpers/ui_mount.dart' as shared;
+
+import 'package:flutter/services.dart';
+import 'package:ngsplusapp/widgets/ui/ui.dart' show AppUiTokens;
+
 void main() {
   Future<void> mount(
     WidgetTester tester, {
@@ -176,5 +181,126 @@ void main() {
       2,
     );
     expect(tester.takeException(), isNull);
+  });
+  group('navigation accessibility regressions', () {
+    testWidgets(
+      'RV1-17 EN QR Actions keeps selected semantics and full-cell 48dp target',
+      (tester) async {
+        final handle = tester.ensureSemantics();
+        try {
+          var selected = 2;
+          await shared.mount(
+            tester,
+            StatefulBuilder(
+              builder: (context, setState) => AppBottomNavigation(
+                selectedIndex: selected,
+                onDestinationSelected: (value) =>
+                    setState(() => selected = value),
+              ),
+            ),
+            width: 320,
+            scale: 2,
+          );
+          final node = tester.getSemantics(find.bySemanticsLabel('QR Actions'));
+          expect(
+            node.getSemanticsData().flagsCollection.isSelected.toBoolOrNull(),
+            isTrue,
+          );
+          for (var index = 0; index < 5; index++) {
+            final target = find.byKey(ValueKey('app_nav_button_$index'));
+            final size = tester.getSize(target);
+            expect(
+              size.width,
+              54,
+            ); // 320 minus floating insets, five cells and gaps.
+            expect(size.height, greaterThanOrEqualTo(48));
+          }
+          await tester.tap(find.byKey(const ValueKey('app_nav_button_0')));
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .getSemantics(find.bySemanticsLabel('QR Actions'))
+                .getSemanticsData()
+                .flagsCollection
+                .isSelected
+                .toBoolOrNull(),
+            isFalse,
+          );
+        } finally {
+          handle.dispose();
+        }
+      },
+    );
+  });
+  group('keyboard navigation feedback', () {
+    for (final dark in [false, true]) {
+      testWidgets('floating bar keeps circular QR and keyboard focus $dark', (
+        tester,
+      ) async {
+        final handle = tester.ensureSemantics();
+        try {
+          tester.view.physicalSize = const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          var selected = 0;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              locale: const Locale('en'),
+              home: StatefulBuilder(
+                builder: (context, setState) => Scaffold(
+                  bottomNavigationBar: AppBottomNavigation(
+                    selectedIndex: selected,
+                    onDestinationSelected: (value) =>
+                        setState(() => selected = value),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final qr = find.byKey(const ValueKey('app_nav_button_2'));
+          final circle = find.descendant(
+            of: qr,
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w is AnimatedContainer &&
+                  w.decoration is BoxDecoration &&
+                  (w.decoration as BoxDecoration).shape == BoxShape.circle,
+            ),
+          );
+          expect(tester.getSize(circle), const Size(64, 64));
+          final context = tester.element(qr);
+          expect(
+            (tester.widget<AnimatedContainer>(circle).decoration
+                    as BoxDecoration)
+                .color,
+            AppUiTokens.of(context).bandBackground,
+          );
+          final home = find.byKey(const ValueKey('app_nav_button_0'));
+          expect(
+            tester.getRect(circle).top,
+            lessThan(tester.getRect(home).top),
+          );
+          for (var i = 0; i < 3; i++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+            await tester.pumpAndSettle();
+          }
+          await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+          await tester.pumpAndSettle();
+          expect(selected, 2);
+          final data = tester
+              .getSemantics(find.bySemanticsLabel('QR Actions'))
+              .getSemanticsData();
+          expect(data.flagsCollection.isSelected.toBoolOrNull(), isTrue);
+          expect(tester.takeException(), isNull);
+        } finally {
+          handle.dispose();
+        }
+      });
+    }
   });
 }

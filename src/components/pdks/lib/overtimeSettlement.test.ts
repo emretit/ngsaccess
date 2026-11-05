@@ -3,11 +3,10 @@ import type { Doc, Id } from "../../../../convex/_generated/dataModel";
 import { computePdksTableRow } from "../../../../convex/lib/pdksTable";
 import { DEFAULT_OVERTIME_RATES, DEFAULT_WORK_SETTINGS } from "../../../../convex/lib/pdksHelpers";
 import { summarizePdksRecords } from "../../../lib/pdksSummary";
-import { analyzePdksRows } from "./analysis";
 import { filterPdksRows, periodTotals, type PdksRow } from "./presentation";
 
 describe("settled overtime in PDKS views", () => {
-  it.each(["weekly45", "dailyShift"] as const)("%s cells, heatmap, chart, KPI and filter share the row's settlement", (overtimeBasis) => {
+  it.each(["weekly45", "dailyShift"] as const)("%s cells, heatmap, KPI and filter share the row's settlement", (overtimeBasis) => {
     const id = "employee" as Id<"employees">;
     const dates = [22, 23, 24, 25, 26].map((d) => `2026-06-${d}`);
     const employee = { _id: id, firstName: "Test", lastName: "Worker", hourlyRate: 100 } as Doc<"employees">;
@@ -32,7 +31,6 @@ describe("settled overtime in PDKS views", () => {
       overtimeBasis === "weekly45" ? [0, 0, 0, 0, 300] : [120, 120, 120, 120, 120],
     );
     expect(periodTotals(row.days).overtimeMinutes).toBe(expected);
-    expect(analyzePdksRows([row]).reduce((sum, d) => sum + d.overtimeMinutes, 0)).toBe(expected);
     expect(summarizePdksRecords([row]).overtimeHours).toBe(expected / 60);
     expect(filterPdksRows([row], "overtime")).toEqual([row]);
     for (const date of [dates[0], dates[4]]) {

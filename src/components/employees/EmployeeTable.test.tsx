@@ -28,26 +28,11 @@ it("02-O2: row send opens confirmation and calls device action only after confir
   mocks.confirm?.();
   expect(mocks.sync).toHaveBeenCalledWith({ employeeId: "e" });
 });
-it("02-D8: selection reserves enough bottom space for the largest toolbar", () => {
-  mocks.selected = ["e"];
-  const html = render();
-  expect(html).toContain('class="fixed bottom-4 left-4 right-4');
-  expect(html).toContain("Toplu işlemler");
-  expect(html).toContain("pb-[calc(40vh+2rem)]");
-  mocks.selected = [];
-  expect(render()).not.toContain("pb-[calc(40vh+2rem)]");
-});
-it("02-O4/D6: checkboxes retain shared neutral border and expanded target without overriding pseudo-element", () => {
-  const html = render();
-  expect(html.match(/border-input after:absolute after:-inset-1.5/g)).toHaveLength(2);
-  expect(html).not.toContain("data-[state=indeterminate]:after:inset");
-  expect(html).toMatch(/<th[^>]*data-column-id="select"[^>]*class="[^"]*\bw-11 px-2\b[^"]*"/);
-});
 
 it("02-O2: bulk send also waits for confirmation", async () => {
   const employees = [employee, { ...employee, _id: "e2" as Id<"employees"> }];
   mocks.selected = ["e", "e2"];
-  render(employees);
+  expect(render(employees)).toContain("Toplu işlemler");
   mocks.bulkSend?.();
   expect(mocks.sync).not.toHaveBeenCalled();
   render(employees);

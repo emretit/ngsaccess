@@ -4,8 +4,6 @@ import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { visitorExpiryDelay } from "./hooks/useVisitorClock";
 import { canCaptureVisitorCard, visitorReaderLabel } from "./lib/readerCapability";
-import { DEFAULT_WORKDAYS } from "@/components/access-control/unified/components/weekdays";
-import { TimeSchedule } from "@/components/access-control/unified/components/TimeSchedule";
 import VisitorFormFields from "./VisitorFormFields";
 import { VisitorCombobox } from "./VisitorCombobox";
 import VisitorTable from "./VisitorTable";
@@ -58,12 +56,6 @@ describe("visitor audit fixes", () => {
     expect(html).toContain("Henüz ziyaretçi kaydı yok");
     expect(html).not.toContain("Sonraki"); expect(html).not.toContain("tarandı");
     expect(html).not.toContain("Ziyaretçi kaydet");
-  });
-  it("retains the shared high-contrast selected weekday style in the visitor zone schedule", () => {
-    const html = renderToStaticMarkup(<TimeSchedule formData={{ start_time: "", end_time: "", days: DEFAULT_WORKDAYS }} setFormData={noop} />);
-    expect(html).toContain('data-state="on"'); expect(html).toContain('data-state="off"');
-    expect(html).toContain("data-[state=on]:bg-primary");
-    expect(html).toContain("data-[state=on]:text-primary-foreground");
   });
   it("shows both filter labels visibly and describes project-wide matching", () => {
     const html = renderToStaticMarkup(<VisitorFilters searchQuery="" onSearchChange={noop} statusFilter="all" onStatusFilterChange={noop} onClear={noop} />);

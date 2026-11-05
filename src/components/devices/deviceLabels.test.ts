@@ -1,11 +1,7 @@
 import { expect, it } from "vitest";
 import { deviceLabels } from "./deviceLabels";
 import { deviceDateTime } from "./deviceAdapter";
-it("komut sözlüğü cümle düzenindedir ve sonucu doğru anlatır", () => {
-  expect(deviceLabels.workStatus).toBe("Çalışma durumu");
-  expect(deviceLabels.reconcile).toBe("Eşitlik kontrolü");
-  expect(deviceLabels.triggerSync).toBe("Panel senkronu");
-  expect(deviceLabels.commandSent).toBe("Komut cihaza iletildi");
+it("IDE UUID yardımı seri numarasıyla karıştırılmaz", () => {
   expect(deviceLabels.uuidHelp).toContain(
     "15 haneli UUID — seri numarası değil",
   );

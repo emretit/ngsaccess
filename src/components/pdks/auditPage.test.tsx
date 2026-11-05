@@ -24,7 +24,6 @@ vi.mock("@/components/pdks/dashboard/PDKSEnhancedExportPanel", () => ({ PDKSEnha
 vi.mock("@/components/pdks/dashboard/PDKSFilterBar", () => ({ PDKSFilterBar: () => null, clearPdksFilters: vi.fn() }));
 vi.mock("@/components/pdks/dashboard/PDKSTableView", () => ({ PDKSTableView: () => <div>Kayıt tablosu</div> }));
 vi.mock("@/components/pdks/dashboard/PDKSHeatmapView", () => ({ PDKSHeatmapView: () => <div>Puantaj tablosu</div> }));
-vi.mock("@/components/pdks/dashboard/PDKSChartView", () => ({ PDKSChartView: () => null }));
 vi.mock("@/components/pdks/dashboard/PDKSEmployeeDetailDrawer", () => ({ PDKSEmployeeDetailDrawer: () => null }));
 vi.mock("@/components/pdks/dashboard/PDKSImportDialog", () => ({ PDKSImportDialog: () => null }));
 vi.mock("@/components/pdks/dashboard/PDKSSmartPresets", () => ({ PDKSSmartPresets: () => null }));

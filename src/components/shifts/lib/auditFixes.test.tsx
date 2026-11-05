@@ -6,7 +6,7 @@ import { getFunctionName } from "convex/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ShiftCalendarView } from "../ShiftCalendarView";
 import { ShiftDayDetails } from "../ShiftDayDetails";
-import { Decision, PreviewPanel, AssignShiftDialog } from "../AssignShiftDialog";
+import { Decision, AssignShiftDialog } from "../AssignShiftDialog";
 import { AssignmentEditDialog } from "../AssignmentEditDialog";
 import { WeekdaySelection } from "../WeekdaySelection";
 import { AddShiftDialog } from "../definitions/AddShiftDialog";
@@ -112,10 +112,6 @@ describe("09 denetim düzeltmeleri", () => {
     expect(html.match(/type="checkbox"/g)).toHaveLength(7);
     expect(html).toContain('id="days-error"');
     expect(html).toContain("size-6 shrink-0 accent-primary");
-  });
-  it("D9: önizleme listesinin kendi kaydırma alanı yoktur", () => {
-    const html = renderToStaticMarkup(<PreviewPanel values={{ ...assignmentInitial("2026-10-19"), employeeIds: [employee._id], shiftId: shift._id, weekPattern: ['MON', 'TUE', 'WED', 'THU', 'FRI'] }} projectId={"project" as Id<"projects">} forceConfirm={false} calendarConfirmed={false} setForceConfirm={() => undefined} setCalendarConfirmed={() => undefined} pending={false} onSave={() => undefined} />);
-    expect(html).toContain("Önizleme"); expect(html).not.toContain("overflow-y-auto"); expect(html).not.toContain("max-h-64");
   });
   it("D3/D4: tanım formu seçimleri tema rengi ve 24px alan kullanır, gece süresi korunur", () => {
     const html = renderToStaticMarkup(<AddShiftDialog open editingShift={{ ...shift, overtimeEnabled: true, isActive: true }} onOpenChange={() => undefined} onClose={() => undefined} onAdd={async () => undefined} onUpdate={async () => undefined} />);

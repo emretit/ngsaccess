@@ -2,7 +2,6 @@ import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { STATUS_META, STATUS_FILTER_LABELS, statusMetaFor } from "./statusMeta";
 import { cellLabel, type PdksCell, type PdksRow } from "./lib/presentation";
-import { analyzePdksRows } from "./lib/analysis";
 import { PDKSHeatmapView } from "./dashboard/PDKSHeatmapView";
 import { PdksRowStatus } from "./dashboard/PdksRowStatus";
 
@@ -23,7 +22,7 @@ it("diğer durumların metası giriş olsa da aynı kalır", () => {
   }
 });
 
-it("ısı haritası ve analiz girişli/girişsiz future günleri ayırır", () => {
+it("ısı haritası girişli/girişsiz future günleri ayırır", () => {
   const cells = [
     { date: "2026-10-23", status: "future", firstEntry: "08:00", totalMinutes: 0 },
     { date: "2026-10-24", status: "future", firstEntry: null, totalMinutes: 0 },
@@ -32,7 +31,4 @@ it("ısı haritası ve analiz girişli/girişsiz future günleri ayırır", () =
   const html = renderToStaticMarkup(<PDKSHeatmapView records={[row]} loading={false} startDate="2026-10-23" endDate="2026-10-24" />);
   expect(html).toMatch(/aria-label="Ada, [^"]*Devam ediyor/);
   expect(html).toMatch(/aria-label="Ada, [^"]*Henüz gelmedi/);
-  expect(analyzePdksRows([row]).map(day => ({ future: day.counts.future, inProgress: day.inProgress }))).toEqual([
-    { future: 1, inProgress: 1 }, { future: 1, inProgress: 0 },
-  ]);
 });

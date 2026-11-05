@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PDKSImportDialog } from "./PDKSImportDialog";
 import { PDKSFilterBar, type FilterValues } from "./PDKSFilterBar";
 import { PDKSDateNavigator } from "./PDKSDateNavigator";
-import { PDKSHeatmapView } from "./PDKSHeatmapView";
 import { restorePdksFocus } from "../lib/focus";
 import { ManualPdksEditDialog } from "../ManualPdksEditDialog";
 import { currentPeriodRange, pdksToday } from "../lib/calendar";
@@ -96,12 +95,6 @@ describe("08 UI denetim düzeltmeleri", () => {
     const range = currentPeriodRange({ ...values, reportType: "monthly", anchorDate: pdksToday() });
     expect(range.from.getDate()).toBe(1);
     expect(range.to.getDate()).toBe(28);
-  });
-  it("O6: mobil puantaj kişi sütunu 120px, geniş ekranda 192px", () => {
-    const html = render(<PDKSHeatmapView records={[]} loading={false} startDate="2026-10-19" endDate="2026-10-25" />);
-    expect(html).toContain("[--pdks-person-width:120px]");
-    expect(html).toContain("sm:[--pdks-person-width:192px]");
-    expect(html).toContain("var(--pdks-person-width)");
   });
   it("D7: kontrollü panel kapanınca açan öğeye odak döner; silinmiş öğeye dönmez", () => {
     const focus = vi.fn(), preventDefault = vi.fn();

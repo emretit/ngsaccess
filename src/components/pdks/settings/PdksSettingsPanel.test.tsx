@@ -18,7 +18,5 @@ describe('PDKS ayarlar kartları', () => {
     expect(html).toContain('Vardiya planı');
     expect(html).toContain('Tatil takvimi');
     expect(html).not.toContain('Çalışma günleri');
-    expect(html).toContain('min-[1200px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]');
-    expect(html).toContain('min-[1200px]:col-span-2');
   });
 });

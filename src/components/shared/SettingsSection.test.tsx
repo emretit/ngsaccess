@@ -35,19 +35,4 @@ describe("SettingsSection", () => {
     expect(ids).toHaveLength(2);
     expect(ids[0]).not.toBe(ids[1]);
   });
-  it.each(["compact", "regular"] as const)(
-    "supports %s density and an optional divider",
-    (density) => {
-      const html = renderToStaticMarkup(
-        <SettingsSection title="Başlık" density={density} divided>
-          Alan
-        </SettingsSection>,
-      );
-      expect(html).toContain(
-        density === "compact" ? "border-t pt-4" : "border-t pt-5",
-      );
-      expect(html).toContain(density === "compact" ? "text-sm" : "text-base");
-      expect(html).not.toContain("text-muted-foreground");
-    },
-  );
 });

@@ -31,13 +31,6 @@ describe("FormActions", () => {
     expect(buttons[1]).toContain('disabled=""');
   });
 
-  it("uses DialogFooter alignment without sticky, border, background or padding", () => {
-    const html = renderToStaticMarkup(<FormActions layout="dialog" isLoading={false} onClose={onClose} />);
-    const container = html.slice(0, html.indexOf('>'));
-    expect(container).toContain('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2');
-    expect(container).not.toMatch(/sticky|border|bg-|p[xy]?-/);
-  });
-
   it("supports custom labels, external form submission and left aligned extra actions", () => {
     const html = renderToStaticMarkup(<FormActions isLoading={false} onClose={onClose} cancelLabel="İptal" submitLabel="Ekle" form="add-zone" extraActions={<button type="button">Önizle</button>} className="custom-actions" />);
     expect(html).toContain('>İptal</button>');

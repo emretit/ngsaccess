@@ -8,7 +8,7 @@ import 'package:ngsplusapp/widgets/door_operation_recovery_dialog.dart';
 import 'package:ngsplusapp/widgets/ui/ui.dart';
 
 import '../../../screenshot_test/_harness.dart';
-import '../d1/fix1_test.dart' show mount;
+import '../../helpers/ui_mount.dart' show mount;
 
 class _ReadOnlyCommands extends AuditCommands {
   int queries = 0;

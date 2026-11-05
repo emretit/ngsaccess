@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ngsplusapp/core/app_date_format.dart';
 import 'package:ngsplusapp/core/attendance_date.dart';
+
+import 'package:ngsplusapp/widgets/ui/ui.dart';
+import '../../helpers/ui_mount.dart' show mount;
 
 void main() {
   final now = DateTime.parse('2026-11-04T12:00:00Z');
@@ -103,6 +105,89 @@ void main() {
         endDay: DateTime.utc(2026, 11),
       ),
       throwsArgumentError,
+    );
+  });
+  group('date picker regressions', () {
+    test(
+      'RV1-13 invalid draft ranges are absent while validated API stays strict',
+      () {
+        final format = AppDateFormat(
+          locale: const Locale('en'),
+          now: DateTime.utc(2026, 11, 4),
+        );
+        expect(
+          format.tryDateRange(
+            startDay: DateTime.utc(2026, 11, 8),
+            endDay: DateTime.utc(2026, 11, 4),
+          ),
+          isNull,
+        );
+        expect(
+          format.tryDateRange(
+            startDay: DateTime.utc(2026, 11, 4),
+            endDay: DateTime.utc(2026, 11, 8),
+          ),
+          '4–8 Nov',
+        );
+        expect(
+          () => format.dateRange(
+            startDay: DateTime.utc(2026, 11, 8),
+            endDay: DateTime.utc(2026, 11, 4),
+          ),
+          throwsArgumentError,
+        );
+      },
+    );
+    test(
+      'RV1-13 empty picker starts on Turkey day and clamps to allowed days',
+      () {
+        final first = DateTime.utc(2026, 11, 1);
+        final last = DateTime.utc(2026, 11, 30);
+        DateTime day(String instant) => AppDateFormat.initialPickerDay(
+          now: DateTime.parse(instant),
+          firstDate: first,
+          lastDate: last,
+        );
+        expect(day('2026-11-03T20:59:00Z'), DateTime.utc(2026, 11, 3));
+        expect(day('2026-11-03T21:00:00Z'), DateTime.utc(2026, 11, 4));
+        expect(day('2025-01-01T00:00:00Z'), first);
+        expect(day('2027-01-01T00:00:00Z'), last);
+        expect(
+          AppDateFormat.initialPickerDay(
+            now: DateTime.utc(2026),
+            value: DateTime.utc(2026, 11, 9),
+            firstDate: first,
+            lastDate: last,
+          ),
+          DateTime.utc(2026, 11, 9),
+        );
+      },
+    );
+    testWidgets(
+      'RV1-13 date field passes explicit initial and current Turkey dates',
+      (tester) async {
+        await mount(
+          tester,
+          AppDateField(
+            label: 'Date',
+            value: null,
+            firstDate: DateTime.utc(2030),
+            lastDate: DateTime.utc(2031),
+            onChanged: (_) {},
+          ),
+        );
+        await tester.tap(find.text('Choose a date'));
+        await tester.pumpAndSettle();
+        final picker = tester.widget<DatePickerDialog>(
+          find.byType(DatePickerDialog),
+        );
+        expect(picker.initialDate, DateTime(2030));
+        final today = AppDateFormat.calendarDayFromInstant(DateTime.now());
+        expect(
+          picker.currentDate,
+          DateTime(today.year, today.month, today.day),
+        );
+      },
     );
   });
 }

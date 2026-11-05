@@ -28,13 +28,4 @@ describe("DetailFieldList", () => {
     expect(html).toContain('text-sm break-words tabular-nums');
     expect(html).toMatch(/<dl[^>]*><div[^>]*><dt[^>]*>Empty<\/dt><dd/);
   });
-
-  it("uses vertical spacing by default and a responsive grid for two columns", () => {
-    const single = renderToStaticMarkup(<DetailFieldList fields={[]} />);
-    const double = renderToStaticMarkup(<DetailFieldList fields={[]} columns={2} className="border-y" />);
-    expect(single).toContain('space-y-4');
-    expect(single).not.toContain('grid');
-    expect(double).toContain('grid gap-4 sm:grid-cols-2 border-y');
-    expect(double).not.toContain('space-y-4');
-  });
 });

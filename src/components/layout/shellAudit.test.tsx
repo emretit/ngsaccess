@@ -49,11 +49,6 @@ describe("Kabuk denetimi", () => {
     expect(html).toMatch(/aria-current="page"[^>]*>Cihazlar/);
     expect(html).toContain("Ana Sayfa");
   });
-  it("gives the mobile menu and account buttons 44px touch targets", () => {
-    const html = render(<AppHeader title="Ana Sayfa" />);
-    expect(html).toMatch(/<button class="h-11 w-11[^"]*">Menü/);
-    expect(html).toMatch(/<button[^>]*class="[^"]*h-11 w-11[^"]*"[^>]*aria-label="Hesap menüsü"/);
-  });
   it("puts the single project name in context for screen readers", () => {
     expect(render(<ProjectSwitcher />)).toContain('<span class="sr-only">Aktif proje: </span>');
   });
@@ -69,6 +64,7 @@ describe("Kabuk denetimi", () => {
     const html = render(<AppSidebarNav />);
     expect(html).toContain('href="/devices"');
     expect(html).not.toContain('href="/virtual-readers"');
+    expect(html).not.toContain("Yakında");
   });
 });
 

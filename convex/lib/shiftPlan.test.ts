@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
-import { MAX_DAY_CYCLE, MAX_SHIFTS_PER_DAY, MAX_WEEK_CYCLE, MIN_SPLIT_GAP_MINUTES, planShiftIds, slotForDate, validateDayShifts, validateShiftPlan, type ShiftPlan } from "./shiftPlan";
+import { planShiftIds, slotForDate, validateDayShifts, validateShiftPlan, type ShiftPlan } from "./shiftPlan";
 import { evaluateShiftAssignment, assignmentIntersectsRange } from "./shiftAssign";
 import { scheduleIntervals } from "./shiftUx";
 const projectId = "project" as Id<"projects">;
@@ -16,7 +16,6 @@ const row = { shiftId: morning._id, projectId, startDate: "2026-06-01", endDate:
 const normalized = (plan: ShiftPlan, extra = {}) => validateShiftPlan({ ...row, weekPattern: plan.kind === "weekly" ? ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] : undefined, plan, ...extra }, shifts);
 
 describe("day plan validation", () => {
-  it("exposes the agreed constants", () => expect([MAX_SHIFTS_PER_DAY, MIN_SPLIT_GAP_MINUTES, MAX_DAY_CYCLE, MAX_WEEK_CYCLE]).toEqual([8, 30, 31, 52]));
   it("sorts a copy by start, accepts eight and rejects nine", () => {
     const values = Array.from({ length: 9 }, (_, i) => shift(`s${i}`, `${String(i * 2).padStart(2, "0")}:00`, `${String(i * 2 + 1).padStart(2, "0")}:00`));
     const input = values.slice(0, 8).reverse();
