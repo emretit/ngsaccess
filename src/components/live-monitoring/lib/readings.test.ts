@@ -18,7 +18,13 @@ describe("canlı tampon sözleşmesi", () => {
   it("yeni olay sayacı yalnız seçili filtreye uyan benzersiz satırlardır", () => { const rows = mergeRows([row("a", 1)], [{ ...row("a", 1), accessStatus: "reddedildi" }, { ...row("b", 2), accessStatus: "izin_verildi" }]); expect(rows.filter(r => matches(r, { ...emptyFilters, result: "denied" }))).toHaveLength(1); });
 });
 describe("URL ve kaynak", () => {
-  it("filtreleri ve okuma kimliğini kayıpsız taşır", () => { const f = { ...emptyFilters, search: "Işıl 0001", result: "unknown" as const, device: "d", employee: "p", door: "k", start: "2026-10-17" }; const url = writeFilters(new URLSearchParams("reading=id&other=value"), f, "project"); expect(readFilters(url, "project")).toEqual(f); expect(url.get("reading")).toBe("id"); expect(url.get("other")).toBe("value"); });
+  it("persists the source filter in the URL and rejects unknown values", () => {
+    const filters = { ...emptyFilters, source: "biometric" as const };
+    expect(readFilters(writeFilters(new URLSearchParams(), filters, "project"), "project")).toEqual(filters);
+    expect(readFilters(new URLSearchParams("source=oops"), "project").source).toBe("all");
+  });
+
+  it("filtreleri ve okuma kimliğini kayıpsız taşır", () => { const f = { ...emptyFilters, search: "Işıl 0001", source: "biometric" as const, result: "unknown" as const, device: "d", employee: "p", door: "k", start: "2026-10-17" }; const url = writeFilters(new URLSearchParams("reading=id&other=value"), f, "project"); expect(readFilters(url, "project")).toEqual(f); expect(url.get("reading")).toBe("id"); expect(url.get("other")).toBe("value"); });
   it("proje değişiminde eski filtreyi kullanmaz", () => expect(readFilters(new URLSearchParams("liveProject=old&device=old&q=old"), "new")).toEqual(emptyFilters));
   it("geçersiz enum/tarihleri temizler, eski mode parametresini atar", () => { const f = readFilters(new URLSearchParams("result=no&start=oops&mode=history"), "p"); expect(f.result).toBe("all"); expect(f.start).toBe(""); expect(writeFilters(new URLSearchParams("mode=history"), f, "p").has("mode")).toBe(false); });
   it.each([["card", "Kart"], ["qr", "QR"], ["mobile", "Mobil"], ["biometric", "Biyometrik · PDKS dışı"], ["unknown", "Kaynak bilinmiyor"]] as const)("%s sunucu kaynağını etiketler", (source, label) => expect(sourceLabel(source)).toBe(label));

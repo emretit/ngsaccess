@@ -1,14 +1,8 @@
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/theme/app_theme.dart';
-
-double contrast(Color foreground, Color background) {
-  final first = foreground.computeLuminance();
-  final second = background.computeLuminance();
-  return (math.max(first, second) + .05) / (math.min(first, second) + .05);
-}
+import '../helpers/contrast.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -14,7 +14,7 @@ import 'package:ngsplusapp/widgets/visitor/visitor_detail.dart';
 import 'package:provider/provider.dart';
 
 import 'auth_fakes.dart';
-import 'visitor_provider_test.dart'
+import 'helpers/visitor_fakes.dart'
     show FakeVisitorRepository, visitorFixture, visitorPage;
 
 class LifecycleVisitors extends FakeVisitorRepository {

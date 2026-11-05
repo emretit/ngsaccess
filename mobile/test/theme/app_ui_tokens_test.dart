@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:ngsplusapp/widgets/ui/app_ui_tokens.dart';
-import 'app_theme_test.dart' show contrast;
+import '../helpers/contrast.dart' show contrast;
 
 void main() {
   test(

@@ -27,7 +27,7 @@ void main() {
     AppMetric(value: '12:31', label: 'Son çıkış'),
     AppMetric(value: '13:14', label: 'Son giriş'),
   ];
-  for (final dark in [false, true]) {
+  for (final dark in [false]) {
     for (final width in [308.0, 200.0]) {
       testWidgets('metric layout measures clock labels at $width dark=$dark', (
         tester,

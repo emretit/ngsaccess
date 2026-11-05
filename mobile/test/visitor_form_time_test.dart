@@ -10,27 +10,8 @@ import 'package:ngsplusapp/widgets/visitor/visitor_labels.dart';
 import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:provider/provider.dart';
 
-import 'visitor_provider_test.dart' show FakeVisitorRepository, visitorFixture;
-
-class RecordingVisitors extends FakeVisitorRepository {
-  final drafts = <VisitorDraft>[];
-
-  @override
-  Future<String> create(
-    VisitorDraft draft, {
-    required String requestId,
-    required VisitorNotice notice,
-    required bool noticeReviewed,
-  }) {
-    drafts.add(draft);
-    return super.create(
-      draft,
-      requestId: requestId,
-      notice: notice,
-      noticeReviewed: noticeReviewed,
-    );
-  }
-}
+import 'helpers/visitor_fakes.dart' show visitorFixture;
+import 'helpers/recording_visitors.dart';
 
 Future<void> openForm(
   WidgetTester tester,

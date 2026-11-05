@@ -12,9 +12,9 @@ import 'package:ngsplusapp/widgets/visitor/visitor_cards.dart';
 import 'package:ngsplusapp/widgets/visitor/visitor_detail.dart';
 import 'package:provider/provider.dart';
 
-import '../../visitor_provider_test.dart'
+import '../../helpers/visitor_fakes.dart'
     show FakeVisitorRepository, visitorFixture, visitorPage;
-import '../../visitor_widgets_test.dart' show app;
+import '../../helpers/visitor_app.dart' show app;
 
 class _NoticeRepository extends FakeVisitorRepository {
   @override

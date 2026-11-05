@@ -1,15 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/models/door_operation.dart';
-
-Map<String, Object?> operationJson({String status = 'pending'}) => {
-  'operationId': 'operation-a',
-  'status': status,
-  'deviceId': 'device-a',
-  'doorId': 'door-a',
-  'deviceName': 'Test door',
-  'requestedAt': '2026-10-19T10:00:00.000Z',
-};
+import '../helpers/door_operation_fixtures.dart';
 
 void main() {
   test('command acknowledgement is terminal but not an attendance event', () {

@@ -6,7 +6,7 @@ import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/providers/qr_provider.dart';
 import 'package:ngsplusapp/repositories/qr_repository.dart';
 
-class MockQrRepository extends Mock implements QrRepository {}
+import '../helpers/qr_fakes.dart';
 
 void main() {
   final serverNow = DateTime.utc(2026, 10, 19, 12);

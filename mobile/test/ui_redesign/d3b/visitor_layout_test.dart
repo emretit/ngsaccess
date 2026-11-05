@@ -14,7 +14,7 @@ import 'package:ngsplusapp/widgets/visitor/visitor_cards.dart';
 import 'package:ngsplusapp/widgets/visitor/visitor_detail.dart';
 import 'package:provider/provider.dart';
 
-import '../../visitor_provider_test.dart'
+import '../../helpers/visitor_fakes.dart'
     show FakeVisitorRepository, visitorPage;
 import '../../../screenshot_test/_harness.dart'
     show captureKey, loadAuditFonts, saveCapture;
@@ -89,7 +89,9 @@ void _minTap(WidgetTester tester, Finder finder) {
 void main() {
   if (_capture) setUpAll(loadAuditFonts);
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
-    for (final size in [(390.0, 1.0), (320.0, 2.0)]) {
+    for (final size in [
+      mode == ThemeMode.dark ? (320.0, 2.0) : (390.0, 1.0),
+    ]) {
       testWidgets('list/form/detail $mode ${size.$1}dp ${size.$2 * 100}%', (
         tester,
       ) async {

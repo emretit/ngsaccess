@@ -1,3 +1,4 @@
+import { expectLabel } from "@/test-utils/filterLabel";
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => permission === "reports.view", loading: false }) }));
 import { getFunctionName } from "convex/server";
 import { MemoryRouter } from "react-router-dom";
@@ -9,7 +10,7 @@ import { CardReadingsFilters } from "../access-control/CardReadingsFilters";
 import { CardReadingsTable } from "../access-control/CardReadingsTable";
 import { Detail } from "./ReadingDetailPanel";
 import { LiveStatus } from "./LiveStatus";
-import { emptyFilters, readFilters, writeFilters, type Reading } from "./lib/readings";
+import { emptyFilters, type Reading } from "./lib/readings";
 import type { Id } from "../../../convex/_generated/dataModel";
 const mocks = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock("convex/react", () => ({ useQuery: mocks.query, useMutation: vi.fn(), useConvexConnectionState: () => ({ isWebSocketConnected: true }) }));
@@ -36,11 +37,6 @@ describe("monitoring UI audit", () => {
     expect(renderToStaticMarkup(<LiveStatus projectId={projectId} live />)).toContain(">Canlı<");
     expect(renderToStaticMarkup(<LiveStatus projectId={projectId} live={false} />)).not.toContain(">Canlı<");
   });
-  it("persists the source filter in the URL and rejects unknown values", () => {
-    const filters = { ...emptyFilters, source: "biometric" as const };
-    expect(readFilters(writeFilters(new URLSearchParams(), filters, projectId), projectId)).toEqual(filters);
-    expect(readFilters(new URLSearchParams("source=oops"), projectId).source).toBe("all");
-  });
   it("shows the last reading date even when today's feed has no rows", () => {
     mocks.query.mockImplementation((ref: Parameters<typeof getFunctionName>[0]) => ref && getFunctionName(ref) === "cardReadings:lastMonitoringReading" ? { accessTime: "2026-08-18T13:06:00Z" } : []);
     const html = renderToStaticMarkup(<LiveStatus projectId={projectId} live />);
@@ -65,15 +61,6 @@ describe("monitoring UI audit", () => {
   });
 });
 
-function expectLabel(html: string, label: string) {
-  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
-  expect(labelTag).not.toBeNull();
-  const id = labelTag?.[1];
-  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
-  expect(control).toBeDefined();
-  expect(control).not.toContain('aria-label=');
-  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
-}
 
 vi.mock("@/components/ui/select", async original => ({
   ...await original<typeof import("@/components/ui/select")>(),

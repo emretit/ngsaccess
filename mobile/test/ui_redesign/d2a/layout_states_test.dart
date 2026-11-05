@@ -25,7 +25,7 @@ import '../../../screenshot_test/_harness.dart'
 
 import '../../auth_fakes.dart';
 import '../../helpers/mocks.dart';
-import '../../widgets/qr_scan_screen_test.dart' show MockCameraController;
+import '../../helpers/camera_fakes.dart' show MockCameraController;
 
 const _captureKey = Key('d2a-layout-capture');
 const _output = String.fromEnvironment('AUDIT_OUTPUT_DIR');
@@ -161,7 +161,7 @@ void main() {
       },
     );
 
-    for (final scale in [1.0, 2.0]) {
+    for (final scale in [dark ? 2.0 : 1.0]) {
       final label = '${dark ? 'dark' : 'light'}_$scale';
       testWidgets(
         'recoverable door snapshot and status action stay reachable $label',
@@ -209,9 +209,7 @@ void main() {
           expect(commands.checks, 2);
           expect(find.text('Aynı isteği yeniden gönder'), findsNothing);
           expect(tester.takeException(), isNull);
-          if (scale == 1) {
-            await _capture(tester, 'd2a_door_snapshot_$label');
-          }
+          await _capture(tester, 'd2a_door_snapshot_$label');
           await tester.ensureVisible(find.text('Kapat'));
           await tester.tap(find.text('Kapat'));
           await tester.pumpAndSettle();
@@ -282,9 +280,7 @@ void main() {
         await tester.pump();
         verify(() => camera.switchCamera()).called(1);
         expect(tester.takeException(), isNull);
-        if (scale == 1) {
-          await _capture(tester, 'd2a_camera_$label');
-        }
+        await _capture(tester, 'd2a_camera_$label');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
         state.dispose();

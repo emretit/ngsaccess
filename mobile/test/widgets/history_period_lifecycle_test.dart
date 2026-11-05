@@ -11,7 +11,7 @@ import 'package:ngsplusapp/widgets/history/history_filter_sheet.dart';
 import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:provider/provider.dart';
 
-import 'history_screen_test.dart' show HistoryTestProvider, summary;
+import '../helpers/history_fakes.dart' show HistoryTestProvider, summary;
 
 Widget periodScreen(
   HistoryTestProvider provider,

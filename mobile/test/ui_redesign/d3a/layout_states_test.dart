@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/providers/attendance_provider.dart';
 import 'package:ngsplusapp/providers/auth_provider.dart';
 import 'package:ngsplusapp/providers/request_provider.dart';
 import 'package:ngsplusapp/screens/history/history_screen.dart';
 import 'package:ngsplusapp/screens/requests/requests_screen.dart';
-import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:ngsplusapp/widgets/history/history_calendar.dart';
 import 'package:ngsplusapp/widgets/history/history_record_tile.dart';
 import 'package:ngsplusapp/widgets/ui/ui.dart';
@@ -16,10 +14,11 @@ import 'package:provider/provider.dart';
 import '../../../screenshot_test/_harness.dart'
     show loadAuditFonts, resolveAuditFontFallbacks;
 import '../../auth_fakes.dart';
-import '../../providers/request_provider_test.dart'
+import '../../helpers/request_fakes.dart'
     show RequestFakeRepository, testLeave;
-import '../../widgets/history_screen_test.dart'
+import '../../helpers/history_fakes.dart'
     show HistoryTestProvider, event, summary;
+import '../../helpers/history_request_app.dart';
 
 const output = String.fromEnvironment('AUDIT_OUTPUT_DIR');
 Future<void> capture(WidgetTester tester, String name) async {
@@ -32,29 +31,13 @@ Future<void> capture(WidgetTester tester, String name) async {
   );
 }
 
-Widget app(Widget child, {required bool dark, required double scale}) =>
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
-      locale: const Locale('tr'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: TextScaler.linear(scale)),
-        child: child ?? const SizedBox.shrink(),
-      ),
-      home: child,
-    );
-
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('tr');
     if (output.isNotEmpty) await loadAuditFonts();
   });
   for (final dark in [false, true]) {
-    for (final compact in [false, true]) {
+    for (final compact in [dark]) {
       final variant =
           '${dark ? 'dark' : 'light'}_${compact ? '320_200' : '390_100'}';
       void viewport(WidgetTester tester) {

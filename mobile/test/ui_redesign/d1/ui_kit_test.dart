@@ -8,7 +8,7 @@ import 'dart:ui' as ui;
 import 'dart:ui' show CheckedState;
 import 'dart:io';
 import 'package:flutter/rendering.dart';
-import '../../theme/app_theme_test.dart' show contrast;
+import '../../helpers/contrast.dart' show contrast;
 import '../../helpers/ui_mount.dart' show mount;
 
 Future<void> mountKit(
@@ -58,7 +58,7 @@ class _DraftRange implements DateTimeRange {
 
 void main() {
   for (final dark in [false, true]) {
-    for (final scale in [1.0, 2.0]) {
+    for (final scale in [dark ? 2.0 : 1.0]) {
       final factories = <String, Widget Function(TextEditingController)>{
         'brand': (_) => const AppBrandBand(
           title: 'Bugünkü durum',

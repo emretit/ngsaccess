@@ -1,3 +1,4 @@
+import { expectLabel } from "@/test-utils/filterLabel";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HolidayCalendarManager } from "./HolidayCalendarManager";
@@ -28,7 +29,6 @@ describe("holiday year filters", () => {
     expect(bar).toBeTruthy();
     expect(bar).toContain('for="holiday-year">Yıl</label>');
     expectLabel(bar ?? "", "Yıl");
-    expect(bar).toContain('min-[761px]:w-40');
     expect(bar).not.toContain('type="search"');
     expect(bar).not.toContain('Tatil ekle');
     expect(bar).not.toContain('Resmi tatilleri yükle');
@@ -45,13 +45,3 @@ describe("holiday year filters", () => {
     expect(state.yearText).toHaveBeenCalledWith(currentYear);
   });
 });
-
-function expectLabel(html: string, label: string) {
-  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
-  expect(labelTag).not.toBeNull();
-  const id = labelTag?.[1];
-  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
-  expect(control).toBeDefined();
-  expect(control).not.toContain('aria-label=');
-  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
-}

@@ -10,7 +10,7 @@ import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:ngsplusapp/widgets/visitor/visitor_labels.dart';
 import 'package:provider/provider.dart';
 
-import '../../visitor_form_time_test.dart' show RecordingVisitors;
+import '../../helpers/recording_visitors.dart' show RecordingVisitors;
 
 // A Turkey-local host must exercise foreign device zones during plain flutter test.
 void main() {

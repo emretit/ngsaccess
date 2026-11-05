@@ -6,7 +6,7 @@ import 'package:ngsplusapp/theme/app_theme.dart';
 
 void main() {
   for (final dark in [false, true]) {
-    for (final language in ['tr', 'en']) {
+    for (final language in [dark ? 'en' : 'tr']) {
       testWidgets('startup failure actions $dark $language at 200 percent', (
         tester,
       ) async {

@@ -10,7 +10,12 @@
   - Denetim sonrası geri konan: `mobile/test/widgets/responsive_container_test.dart` (davranış, CSS değil), `deviceLabels` uuidHelp metni (IDE UUID olayı koruması)
   - Kapılar: tam vitest 488 dosya / 5.532 case 0 fail (60 sn) · tam flutter test 69 dosya / 861 case 0 fail (55 sn) · flutter analyze temiz · tsc app+convex 0
   - Commit pathspec: `.claude/pathspec-test-slim-faz1.txt` (başka oturumun Employees/continueEmployee/todo.md değişiklikleri HARİÇ)
-- [ ] Faz 1 commit (Emre onayı)
+- [x] Faz 1 commit 1d2becb4 (2026-11-05)
+- [x] Faz 2 uygulandı (Codex ×2) + Claude denetimi (0 yüksek / 0 orta / 3 düşük) → `raw/faz2-*.md`
+  - Web: DeviceCommandCenter 3 dosya → 1, readFilters → `lib/readings.test.ts`, 9 kopya `expectLabel` → `src/test-utils/filterLabel.ts` (case silinmedi)
+  - Mobil: test→test import 0 (12 + `qr_fakes` ortak yardımcı `test/helpers/`), görsel matris daraltma 863 → 799
+  - Koordinatör düzeltmesi: `screenshot_test` import'ları helpers'a (Faz 2 kırmıştı), 3 artık re-export silindi, `LeaveAudit` son sınıf assertion'ı
+  - Kapılar: tam vitest 488 / 5.543 0 fail (50 sn) · flutter test 799 0 fail (31 sn) · `flutter analyze` (screenshot_test dahil) temiz · tsc 0
 - [ ] Kalan sorular 1, 3, 4, 5 → Faz 2/3
 
 ## DÜZELTME (2026-11-05, Faz 1 sonrası yüksüz ölçüm)

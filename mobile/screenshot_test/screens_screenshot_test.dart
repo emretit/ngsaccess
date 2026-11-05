@@ -41,8 +41,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../test/helpers/preference_store.dart';
-import '../test/widgets/qr_scan_screen_test.dart'
-    show MockQrRepository, MockCameraController;
+import '../test/helpers/camera_fakes.dart';
+import '../test/helpers/qr_fakes.dart';
 import '_harness.dart';
 
 class Shot {

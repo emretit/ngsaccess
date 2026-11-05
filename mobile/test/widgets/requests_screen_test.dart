@@ -13,10 +13,10 @@ import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:provider/provider.dart';
 
 import '../auth_fakes.dart';
-import '../providers/request_provider_test.dart'
+import '../helpers/request_fakes.dart'
     show RequestFakeRepository, testLeave, testCorrection;
 
-import '../ui_redesign/d3a/layout_states_test.dart' show app;
+import '../helpers/history_request_app.dart' show app;
 
 void main() {
   group('request screens', () {

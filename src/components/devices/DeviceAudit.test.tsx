@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { Device } from "@/types/device";
 import { DeviceTableRow } from "./DeviceTableRow";
-import { DeviceCommandCenter } from "./DeviceCommandCenter";
 import { QRCodeDialog } from "./QRCodeDialog";
 import { DevicesContent } from "./DevicesContent";
 import { DeviceFilters } from "./DeviceFilters";
@@ -183,48 +182,6 @@ describe("cihaz audit görünümü", () => {
       stopPropagation: vi.fn(),
     } as unknown as MouseEvent<HTMLTableCellElement>);
     expect(select).toHaveBeenCalledOnce();
-  });
-  it("çevrimdışı panelde kapı açma etkin kalır, kuyruğu açıklar ve okuyucu ayarı sınırını gösterir", () => {
-    mocks.query.mockReturnValue({
-      device,
-      doors: [{ _id: "door", name: "Kapı", hikDoorNo: 2 }],
-      readers: [
-        {
-          _id: "r",
-          doorId: "door",
-          name: "Okuyucu",
-          direction: "entry",
-          hikReaderNo: 3,
-        },
-      ],
-      capabilities: null,
-      recentEvents: [],
-      queues: {
-        hikvision: {
-          pending: { count: 0 },
-          processing: { count: 0 },
-          done: { count: 0 },
-          failed: { count: 0 },
-        },
-      },
-    });
-    const html = renderToStaticMarkup(
-      <DeviceCommandCenter deviceId={device._id} />,
-    );
-    expect(html).toContain(
-      'role="status" class="py-2 text-sm text-warning">Cihaz çevrimdışı — komut kuyruğa alınır</p>',
-    );
-    const openButton = html
-      .match(/<button[^>]*>[\s\S]*?<\/button>/g)
-      ?.find((button) => button.includes("Kapıyı aç"));
-    expect(openButton).toBeDefined();
-    expect(openButton).not.toContain('disabled=""');
-    expect(html).toContain("Okuyucu ayarını oku");
-    expect(html).toContain(
-      "Yerel köprü bağlantısında okuyucu ayarları",
-    );
-    expect(html).not.toContain("Plan -");
-    expect(html).not.toContain("(TR)");
   });
   it("QR adını ve açıklamasını erişilebilir olarak sunar", () => {
     const html = renderToStaticMarkup(

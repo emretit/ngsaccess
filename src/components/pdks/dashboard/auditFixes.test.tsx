@@ -1,3 +1,4 @@
+import { expectLabel } from "@/test-utils/filterLabel";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -130,13 +131,3 @@ it("08-H2: assigned overnight manual form labels the following day", () => {
   state.values = [];
   expect(render(<ManualPdksEditDialog {...props} />)).not.toContain("Çıkış ertesi gün kaydedilecek.");
 });
-
-function expectLabel(html: string, label: string) {
-  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
-  expect(labelTag).not.toBeNull();
-  const id = labelTag?.[1];
-  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
-  expect(control).toBeDefined();
-  expect(control).not.toContain('aria-label=');
-  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
-}

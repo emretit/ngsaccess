@@ -11,10 +11,8 @@ import 'package:ngsplusapp/repositories/qr_repository.dart';
 import 'package:ngsplusapp/screens/qr_scan/qr_scan_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-
-class MockQrRepository extends Mock implements QrRepository {}
-
-class MockCameraController extends Mock implements MobileScannerController {}
+import '../helpers/camera_fakes.dart';
+import '../helpers/qr_fakes.dart';
 
 void main() {
   late MockQrRepository repository;

@@ -12,10 +12,10 @@ import 'package:ngsplusapp/widgets/ui/ui.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth_fakes.dart';
-import '../../providers/request_provider_test.dart' show RequestFakeRepository;
-import '../../widgets/history_screen_test.dart'
+import '../../helpers/request_fakes.dart' show RequestFakeRepository;
+import '../../helpers/history_fakes.dart'
     show HistoryTestProvider, event, screen, summary;
-import 'layout_states_test.dart' show app;
+import '../../helpers/history_request_app.dart' show app;
 
 Finder day(String date) => find.byKey(ValueKey('history-day-$date'));
 Finder marker(String date) => find.byKey(ValueKey('history-day-marker-$date'));

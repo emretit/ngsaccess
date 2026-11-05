@@ -16,7 +16,7 @@ import '../../../screenshot_test/_harness.dart'
     show loadAuditFonts, resolveAuditFontFallbacks;
 import '../../auth_fakes.dart';
 import '../../helpers/preference_store.dart';
-import '../../widgets/login_screen_test.dart' show wrapLogin;
+import '../../helpers/login_app.dart' show wrapLogin;
 
 const _output = String.fromEnvironment('AUDIT_OUTPUT_DIR');
 

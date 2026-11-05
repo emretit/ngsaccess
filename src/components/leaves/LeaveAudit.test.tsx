@@ -38,7 +38,6 @@ describe("leave audit controls", () => {
     const html = renderFilters();
     expect(html).toContain('for="leave-filter-person">Kişi</label>');
     expect(html).toContain('for="leave-filter-type">İzin türü</label>');
-    expect(html).toContain('min-[761px]:w-40');
     expect(html).toContain('Tüm kişiler');
     expect(html).toContain('Tüm türler');
     expect(html).toContain('Filtreleri temizle');

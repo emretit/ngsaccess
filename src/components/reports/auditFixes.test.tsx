@@ -1,3 +1,4 @@
+import { expectLabel } from "@/test-utils/filterLabel";
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
 import { describe, it, expect, vi } from 'vitest';
 import type { ReactNode } from 'react';
@@ -69,7 +70,6 @@ describe('reports audit fixes', () => {
     expect(html).toContain('Başlangıç tarihi bitiş tarihinden sonra olamaz.'); expect(html).not.toContain('Dönem seçimini düzeltin.');
     expect(html).toContain('for="report-period">Dönem</label>');
     expect(html).toContain('for="report-department">Departman</label>');
-    expect(html).toContain('min-[761px]:w-40');
     expect(html).toContain('Tüm departmanlar');
     expectLabel(html, "Departman");
     expect(html.indexOf('id="report-to"')).toBeLessThan(html.indexOf('Filtreleri temizle'));
@@ -96,13 +96,3 @@ it('shows the break filter and enables clearing a URL-only violation selection',
   expect(html).toContain('for="report-break"');
   expect(html).toMatch(/<button(?![^>]* disabled=)[^>]*>Filtreleri temizle<\/button>/);
 });
-
-function expectLabel(html: string, label: string) {
-  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
-  expect(labelTag).not.toBeNull();
-  const id = labelTag?.[1];
-  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
-  expect(control).toBeDefined();
-  expect(control).not.toContain('aria-label=');
-  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
-}

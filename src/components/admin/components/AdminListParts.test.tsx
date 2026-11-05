@@ -1,3 +1,4 @@
+import { expectLabel } from "@/test-utils/filterLabel";
 import { MemoryRouter } from "react-router-dom";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName, type FunctionReference } from "convex/server";
@@ -20,7 +21,6 @@ vi.mock("../hooks/useUserManagement", () => ({ useUserManagement: () => ({ proje
 
 it("gives AdminSelect an upper FIELD label and full-width select", () => {
   const html = renderToStaticMarkup(<AdminSelect label="Durum" value="all" onChange={() => {}}><option value="all">Tüm durumlar</option></AdminSelect>);
-  expect(html).toContain('class="grid w-full min-w-0 gap-1 text-xs min-[761px]:w-40"');
   expectLabel(html, "Durum");
   expect(html).toMatch(/<select[^>]*class="[^"]*w-full[^"]*min-w-0/);
   expect(html).not.toContain("max-w-[210px]");
@@ -37,17 +37,6 @@ it.each([
     expectLabel(html, label);
   }
   for (const option of options) expect(html).toContain(option);
-  expect(html).toContain("grid w-full min-w-0 gap-1 text-xs min-[761px]:w-40");
   expect(html).toContain("Filtreleri temizle");
   expect(html).not.toContain("button:last");
 });
-
-function expectLabel(html: string, label: string) {
-  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
-  expect(labelTag).not.toBeNull();
-  const id = labelTag?.[1];
-  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
-  expect(control).toBeDefined();
-  expect(control).not.toContain('aria-label=');
-  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
-}

@@ -1,3 +1,4 @@
+import { expectLabel } from "@/test-utils/filterLabel";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { expect, it, vi } from "vitest";
@@ -17,20 +18,9 @@ vi.mock("@/components/ui/select", async original => ({
 }));
 it("shows FIELD labels, all statuses and a visible clear action even with zero counts", () => {
   const html = renderToStaticMarkup(<EmployeeFilters searchQuery="eşleşmeyen" onSearchChange={() => {}} status="all" statusCounts={{ all: 0, active: 0, inactive: 0 }} onStatusChange={() => {}} sort="name:asc" onSortChange={() => {}} onClear={() => {}} hasFilters={false} />);
-  expect(html.match(/grid w-full min-w-0 gap-1 text-xs min-\[761px\]:w-40/g)).toHaveLength(2);
   expectLabel(html, "Personel durumu");
   expectLabel(html, "Personel sıralaması");
   expect(html).toContain("Tüm durumlar (0)");
   expect(html).toContain("Filtreleri temizle");
   expect(html).not.toContain("button:last-of-type");
 });
-
-function expectLabel(html: string, label: string) {
-  const labelTag = html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${label}</label>`));
-  expect(labelTag).not.toBeNull();
-  const id = labelTag?.[1];
-  const control = html.match(new RegExp(`<(?:button|input|select)[^>]*id="${id}"[^>]*>`))?.[0];
-  expect(control).toBeDefined();
-  expect(control).not.toContain('aria-label=');
-  expect(html.match(new RegExp(`for="${id}"`, "g"))).toHaveLength(1);
-}

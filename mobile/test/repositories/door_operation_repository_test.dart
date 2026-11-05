@@ -14,7 +14,7 @@ import 'package:ngsplusapp/repositories/door_operation_repository.dart';
 import 'package:ngsplusapp/services/door_operation_store.dart';
 
 import '../auth_fakes.dart';
-import '../models/door_operation_test.dart' show operationJson;
+import '../helpers/door_operation_fixtures.dart' show operationJson;
 
 void main() {
   test(

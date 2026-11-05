@@ -20,10 +20,9 @@ import 'package:ngsplusapp/providers/visitor_provider.dart';
 import 'package:ngsplusapp/repositories/device_repository.dart';
 import 'package:ngsplusapp/repositories/door_operation_repository.dart';
 import '../test/helpers/mocks.dart';
-import '../test/providers/request_provider_test.dart'
-    show RequestFakeRepository;
-import '../test/visitor_provider_test.dart' show FakeVisitorRepository;
-import '../test/widgets/history_screen_test.dart' show HistoryTestProvider;
+import '../test/helpers/history_fakes.dart' show HistoryTestProvider;
+import '../test/helpers/request_fakes.dart' show RequestFakeRepository;
+import '../test/helpers/visitor_fakes.dart' show FakeVisitorRepository;
 
 class AuditTestBinding extends AutomatedTestWidgetsFlutterBinding {
   @override

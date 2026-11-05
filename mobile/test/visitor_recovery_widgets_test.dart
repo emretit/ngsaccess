@@ -9,14 +9,14 @@ import 'package:ngsplusapp/screens/visitor/visitor_screen.dart';
 import 'package:ngsplusapp/screens/visitor/visitor_form_screen.dart';
 import 'package:provider/provider.dart';
 
-import 'visitor_create_recovery_test.dart'
+import 'helpers/visitor_recovery_fakes.dart'
     show
         MemoryVisitorIntents,
         RecoveryVisitors,
         recoveryAuth,
         scopeA,
         firstRequest;
-import 'visitor_provider_test.dart' show visitorFixture, visitorPage;
+import 'helpers/visitor_fakes.dart' show visitorFixture, visitorPage;
 
 Widget recoveryApp(VisitorProvider state) => ChangeNotifierProvider.value(
   value: state,

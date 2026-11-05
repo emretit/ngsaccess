@@ -22,7 +22,7 @@ import 'package:provider/provider.dart';
 
 import '../auth_fakes.dart';
 import '../helpers/mocks.dart';
-import '../providers/door_operation_provider_test.dart' as door;
+import '../helpers/door_operation_fakes.dart' as door;
 
 class _Attendance extends AttendanceProvider {
   _Attendance() : super(repository: MockAttendanceRepository());
