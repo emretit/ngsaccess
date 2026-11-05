@@ -13,7 +13,7 @@ describe("personel metin kuralları", () => {
     expect(() => validateEmployeeText({ lastName: "" })).toThrow("Soyad alanı zorunludur");
     expect(() => validateEmployeeText({ cardNumber: "  " })).toThrow("Kart numarası zorunludur");
     expect(() => validateEmployeeText({ email: "ada" })).toThrow("e-posta");
-    for (const tcNo of ["123", "01234567890", "1234567890a"]) expect(() => validateEmployeeText({ tcNo })).toThrow("TC Kimlik No");
+    for (const tcNo of ["123", "01234567890", "1234567890a", "12345678901"]) expect(() => validateEmployeeText({ tcNo })).toThrow("TC Kimlik No");
   });
 });
 describe("personel yazma kuralları", () => {

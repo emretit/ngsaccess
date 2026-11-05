@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { isValidTurkishIdentityNumber } from "../../../../convex/lib/employeeImportValidation";
+import { TC_NO_INVALID_MESSAGE } from "../../../../convex/lib/employeeUx";
 
-const TC_REGEX = /^[1-9]\d{10}$/;
 const EMAIL_SCHEMA = z.email();
 
 export const employeeFormSchema = z
@@ -33,11 +34,10 @@ export const employeeFormSchema = z
   .superRefine((data, ctx) => {
     if (data.tcNo && data.tcNo.trim()) {
       const trimmed = data.tcNo.trim();
-      if (!TC_REGEX.test(trimmed)) {
+      if (!isValidTurkishIdentityNumber(trimmed)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message:
-            "TC Kimlik No 11 haneli olmalı ve geçerli formatta olmalıdır",
+          message: TC_NO_INVALID_MESSAGE,
           path: ["tcNo"],
         });
       }
