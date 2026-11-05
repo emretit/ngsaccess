@@ -34,6 +34,6 @@ it("atomic import recheck catches a conflict that appeared after preview", async
   expect((await t.query(internal.hikDeviceImport.classifyPersons, { projectId: ids.projectId, persons: [person] }))[0].status).toBe("new");
   await t.run(ctx => ctx.db.insert("employees", { projectId: ids.projectId, firstName: "Existing", lastName: "", cardNumber: "1", email: "" }));
   const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
-  expect(await caller.mutation(internal.hikDeviceImport.createPerson, { deviceId: ids.deviceId, userId: ids.userId, person, consent: false })).toMatchObject({ row: { status: "matched" } });
+  expect(await caller.mutation(internal.hikDeviceImport.createPerson, { deviceId: ids.deviceId, userId: ids.userId, person })).toMatchObject({ row: { status: "matched" } });
   expect(await t.run(ctx => ctx.db.query("employees").collect())).toHaveLength(1);
 });

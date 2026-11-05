@@ -41,10 +41,10 @@ export const classifyPersons = internalQuery({
   },
 });
 
-/** Atomic recheck, creation, consent, and rule membership for one person. */
+/** Atomic recheck, creation, and rule membership for one person. */
 export const createPerson = internalMutation({
-  args: { deviceId: v.id("devices"), userId: v.id("users"), person: personValidator, consent: v.boolean(), grantFullDeviceAccess: v.optional(v.boolean()) },
-  handler: async (ctx, args): Promise<{ row: ImportRow; employeeId?: Id<"employees">; ruleId?: Id<"accessRules">; consentRecorded: boolean }> => {
+  args: { deviceId: v.id("devices"), userId: v.id("users"), person: personValidator, grantFullDeviceAccess: v.optional(v.boolean()) },
+  handler: async (ctx, args): Promise<{ row: ImportRow; employeeId?: Id<"employees">; ruleId?: Id<"accessRules"> }> => {
     const device = await ctx.db.get(args.deviceId);
     const user = await ctx.db.get(args.userId);
     if (!device?.projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway" || !device.hikDevIndex || !user) throw new Error("Aktarım hedefi bulunamadı");
@@ -54,7 +54,7 @@ export const createPerson = internalMutation({
     await requirePermission(ctx, user, device.projectId, "employees.manage");
     if (args.grantFullDeviceAccess) await requirePermission(ctx, user, device.projectId, "accessRules.manage");
     const row = await classify(ctx, args.person, device.projectId);
-    if (row.status !== "new") return { row, consentRecorded: false };
+    if (row.status !== "new") return { row };
     if (!row.employeeNo.trim()) throw new Error("Cihaz kişi numarası boş");
     const now = new Date().toISOString();
     const validity = importedValidity(row.valid, Date.now());
@@ -81,33 +81,12 @@ export const createPerson = internalMutation({
       }
       await upsertGroupMembership(ctx, employeeId, ruleId, device.projectId);
     }
-    const consentRecorded = args.consent && row.fingerCount > 0;
-    if (consentRecorded) await ctx.db.insert("employeeConsents", { employeeId, consentType: "biometric_fingerprint", grantedAt: now, grantedBy: user._id, notes: `Cihazdan aktarım: ${device.name}` });
     await writeAudit(ctx, { user, projectId: device.projectId, action: "create", targetTable: "employees", targetId: employeeId, newValue: { cardNumber: row.employeeNo }, note: `Cihazdan aktarım: ${device.name}` });
-    return { row, employeeId, ruleId, consentRecorded };
+    return { row, employeeId, ruleId };
   },
 });
 
 export const biometricEnabled = internalQuery({ args: { projectId: v.id("projects") }, handler: (ctx, args) => isBiometricEnabled(ctx, args.projectId) });
-
-/** Recheck the import identity and record consent only when no active consent exists. */
-export const recordImportConsent = internalMutation({
-  args: { employeeId: v.id("employees"), deviceId: v.id("devices"), userId: v.id("users"), expectedCardNumber: v.string() },
-  handler: async (ctx, args): Promise<boolean> => {
-    const employee = await ctx.db.get(args.employeeId);
-    const device = await ctx.db.get(args.deviceId);
-    const user = await ctx.db.get(args.userId);
-    if (!employee || !device?.projectId || !user || employee.projectId !== device.projectId || employee.cardNumber !== args.expectedCardNumber) throw new Error("Kişi bilgileri değişti");
-    if (!isProjectAllowed(await getProjectIdsForUser({ ...ctx, user }), device.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
-    for (const permission of ["devices.manage", "employees.manage", "biometrics.manage"] as const) await requirePermission(ctx, user, device.projectId, permission);
-    await assertBiometricAllowed(ctx, device.projectId);
-    const consents = await ctx.db.query("employeeConsents").withIndex("by_employee_type", q => q.eq("employeeId", args.employeeId).eq("consentType", "biometric_fingerprint")).take(201);
-    if (consents.length > 200) throw new Error("Rıza kaydı sınırı aşıldı");
-    if (consents.some(consent => !consent.revokedAt)) return false;
-    await ctx.db.insert("employeeConsents", { employeeId: args.employeeId, consentType: "biometric_fingerprint", grantedAt: new Date().toISOString(), grantedBy: user._id, notes: `Cihazdan aktarım: ${device.name}` });
-    return true;
-  },
-});
 
 /** Store a device-resident template atomically without granting access to its source. */
 export const recordSource = internalMutation({
@@ -121,8 +100,6 @@ export const recordSource = internalMutation({
     if (!isProjectAllowed(await getProjectIdsForUser({ ...ctx, user }), employee.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
     for (const permission of ["devices.manage", "employees.manage", "biometrics.manage"] as const) await requirePermission(ctx, user, employee.projectId, permission);
     await assertBiometricAllowed(ctx, employee.projectId);
-    const consents = await ctx.db.query("employeeConsents").withIndex("by_employee_type", q => q.eq("employeeId", args.employeeId).eq("consentType", "biometric_fingerprint")).take(201);
-    if (consents.length > 200 || !consents.some(consent => !consent.revokedAt)) throw new Error("Parmak izi aktarımı için açık rıza gereklidir");
     const templates = await ctx.db.query("employeeFingerprints").withIndex("by_employee", q => q.eq("employeeId", args.employeeId)).take(11);
     if (templates.some(template => template.fingerPrintID === args.fingerNo)) return;
     if (templates.length >= MAX_FINGERPRINTS_PER_EMPLOYEE) throw new Error("Parmak izi sınırı aşıldı");

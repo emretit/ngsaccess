@@ -61,8 +61,6 @@ export async function enrollmentTarget(ctx: QueryCtx, employeeId: Id<"employees"
   if (fingerprintCapability(device.hikCapabilitiesSnapshot) === false) throw new ConvexError("Bu cihaz parmak izi kaydını desteklemiyor");
   await assertBiometricAllowed(ctx, employee.projectId);
   await assertBiometricAllowed(ctx, device.projectId);
-  const consents = await ctx.db.query("employeeConsents").withIndex("by_employee_type", q => q.eq("employeeId", employeeId).eq("consentType", "biometric_fingerprint")).take(201);
-  if (consents.length > 200 || !consents.some(consent => !consent.revokedAt)) throw new ConvexError("Parmak izi kaydı için kişinin açık rızası gereklidir.");
   return { employee, device };
 }
 

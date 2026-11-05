@@ -310,7 +310,7 @@ export default function EmployeeForm({
             <Button type="button" variant="outline" className="max-sm:min-h-11" onClick={() => onSave(savedResult)}>Tamam</Button>
             {!employee && onContinue && <Button type="button" className="max-sm:min-h-11" onClick={() => onContinue(savedResult)}>Ayrıntılara devam et</Button>}
           </div>
-          {!employee && <p className="text-xs text-muted-foreground">Rıza ve parmak izi işlemleri kişinin ayrıntılarında.</p>}
+          {!employee && <p className="text-xs text-muted-foreground">Parmak izi işlemleri kişinin ayrıntılarında.</p>}
         </div>
       ) : (
         // Eklemeyle aynı: çubuk düzenlemede de hep görünür; değişiklik yokken kaydet/geri al pasif.

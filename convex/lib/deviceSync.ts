@@ -60,8 +60,6 @@ export async function rosterCardNumbersWithBiometric(
       let enabled = projectEnabled.get(emp.projectId);
       if (enabled === undefined) { enabled = await isBiometricEnabled(ctx, emp.projectId); projectEnabled.set(emp.projectId, enabled); }
       if (!enabled) continue;
-      const consents = await ctx.db.query("employeeConsents").withIndex("by_employee_type", q => q.eq("employeeId", employeeId).eq("consentType", "biometric_fingerprint")).take(201);
-      if (consents.length > 200 || !consents.some(consent => !consent.revokedAt)) continue;
     }
     const cardNumber = emp?.cardNumber?.trim();
     if (cardNumber) seen.add(cardNumber);

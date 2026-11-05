@@ -22,9 +22,6 @@ vi.mock("convex/react", () => ({ useQuery: (ref: Parameters<typeof getFunctionNa
 } }));
 vi.mock("./EmployeeActivityBoundary", () => ({ EmployeeActivityBoundary: ({ title, children }: { title: string; children: ReactNode }) => { scope.boundaries.push(title); return children; } }));
 vi.mock("./EmployeeRecentReadings", () => ({ EmployeeRecentReadings: () => <div data-testid="readings" /> }));
-vi.mock("./EmployeeConsentsCard", () => ({
-  EmployeeConsentsCard: ({ employeeId }: { employeeId: string }) => <div data-testid="consents" data-employee-id={employeeId} />,
-}));
 
 const employee: Employee = {
   _id: "employee-a" as Id<"employees">,
@@ -38,12 +35,12 @@ const employee: Employee = {
 beforeEach(() => { scope.isAdmin = false; scope.deleted = false; scope.recordDeleted = false; scope.boundaries = []; });
 
 describe("çalışan ayrıntısı", () => {
-  it("KVKK rıza kartını seçili çalışan için son geçişlerin üstünde gösterir", () => {
+  it("seçili çalışan için genel bilgileri ve son geçişleri gösterir; KVKK rıza bölümü yok", () => {
     const html = renderToStaticMarkup(<EmployeeDetails employee={employee} onClose={() => undefined} />);
-    expect(html).toContain('data-employee-id="employee-a"');
     expect(html).toContain("Genel bilgiler");
     expect(html).toContain(">Fotoğraf</h3>");
-    expect(html.indexOf('data-testid="consents"')).toBeLessThan(html.indexOf('data-testid="readings"'));
+    expect(html).toContain('data-testid="readings"');
+    expect(scope.boundaries).not.toContain("KVKK rızaları");
   });
 
   it("yönetici düzenlemesinde çift başlık ve ikinci fotoğraf bloğu çizmez", () => {
@@ -61,7 +58,7 @@ describe("çalışan ayrıntısı", () => {
     }
   });
 
-  it("çalışan yokken hiçbir bölüm, rıza kartı dahil, çizmez", () => {
+  it("çalışan yokken hiçbir bölüm çizmez", () => {
     const html = renderToStaticMarkup(<EmployeeDetails employee={null} onClose={() => undefined} />);
     expect(html).toBe("");
   });

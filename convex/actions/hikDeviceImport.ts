@@ -100,20 +100,20 @@ export async function runPreviewDeviceImport(ctx: ImportCtx, args: { deviceId: I
 }
 export const previewDeviceImport = authedAction({ args: { deviceId: v.id("devices") }, handler: runPreviewDeviceImport });
 
-type ImportResult = { created: number; matched: number; conflicts: number; manual: number; consentsRecorded: number; fingerprintsStored: number; fingerprintsSkipped: number; ruleId: Id<"accessRules"> | null };
-export async function runImportDevicePersons(ctx: ImportCtx, args: { deviceId: Id<"devices">; employeeNos: string[]; biometricConsentConfirmed: boolean; grantFullDeviceAccess?: boolean }): Promise<ImportResult> {
+type ImportResult = { created: number; matched: number; conflicts: number; manual: number; fingerprintsStored: number; fingerprintsSkipped: number; ruleId: Id<"accessRules"> | null };
+export async function runImportDevicePersons(ctx: ImportCtx, args: { deviceId: Id<"devices">; employeeNos: string[]; grantFullDeviceAccess?: boolean }): Promise<ImportResult> {
   if (args.employeeNos.length > MAX_IMPORT_PERSONS) throw new Error(`Bir aktarımda en fazla ${MAX_IMPORT_PERSONS} kişi seçilebilir`);
   const target = await authorizeImportDevice(ctx, args.deviceId, true);
   if (args.grantFullDeviceAccess && !await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: target.projectId, permission: "accessRules.manage" })) throw new Error("Erişim kapsamını genişletmek için erişim kuralı yönetimi yetkisi gerekir");
   const biometricPermission: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: target.projectId, permission: "biometrics.manage" });
   const biometricEnabled: boolean = await ctx.runQuery(internal.hikDeviceImport.biometricEnabled, { projectId: target.projectId });
-  const transferFingers = args.biometricConsentConfirmed && biometricPermission && biometricEnabled;
+  const transferFingers = biometricPermission && biometricEnabled;
   const data = await readDevicePersons(target.devIndex, [...new Set(args.employeeNos.map(value => value.trim()))]);
   const classified: ImportRow[] = await ctx.runQuery(internal.hikDeviceImport.classifyPersons, { projectId: target.projectId, persons: data.persons });
   if (transferFingers && classified.some(row => (row.status === "new" || row.status === "matched") && row.fingerCount > 0)) await assertTemplateKey();
-  const result: ImportResult = { created: 0, matched: 0, conflicts: 0, manual: 0, consentsRecorded: 0, fingerprintsStored: 0, fingerprintsSkipped: 0, ruleId: null };
+  const result: ImportResult = { created: 0, matched: 0, conflicts: 0, manual: 0, fingerprintsStored: 0, fingerprintsSkipped: 0, ruleId: null };
   for (const person of data.persons) {
-    const created: { row: ImportRow; employeeId?: Id<"employees">; ruleId?: Id<"accessRules">; consentRecorded: boolean } = await ctx.runMutation(internal.hikDeviceImport.createPerson, { deviceId: args.deviceId, userId: ctx.user._id, person, consent: transferFingers, grantFullDeviceAccess: args.grantFullDeviceAccess === true });
+    const created: { row: ImportRow; employeeId?: Id<"employees">; ruleId?: Id<"accessRules"> } = await ctx.runMutation(internal.hikDeviceImport.createPerson, { deviceId: args.deviceId, userId: ctx.user._id, person, grantFullDeviceAccess: args.grantFullDeviceAccess === true });
     const matchedEmployeeId = created.row.status === "matched" ? created.row.matchedEmployeeId : undefined;
     if (created.row.status === "matched") result.matched++;
     const employeeId = created.employeeId ?? matchedEmployeeId;
@@ -124,14 +124,9 @@ export async function runImportDevicePersons(ctx: ImportCtx, args: { deviceId: I
       continue;
     }
     if (created.employeeId) { result.created++; result.ruleId = created.ruleId ?? null; }
-    if (created.consentRecorded) result.consentsRecorded++;
     let stored = 0;
     try {
       if (transferFingers && person.fingerCount > 0) {
-        if (matchedEmployeeId) {
-          const recorded: boolean = await ctx.runMutation(internal.hikDeviceImport.recordImportConsent, { employeeId, deviceId: args.deviceId, userId: ctx.user._id, expectedCardNumber: person.employeeNo });
-          if (recorded) result.consentsRecorded++;
-        }
         const existing: Doc<"employeeFingerprints">[] = await ctx.runQuery(internal.employeeFingerprints.listInternal, { employeeId });
         const storedSlots = new Set(existing.map(template => template.fingerPrintID));
         const templates = await readFingerprintTemplates(target.devIndex, person.employeeNo);
@@ -156,4 +151,5 @@ export async function runImportDevicePersons(ctx: ImportCtx, args: { deviceId: I
   }
   return result;
 }
-export const importDevicePersons = authedAction({ args: { deviceId: v.id("devices"), employeeNos: v.array(v.string()), biometricConsentConfirmed: v.boolean(), grantFullDeviceAccess: v.optional(v.boolean()) }, handler: runImportDevicePersons });
+// biometricConsentConfirmed: yayın arası eski web istemcisi göndermeye devam eder; yok sayılır.
+export const importDevicePersons = authedAction({ args: { deviceId: v.id("devices"), employeeNos: v.array(v.string()), biometricConsentConfirmed: v.optional(v.boolean()), grantFullDeviceAccess: v.optional(v.boolean()) }, handler: (ctx, { biometricConsentConfirmed: _legacy, ...args }) => runImportDevicePersons(ctx, args) });

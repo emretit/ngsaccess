@@ -6,7 +6,7 @@ import { getFunctionName } from "convex/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { EmployeeFingerprintCard } from "./EmployeeFingerprintCard";
 
-const mocks = vi.hoisted(() => ({ admin: true, enabled: true, consent: true, scanned: false, active: true, hasDevice: true, fingerNos: [2], covered: true, statuses: [] as string[], actions: [] as (() => Promise<unknown>)[], begin: vi.fn(), enroll: vi.fn(), buttons: [] as { children?: ReactNode; disabled?: boolean; "aria-label"?: string; "aria-describedby"?: string }[] }));
+const mocks = vi.hoisted(() => ({ admin: true, enabled: true, scanned: false, active: true, hasDevice: true, fingerNos: [2], covered: true, statuses: [] as string[], actions: [] as (() => Promise<unknown>)[], begin: vi.fn(), enroll: vi.fn(), buttons: [] as { children?: ReactNode; disabled?: boolean; "aria-label"?: string; "aria-describedby"?: string }[] }));
 vi.mock("react", async original => {
   const react = await original<typeof import("react")>();
   return { ...react, useState: (initial: unknown) => {
@@ -23,7 +23,6 @@ vi.mock("convex/react", () => ({
   useQuery: (ref: Parameters<typeof getFunctionName>[0]) => {
     const name = getFunctionName(ref);
     if (name.includes("getEmployeeBiometricModule")) return { enabled: mocks.enabled };
-    if (name.includes("employeeConsents")) return mocks.consent ? [{ consentType: "biometric_fingerprint" }] : [];
     return { templates: mocks.fingerNos.map(fingerNo => ({ fingerNo, enrolledAt: "2026-10-22T08:00:00Z", deviceIds: mocks.covered ? ["device-a"] : [] })), active: mocks.active, devices: mocks.hasDevice ? [{ _id: "device-a", name: "Panel", capabilitiesScanned: mocks.scanned }] : [], enrollments: mocks.fingerNos.map(fingerNo => ({ _id: `row-${fingerNo}`, deviceId: "device-a", deviceName: "Panel", fingerNo, enrolledAt: "2026-10-22T08:00:00Z" })) };
   },
   useAction: (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref).includes("enrollFingerprintOnDevice") ? mocks.enroll : vi.fn(),
@@ -37,7 +36,7 @@ vi.mock("@/components/ui/dialog", () => {
 vi.mock("@/components/shared/ConfirmDestructive", () => ({ ConfirmDestructive: () => null }));
 const employeeId = "employee-a" as Id<"employees">;
 function render() { return renderToStaticMarkup(<EmployeeFingerprintCard employeeId={employeeId} />); }
-beforeEach(() => { mocks.admin = true; mocks.enabled = true; mocks.consent = true; mocks.scanned = false; mocks.active = true; mocks.hasDevice = true; mocks.covered = true; mocks.buttons = []; mocks.fingerNos = [2]; mocks.statuses = []; mocks.actions = []; mocks.begin.mockReset(); mocks.enroll.mockReset(); });
+beforeEach(() => { mocks.admin = true; mocks.enabled = true; mocks.scanned = false; mocks.active = true; mocks.hasDevice = true; mocks.covered = true; mocks.buttons = []; mocks.fingerNos = [2]; mocks.statuses = []; mocks.actions = []; mocks.begin.mockReset(); mocks.enroll.mockReset(); });
 
 describe("parmak izi kartı", () => {
   it("sensör yönergesi yalnız begin başarılı olunca gösterilir", async () => {
@@ -104,14 +103,13 @@ describe("parmak izi kartı", () => {
     expect(html).toContain('role="status"');
     expect(html.match(/<option/g)?.length).toBe(1);
   });
-  it.each(["consent", "inactive", "device"])("%s şartı eksikse açıklamayla kayıt düğmesini kapatır", condition => {
-    if (condition === "consent") mocks.consent = false;
+  it.each(["inactive", "device"])("%s şartı eksikse açıklamayla kayıt düğmesini kapatır", condition => {
     if (condition === "inactive") mocks.active = false;
     if (condition === "device") mocks.hasDevice = false;
     const html = render();
     const button = mocks.buttons.find(button => button.children === "Kaydı başlat");
     expect(button?.disabled).toBe(true);
     expect(button?.["aria-describedby"]).toBeTruthy();
-    expect(html).toContain(condition === "consent" ? "açık rıza gerekli" : condition === "inactive" ? "Pasif kişiye" : "uygun Hik gateway");
+    expect(html).toContain(condition === "inactive" ? "Pasif kişiye" : "uygun Hik gateway");
   });
 });

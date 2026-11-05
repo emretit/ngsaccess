@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 const modules = import.meta.glob("./**/*.ts");
-it.each(["missing", "granted", "revoked", "grantedAgain"] as const)("face delivery respects explicit withdrawal: %s", async state => {
+it.each(["missing", "granted", "revoked", "grantedAgain"] as const)("face delivery ignores consent records: %s", async state => {
   const t = convexTest(schema, modules);
   const ids = await t.run(async ctx => {
     const userId = await ctx.db.insert("users", {});
@@ -16,7 +16,5 @@ it.each(["missing", "granted", "revoked", "grantedAgain"] as const)("face delive
     if (state === "grantedAgain") await ctx.db.insert("employeeConsents", { employeeId, consentType: "biometric_face", grantedAt: "2026-01-03", grantedBy: userId });
     return { employeeId, storageId };
   });
-  const call = t.query(internal.employeeFaces.getStorageRef, { employeeId: ids.employeeId });
-  if (state === "revoked") await expect(call).rejects.toThrow("Yüz tanıma rızası iptal edilmiş");
-  else expect(await call).toMatchObject({ pictureStorageId: ids.storageId });
+  expect(await t.query(internal.employeeFaces.getStorageRef, { employeeId: ids.employeeId })).toMatchObject({ pictureStorageId: ids.storageId });
 });

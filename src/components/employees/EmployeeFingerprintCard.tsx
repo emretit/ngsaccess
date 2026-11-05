@@ -23,7 +23,6 @@ export function EmployeeFingerprintCard({ employeeId }: { employeeId: Id<"employ
 
 function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
   const data = useQuery(api.fingerprintEnrollment.listForEmployee, { employeeId });
-  const consents = useQuery(api.employeeConsents.listForEmployee, { employeeId });
   const enroll = useAction(api.actions.hikFingerprint.enrollFingerprintOnDevice);
   const remove = useAction(api.actions.hikFingerprint.removeFingerprint);
   const resend = useAction(api.actions.hikFingerprint.resendFingerprint);
@@ -37,9 +36,8 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
   const reasonId = useId();
   const deviceInputId = useId();
   const device = data?.devices.find(item => item._id === deviceId) ?? data?.devices[0];
-  const hasConsent = consents?.some(consent => consent.consentType === "biometric_fingerprint" && !consent.revokedAt) === true;
   const fingerNo = nextFreeFingerNo(data?.templates.map(row => row.fingerNo) ?? []);
-  const reason = !data || !consents ? "Parmak izi bilgileri yükleniyor…" : !hasConsent ? "Parmak izi için açık rıza gerekli. KVKK rızaları bölümünden ekleyin." : !data.active ? "Pasif kişiye parmak izi kaydedilemez." : !device ? "Kişinin erişim kapsamında uygun Hik gateway cihazı bulunamadı." : fingerNo === null ? FINGERPRINT_LIMIT_MESSAGE : "";
+  const reason = !data ? "Parmak izi bilgileri yükleniyor…" : !data.active ? "Pasif kişiye parmak izi kaydedilemez." : !device ? "Kişinin erişim kapsamında uygun Hik gateway cihazı bulunamadı." : fingerNo === null ? FINGERPRINT_LIMIT_MESSAGE : "";
   const { run, pending } = useAsyncAction(async () => {
     if (!device || reason || fingerNo === null) return;
     setConfirmOpen(false);

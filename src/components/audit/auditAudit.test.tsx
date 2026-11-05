@@ -100,6 +100,6 @@ describe('denetim kaydı audit düzeltmeleri', () => {
   expect(html).not.toContain('open=');
   expect(html).toContain('Hangi eylemler kaydedilir');
   expect(html.match(/<li>/g)).toHaveLength(6);
-  for (const text of ['rızalarının', 'Elle PDKS', 'Tatil ekleme', 'Biyometrik imha', 'otomatik temizliği', 'Diğer yönetim işlemleri']) expect(html).toContain(text);
+  for (const text of ['Ziyaretçi rızasının', 'Elle PDKS', 'Tatil ekleme', 'Biyometrik imha', 'otomatik temizliği', 'Diğer yönetim işlemleri']) expect(html).toContain(text);
  });
 });

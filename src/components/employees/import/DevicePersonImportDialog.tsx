@@ -27,7 +27,7 @@ import {
   personImportSelection,
   personSelectionState,
   selectablePersons,
-  showFingerprintConsent,
+  transfersFingerprints,
   togglePersonSelection,
   type DeviceImportPreview,
   type DeviceImportResult,
@@ -111,7 +111,6 @@ onImported: (result: DeviceImportResult) => void;
   );
   const [preview, setPreview] = useState<DeviceImportPreview | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const [consent, setConsent] = useState(false);
   const [grantFullDeviceAccess, setGrantFullDeviceAccess] = useState(false);
   const [busy, setBusy] = useState<"preview" | "import" | null>(
     null,
@@ -122,24 +121,18 @@ onImported: (result: DeviceImportResult) => void;
   );
   const disabled = !connected || busy !== null;
   const newRows = selectablePersons(preview);
-  const hasFingerprints = showFingerprintConsent(
+  const hasFingerprints = transfersFingerprints(
     preview,
     selected,
     canBiometrics,
   );
-  const importSelection = personImportSelection(
-    preview,
-    selected,
-    canBiometrics,
-    consent,
-  );
+  const importSelection = personImportSelection(preview, selected);
   const selectedNos = importSelection.employeeNos;
 
   async function readPreview() {
     const result = await previewPersons({ deviceId: device._id });
     setPreview(result);
     setSelected(defaultPersonSelection(result));
-    setConsent(false);
     setGrantFullDeviceAccess(false);
   }
   async function showPreview() {
@@ -184,7 +177,6 @@ onImported: (result: DeviceImportResult) => void;
   function togglePerson(employeeNo: string) {
     if (disabled) return;
     setSelected((current) => togglePersonSelection(current, employeeNo));
-    setConsent(false);
   }
   return <section className="min-w-0 space-y-3">
     {!connected && <p role="status" className="text-sm text-warning">Cihaz çevrimdışı — aktarım yapılamaz</p>}
@@ -231,7 +223,6 @@ onImported: (result: DeviceImportResult) => void;
                               ? newRows.map((row) => row.employeeNo)
                               : [],
                           );
-                          setConsent(false);
                         }}
                       />
                     </TableHead>
@@ -315,25 +306,10 @@ onImported: (result: DeviceImportResult) => void;
               {preview.biometricEnabled === false && (
                 <p role="status" className="text-sm text-warning">Bu projede biyometri modülü kapalı; parmak izleri aktarılmaz (Ayarlar → Gizlilik)</p>
               )}
-              {canBiometrics && hasFingerprints && (
-                <div className="space-y-1">
-                  <label className="flex items-start gap-2 text-sm">
-                    <Checkbox
-                      className="mt-0.5"
-                      disabled={disabled}
-                      checked={consent}
-                      onCheckedChange={(checked) =>
-                        setConsent(checked === true)
-                      }
-                    />
-                    Seçilen kişilerin parmak izi açık rızası alınmıştır
-                  </label>
-                  {!consent && (
-                    <p className="text-xs text-muted-foreground">
-                      İşaretlemezseniz kişiler parmak izi olmadan aktarılır.
-                    </p>
-                  )}
-                </div>
+              {hasFingerprints && (
+                <p className="text-sm text-muted-foreground">
+                  Seçilen kişilerin parmak izleri de cihazdan aktarılır.
+                </p>
               )}
               <p className="text-sm text-muted-foreground">Yeni kişiler erişim kuralı olmadan kaydedilir. Cihazdaki kapı ve saat izinleri değiştirilmez; geçerlilik tarihleri korunur. Tarih bilgisi eksik veya süresi dolmuş kişiler pasif kaydedilir.</p>
               {canManageAccess && <label className="flex items-start gap-2 text-sm">
@@ -354,7 +330,7 @@ onImported: (result: DeviceImportResult) => void;
           <AlertDialogHeader>
             <AlertDialogTitle>Kişiler aktarılıyor</AlertDialogTitle>
             <AlertDialogDescription>
-              {selectedNos.length} kişi için aktarım yapılıyor{importSelection.biometricConsentConfirmed ? " ve parmak izleri cihazdan okunuyor" : ""}. Birkaç dakika sürebilir; pencereyi kapatmayın.
+              {selectedNos.length} kişi için aktarım yapılıyor{hasFingerprints ? " ve parmak izleri cihazdan okunuyor" : ""}. Birkaç dakika sürebilir; pencereyi kapatmayın.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <LoadingSpinner size="sm" text="" inline className="py-2" />

@@ -50,7 +50,6 @@ import type * as emailVerification from "../emailVerification.js";
 import type * as employeeAuth from "../employeeAuth.js";
 import type * as employeeBiometrics from "../employeeBiometrics.js";
 import type * as employeeCheckIn from "../employeeCheckIn.js";
-import type * as employeeConsents from "../employeeConsents.js";
 import type * as employeeFaces from "../employeeFaces.js";
 import type * as employeeFingerprints from "../employeeFingerprints.js";
 import type * as employeeImport from "../employeeImport.js";
@@ -318,7 +317,6 @@ declare const fullApi: ApiFromModules<{
   employeeAuth: typeof employeeAuth;
   employeeBiometrics: typeof employeeBiometrics;
   employeeCheckIn: typeof employeeCheckIn;
-  employeeConsents: typeof employeeConsents;
   employeeFaces: typeof employeeFaces;
   employeeFingerprints: typeof employeeFingerprints;
   employeeImport: typeof employeeImport;

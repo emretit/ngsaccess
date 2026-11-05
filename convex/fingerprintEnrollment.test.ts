@@ -21,8 +21,7 @@ async function fixture(role: "project_admin" | "project_user" = "project_admin")
     const ruleId = await ctx.db.insert("accessRules", { projectId, name: "Rule", isActive: true });
     const membershipId = await ctx.db.insert("groupMembers", { projectId, groupId: ruleId, employeeId, createdAt: "now" });
     await ctx.db.insert("groupDevices", { projectId, groupId: ruleId, deviceId, createdAt: "now" });
-    const consentId = await ctx.db.insert("employeeConsents", { employeeId, consentType: "biometric_fingerprint", grantedAt: "now" });
-    return { projectId, otherProjectId, userId, sessionId, employeeId, deviceId, membershipId, consentId };
+    return { projectId, otherProjectId, userId, sessionId, employeeId, deviceId, membershipId };
   });
   return { t, ...ids, caller: t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` }), target: { employeeId: ids.employeeId, deviceId: ids.deviceId, fingerNo: 2 } };
 }
@@ -67,10 +66,9 @@ describe("cihazda parmak izi metadata ve izinler", () => {
     await expect(f.caller.mutation(api.fingerprintEnrollment.beginEnrollment, f.target)).rejects.toThrow("yetkiniz");
     await expect(f.caller.mutation(api.fingerprintEnrollment.cancelEnrollment, { ...f.target, attemptId: "unknown" })).rejects.toThrow("yetkiniz");
   });
-  it.each(["consent", "module", "membership", "project", "transport", "inactive"])("%s şartı bozulursa kayıt engellenir", async condition => {
+  it.each(["module", "membership", "project", "transport", "inactive"])("%s şartı bozulursa kayıt engellenir", async condition => {
     const f = await fixture();
     await f.t.run(async ctx => {
-      if (condition === "consent") await ctx.db.patch(f.consentId, { revokedAt: "now" });
       if (condition === "module") { const settings = await ctx.db.query("projectPrivacySettings").first(); if (settings) await ctx.db.patch(settings._id, { biometricEnabled: false }); }
       if (condition === "membership") await ctx.db.delete(f.membershipId);
       if (condition === "project") await ctx.db.patch(f.deviceId, { projectId: f.otherProjectId });
@@ -96,11 +94,10 @@ describe("cihazda parmak izi metadata ve izinler", () => {
     await f.t.run(ctx => ctx.db.patch(f.employeeId, { cardNumber: "456" }));
     await expect(f.t.mutation(internal.fingerprintEnrollment.upsert, { ...f.target, attemptId, enrolledBy: f.userId, expectedCardNumber: "123" })).rejects.toThrow("değişti");
   });
-  it.each(["card", "inactive", "remove", "termination", "import", "consent"])("%s yaşam döngüsü metadata temizliğini sıraya koyar", async operation => {
+  it.each(["card", "inactive", "remove", "termination", "import"])("%s yaşam döngüsü metadata temizliğini sıraya koyar", async operation => {
     const f = await fixture();
     await f.caller.mutation(api.fingerprintEnrollment.beginEnrollment, f.target);
     await f.t.run(ctx => ctx.db.insert("employeeFingerprints", { employeeId: f.employeeId, projectId: f.projectId, fingerPrintID: 2, encData: "encrypted", iv: "iv", keyVersion: "v1", addedAt: Date.now(), enrolledBy: f.userId }));
-    if (operation === "consent") await f.caller.mutation(api.employeeConsents.revoke, { id: f.consentId });
     if (operation === "card") await f.caller.mutation(api.employees.update, { employeeId: f.employeeId, cardNumber: "456" });
     if (operation === "inactive") await f.caller.mutation(api.employees.update, { employeeId: f.employeeId, isActive: false });
     if (operation === "remove") await f.caller.mutation(api.employees.remove, { employeeId: f.employeeId });
@@ -164,11 +161,10 @@ describe("encrypted central templates", () => {
     const publicData = await f.caller.query(api.fingerprintEnrollment.listForEmployee, { employeeId: f.employeeId });
     expect(publicData.templates[0].deviceIds).toEqual([f.deviceId]);
   });
-  it.each(["consent", "module", "pending", "capability", "inactive"])("push target repeats %s eligibility check", async condition => {
+  it.each(["module", "pending", "capability", "inactive"])("push target repeats %s eligibility check", async condition => {
     const f = await fixture();
     await store(f);
     await f.t.run(async ctx => {
-      if (condition === "consent") await ctx.db.patch(f.consentId, { revokedAt: "now" });
       if (condition === "module") {
         const settings = await ctx.db.query("projectPrivacySettings").first();
         if (settings) await ctx.db.patch(settings._id, { biometricEnabled: false });
@@ -182,11 +178,10 @@ describe("encrypted central templates", () => {
     });
     expect(await f.t.query(internal.fingerprintEnrollment.getPushTarget, { employeeId: f.employeeId, deviceId: f.deviceId })).toBeNull();
   });
-  it("removal erases central template and queues devices with module off and consent revoked", async () => {
+  it("removal erases central template and queues devices with module off", async () => {
     const f = await fixture();
     await store(f);
     await f.t.run(async ctx => {
-      await ctx.db.patch(f.consentId, { revokedAt: "now" });
       const settings = await ctx.db.query("projectPrivacySettings").first();
       if (settings) await ctx.db.patch(settings._id, { biometricEnabled: false });
     });
@@ -234,14 +229,14 @@ describe("fix1 transactional reservations and recovery", () => {
     await f.t.run(ctx => ctx.db.patch(rowId, { pendingUntil: undefined, deletionEmployeeNo: undefined, enrolledEmployeeNo: "123", enrolledAt: "2000-01-01T00:00:00Z" }));
     expect(await begin(f, templateId)).toMatchObject({ enrollmentId: rowId });
   });
-  it("consent revocation snapshots a pre-send reservation; record rejection retains retry metadata", async () => {
+  it("deactivation snapshots a pre-send reservation; record rejection retains retry metadata", async () => {
     const f = await fixture();
     const templateId = await template(f);
     const reservation = await begin(f, templateId);
     if (!reservation || "current" in reservation) throw new Error("expected reservation");
     const central = await f.t.run(ctx => ctx.db.get(templateId));
     if (!central) throw new Error("missing template");
-    await f.caller.mutation(api.employeeConsents.revoke, { id: f.consentId });
+    await f.caller.mutation(api.employees.update, { employeeId: f.employeeId, isActive: false });
     const row = await f.t.run(ctx => ctx.db.get(reservation.enrollmentId));
     expect(row).toMatchObject({ deletionEmployeeNo: "123", cancelRequested: true, pendingUntil: expect.any(Number) });
     await expect(f.t.mutation(internal.fingerprintEnrollment.recordPush, { ...f.target, templateId, addedAt: central.addedAt, expectedCardNumber: "123", attemptId: reservation.attemptId })).rejects.toThrow();
@@ -346,7 +341,8 @@ describe("fix1 transactional reservations and recovery", () => {
         expect(query.mock.calls.map(call => call[0])).not.toContain("groupMembers");
       } finally { query.mockRestore(); }
     });
-    await f.t.run(ctx => ctx.db.patch(f.consentId, { revokedAt: "now" }));
-    expect(await f.t.run(ctx => rosterCardNumbersWithBiometric(ctx, new Set([f.employeeId]), "employeeFingerprints", f.deviceId))).toEqual([]);
+    // Rıza kaydı artık roster'ı etkilemez (firma ile çalışan arasında).
+    await f.t.run(ctx => ctx.db.insert("employeeConsents", { employeeId: f.employeeId, consentType: "biometric_fingerprint", grantedAt: "now", revokedAt: "now" }));
+    expect(await f.t.run(ctx => rosterCardNumbersWithBiometric(ctx, new Set([f.employeeId]), "employeeFingerprints", f.deviceId))).toEqual(["123"]);
   });
 });

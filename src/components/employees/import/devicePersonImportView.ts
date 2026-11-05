@@ -40,7 +40,8 @@ export function togglePersonSelection(selected: string[], employeeNo: string) {
     ? selected.filter((no) => no !== employeeNo)
     : [...selected, employeeNo];
 }
-export function showFingerprintConsent(
+/** Parmak izi yetkisi ve açık biyometri modülüyle seçili kişilerin şablonları da okunur. */
+export function transfersFingerprints(
   preview: DeviceImportPreview | null,
   selected: string[],
   canBiometrics: boolean,
@@ -54,15 +55,11 @@ export function showFingerprintConsent(
 export function personImportSelection(
   preview: DeviceImportPreview | null,
   selected: string[],
-  canBiometrics: boolean,
-  consent: boolean,
 ) {
   return {
     employeeNos: selectedPersons(preview, selected).map(
       (row) => row.employeeNo,
     ),
-    biometricConsentConfirmed:
-      showFingerprintConsent(preview, selected, canBiometrics) && consent,
   };
 }
 export function importResultText(
@@ -79,9 +76,6 @@ export function importResultText(
     summary +
     (result.fingerprintsSkipped > 0
       ? ` · ${result.fingerprintsSkipped} parmak izi atlandı`
-      : "") +
-    (result.consentsRecorded > 0
-      ? ` · ${result.consentsRecorded} rıza kaydı`
       : "") +
     (result.ruleId ? ` · Erişim kuralı: ${deviceName} mevcut kişiler` : "")
   );

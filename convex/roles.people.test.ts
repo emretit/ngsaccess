@@ -44,7 +44,7 @@ async function invoke(f: Fixture, permission: Permission) {
   switch (permission) {
     case "employees.view": return f.caller.query(api.employees.getById, { employeeId: f.employeeId });
     case "employees.manage": return f.caller.mutation(api.companies.create, { projectId: f.projectId, name: "HR" });
-    case "biometrics.manage": return f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "biometric_fingerprint" });
+    case "biometrics.manage": return f.caller.query(api.fingerprintEnrollment.listForEmployee, { employeeId: f.employeeId });
     case "pay.view": return f.caller.query(api.employees.getById, { employeeId: f.employeeId });
     case "schedule.manage": return f.caller.mutation(api.shifts.create, { projectId: f.projectId, name: "Day", startTime: "08:00", endTime: "17:00" });
     case "attendance.approve": return f.caller.mutation(api.leaves.create, { employeeId: f.employeeId, leaveType: "annual", startDate: "2026-11-02", endDate: "2026-11-03" });
@@ -106,12 +106,10 @@ it("scheduled reports recheck the recipient's current reports.view permission", 
   await f.admin.mutation(api.roles.setRolePermissions, { projectId: f.projectId, role: "viewer", permissions: ROLE_DEFAULTS.viewer.filter(p => p !== "reports.view") });
   expect(await f.t.query(internal.reports.getReportSummaryForEmail, { scheduleId, year: 2026, month: 10 })).toBeNull();
 });
-it("photo consent uses employees.manage while biometric consent and privacy settings have separate gates", async () => {
+it("biometric module setting requires biometrics.manage", async () => {
   const f = await setup("hr");
   await f.admin.mutation(api.roles.setRolePermissions, { projectId: f.projectId, role: "hr", permissions: ROLE_DEFAULTS.hr.filter(p => p !== "biometrics.manage") });
-  await expect(f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "photo" })).resolves.toBeDefined();
   const before = await snapshot(f);
-  await expect(f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "biometric_face" })).rejects.toThrow("Bu işlem için yetkiniz yok");
   await expect(f.caller.mutation(api.privacyBiometric.setBiometricModule, { projectId: f.projectId, enabled: false })).rejects.toThrow("Bu işlem için yetkiniz yok");
   expect(await snapshot(f)).toEqual(before);
   await f.admin.mutation(api.privacyBiometric.setBiometricModule, { projectId: f.projectId, enabled: false });

@@ -39,7 +39,7 @@ it("yeni kayıt başarısında ayrıntılara devam id'yi üst akışa taşır; d
   const onContinue = vi.fn(); const onSave = vi.fn();
   const fresh = renderToStaticMarkup(<EmployeeForm onClose={() => {}} onSave={onSave} onContinue={onContinue} />);
   expect(fresh).toContain("Ayrıntılara devam et");
-  expect(fresh).toContain("Rıza ve parmak izi işlemleri kişinin ayrıntılarında.");
+  expect(fresh).toContain("Parmak izi işlemleri kişinin ayrıntılarında.");
   mocks.clicks.get("Ayrıntılara devam et")?.();
   expect(onContinue).toHaveBeenCalledWith({ employeeId: employee._id });
   mocks.clicks.get("Tamam")?.(); expect(onSave).toHaveBeenCalledWith({ employeeId: employee._id });
