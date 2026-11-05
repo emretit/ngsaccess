@@ -406,7 +406,7 @@ void main() {
       find.text('Could not save your preference. Please try again.'),
       findsOneWidget,
     );
-    expect(theme.themeMode, ThemeMode.light);
+    expect(theme.themeMode, ThemeMode.system);
   });
 
   for (final language in ['en', 'tr']) {

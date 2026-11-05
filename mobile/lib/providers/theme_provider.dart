@@ -13,7 +13,7 @@ class ThemeProvider extends ChangeNotifier {
   static const _key = 'mobile_theme_mode';
   final PreferencesLoader _preferencesLoader;
   Future<void> _writes = Future<void>.value();
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.system;
   PreferenceError? _error;
   int _revision = 0;
   int _pending = 0;
@@ -31,8 +31,8 @@ class ThemeProvider extends ChangeNotifier {
       if (_disposed || revision != _revision) return;
       _themeMode = switch (prefs.getString(_key)) {
         'dark' => ThemeMode.dark,
-        'system' => ThemeMode.system,
-        _ => ThemeMode.light,
+        'light' => ThemeMode.light,
+        _ => ThemeMode.system,
       };
       _error = null;
     } catch (_) {

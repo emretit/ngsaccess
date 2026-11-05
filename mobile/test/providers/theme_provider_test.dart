@@ -51,10 +51,28 @@ void main() {
     final provider = ThemeProvider(preferencesLoader: () async => prefs);
     addTearDown(provider.dispose);
     expect(await provider.setThemeMode(ThemeMode.dark), isFalse);
-    expect(provider.themeMode, ThemeMode.light);
+    expect(provider.themeMode, ThemeMode.system);
     expect(provider.error, PreferenceError.storage);
     expect(provider.isSaving, isFalse);
   });
+
+  test(
+    'missing preference follows the system; saved light stays light',
+    () async {
+      final empty = ThemeProvider(
+        preferencesLoader: () async => TestPreferences(),
+      );
+      addTearDown(empty.dispose);
+      await empty.bootstrap();
+      expect(empty.themeMode, ThemeMode.system);
+
+      final saved = TestPreferences()..values['mobile_theme_mode'] = 'light';
+      final light = ThemeProvider(preferencesLoader: () async => saved);
+      addTearDown(light.dispose);
+      await light.bootstrap();
+      expect(light.themeMode, ThemeMode.light);
+    },
+  );
 
   test('bootstrap storage failure and disposal are safe', () async {
     final provider = ThemeProvider(
