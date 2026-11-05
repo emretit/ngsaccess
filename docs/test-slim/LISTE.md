@@ -16,7 +16,8 @@
   - Mobil: test→test import 0 (12 + `qr_fakes` ortak yardımcı `test/helpers/`), görsel matris daraltma 863 → 799
   - Koordinatör düzeltmesi: `screenshot_test` import'ları helpers'a (Faz 2 kırmıştı), 3 artık re-export silindi, `LeaveAudit` son sınıf assertion'ı
   - Kapılar: tam vitest 488 / 5.543 0 fail (50 sn) · flutter test 799 0 fail (31 sn) · `flutter analyze` (screenshot_test dahil) temiz · tsc 0
-- [ ] Kalan sorular 1, 3, 4, 5 → Faz 2/3
+- [x] Faz 2 commit a7d0fe8e (2026-11-05)
+- [x] Faz 3 kararları (2026-11-05, Emre "ne gerekiyorsa yap" → koordinatör önerisi): 4 sorunun hepsi DOKUNMA → **iş KAPANDI**
 
 ## DÜZELTME (2026-11-05, Faz 1 sonrası yüksüz ölçüm)
 İlk ölçüm 4 ajan aynı anda çalışırken alındı ve **yanıltıcıydı**. Yüksüz makinede:
@@ -82,7 +83,17 @@ Tahmini kazanç (Faz 1+2): web ~55 case / ~22 dosya / ~%40 süre · mobil ~70 ca
 - Mobil `d3a/fix1_regression_test.dart`, `d3b/fix1_test.dart`: birleştirilebilir ama case silinmez (UTC gün sınırı, consent gating, hesap değişiminde temizlik).
 - Yetki/rol, sır gating, PDKS hesapları, Hik/IDE senkronu, "cihaz kişileri otomatik silinmez", `hikDeviceImport` 3 katmanı.
 
-## D. Karar gereken (Emre)
+## D. Kararlar (2026-11-05 — hepsi DOKUNMA, iş kapandı)
+| Soru | Karar | Gerekçe |
+|---|---|---|
+| 1. Ölçek testleri | Dokunma | Yüksüz kazanç ~25 sn; kapasite sınırı regresyonlarını koruyorlar |
+| 3. `screenshot_test/` | Kalsın | 2026-11-04 mobil arayüz yenilemesinde kullanıldı (`docs/mobile-ui-audit/after-*`) |
+| 4. Legacy PDKS yolu | Kalsın | Canlıda sürümsüz proje olup olmadığı bilinmiyor; silmek PDKS hesabını bozabilir |
+| 5. `vi.mock("react")` 40 dosya | Şimdilik değil | ~1-2 gün, case sayısı değişmez; sorun çıkaran dosya olursa tek tek |
+
+Açık bırakılan küçük adaylar (ileride, istenirse): `leavesBackend`/`reportTransactions.backend` testlerini `convex/`a gerçek fixture ile taşı · `app_composition` dil döngüsü · `turkey_time` alt süreç testini ayrı koşuya al · metin/kopya testleri.
+
+### İlk soru listesi (arşiv)
 1. **Ölçek testleri** (500-20.002 kayıt): N küçültülüp her koşuda mı kalsın, yoksa tam ölçek ayrı `npm run test:scale` koşusuna mı? → Öneri: ikisi birden (küçük N her koşuda, tam ölçek yayın öncesi).
 2. **CSS/Tailwind sınıf testleri** kabul kriteri mi? → Öneri: hayır, sil (A + B'deki ~20 case).
 3. **`screenshot_test/` golden matrisi** hâlâ kullanılıyor mu? Kullanılmıyorsa 280 case'lik daraltma + `acceptance/kit_completion_test` QR toleransı da gider.
