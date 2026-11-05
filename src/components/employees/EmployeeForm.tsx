@@ -153,6 +153,12 @@ export default function EmployeeForm({
     );
   };
 
+  // Kaydedince kalkar: düzenlemede photoUrl=null gider, sunucu dosyayı da siler.
+  const removePhoto = () => {
+    setFormData((current) => ({ ...current, photoUrl: null, photoStorageId: undefined }));
+    setPhotoPreview(null);
+  };
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (uploading || isLoading || stages.length > 0) return;
@@ -252,10 +258,24 @@ export default function EmployeeForm({
                       photoPreview={photoPreview}
                       onPhotoChange={onPhotoChange}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      JPEG, PNG veya WebP · en çok 5 MB. Fotoğraf personel
-                      profilinde kullanılır.
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">
+                        JPEG, PNG veya WebP · en çok 5 MB. Fotoğraf personel
+                        profilinde kullanılır.
+                      </p>
+                      {photoPreview && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0 text-xs text-destructive"
+                          disabled={uploading || isLoading}
+                          onClick={removePhoto}
+                        >
+                          Fotoğrafı kaldır
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   {photoError && (
                     <FormFeedback tone="error">

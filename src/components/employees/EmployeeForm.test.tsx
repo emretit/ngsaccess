@@ -1,25 +1,25 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it, vi } from "vitest";
 import { getFunctionName } from "convex/server";
 import type { Employee } from "@/types/employee";
 import type { Id } from "../../../convex/_generated/dataModel";
 import EmployeeForm, { deactivationEffects, sendsDeactivation } from "./EmployeeForm";
-const mocks = vi.hoisted(() => ({ query: vi.fn(), current: undefined as unknown, stages: [] as string[], saved: undefined as { employeeId: Id<"employees"> } | undefined, loading: false, uploading: false, clicks: new Map<string, () => void>(), remoteChanged: false, reload: vi.fn(), confirm: undefined as (() => void) | undefined, optionsLoading: true, formData: {} as Record<string, unknown>, initialData: undefined as string | undefined }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), current: undefined as unknown, stages: [] as string[], saved: undefined as { employeeId: Id<"employees"> } | undefined, loading: false, uploading: false, clicks: new Map<string, () => void>(), remoteChanged: false, reload: vi.fn(), confirm: undefined as (() => void) | undefined, optionsLoading: true, formData: {} as Record<string, unknown>, initialData: undefined as string | undefined, photoPreview: null as string | null }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p" }) }));
 vi.mock("convex/react", () => ({ useMutation: () => async () => null, useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => { const name = getFunctionName(ref); mocks.query(name, args); return name === "employees:getById" ? mocks.current : name === "fingerprintEnrollment:listForEmployee" ? undefined : []; } }));
-vi.mock("./hooks/useEmployeeFormData", () => ({ useEmployeeFormData: () => ({ formData: mocks.formData, initialData: mocks.remoteChanged ? '{"firstName":"old"}' : mocks.initialData, remoteChanged: mocks.remoteChanged, reloadLatest: mocks.reload, departments: [], companies: [], accessRules: [], positions: [], optionsLoading: mocks.optionsLoading }) }));
+vi.mock("./hooks/useEmployeeFormData", () => ({ useEmployeeFormData: () => ({ formData: mocks.formData, initialData: mocks.remoteChanged ? '{"firstName":"old"}' : mocks.initialData, remoteChanged: mocks.remoteChanged, reloadLatest: mocks.reload, departments: [], companies: [], accessRules: [], positions: [], optionsLoading: mocks.optionsLoading, photoPreview: mocks.photoPreview, setPhotoPreview: vi.fn(), setFormData: vi.fn() }) }));
 vi.mock("./hooks/useEmployeeFormSubmit", () => ({ useEmployeeFormSubmit: () => ({ stages: mocks.stages, isLoading: mocks.loading, savedResult: mocks.saved }) }));
 vi.mock("./hooks/usePhotoUpload", () => ({ usePhotoUpload: () => ({ isLoading: mocks.uploading }) }));
 vi.mock("@/components/shared/UnsavedChangesDialog", () => ({ useUnsavedChangesGuard: (dirty: boolean) => ({ dialog: null, requestClose: (action: () => void) => { if (dirty) mocks.confirm = action; else action(); } }) }));
 vi.mock("./PhotoUpload", () => ({ default: () => null }));
-vi.mock("./EmployeeFormFields", () => ({ default: () => null }));
+vi.mock("./EmployeeFormFields", () => ({ default: ({ photo }: { photo?: ReactNode }) => <>{photo}</> }));
 vi.mock("@/components/ui/button", () => ({ Button: ({ children, onClick, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) => {
   if (typeof children === "string" && onClick) mocks.clicks.set(children, () => onClick({} as React.MouseEvent<HTMLButtonElement>));
   return <button {...props}>{children}</button>;
 } }));
 const employee: Employee = { _id: "e" as Id<"employees">, firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", isActive: true };
-beforeEach(() => { vi.clearAllMocks(); mocks.current = undefined; mocks.stages = []; mocks.saved = undefined; mocks.loading = false; mocks.uploading = false; mocks.clicks.clear(); mocks.remoteChanged = false; mocks.confirm = undefined; mocks.optionsLoading = true; mocks.formData = {}; mocks.initialData = undefined; });
+beforeEach(() => { vi.clearAllMocks(); mocks.current = undefined; mocks.stages = []; mocks.saved = undefined; mocks.loading = false; mocks.uploading = false; mocks.clicks.clear(); mocks.remoteChanged = false; mocks.confirm = undefined; mocks.optionsLoading = true; mocks.formData = {}; mocks.initialData = undefined; mocks.photoPreview = null; });
 it("02-D9: edit subscribes to a single employee and handles deletion", () => {
   renderToStaticMarkup(<EmployeeForm employee={employee} onClose={() => {}} onSave={() => {}} />);
   expect(mocks.query).toHaveBeenCalledWith("employees:getById", { employeeId: "e" });
@@ -97,4 +97,12 @@ it("pasifleştirme onayı yalnız kayıt isActive=false gönderecekse açılır"
   // Taslak açılırken de pasifti (başkası arada aktifleştirdi): onlyChangedFields isActive'i göndermez.
   expect(sendsDeactivation(false, JSON.stringify({ isActive: false }))).toBe(false);
   expect(sendsDeactivation(false, undefined)).toBe(true);
+});
+
+it("P25: fotoğraf varken kaldırma düğmesi çıkar, yokken çıkmaz", () => {
+  mocks.optionsLoading = false;
+  mocks.photoPreview = null;
+  expect(renderToStaticMarkup(<EmployeeForm embedded employee={employee} onClose={() => {}} onSave={() => {}} />)).not.toContain("Fotoğrafı kaldır");
+  mocks.photoPreview = "https://example.test/a.jpg";
+  expect(renderToStaticMarkup(<EmployeeForm embedded employee={employee} onClose={() => {}} onSave={() => {}} />)).toContain("Fotoğrafı kaldır");
 });

@@ -44,6 +44,11 @@ describe("onlyChangedFields", () => {
     expect(onlyChangedFields(full(edited), edited, JSON.stringify(base))).toEqual({ employeeId, photoUrl: "https://example.test/b.jpg", photoStorageId: "storage-b" });
   });
 
+  it("P25: removing the photo sends photoUrl null so the server clears it", () => {
+    const edited = { ...base, photoUrl: null, photoStorageId: undefined };
+    expect(onlyChangedFields(full(edited), edited, JSON.stringify(base))).toEqual({ employeeId, photoUrl: null, photoStorageId: undefined });
+  });
+
   it("always keeps an added access rule and falls back to the full payload without a baseline", () => {
     const rule = "rule-a" as Id<"accessRules">;
     expect(onlyChangedFields({ employeeId, accessRuleId: rule, firstName: "Ada" }, { ...base, accessRuleId: rule }, JSON.stringify(base))).toEqual({ employeeId, accessRuleId: rule });

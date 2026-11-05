@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import Employees from "@/pages/Employees";
+vi.mock("convex/react", () => ({ useQuery: () => undefined }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p", isAdmin: true }) }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ activeProject: { name: "Proje" } }) }));
 vi.mock("@/hooks/useEmployees", () => ({ useEmployees: () => ({ employees: [{ _id: "e", firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", departmentId: "d", isActive: true }], isLoading: navigation.loading, hasProjectAccess: true }) }));

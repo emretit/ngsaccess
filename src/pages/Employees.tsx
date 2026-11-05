@@ -3,6 +3,10 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { notify } from "@/lib/notify";
+import { resolveContinuingEmployee } from "@/components/employees/lib/continueEmployee";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -76,11 +80,21 @@ function EmployeePage() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [continuingEmployeeId, setContinuingEmployeeId] = useState<Id<"employees"> | null>(null);
+  const continuingLookup = useQuery(
+    api.employees.getById,
+    continuingEmployeeId ? { employeeId: continuingEmployeeId } : "skip",
+  );
   useEffect(() => {
     if (!continuingEmployeeId) return;
-    const saved = employees.find(item => item._id === continuingEmployeeId);
-    if (saved) { setEditingEmployee(saved); setContinuingEmployeeId(null); }
-  }, [employees, continuingEmployeeId]);
+    const next = resolveContinuingEmployee(employees, continuingEmployeeId, continuingLookup);
+    if (next === "wait") return;
+    setContinuingEmployeeId(null);
+    if (next !== "missing") setEditingEmployee(next);
+    else {
+      setIsPanelOpen(false);
+      notify.error("Personel ayrıntısı açılamadı", "Kayıt listede bulunamadı; silinmiş olabilir.");
+    }
+  }, [employees, continuingEmployeeId, continuingLookup]);
   useEffect(() => {
     const state: unknown = location.state;
     if (!state || typeof state !== "object" || !("transferEmployeeId" in state) || !("transferProjectId" in state) || state.transferProjectId !== projectId || isLoading) return;
