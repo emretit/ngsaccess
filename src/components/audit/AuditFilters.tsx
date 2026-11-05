@@ -1,6 +1,6 @@
 import { CalendarIcon } from 'lucide-react';
 import { formatTrDate } from '@/lib/date';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { AUDIT_TARGET_LABELS } from '../../../convex/lib/auditLogQuery';
@@ -31,10 +31,10 @@ function ActorFilter({ args, value, onChange }: { args: AuditArgs; value: string
   </FilterField>;
 }
 
-export function AuditFilters({ state, args, ready, rangeError }: { state: ReturnType<typeof useAuditUrlState>; args: AuditArgs; ready: boolean; rangeError?: string }) {
+export function AuditFilters({ state, args, ready, rangeError, actions }: { state: ReturnType<typeof useAuditUrlState>; args: AuditArgs; ready: boolean; rangeError?: string; actions?: ReactNode }) {
   const count = ['user', 'action', 'target', 'start', 'end'].filter(key => state.params.get(key)).length;
   return <div className="min-w-0 space-y-3 border-b pb-4">
-    <FilterBar search={state.search} onSearchChange={value => state.setSearch(value.slice(0, 500))} searchLabel="Denetim kayıtlarında ara" placeholder="Kullanıcı, varlık veya not ara" onClear={state.clear} hasFilters={count > 0}>
+    <FilterBar search={state.search} onSearchChange={value => state.setSearch(value.slice(0, 500))} searchLabel="Denetim kayıtlarında ara" placeholder="Kullanıcı, varlık veya not ara" onClear={state.clear} hasFilters={count > 0} end={actions}>
       <CollapsibleFilters activeCount={count} forceOpen={Boolean(rangeError)} desktopDisplay="contents">
         {ready ? <QuerySectionBoundary className="contents" resetKey={`${args.projectId}-${args.allProjects}`} title="Kullanıcı seçenekleri yüklenemedi" description="Yeniden deneyebilirsiniz."><ActorFilter args={args} value={state.params.get('user') || ''} onChange={value => state.update('user', value)} /></QuerySectionBoundary> : <div className="text-sm text-muted-foreground">Kullanıcıları görmek için bir proje seçin.</div>}
         <FilterField label="Eylem" htmlFor="audit-action"><Select value={args.action || 'all'} onValueChange={value => state.update('action', value)}><SelectTrigger id="audit-action" className="w-full min-w-0"><SelectValue /></SelectTrigger><SelectContent className="max-w-[calc(100vw-32px)]"><SelectItem value="all">Tüm eylemler</SelectItem>{Object.entries(actionLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></FilterField>

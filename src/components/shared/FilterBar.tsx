@@ -23,6 +23,7 @@ type FilterBarProps = SearchProps & {
   children?: ReactNode;
   onClear?: () => void;
   hasFilters?: boolean;
+  /** Sayfa aksiyonları (içe/dışa aktar, şablon, ayarlar): filtrelerle aynı satırda sağa yaslanır. */
   end?: ReactNode;
   label?: string;
   layout?: "wrap" | "grid";
@@ -32,13 +33,13 @@ type FilterBarProps = SearchProps & {
 export function FilterBar({ search, onSearchChange, searchLabel = "Ara", placeholder = "Ara…", children, onClear, hasFilters = false, end, label = "Liste filtreleri", layout = "wrap" }: FilterBarProps) {
   const id = useId();
   const grid = layout === "grid";
-  const searchInput = onSearchChange && <div className={grid ? "min-w-0" : "w-full space-y-1 min-[761px]:w-[260px]"}>
-    <Label className={grid ? "sr-only" : undefined} htmlFor={id}>{searchLabel}</Label>
+  const searchInput = onSearchChange && <div className={grid ? "min-w-0" : "grid w-full min-w-0 gap-1 text-xs min-[761px]:w-[260px]"}>
+    {grid ? <Label className="sr-only" htmlFor={id}>{searchLabel}</Label> : <label htmlFor={id}>{searchLabel}</label>}
     <Input id={id} type="search" value={search} placeholder={placeholder} onChange={event => onSearchChange(event.target.value)} />
   </div>;
   return <div role="search" aria-label={label} className={grid ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2" : "flex flex-wrap items-end gap-3"}>
     {!grid && searchInput}{children}{grid && searchInput}
     {onClear && <Button type="button" variant="ghost" disabled={!hasFilters && !search} onClick={onClear}>Filtreleri temizle</Button>}
-    {end && <div className="ml-auto">{end}</div>}
+    {end && <div className="ml-auto flex flex-wrap items-center gap-2">{end}</div>}
   </div>;
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { FilterBar, FilterField } from "@/components/shared/FilterBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 interface Props {
@@ -10,9 +11,10 @@ interface Props {
   onSortChange: (value: string) => void;
   onClear: () => void;
   hasFilters: boolean;
+  actions?: ReactNode;
 }
 export function EmployeeFilters(p: Props) {
-  return <FilterBar search={p.searchQuery} onSearchChange={p.onSearchChange} searchLabel="Personel ara" placeholder="Ad, e-posta, kart veya bordro…" onClear={p.onClear} hasFilters={p.hasFilters}>
+  return <FilterBar search={p.searchQuery} onSearchChange={p.onSearchChange} searchLabel="Personel ara" placeholder="Ad, e-posta, kart veya bordro…" onClear={p.onClear} hasFilters={p.hasFilters} end={p.actions}>
     <FilterField label="Personel durumu" htmlFor="employee-status"><Select value={p.status} onValueChange={p.onStatusChange}>
       <SelectTrigger id="employee-status" className="w-full min-w-0"><SelectValue /></SelectTrigger>
       <SelectContent>

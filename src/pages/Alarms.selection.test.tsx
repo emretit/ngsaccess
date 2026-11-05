@@ -24,12 +24,12 @@ vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permis
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: state.projectId, activeProject: { name: state.projectId }, loading: false }) }));
 vi.mock("convex/react", () => ({ useQuery: () => [], useMutation: () => vi.fn(), usePaginatedQuery: () => ({ results: Array.from({ length: 51 }, (_, i) => ({ _id: `e${i}`, label: `Olay ${i}`, eventTime: "2026-11-01T00:00:00Z", severity: "warning" })), status: "Exhausted", loadMore: vi.fn() }) }));
 
-type Node = ReactElement<{ children?: unknown; type?: string; checked?: boolean; disabled?: boolean; onChange?: (value: never) => void; value?: unknown }>;
+type Node = ReactElement<{ children?: unknown; start?: unknown; actions?: unknown; type?: string; checked?: boolean; disabled?: boolean; onChange?: (value: never) => void; value?: unknown }>;
 function nodes(value: unknown): Node[] {
   if (Array.isArray(value)) return value.flatMap(nodes);
   if (!value || typeof value !== "object" || !("props" in value)) return [];
   const node = value as Node;
-  return [node, ...nodes(node.props.children)];
+  return [node, ...nodes([node.props.start, node.props.children, node.props.actions])];
 }
 function render() {
   state.cursor = 0;

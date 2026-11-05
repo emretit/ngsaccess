@@ -28,9 +28,9 @@ function AuthorizedAuditLog() {
     <PageHeader title="Denetim Kaydı" scope={<span>{allProjects ? 'Tüm projeler · Projesiz kayıtlar dahil' : activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)</span>}>
       {profile?.role === 'super_admin' && <label className="flex min-h-10 items-center gap-2 text-sm"><Switch checked={allProjects} onCheckedChange={checked => state.update('allProjects', checked ? 'true' : '')} />Tüm projeler</label>}
     </PageHeader>
-    {ready && !state.changingScope && !rangeError && <AuditExportButton key={JSON.stringify(args)} args={args} projectName={activeProject?.name ?? "proje"} />}
     <AuditCoverage />
-    <AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError} />
+    <AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError}
+      actions={ready && !state.changingScope && !rangeError && <AuditExportButton key={JSON.stringify(args)} args={args} projectName={activeProject?.name ?? "proje"} />} />
     {!allProjects && <p className="text-xs text-muted-foreground">Seçili projenin kayıtları gösteriliyor. Projeyi üst çubuktan değiştirebilirsiniz.</p>}
     {loading || state.changingScope ? <AuditTable rows={[]} allProjects={allProjects} loading onSelect={() => {}} /> : !ready ? <EmptyState title="Bir proje seçin" description="Denetim kayıtlarını görmek için üst çubuktan bir proje seçin." /> : rangeError ? <AuditTable rows={[]} allProjects={allProjects} onSelect={() => {}} message={<p className="text-xs text-muted-foreground">Geçerli bir tarih aralığı seçilince kayıtlar listelenir.</p>} /> : <AuditResults key={JSON.stringify(args)} args={args} />}
   </div>;

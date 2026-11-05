@@ -20,9 +20,9 @@ describe("FilterBar", () => {
     expect(html).toContain('value="Ayşe"');
     expect(html).toContain('placeholder="Ad soyad"');
     expect(html).toContain('flex flex-wrap items-end gap-3');
-    expect(html).toContain('w-full space-y-1 min-[761px]:w-[260px]');
+    expect(html).toContain('grid w-full min-w-0 gap-1 text-xs min-[761px]:w-[260px]');
     expect(html).not.toContain('disabled=""');
-    expect(html).toContain('<div class="ml-auto"><span>Actions</span></div>');
+    expect(html).toContain('<div class="ml-auto flex flex-wrap items-center gap-2"><span>Actions</span></div>');
   });
 
   it("disables clear only when both search and filters are empty", () => {

@@ -202,13 +202,13 @@ function EmployeePage() {
             setPrivateQuery(null);
             update({ q: "", department: "", company: "", status: "" });
           }}
+          actions={(canManage || canExport) && <>
+            {canManage && <Button variant="outline" onClick={() => setImportDialogOpen(true)}>İçe aktar</Button>}
+            {canExport && <Button variant="outline" disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onClick={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</Button>}
+            {canManage && <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>}
+          </>}
         />
-        {(canManage || canExport) && <div className="flex flex-wrap items-center gap-2">
-          {canManage && <Button variant="outline" onClick={() => setImportDialogOpen(true)}>İçe aktar</Button>}
-          {canExport && <Button variant="outline" disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onClick={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</Button>}
-          {canManage && <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>}
-          {exportError && <span role="alert" className="text-sm text-destructive">{exportError}</span>}
-        </div>}
+        {exportError && <p role="alert" className="text-sm text-destructive">{exportError}</p>}
         <EmployeeTable
           key={`${projectId}/${q}/${department}/${company}/${status}/${sort}/${page}/${size}`}
           loading={isLoading}
