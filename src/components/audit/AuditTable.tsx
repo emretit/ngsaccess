@@ -8,7 +8,7 @@ import { actionLabels, timestampFormat, type AuditRow } from './auditState';
 import { onRowActivate, ROW_CLICK_CLASS } from '@/lib/tableRowClick';
 
 export function AuditTable({ rows, allProjects, onSelect, loading = false, message, emptyTitle = "Henüz denetim kaydı yok", emptyDescription }: { loading?: boolean; message?: ReactNode; emptyTitle?: string; emptyDescription?: string; rows: AuditRow[]; allProjects?: boolean; onSelect: (row: AuditRow, trigger: HTMLButtonElement) => void }) {
-  return <div className="min-w-0 overflow-x-auto rounded-md border"><Table resizeKey="audit-log" className="w-full table-fixed text-left text-xs" aria-label="Denetim kayıtları">
+  return <Table framed resizeKey="audit-log" className="w-full table-fixed text-left text-xs" aria-label="Denetim kayıtları">
     <TableHeader className="h-9 border-b bg-muted/40 text-muted-foreground"><TableRow>
       <TableHead columnId="time" scope="col" className="hidden w-[172px] px-3 font-medium lg:table-cell">Zaman (TR)</TableHead><TableHead columnId="actor" scope="col" className="hidden w-[140px] px-3 font-medium lg:table-cell">Kullanıcı</TableHead><TableHead columnId="action" scope="col" className="w-[104px] px-3 font-medium">Eylem</TableHead><TableHead columnId="target" scope="col" className="px-3 font-medium md:w-[150px]">Varlık</TableHead>
       {allProjects && <TableHead columnId="project" scope="col" className="hidden w-[140px] px-3 font-medium xl:table-cell">Proje</TableHead>}<TableHead columnId="note" scope="col" className="hidden px-3 font-medium md:table-cell">Not</TableHead><TableHead columnId="actions" resizable={false} resizeLabel="Ayrıntı" scope="col" className="w-[76px] px-2 font-medium"><span className="sr-only">Ayrıntı</span></TableHead>
@@ -20,5 +20,5 @@ export function AuditTable({ rows, allProjects, onSelect, loading = false, messa
       {allProjects && <TableCell title={row.projectName} className="hidden truncate px-3 xl:table-cell">{row.projectName}</TableCell>}<TableCell title={row.note || "—"} className="hidden truncate px-3 text-muted-foreground md:table-cell">{row.note || '—'}</TableCell>
       <TableCell className="px-1"><Button variant="ghost" size="sm" className="min-h-10 px-2 text-xs" aria-haspopup="dialog" aria-label={`${timestampFormat.format(row.timestamp)} · ${actor} · Olay ayrıntısı`} onClick={event => onSelect(row, event.currentTarget)}>Ayrıntı</Button></TableCell>
     </TableRow>; })}</TableBody>
-  </Table></div>;
+  </Table>;
 }

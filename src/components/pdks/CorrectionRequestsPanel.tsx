@@ -77,71 +77,69 @@ export function CorrectionRequestsPanel({
       ) : result.page.length === 0 ? (
         <EmptyState title="Bekleyen düzeltme talebi yok." />
       ) : (
-        <div className="overflow-x-auto">
-          <Table resizeKey="pdks-correction-requests">
-            <TableHeader>
-              <TableRow>
-                <TableHead columnId="employee" className="w-[200px]">Çalışan</TableHead>
-                <TableHead columnId="date">Tarih</TableHead>
-                <TableHead columnId="type">Tür</TableHead>
-                <TableHead columnId="requested-times">İstenen giriş / çıkış</TableHead>
-                <TableHead columnId="reason">Gerekçe</TableHead>
-                <TableHead columnId="created-at">Talep zamanı</TableHead>
-                <TableHead columnId="actions" resizable={false}>İşlemler</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {result.page.map((row) => (
-                <TableRow key={row._id}>
-                  <TableCell className="truncate" title={row.employeeName}>{row.employeeName}</TableCell>
-                  <TableCell>
-                    {row.date.split("-").reverse().join(".")}
-                  </TableCell>
-                  <TableCell>
+        <Table framed resizeKey="pdks-correction-requests">
+          <TableHeader>
+            <TableRow>
+              <TableHead columnId="employee" className="w-[200px]">Çalışan</TableHead>
+              <TableHead columnId="date">Tarih</TableHead>
+              <TableHead columnId="type">Tür</TableHead>
+              <TableHead columnId="requested-times">İstenen giriş / çıkış</TableHead>
+              <TableHead columnId="reason">Gerekçe</TableHead>
+              <TableHead columnId="created-at">Talep zamanı</TableHead>
+              <TableHead columnId="actions" resizable={false}>İşlemler</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {result.page.map((row) => (
+              <TableRow key={row._id}>
+                <TableCell className="truncate" title={row.employeeName}>{row.employeeName}</TableCell>
+                <TableCell>
+                  {row.date.split("-").reverse().join(".")}
+                </TableCell>
+                <TableCell>
+                  {
                     {
-                      {
-                        checkIn: "Giriş",
-                        checkOut: "Çıkış",
-                        both: "Giriş ve çıkış",
-                      }[row.correctionType]
-                    }
-                  </TableCell>
-                  <TableCell>
-                    {row.requestedCheckIn || "—"} /{" "}
-                    {row.requestedCheckOut || "—"}
-                  </TableCell>
-                  <TableCell className="max-w-full truncate" title={row.reason}>
-                    {row.reason}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(row.createdAt).toLocaleString("tr-TR", {
-                      timeZone: "Europe/Istanbul",
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => open(row._id, true)}
-                      >
-                        Onayla
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => open(row._id, false)}
-                      >
-                        Reddet
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                      checkIn: "Giriş",
+                      checkOut: "Çıkış",
+                      both: "Giriş ve çıkış",
+                    }[row.correctionType]
+                  }
+                </TableCell>
+                <TableCell>
+                  {row.requestedCheckIn || "—"} /{" "}
+                  {row.requestedCheckOut || "—"}
+                </TableCell>
+                <TableCell className="max-w-full truncate" title={row.reason}>
+                  {row.reason}
+                </TableCell>
+                <TableCell>
+                  {new Date(row.createdAt).toLocaleString("tr-TR", {
+                    timeZone: "Europe/Istanbul",
+                  })}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => open(row._id, true)}
+                    >
+                      Onayla
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => open(row._id, false)}
+                    >
+                      Reddet
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
       {result && (
         <div className="flex gap-2">

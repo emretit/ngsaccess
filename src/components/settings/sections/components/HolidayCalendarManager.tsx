@@ -94,14 +94,14 @@ function HolidayCalendarContent() {
         }} onBlur={() => setYearText(String(year))} />
       </FilterField>
     </FilterBar>
-      <div className="min-w-0 overflow-x-auto rounded-md border"><Table resizeKey="settings-holidays" density="compact">
+      <Table framed resizeKey="settings-holidays" density="compact">
         <TableHeader><TableRow><TableHead columnId="date" className="w-40">Tarih</TableHead><TableHead columnId="name">Tatil adı</TableHead><TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-16"><span className="sr-only">İşlemler</span></TableHead></TableRow></TableHeader>
         <TableBody>{loading || holidays === undefined ? <TableStateRow colSpan={3} state="loading" label="Tatiller yükleniyor" /> : holidays.length === 0 ? <TableStateRow colSpan={3} state="empty" title={`${year} yılı için tanımlı tatil yok`} description="Bir tatil ekleyin veya resmi tatilleri yükleyin." /> : [...holidays].sort((a, b) => a.date.localeCompare(b.date)).map(holiday => <TableRow key={holiday._id} id={`holiday-${holiday.date}`} tabIndex={-1} className="h-[42px]">
           <TableCell className="truncate tabular-nums" title={new Date(`${holiday.date}T12:00:00`).toLocaleDateString("tr-TR", { dateStyle: "full" })}>{new Date(`${holiday.date}T12:00:00`).toLocaleDateString("tr-TR")}<span className="block truncate text-xs text-muted-foreground">{new Date(`${holiday.date}T12:00:00`).toLocaleDateString("tr-TR", { weekday: "long" })}</span></TableCell>
           <TableCell><span className="block truncate" title={holiday.name}>{holiday.name}</span><span className="block truncate text-xs text-muted-foreground" title={holiday.isHalfDay ? "Yarım gün" : "Tam gün"}>{holiday.isHalfDay ? "Yarım gün" : "Tam gün"}</span></TableCell>
           <TableCell className="w-12"><Button variant="ghost" size="icon" className="h-9 w-9" aria-label={`${holiday.name} tatilini sil`} disabled={pending} onClick={() => { setDeleteHoliday(holiday); setDeleteOpen(true); }}><Trash2 className="h-4 w-4" /></Button></TableCell>
         </TableRow>)}</TableBody>
-      </Table></div>
+      </Table>
     <Dialog open={open} onOpenChange={next => { if (!next) close(); }}>
       <DialogContent onCloseAutoFocus={event => { if (focusDate) { event.preventDefault(); document.getElementById(`holiday-${focusDate}`)?.focus(); } }}>
         <DialogHeader><DialogTitle>Tatil ekle</DialogTitle><DialogDescription>Tatil seçili projenin takvimine eklenir. Yıldızlı alanlar zorunludur.</DialogDescription></DialogHeader>

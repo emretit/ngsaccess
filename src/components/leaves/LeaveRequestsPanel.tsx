@@ -69,69 +69,67 @@ export function LeaveRequestsPanel({
   }
   return (
     <section className="space-y-4" aria-label="İzin talepleri">
-        <div className="overflow-x-auto">
-          <Table resizeKey="leave-requests">
-            <TableHeader>
-              <TableRow>
-                <TableHead columnId="employee">Çalışan</TableHead>
-                <TableHead columnId="type">Tür</TableHead>
-                <TableHead columnId="dates">Tarih aralığı</TableHead>
-                <TableHead columnId="days">Gün</TableHead>
-                <TableHead columnId="notes">Çalışan notu</TableHead>
-                <TableHead columnId="requested-at">Talep zamanı</TableHead>
-                <TableHead columnId="actions" resizable={false}>İşlemler</TableHead>
+        <Table framed resizeKey="leave-requests">
+          <TableHeader>
+            <TableRow>
+              <TableHead columnId="employee">Çalışan</TableHead>
+              <TableHead columnId="type">Tür</TableHead>
+              <TableHead columnId="dates">Tarih aralığı</TableHead>
+              <TableHead columnId="days">Gün</TableHead>
+              <TableHead columnId="notes">Çalışan notu</TableHead>
+              <TableHead columnId="requested-at">Talep zamanı</TableHead>
+              <TableHead columnId="actions" resizable={false}>İşlemler</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {result === undefined ? (
+              <TableStateRow colSpan={7} state="loading" label="Talepler yükleniyor." />
+            ) : result.page.length === 0 ? (
+              <TableStateRow colSpan={7} state="empty" title="Bekleyen izin talebi yok." />
+            ) : result.page.map((row) => (
+              <TableRow key={row._id}>
+                <TableCell className="truncate" title={row.employeeName}>
+                  {row.employeeName}
+                  <span className="block truncate text-xs text-muted-foreground" title={row.departmentName ?? undefined}>
+                    {row.departmentName}
+                  </span>
+                </TableCell>
+                <TableCell className="truncate" title={leaveTypes[row.leaveType]}>{leaveTypes[row.leaveType]}</TableCell>
+                <TableCell className="truncate" title={`${dateLabel(row.startDate)} – ${dateLabel(row.endDate)}`}>
+                  {dateLabel(row.startDate)} – {dateLabel(row.endDate)}
+                </TableCell>
+                <TableCell>{row.calendarDays ?? "—"}</TableCell>
+                <TableCell className="max-w-full truncate" title={row.notes || "—"}>
+                  {row.notes || "—"}
+                </TableCell>
+                <TableCell className="truncate" title={new Date(row.createdAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}>
+                  {new Date(row.createdAt).toLocaleString("tr-TR", {
+                    timeZone: "Europe/Istanbul",
+                  })}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => open(row._id, true)}
+                    >
+                      Onayla
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => open(row._id, false)}
+                    >
+                      Reddet
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {result === undefined ? (
-                <TableStateRow colSpan={7} state="loading" label="Talepler yükleniyor." />
-              ) : result.page.length === 0 ? (
-                <TableStateRow colSpan={7} state="empty" title="Bekleyen izin talebi yok." />
-              ) : result.page.map((row) => (
-                <TableRow key={row._id}>
-                  <TableCell className="truncate" title={row.employeeName}>
-                    {row.employeeName}
-                    <span className="block truncate text-xs text-muted-foreground" title={row.departmentName ?? undefined}>
-                      {row.departmentName}
-                    </span>
-                  </TableCell>
-                  <TableCell className="truncate" title={leaveTypes[row.leaveType]}>{leaveTypes[row.leaveType]}</TableCell>
-                  <TableCell className="truncate" title={`${dateLabel(row.startDate)} – ${dateLabel(row.endDate)}`}>
-                    {dateLabel(row.startDate)} – {dateLabel(row.endDate)}
-                  </TableCell>
-                  <TableCell>{row.calendarDays ?? "—"}</TableCell>
-                  <TableCell className="max-w-full truncate" title={row.notes || "—"}>
-                    {row.notes || "—"}
-                  </TableCell>
-                  <TableCell className="truncate" title={new Date(row.createdAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}>
-                    {new Date(row.createdAt).toLocaleString("tr-TR", {
-                      timeZone: "Europe/Istanbul",
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => open(row._id, true)}
-                      >
-                        Onayla
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => open(row._id, false)}
-                      >
-                        Reddet
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+            ))}
+          </TableBody>
+        </Table>
       {result && (
         <div className="flex gap-2">
           <Button

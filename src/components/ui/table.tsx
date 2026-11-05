@@ -2,6 +2,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 import {
+  COLUMN_SCALE_VAR,
   ColumnResizeHandle,
   FALLBACK_COLUMN_WIDTH,
   ColumnResizeProvider,
@@ -15,8 +16,12 @@ const Table = React.forwardRef<
     density?: "compact" | "comfortable"
     /** Verilirse `columnId`'li başlıklar sürüklenebilir olur; genişlik bu anahtarla saklanır. */
     resizeKey?: string
+    /** Kenarlıklı kutu; tablonun dışına ayrıca kaydırma/kenarlık div'i sarmayın. */
+    framed?: boolean
+    /** Verilirse kaydırma kutusu klavyeyle odaklanıp kaydırılabilen adlandırılmış bölge olur. */
+    scrollLabel?: string
   }
->(({ className, density = "compact", resizeKey, style, ...props }, ref) => {
+>(({ className, density = "compact", resizeKey, framed = false, scrollLabel, style, ...props }, ref) => {
   const resize = useColumnResizeState(resizeKey)
   const setRef = React.useCallback(
     (el: HTMLTableElement | null) => {
@@ -28,7 +33,16 @@ const Table = React.forwardRef<
   )
   return (
     <ColumnResizeProvider value={resize.context}>
-      <div className="relative w-full overflow-auto">
+      <div
+        role={scrollLabel ? "region" : undefined}
+        aria-label={scrollLabel}
+        tabIndex={scrollLabel ? 0 : undefined}
+        className={cn(
+          "relative w-full overflow-auto",
+          framed && "rounded-md border",
+          scrollLabel && "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        )}
+      >
         <table
           ref={setRef}
           className={cn(
@@ -119,11 +133,14 @@ const TableHead = React.forwardRef<
     },
     [ref, register, columnId]
   )
-  const width = active && resize.frozen ? (resize.widths[columnId] ?? FALLBACK_COLUMN_WIDTH) : undefined
+  const base = active && resize.frozen ? (resize.widths[columnId] ?? FALLBACK_COLUMN_WIDTH) : undefined
+  // Sürüklenebilir sütun kabı doldurmak için ölçeklenir; sabit sütun (onay kutusu, işlem) tabanda kalır.
+  const width = base === undefined || !resizable ? base : `calc(${base}px * var(${COLUMN_SCALE_VAR}, 1))`
   return (
     <th
       ref={setRef}
       data-column-id={active ? columnId : undefined}
+      data-column-fixed={active && !resizable ? "" : undefined}
       className={cn(
         "h-9 bg-subtle px-4 text-[11px] text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
         // className'den sonra gelmemeli: sticky/absolute başlıkları ezmesin.

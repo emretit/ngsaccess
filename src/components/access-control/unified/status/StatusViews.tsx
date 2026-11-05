@@ -88,8 +88,8 @@ export function GrantRows({
   );
   return (
     <>
-      <div className="hidden lg:block overflow-x-auto">
-        <Table resizeKey={hideDevice ? "device-access-status" : "access-status"} className="w-full text-sm">
+      <div className="hidden lg:block">
+        <Table framed resizeKey={hideDevice ? "device-access-status" : "access-status"} className="w-full text-sm">
           <TableHeader>
             <TableRow>
               {canManage && <TableHead columnId="select" resizable={false} className="p-2">Seç</TableHead>}

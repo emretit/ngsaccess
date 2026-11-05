@@ -320,78 +320,76 @@ export default function EmployeeTable({
           )}
         </div>
       )}
-      <div className="min-w-0 overflow-x-auto rounded-md border">
-        <Table resizeKey="employees" className="w-full table-fixed text-xs">
-          <TableHeader>
-            <TableRow className="h-9 bg-muted/50">
-              <EmployeeSelectAll
-                disabled={
-                  !canSelect ||
-                  loading ||
-                  sortedEmployees.length === 0 ||
-                  departmentPending ||
-                  isBulkSyncing ||
-                  syncAction.pending
-                }
-                checked={employeeSelectionState(employees, selectedEmployees)}
-                onSelectAll={handleSelectAll}
-              />
-              {column("name", "Ad soyad", "min-[760px]:w-[240px]")}
-              {column("email", "E-posta", "hidden min-[1100px]:table-cell")}
-              {showCompany &&
-                column("company", "Şirket", "hidden min-[1100px]:table-cell")}
-              {showDepartment &&
-                column(
-                  "department",
-                  "Departman",
-                  "hidden min-[760px]:table-cell",
-                )}
-              {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
-              {column("card", "Kart no", "hidden min-[760px]:table-cell")}
-              {canSeeBiometrics && (
-                <TableHead
-                  columnId="biometrics"
-                  className="hidden w-[96px] min-[760px]:table-cell"
-                >
-                  Biyometrik
-                </TableHead>
+      <Table framed resizeKey="employees" className="w-full table-fixed text-xs">
+        <TableHeader>
+          <TableRow className="h-9 bg-muted/50">
+            <EmployeeSelectAll
+              disabled={
+                !canSelect ||
+                loading ||
+                sortedEmployees.length === 0 ||
+                departmentPending ||
+                isBulkSyncing ||
+                syncAction.pending
+              }
+              checked={employeeSelectionState(employees, selectedEmployees)}
+              onSelectAll={handleSelectAll}
+            />
+            {column("name", "Ad soyad", "min-[760px]:w-[240px]")}
+            {column("email", "E-posta", "hidden min-[1100px]:table-cell")}
+            {showCompany &&
+              column("company", "Şirket", "hidden min-[1100px]:table-cell")}
+            {showDepartment &&
+              column(
+                "department",
+                "Departman",
+                "hidden min-[760px]:table-cell",
               )}
-              {column("status", "Durum", "w-[180px]")}
-              <TableHead columnId="actions" resizable={false} className="w-11">
-                <span className="sr-only">İşlemler</span>
+            {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
+            {column("card", "Kart no", "hidden min-[760px]:table-cell")}
+            {canSeeBiometrics && (
+              <TableHead
+                columnId="biometrics"
+                className="hidden w-[96px] min-[760px]:table-cell"
+              >
+                Biyometrik
               </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? <TableStateRow colSpan={7 + Number(showCompany) + Number(showDepartment) + Number(canSeeBiometrics)} state="loading" label="Personel bilgileri yükleniyor…" /> : sortedEmployees.length === 0 ? (
-              <TableStateRow colSpan={7 + Number(showCompany) + Number(showDepartment) + Number(canSeeBiometrics)} state="custom">{emptyState ?? <EmptyState title="Henüz personel eklenmedi" />}</TableStateRow>
-            ) : sortedEmployees.map((employee) => (
-              <EmployeeTableRow
-                key={employee._id}
-                employee={employee}
-                canManage={canManage}
-                departmentPending={departmentPending}
-                isBulkSyncing={isBulkSyncing}
-                syncPending={syncAction.pending}
-                bulkSyncPending={bulkSyncAction.pending}
-                selectedEmployees={selectedEmployees}
-                handleSelectEmployee={handleSelectEmployee}
-                onViewDetails={onViewDetails}
-                showDepartment={showDepartment}
-                showCompany={showCompany}
-                biometrics={
-                  canSeeBiometrics
-                    ? (biometricsByEmployee.get(employee._id) ?? null)
-                    : undefined
-                }
-                onSync={(employee) => setSyncRequest({ employees: [employee] })}
-                handlePasswordResetClick={handlePasswordResetClick}
-                handleIndividualDeleteClick={handleIndividualDeleteClick}
-              />
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            )}
+            {column("status", "Durum", "w-[180px]")}
+            <TableHead columnId="actions" resizable={false} className="w-11">
+              <span className="sr-only">İşlemler</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading ? <TableStateRow colSpan={7 + Number(showCompany) + Number(showDepartment) + Number(canSeeBiometrics)} state="loading" label="Personel bilgileri yükleniyor…" /> : sortedEmployees.length === 0 ? (
+            <TableStateRow colSpan={7 + Number(showCompany) + Number(showDepartment) + Number(canSeeBiometrics)} state="custom">{emptyState ?? <EmptyState title="Henüz personel eklenmedi" />}</TableStateRow>
+          ) : sortedEmployees.map((employee) => (
+            <EmployeeTableRow
+              key={employee._id}
+              employee={employee}
+              canManage={canManage}
+              departmentPending={departmentPending}
+              isBulkSyncing={isBulkSyncing}
+              syncPending={syncAction.pending}
+              bulkSyncPending={bulkSyncAction.pending}
+              selectedEmployees={selectedEmployees}
+              handleSelectEmployee={handleSelectEmployee}
+              onViewDetails={onViewDetails}
+              showDepartment={showDepartment}
+              showCompany={showCompany}
+              biometrics={
+                canSeeBiometrics
+                  ? (biometricsByEmployee.get(employee._id) ?? null)
+                  : undefined
+              }
+              onSync={(employee) => setSyncRequest({ employees: [employee] })}
+              handlePasswordResetClick={handlePasswordResetClick}
+              handleIndividualDeleteClick={handleIndividualDeleteClick}
+            />
+          ))}
+        </TableBody>
+      </Table>
 
       <EmployeeTableDialogs
         showDeleteDialog={showDeleteDialog}

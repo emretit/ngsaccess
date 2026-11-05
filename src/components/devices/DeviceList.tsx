@@ -114,100 +114,93 @@ export function DeviceList({
         )}
       </div>
 
-      <div
-        role="region"
-        aria-label="Cihaz listesi, yatay kaydırılabilir"
-        tabIndex={0}
-        className="min-w-0 max-w-full overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Table resizeKey={showProject ? "devices-all-projects" : "devices"} density="compact" className="w-full table-fixed">
-          <TableHeader className="bg-subtle">
-            <TableRow>
-              <TableHead columnId="select" resizable={false} resizeLabel="Cihaz seçimi" className="w-9 px-2 md:w-10 md:px-3">
-                <ListSelectAll
-                  label="Görünen tüm cihazları seç"
-                  checked={checked}
-                  onChange={handleSelectAll}
-                  disabled={isLoading || pageDevices.length === 0}
-                />
-              </TableHead>
-              {showProject && (
-                <TableHead columnId="project" className="hidden lg:table-cell">Proje</TableHead>
-              )}
-              <TableHead columnId="name" className="px-2 md:w-[220px] md:px-4">Cihaz adı</TableHead>
-              <TableHead columnId="model" className="hidden md:table-cell w-[180px]">
-                Marka / model
-              </TableHead>
-              <TableHead columnId="serial" className="hidden xl:table-cell w-[170px]">
-                Seri no / UUID
-              </TableHead>
-              {!(hideLocation || hideZoneColumn) && (
-                <TableHead columnId="zone" className="hidden lg:table-cell w-[140px]">
-                  Bölge
-                </TableHead>
-              )}
-              <TableHead columnId="connection" className="w-[112px] px-1 md:w-[132px] md:px-3">
-                Bağlantı
-              </TableHead>
-              <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-11 px-0 md:px-1">
-                <span className="sr-only">İşlemler</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableStateRow colSpan={colCount} state="loading" label="Cihazlar yükleniyor" />
-            ) : filteredDevices.length > 0 ? (
-              pageDevices.map((device, i) => (
-                <DeviceTableRow
-                  key={String(device._id) || `device-${i}`}
-                  canManage={canManage}
-                  device={device}
-                  rowIndex={i + 1}
-                  zoneName={getZoneName(device)}
-                  showProject={showProject}
-                  hideLocation={hideLocation}
-                  hideZoneColumn={hideZoneColumn}
-                  projectName={getProjectName?.(device)}
-                  onDeleteDevice={onDeleteDevice}
-                  onAssignLocation={onAssignLocation}
-                  onEditDevice={onEditDevice}
-                  onQRClick={onQRClick}
-                  onReleaseDevice={onReleaseDevice}
-                  selected={selectedDevices.includes(device._id)}
-                  onSelect={handleSelectDevice}
-                />
-              ))
-            ) : (
-              <TableStateRow
-                colSpan={colCount}
-                state="empty"
-                icon={Smartphone}
-                title={
-                  devices.length
-                    ? "Filtrelere uygun cihaz bulunamadı"
-                    : "Bu projede henüz cihaz yok"
-                }
-                description={
-                  devices.length
-                    ? "Etkin filtreleri temizleyerek tüm cihazları görüntüleyin."
-                    : "Bu projeye henüz cihaz eklenmemiş."
-                }
-                action={
-                  devices.length && onClearFilters
-                    ? {
-                        label: "Filtreleri temizle",
-                        onClick: onClearFilters,
-                      }
-                    : onAddDevice
-                      ? { label: "Cihaz ekle", onClick: onAddDevice }
-                      : undefined
-                }
+      <Table scrollLabel="Cihaz listesi, yatay kaydırılabilir" resizeKey={showProject ? "devices-all-projects" : "devices"} density="compact" className="w-full table-fixed">
+        <TableHeader className="bg-subtle">
+          <TableRow>
+            <TableHead columnId="select" resizable={false} resizeLabel="Cihaz seçimi" className="w-9 px-2 md:w-10 md:px-3">
+              <ListSelectAll
+                label="Görünen tüm cihazları seç"
+                checked={checked}
+                onChange={handleSelectAll}
+                disabled={isLoading || pageDevices.length === 0}
               />
+            </TableHead>
+            {showProject && (
+              <TableHead columnId="project" className="hidden lg:table-cell">Proje</TableHead>
             )}
-          </TableBody>
-        </Table>
-      </div>
+            <TableHead columnId="name" className="px-2 md:w-[220px] md:px-4">Cihaz adı</TableHead>
+            <TableHead columnId="model" className="hidden md:table-cell w-[180px]">
+              Marka / model
+            </TableHead>
+            <TableHead columnId="serial" className="hidden xl:table-cell w-[170px]">
+              Seri no / UUID
+            </TableHead>
+            {!(hideLocation || hideZoneColumn) && (
+              <TableHead columnId="zone" className="hidden lg:table-cell w-[140px]">
+                Bölge
+              </TableHead>
+            )}
+            <TableHead columnId="connection" className="w-[112px] px-1 md:w-[132px] md:px-3">
+              Bağlantı
+            </TableHead>
+            <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-11 px-0 md:px-1">
+              <span className="sr-only">İşlemler</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            <TableStateRow colSpan={colCount} state="loading" label="Cihazlar yükleniyor" />
+          ) : filteredDevices.length > 0 ? (
+            pageDevices.map((device, i) => (
+              <DeviceTableRow
+                key={String(device._id) || `device-${i}`}
+                canManage={canManage}
+                device={device}
+                rowIndex={i + 1}
+                zoneName={getZoneName(device)}
+                showProject={showProject}
+                hideLocation={hideLocation}
+                hideZoneColumn={hideZoneColumn}
+                projectName={getProjectName?.(device)}
+                onDeleteDevice={onDeleteDevice}
+                onAssignLocation={onAssignLocation}
+                onEditDevice={onEditDevice}
+                onQRClick={onQRClick}
+                onReleaseDevice={onReleaseDevice}
+                selected={selectedDevices.includes(device._id)}
+                onSelect={handleSelectDevice}
+              />
+            ))
+          ) : (
+            <TableStateRow
+              colSpan={colCount}
+              state="empty"
+              icon={Smartphone}
+              title={
+                devices.length
+                  ? "Filtrelere uygun cihaz bulunamadı"
+                  : "Bu projede henüz cihaz yok"
+              }
+              description={
+                devices.length
+                  ? "Etkin filtreleri temizleyerek tüm cihazları görüntüleyin."
+                  : "Bu projeye henüz cihaz eklenmemiş."
+              }
+              action={
+                devices.length && onClearFilters
+                  ? {
+                      label: "Filtreleri temizle",
+                      onClick: onClearFilters,
+                    }
+                  : onAddDevice
+                    ? { label: "Cihaz ekle", onClick: onAddDevice }
+                    : undefined
+              }
+            />
+          )}
+        </TableBody>
+      </Table>
 
       <PaginationBar
         summary={

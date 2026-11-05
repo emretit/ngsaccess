@@ -9,6 +9,10 @@ import { cn } from "@/lib/utils"
  * bir tutamak gösterir. İlk sürüklemede görünen tüm sütunların o anki genişliği
  * dondurulur (tablo `table-layout: fixed` olur), böylece yalnızca sürüklenen sütun
  * değişir. Genişlikler tarayıcıda `localStorage`'a yazılır; çift tık sıfırlar.
+ *
+ * Kayıtlı genişlik tabandır: kap daha genişse sürüklenebilir sütunlar oranlı büyüyüp
+ * kabı doldurur (sabit sütunlar — onay kutusu, işlem — büyümez); kap daralınca tabana
+ * kadar küçülür, sonra tablo yatay kayar.
  */
 
 type ColumnWidths = Record<string, number>
@@ -17,6 +21,8 @@ const MIN_COLUMN_WIDTH = 48
 export const FALLBACK_COLUMN_WIDTH = 140
 const KEYBOARD_STEP = 16
 const STORAGE_PREFIX = "ngs:table-widths:"
+/** Sürüklenebilir başlıkların genişlik çarpanı; tablo elemanına yazılır. */
+export const COLUMN_SCALE_VAR = "--table-column-scale"
 
 function readWidths(resizeKey: string): ColumnWidths {
   try {
@@ -47,13 +53,59 @@ function writeWidths(resizeKey: string, widths: ColumnWidths) {
 
 const isVisible = (el: Element) => el.getClientRects().length > 0
 
+type HeaderCell = { id: string | undefined; fixed: boolean; measured: number }
+export type HeaderLayout = { container: number; cells: HeaderCell[] }
+
+function readHeader(table: HTMLTableElement): HeaderLayout | null {
+  const row = table.tHead?.rows[table.tHead.rows.length - 1]
+  if (!row) return null
+  const cells: HeaderCell[] = []
+  for (const cell of Array.from(row.cells)) {
+    if (!isVisible(cell)) continue
+    const id = cell.dataset.columnId
+    cells.push({
+      id,
+      fixed: id === undefined || cell.dataset.columnFixed !== undefined,
+      measured: id === undefined ? cell.getBoundingClientRect().width : 0,
+    })
+  }
+  return { container: table.parentElement?.clientWidth ?? 0, cells }
+}
+
+/** Sabit sütun toplamı, sürüklenebilir taban toplamı ve kabı dolduracak çarpan. */
+export function fitColumns(header: HeaderLayout, widths: ColumnWidths) {
+  let fixedSum = 0
+  let scalableSum = 0
+  for (const cell of header.cells) {
+    const width = cell.id === undefined ? cell.measured : (widths[cell.id] ?? FALLBACK_COLUMN_WIDTH)
+    if (cell.fixed) fixedSum += width
+    else scalableSum += width
+  }
+  const free = header.container - fixedSum
+  const scale = scalableSum > 0 && free > scalableSum ? free / scalableSum : 1
+  return { fixedSum, scalableSum, scale }
+}
+
+/** Ekranda `rendered` px görünmesi için saklanacak taban: dolduran tabloda diğer sütunlar da ölçeklenir. */
+export function baseWidthFor(id: string, rendered: number, header: HeaderLayout, widths: ColumnWidths) {
+  const { fixedSum, scalableSum } = fitColumns(header, widths)
+  const own = header.cells.some((cell) => cell.id === id && !cell.fixed)
+    ? (widths[id] ?? FALLBACK_COLUMN_WIDTH)
+    : 0
+  const others = scalableSum - own
+  const free = header.container - fixedSum
+  if (others <= 0 || others + rendered >= free) return rendered
+  return (rendered * others) / (free - rendered)
+}
+
 type ColumnResizeContextValue = {
   widths: ColumnWidths
   frozen: boolean
   register: (id: string, el: HTMLTableCellElement | null) => void
-  /** Görünen sütunları dondurur, sürüklemenin başlayacağı genişliği döner. */
+  /** Görünen sütunları dondurur, sürüklemenin başlayacağı (ekrandaki) genişliği döner. */
   begin: (id: string) => number
-  setWidth: (id: string, width: number, minWidth?: number) => void
+  /** Sütunu ekranda `rendered` px yapacak tabanı saklar. */
+  setWidth: (id: string, rendered: number, minWidth?: number) => void
   reset: () => void
 }
 
@@ -81,6 +133,7 @@ export function useColumnResizeState(resizeKey: string | undefined) {
   const cells = React.useRef(new Map<string, HTMLTableCellElement>())
   const tableRef = React.useRef<HTMLTableElement | null>(null)
   const wroteWidth = React.useRef(false)
+  const scaleRef = React.useRef(1)
   const widthsRef = React.useRef(widths)
   React.useLayoutEffect(() => {
     widthsRef.current = widths
@@ -103,36 +156,45 @@ export function useColumnResizeState(resizeKey: string | undefined) {
     if (pending?.key) writeWidths(pending.key, pending.widths)
   }, [])
 
-  // Dondurulmuş tabloda genişlik = görünen sütunların toplamı; kırılım değişince yeniden hesaplanır.
+  // Dondurulmuş tabloda genişlik = sütun toplamı, kap daha genişse kabı doldurur; kap boyutu değişince yeniden hesaplanır.
   React.useLayoutEffect(() => {
     const table = tableRef.current
     if (!table) return
-    if (!frozen) {
-      if (wroteWidth.current) table.style.removeProperty("width")
+    const clear = () => {
+      if (wroteWidth.current) {
+        table.style.removeProperty("width")
+        table.style.removeProperty(COLUMN_SCALE_VAR)
+      }
       wroteWidth.current = false
+      scaleRef.current = 1
+    }
+    if (!frozen) {
+      clear()
       return
     }
     const apply = () => {
       // Mobilde tablo kart düzenine (display: block) geçebilir; orada sabit genişlik kartları daraltır.
       if (getComputedStyle(table).display !== "table") {
-        if (wroteWidth.current) table.style.removeProperty("width")
-        wroteWidth.current = false
+        clear()
         return
       }
-      const row = table.tHead?.rows[table.tHead.rows.length - 1]
-      if (!row) return
-      let sum = 0
-      for (const cell of Array.from(row.cells)) {
-        if (!isVisible(cell)) continue
-        const id = cell.dataset.columnId
-        sum += id ? (widthsRef.current[id] ?? FALLBACK_COLUMN_WIDTH) : cell.getBoundingClientRect().width
-      }
-      if (sum > 0) {
-        table.style.width = `${Math.round(sum)}px`
-        wroteWidth.current = true
-      }
+      const header = readHeader(table)
+      if (!header) return
+      const { fixedSum, scalableSum, scale } = fitColumns(header, widthsRef.current)
+      const total = fixedSum + scalableSum * scale
+      if (total <= 0) return
+      scaleRef.current = scale
+      table.style.setProperty(COLUMN_SCALE_VAR, String(scale))
+      table.style.width = `${total}px`
+      wroteWidth.current = true
     }
     apply()
+    const container = table.parentElement
+    if (container && typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => apply())
+      observer.observe(container)
+      return () => observer.disconnect()
+    }
     window.addEventListener("resize", apply)
     return () => window.removeEventListener("resize", apply)
   }, [frozen, widths])
@@ -148,15 +210,25 @@ export function useColumnResizeState(resizeKey: string | undefined) {
       const next: ColumnWidths = { ...current }
       cells.current.forEach((el, cellId) => {
         if (next[cellId] === undefined && isVisible(el)) {
-          next[cellId] = Math.round(el.getBoundingClientRect().width)
+          const scale = el.dataset.columnFixed === undefined ? scaleRef.current : 1
+          next[cellId] = Math.round(el.getBoundingClientRect().width / scale)
         }
       })
       if (Object.keys(next).length !== Object.keys(current).length) setWidths(() => next)
-      return next[id] ?? FALLBACK_COLUMN_WIDTH
+      // Sürükleme ekrandaki genişlikten başlar; dolduran tabloda bu tabandan büyüktür.
+      const cell = cells.current.get(id)
+      if (cell && isVisible(cell)) return Math.round(cell.getBoundingClientRect().width)
+      return (next[id] ?? FALLBACK_COLUMN_WIDTH) * scaleRef.current
     },
-    setWidth: (id, width, minWidth = MIN_COLUMN_WIDTH) => {
-      const rounded = Math.max(minWidth, Math.round(width))
-      setWidths((prev) => (prev[id] === rounded ? prev : { ...prev, [id]: rounded }))
+    setWidth: (id, rendered, minWidth = MIN_COLUMN_WIDTH) => {
+      const table = tableRef.current
+      const header = table && getComputedStyle(table).display === "table" ? readHeader(table) : null
+      const target = Math.max(minWidth, rendered)
+      setWidths((prev) => {
+        const base = header ? baseWidthFor(id, target, header, prev) : target
+        const rounded = Math.max(minWidth, Math.round(base))
+        return prev[id] === rounded ? prev : { ...prev, [id]: rounded }
+      })
     },
     reset: () => setWidths(() => ({})),
   }), [setWidths])

@@ -212,97 +212,96 @@ onImported: (result: DeviceImportResult) => void;
                   İlk 1000 kişi gösteriliyor.
                 </p>
               )}
-              <div className="min-w-0 max-w-full">
-                <Table
-                  resizeKey="device-person-import"
-                  className="table-fixed [&_th]:px-1"
-                  aria-label="Cihazdaki kişiler"
-                >
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead columnId="select" resizable={false} resizeLabel="Kişi seçimi" className="w-10">
-                        <ListSelectAll
-                          label="Tüm aktarılabilir kişileri seç"
-                          disabled={disabled || newRows.length === 0}
-                          checked={personSelectionState(preview, selected)}
-                          onChange={(checked) => {
-                            setSelected(
-                              checked
-                                ? newRows.map((row) => row.employeeNo)
-                                : [],
-                            );
-                            setConsent(false);
-                          }}
-                        />
-                      </TableHead>
-                      <TableHead columnId="employee-number" className="break-words">
-                        Cihaz kişi no
-                      </TableHead>
-                      <TableHead columnId="name">Ad</TableHead>
-                      <TableHead columnId="cards">Kart</TableHead>
-                      <TableHead columnId="fingerprints" className="break-words">Parmak izi</TableHead>
-                      <TableHead columnId="status">Durum</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {preview.rows.map((row) => (
-                      <TableRow
-                        key={row.employeeNo}
-                        className={
-                          isSelectablePerson(row) && !disabled
-                            ? "cursor-pointer"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (isSelectablePerson(row))
-                            togglePerson(row.employeeNo);
+              <Table
+                framed
+                resizeKey="device-person-import"
+                className="table-fixed [&_th]:px-1"
+                aria-label="Cihazdaki kişiler"
+              >
+                <TableHeader>
+                  <TableRow>
+                    <TableHead columnId="select" resizable={false} resizeLabel="Kişi seçimi" className="w-10">
+                      <ListSelectAll
+                        label="Tüm aktarılabilir kişileri seç"
+                        disabled={disabled || newRows.length === 0}
+                        checked={personSelectionState(preview, selected)}
+                        onChange={(checked) => {
+                          setSelected(
+                            checked
+                              ? newRows.map((row) => row.employeeNo)
+                              : [],
+                          );
+                          setConsent(false);
                         }}
-                      >
-                        <TableCell className="px-2">
-                          <Checkbox
-                            aria-label={`${row.name} seç`}
-                            checked={selected.includes(row.employeeNo)}
-                            disabled={disabled || !isSelectablePerson(row)}
-                            onClick={(event) => event.stopPropagation()}
-                            onCheckedChange={() => togglePerson(row.employeeNo)}
-                          />
-                        </TableCell>
-                        <TableCell className="truncate px-1" title={row.employeeNo}>
-                          {row.employeeNo}
-                        </TableCell>
-                        <TableCell className="px-1">
-                          <p className="truncate" title={row.name}>{row.name}</p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground" title={`Kapılar: ${row.doorRight || "Bilgi yok"}`}>Kapılar: {row.doorRight || "Bilgi yok"}</p>
-                          <p className="truncate text-xs text-muted-foreground" title={`Kapı planları: ${row.rightPlans?.map(plan => `${plan.doorNo}: ${plan.planTemplateNo}`).join("; ") || "Bilgi yok"}`}>Kapı planları: {row.rightPlans?.map(plan => `${plan.doorNo}: ${plan.planTemplateNo}`).join("; ") || "Bilgi yok"}</p>
-                          <p className="truncate text-xs text-muted-foreground" title={`Geçerlilik: ${validityLabel(row.valid)}`}>Geçerlilik: {validityLabel(row.valid)}</p>
-                        </TableCell>
-                        <TableCell className="truncate px-1" title={row.cards.length ? row.cards.join(", ") : "Kartsız"}>
-                          {row.cards.length ? row.cards.join(", ") : "Kartsız"}
-                        </TableCell>
-                        <TableCell className="px-1">
-                          {row.fingerCount || "—"}
-                        </TableCell>
-                        <TableCell className="break-words px-1">
-                          <StatusBadge
-                            className="max-w-full whitespace-normal"
-                            tone={statuses[row.status].tone}
-                          >
-                            {statuses[row.status].label}
-                          </StatusBadge>
-                          {row.status === "matched" && isSelectablePerson(row) && (
-                            <p className="mt-1 text-xs text-muted-foreground">Parmak izi ngsplus'a aktarılacak</p>
-                          )}
-                          {row.reason && (
-                            <p className="mt-1 truncate text-xs text-muted-foreground" title={row.reason}>
-                              {row.reason}
-                            </p>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                      />
+                    </TableHead>
+                    <TableHead columnId="employee-number" className="break-words">
+                      Cihaz kişi no
+                    </TableHead>
+                    <TableHead columnId="name">Ad</TableHead>
+                    <TableHead columnId="cards">Kart</TableHead>
+                    <TableHead columnId="fingerprints" className="break-words">Parmak izi</TableHead>
+                    <TableHead columnId="status">Durum</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {preview.rows.map((row) => (
+                    <TableRow
+                      key={row.employeeNo}
+                      className={
+                        isSelectablePerson(row) && !disabled
+                          ? "cursor-pointer"
+                          : undefined
+                      }
+                      onClick={() => {
+                        if (isSelectablePerson(row))
+                          togglePerson(row.employeeNo);
+                      }}
+                    >
+                      <TableCell className="px-2">
+                        <Checkbox
+                          aria-label={`${row.name} seç`}
+                          checked={selected.includes(row.employeeNo)}
+                          disabled={disabled || !isSelectablePerson(row)}
+                          onClick={(event) => event.stopPropagation()}
+                          onCheckedChange={() => togglePerson(row.employeeNo)}
+                        />
+                      </TableCell>
+                      <TableCell className="truncate px-1" title={row.employeeNo}>
+                        {row.employeeNo}
+                      </TableCell>
+                      <TableCell className="px-1">
+                        <p className="truncate" title={row.name}>{row.name}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground" title={`Kapılar: ${row.doorRight || "Bilgi yok"}`}>Kapılar: {row.doorRight || "Bilgi yok"}</p>
+                        <p className="truncate text-xs text-muted-foreground" title={`Kapı planları: ${row.rightPlans?.map(plan => `${plan.doorNo}: ${plan.planTemplateNo}`).join("; ") || "Bilgi yok"}`}>Kapı planları: {row.rightPlans?.map(plan => `${plan.doorNo}: ${plan.planTemplateNo}`).join("; ") || "Bilgi yok"}</p>
+                        <p className="truncate text-xs text-muted-foreground" title={`Geçerlilik: ${validityLabel(row.valid)}`}>Geçerlilik: {validityLabel(row.valid)}</p>
+                      </TableCell>
+                      <TableCell className="truncate px-1" title={row.cards.length ? row.cards.join(", ") : "Kartsız"}>
+                        {row.cards.length ? row.cards.join(", ") : "Kartsız"}
+                      </TableCell>
+                      <TableCell className="px-1">
+                        {row.fingerCount || "—"}
+                      </TableCell>
+                      <TableCell className="break-words px-1">
+                        <StatusBadge
+                          className="max-w-full whitespace-normal"
+                          tone={statuses[row.status].tone}
+                        >
+                          {statuses[row.status].label}
+                        </StatusBadge>
+                        {row.status === "matched" && isSelectablePerson(row) && (
+                          <p className="mt-1 text-xs text-muted-foreground">Parmak izi ngsplus'a aktarılacak</p>
+                        )}
+                        {row.reason && (
+                          <p className="mt-1 truncate text-xs text-muted-foreground" title={row.reason}>
+                            {row.reason}
+                          </p>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
               {newRows.length === 0 && (
                 <p className="text-sm text-muted-foreground">
                   Aktarılacak kişi veya yeni parmak izi yok.
