@@ -9,6 +9,8 @@ import 'package:ngsplusapp/screens/history/history_screen.dart';
 import 'package:ngsplusapp/screens/requests/requests_screen.dart';
 import 'package:ngsplusapp/widgets/history/history_calendar.dart';
 import 'package:ngsplusapp/widgets/ui/ui.dart';
+import 'package:ngsplusapp/models/attendance.dart';
+import 'package:ngsplusapp/models/attendance_summary.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth_fakes.dart';
@@ -38,7 +40,7 @@ Widget calendar({
         child: HistoryCalendar(
           month: month ?? DateTime(2026, 10),
           today: DateTime(2026, 10, 21),
-          dayCounts: counts,
+          days: _days(counts),
           onDaySelected: (_) {},
         ),
       ),
@@ -75,7 +77,8 @@ void main() {
       tester,
     ) async {
       viewport(tester, width);
-      await tester.pumpWidget(calendar(counts: const {}, scale: scale));
+      // Unknown counts list every past day, so 1 October is always present.
+      await tester.pumpWidget(calendar(scale: scale));
       await tester.pumpAndSettle();
       expect(
         tester.widget(day('2026-10-01')),
@@ -183,6 +186,8 @@ void main() {
       expect(monthHeading.properties.liveRegion, isTrue);
       expect(monthHeading.properties.header, isTrue);
       await tester.tap(day('2026-10-19'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View records'));
       await tester.pumpAndSettle();
       expect(provider.filters.last.startDate, '2026-10-19');
       await tester.tap(find.text('Clear filters'));
@@ -333,3 +338,21 @@ void main() {
     });
   }
 }
+
+Map<String, AttendanceDaySummary>? _days(Map<String, int>? counts) =>
+    counts == null
+    ? null
+    : {
+        for (final entry in counts.entries)
+          entry.key: AttendanceDaySummary(
+            date: entry.key,
+            entryCount: entry.value,
+            exitCount: 0,
+            deniedCount: 0,
+            unknownCount: 0,
+            firstEntry: null,
+            lastEntry: null,
+            lastExit: null,
+            lastDirection: AttendanceDirection.exit,
+          ),
+      };

@@ -7,6 +7,7 @@ import 'package:ngsplusapp/theme/app_theme.dart';
 import 'package:ngsplusapp/widgets/history/history_calendar.dart';
 import 'package:ngsplusapp/widgets/history/history_record_tile.dart';
 import 'package:ngsplusapp/widgets/history/history_records_list.dart';
+import 'package:ngsplusapp/models/attendance_summary.dart';
 
 Widget host(Widget child, {double textScale = 1}) => MaterialApp(
   theme: AppTheme.lightTheme,
@@ -50,7 +51,7 @@ void main() {
           SingleChildScrollView(
             child: HistoryCalendar(
               month: DateTime(2026, 10),
-              dayCounts: const {'2026-10-12': 3},
+              days: _days(const {'2026-10-12': 3}),
               onDaySelected: (day) => selected = day,
             ),
           ),
@@ -238,3 +239,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
+
+Map<String, AttendanceDaySummary>? _days(Map<String, int>? counts) =>
+    counts == null
+    ? null
+    : {
+        for (final entry in counts.entries)
+          entry.key: AttendanceDaySummary(
+            date: entry.key,
+            entryCount: entry.value,
+            exitCount: 0,
+            deniedCount: 0,
+            unknownCount: 0,
+            firstEntry: null,
+            lastEntry: null,
+            lastExit: null,
+            lastDirection: AttendanceDirection.exit,
+          ),
+      };

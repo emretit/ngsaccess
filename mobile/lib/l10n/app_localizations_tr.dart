@@ -262,9 +262,6 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyTabThisMonth => 'Takvim';
 
   @override
-  String get historyTabStats => 'Özet';
-
-  @override
   String get historyLoading => 'Kayıtlar yükleniyor';
 
   @override
@@ -277,16 +274,10 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyEmptyHint => 'Yeni geçişleriniz burada görünecek.';
 
   @override
-  String get historyMonthSummary => 'Bu ayın özeti';
+  String get historyMonthSummary => 'Ay özeti';
 
   @override
   String get historyActiveDays => 'Giriş günü';
-
-  @override
-  String get historyThisWeek => 'Bu hafta';
-
-  @override
-  String get historyWeeklySummary => 'Haftalık özet';
 
   @override
   String get historyUnknownDevice => 'Kapı bilgisi yok';
@@ -927,12 +918,6 @@ class AppLocalizationsTr extends AppLocalizations {
       'Seçtiğiniz tarih veya cihaz için kayıt bulunmuyor.';
 
   @override
-  String get historyCalendarLegend => 'Noktalı günlerde kayıt var.';
-
-  @override
-  String get historySelectDayHint => 'Kayıtlarını görmek için bir gün seçin.';
-
-  @override
   String get historyNoActivity => 'Bu dönemde erişim hareketi yok';
 
   @override
@@ -943,7 +928,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyDeniedCount => 'Reddedilen';
 
   @override
-  String get historyUnknownCount => 'Belirsiz';
+  String get historyUnknownCount => 'Yönü belirsiz';
 
   @override
   String get historyLoadedDevices =>
@@ -951,9 +936,6 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get historyNoDeviceOptions => 'Bu kayıtlar için kapı seçeneği yok.';
-
-  @override
-  String get historyTabThisMonthPeriod => 'Bu ay';
 
   @override
   String get visitorPeopleSection => 'Kişi bilgileri';
@@ -1309,4 +1291,39 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get visitorPreRegistered => 'Yetkili aktivasyonu bekleniyor';
+
+  @override
+  String get historyDayFirstEntry => 'İlk giriş';
+
+  @override
+  String get historyDayLastExit => 'Son çıkış';
+
+  @override
+  String get historyDayViewRecords => 'Kayıtları gör';
+
+  @override
+  String get historyDayNoRecords => 'Bu gün kayıt yok';
+
+  @override
+  String get historyDayUnavailable => 'Bu günün özeti alınamadı.';
+
+  @override
+  String get historyLegendRecords => 'Kayıt var';
+
+  @override
+  String get historyLegendDenied => 'Ret var';
+
+  @override
+  String get historyLegendMissingExit => 'Çıkış yok';
+
+  @override
+  String historyDayDenied(int count) {
+    return '$count reddedilen';
+  }
+
+  @override
+  String get historyDayMissingExit => 'çıkış kaydı yok';
+
+  @override
+  String get historyBackToToday => 'Bugün';
 }

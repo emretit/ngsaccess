@@ -21,7 +21,7 @@ void main() {
     await initializeDateFormatting('tr');
   });
 
-  testWidgets('month and Monday week totals use independent server summaries', (
+  testWidgets('calendar shows the displayed month summary below it', (
     tester,
   ) async {
     final provider = HistoryTestProvider()
@@ -31,35 +31,42 @@ void main() {
         '2026-10-31',
         150,
       )
-      ..summaries['2026-10-19/2026-10-25'] = summary(
-        '2026-10-19',
-        '2026-10-25',
-        25,
+      ..summaries['2026-09-01/2026-09-30'] = summary(
+        '2026-09-01',
+        '2026-09-30',
+        90,
       );
     addTearDown(provider.dispose);
     await tester.pumpWidget(screen(provider));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Overview'));
+    expect(find.text('Overview'), findsNothing);
+    await tester.tap(find.text('Calendar'));
     await tester.pumpAndSettle();
 
-    expect(
-      provider.ranges,
-      containsAll(['2026-10-01/2026-10-31', '2026-10-19/2026-10-25']),
+    expect(provider.ranges, ['2026-10-01/2026-10-31']);
+    await tester.scrollUntilVisible(
+      find.text('150'),
+      200,
+      scrollable: _calendarScroll(),
     );
+    expect(find.text('Monthly summary'), findsOneWidget);
     expect(find.text('150'), findsOneWidget);
-    expect(find.text('25'), findsNothing);
-    await tester.tap(find.text('This week'));
+
+    await tester.tap(find.byTooltip('Previous month'));
     await tester.pumpAndSettle();
-    expect(find.text('25'), findsOneWidget);
+    expect(provider.ranges.last, '2026-09-01/2026-09-30');
+    await tester.scrollUntilVisible(
+      find.text('90'),
+      200,
+      scrollable: _calendarScroll(),
+    );
+    expect(find.text('90'), findsOneWidget);
     expect(find.text('150'), findsNothing);
-    await tester.tap(find.text('This month'));
-    await tester.pumpAndSettle();
-    expect(find.text('150'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets(
-    'calendar day opens server day filter instead of a partial dialog',
+    'calendar day opens sheet then explicitly applies the server day filter',
     (tester) async {
       final provider = HistoryTestProvider()
         ..summaries['2026-10-01/2026-10-31'] = summary(
@@ -76,12 +83,23 @@ void main() {
         find.byType(HistoryCalendar),
       );
       // Three granted movements plus five denied attempts are eight records.
-      expect(calendar.dayCounts?['2026-10-19'], 8);
+      final day19 = calendar.days?['2026-10-19'];
+      expect(
+        (day19?.entryCount ?? 0) +
+            (day19?.exitCount ?? 0) +
+            (day19?.deniedCount ?? 0) +
+            (day19?.unknownCount ?? 0),
+        8,
+      );
       final day = find.byKey(const ValueKey('history-day-2026-10-19'));
       await tester.ensureVisible(day);
       await tester.tap(day);
       await tester.pumpAndSettle();
 
+      expect(provider.filters.length, 1);
+      expect(find.text('View records'), findsOneWidget);
+      await tester.tap(find.text('View records'));
+      await tester.pumpAndSettle();
       expect(provider.filters.last, (
         startDate: '2026-10-19',
         endDate: '2026-10-19',
@@ -322,9 +340,11 @@ void main() {
           await tester.tap(find.text(l10n.historyTabThisMonth));
           await tester.pumpAndSettle();
           expect(find.byTooltip(l10n.historyFilterTitle), findsNothing);
-          await tester.ensureVisible(find.text(l10n.historyTabStats));
-          await tester.tap(find.text(l10n.historyTabStats));
-          await tester.pumpAndSettle();
+          await tester.scrollUntilVisible(
+            find.text('150'),
+            200,
+            scrollable: _calendarScroll(),
+          );
           expect(find.text('150'), findsOneWidget);
           await tester.ensureVisible(find.text(l10n.historyTabAll));
           await tester.tap(find.text(l10n.historyTabAll));
@@ -360,3 +380,16 @@ void main() {
     }
   }
 }
+
+// Resolve once: the calendar itself scrolls out of the tree on long pages.
+Finder _calendarScroll() => find.byWidget(
+  find
+      .ancestor(
+        of: find.byType(HistoryCalendar),
+        matching: find.byType(Scrollable),
+      )
+      .first
+      .evaluate()
+      .first
+      .widget,
+);

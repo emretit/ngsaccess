@@ -273,9 +273,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyTabThisMonth => 'Calendar';
 
   @override
-  String get historyTabStats => 'Overview';
-
-  @override
   String get historyLoading => 'Loading records';
 
   @override
@@ -288,16 +285,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyEmptyHint => 'Your new access records will appear here.';
 
   @override
-  String get historyMonthSummary => 'This month’s summary';
+  String get historyMonthSummary => 'Monthly summary';
 
   @override
   String get historyActiveDays => 'Entry days';
-
-  @override
-  String get historyThisWeek => 'This week';
-
-  @override
-  String get historyWeeklySummary => 'Weekly summary';
 
   @override
   String get historyUnknownDevice => 'Door unavailable';
@@ -945,12 +936,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'No records match the selected date or device.';
 
   @override
-  String get historyCalendarLegend => 'Days with a dot have records.';
-
-  @override
-  String get historySelectDayHint => 'Select a day to see its records.';
-
-  @override
   String get historyNoActivity => 'No access events in this period';
 
   @override
@@ -961,7 +946,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyDeniedCount => 'Denied';
 
   @override
-  String get historyUnknownCount => 'Unknown';
+  String get historyUnknownCount => 'Unclear direction';
 
   @override
   String get historyLoadedDevices =>
@@ -970,9 +955,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get historyNoDeviceOptions =>
       'No door options are available for these records.';
-
-  @override
-  String get historyTabThisMonthPeriod => 'This month';
 
   @override
   String get visitorPeopleSection => 'Personal details';
@@ -1335,4 +1317,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get visitorPreRegistered => 'Awaiting operator activation';
+
+  @override
+  String get historyDayFirstEntry => 'First entry';
+
+  @override
+  String get historyDayLastExit => 'Last exit';
+
+  @override
+  String get historyDayViewRecords => 'View records';
+
+  @override
+  String get historyDayNoRecords => 'No records on this day';
+
+  @override
+  String get historyDayUnavailable => 'This day’s summary is unavailable.';
+
+  @override
+  String get historyLegendRecords => 'Records';
+
+  @override
+  String get historyLegendDenied => 'Denied';
+
+  @override
+  String get historyLegendMissingExit => 'No exit';
+
+  @override
+  String historyDayDenied(int count) {
+    return '$count denied';
+  }
+
+  @override
+  String get historyDayMissingExit => 'no exit record';
+
+  @override
+  String get historyBackToToday => 'Today';
 }

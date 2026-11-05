@@ -105,15 +105,12 @@
   "historyTitle": "History",
   "historyTabAll": "Records",
   "historyTabThisMonth": "Calendar",
-  "historyTabStats": "Overview",
   "historyLoading": "Loading records",
   "historyErrorTitle": "Records could not be loaded",
   "historyEmpty": "No records found",
   "historyEmptyHint": "Your new access records will appear here.",
-  "historyMonthSummary": "This month’s summary",
+  "historyMonthSummary": "Monthly summary",
   "historyActiveDays": "Entry days",
-  "historyThisWeek": "This week",
-  "historyWeeklySummary": "Weekly summary",
   "historyUnknownDevice": "Door unavailable",
   "historyRecordDetailTitle": "Record details",
   "historyDetailDate": "Date",
@@ -340,15 +337,12 @@
   "historyApplyFilters": "Apply filters",
   "historyShowAllRecords": "Show all records",
   "historyFilteredEmptyHint": "No records match the selected date or device.",
-  "historyCalendarLegend": "Days with a dot have records.",
-  "historySelectDayHint": "Select a day to see its records.",
   "historyNoActivity": "No access events in this period",
   "historyNoActivityHint": "New records will appear here. No records does not mean an absence.",
   "historyDeniedCount": "Denied",
-  "historyUnknownCount": "Unknown",
+  "historyUnknownCount": "Unclear direction",
   "historyLoadedDevices": "Doors appearing in this list of records are shown.",
   "historyNoDeviceOptions": "No door options are available for these records.",
-  "historyTabThisMonthPeriod": "This month",
   "visitorPeopleSection": "Personal details",
   "visitorVisitSection": "Visit details",
   "visitorActivationHint": "An authorized operator must activate access after the invitation is saved.",
@@ -464,5 +458,24 @@
     "description": "Localized record count; English singular/plural, Turkish number followed by noun."
   },
   "unlockGranted": "Access Granted",
-  "visitorPreRegistered": "Awaiting operator activation"
+  "visitorPreRegistered": "Awaiting operator activation",
+  "historyDayFirstEntry": "First entry",
+  "historyDayLastExit": "Last exit",
+  "historyDayViewRecords": "View records",
+  "historyDayNoRecords": "No records on this day",
+  "historyDayUnavailable": "This day’s summary is unavailable.",
+  "historyLegendRecords": "Records",
+  "historyLegendDenied": "Denied",
+  "historyLegendMissingExit": "No exit",
+  "historyDayDenied": "{count} denied",
+  "@historyDayDenied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    },
+    "description": "Calendar day semantics: denied access count."
+  },
+  "historyDayMissingExit": "no exit record",
+  "historyBackToToday": "Today"
 }

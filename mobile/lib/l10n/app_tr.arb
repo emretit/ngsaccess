@@ -105,15 +105,12 @@
   "historyTitle": "Geçmiş",
   "historyTabAll": "Kayıtlar",
   "historyTabThisMonth": "Takvim",
-  "historyTabStats": "Özet",
   "historyLoading": "Kayıtlar yükleniyor",
   "historyErrorTitle": "Kayıtlar alınamadı",
   "historyEmpty": "Kayıt bulunamadı",
   "historyEmptyHint": "Yeni geçişleriniz burada görünecek.",
-  "historyMonthSummary": "Bu ayın özeti",
+  "historyMonthSummary": "Ay özeti",
   "historyActiveDays": "Giriş günü",
-  "historyThisWeek": "Bu hafta",
-  "historyWeeklySummary": "Haftalık özet",
   "historyUnknownDevice": "Kapı bilgisi yok",
   "historyRecordDetailTitle": "Kayıt ayrıntısı",
   "historyDetailDate": "Tarih",
@@ -340,15 +337,12 @@
   "historyApplyFilters": "Filtreleri uygula",
   "historyShowAllRecords": "Tüm kayıtları göster",
   "historyFilteredEmptyHint": "Seçtiğiniz tarih veya cihaz için kayıt bulunmuyor.",
-  "historyCalendarLegend": "Noktalı günlerde kayıt var.",
-  "historySelectDayHint": "Kayıtlarını görmek için bir gün seçin.",
   "historyNoActivity": "Bu dönemde erişim hareketi yok",
   "historyNoActivityHint": "Yeni kayıtlar burada görünecek. Kayıt olmaması devamsızlık anlamına gelmez.",
   "historyDeniedCount": "Reddedilen",
-  "historyUnknownCount": "Belirsiz",
+  "historyUnknownCount": "Yönü belirsiz",
   "historyLoadedDevices": "Bu listedeki kayıtlarda yer alan kapılar gösterilir.",
   "historyNoDeviceOptions": "Bu kayıtlar için kapı seçeneği yok.",
-  "historyTabThisMonthPeriod": "Bu ay",
   "visitorPeopleSection": "Kişi bilgileri",
   "visitorVisitSection": "Ziyaret bilgileri",
   "visitorActivationHint": "Davet kaydı oluşturulduktan sonra yetkili aktivasyonu gerekir.",
@@ -464,5 +458,24 @@
     "description": "Localized record count; English singular/plural, Turkish number followed by noun."
   },
   "unlockGranted": "Erişim Verildi",
-  "visitorPreRegistered": "Yetkili aktivasyonu bekleniyor"
+  "visitorPreRegistered": "Yetkili aktivasyonu bekleniyor",
+  "historyDayFirstEntry": "İlk giriş",
+  "historyDayLastExit": "Son çıkış",
+  "historyDayViewRecords": "Kayıtları gör",
+  "historyDayNoRecords": "Bu gün kayıt yok",
+  "historyDayUnavailable": "Bu günün özeti alınamadı.",
+  "historyLegendRecords": "Kayıt var",
+  "historyLegendDenied": "Ret var",
+  "historyLegendMissingExit": "Çıkış yok",
+  "historyDayDenied": "{count} reddedilen",
+  "@historyDayDenied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    },
+    "description": "Calendar day semantics: denied access count."
+  },
+  "historyDayMissingExit": "çıkış kaydı yok",
+  "historyBackToToday": "Bugün"
 }

@@ -14,8 +14,7 @@ import 'package:provider/provider.dart';
 import '../../../screenshot_test/_harness.dart'
     show loadAuditFonts, resolveAuditFontFallbacks;
 import '../../auth_fakes.dart';
-import '../../helpers/request_fakes.dart'
-    show RequestFakeRepository, testLeave;
+import '../../helpers/request_fakes.dart' show RequestFakeRepository, testLeave;
 import '../../helpers/history_fakes.dart'
     show HistoryTestProvider, event, summary;
 import '../../helpers/history_request_app.dart';
@@ -108,8 +107,29 @@ void main() {
           expect(tester.widget(day), isA<AppListRow>());
         }
         await capture(tester, 'd3a_history_calendar_$variant');
-        await tester.ensureVisible(find.text('Özet'));
-        await tester.tap(find.text('Özet'));
+        final beforeDay = provider.filters.length;
+        await tester.tap(day);
+        await tester.pumpAndSettle();
+        expect(find.text('Kayıtları gör'), findsOneWidget);
+        expect(provider.filters.length, beforeDay);
+        await tester.tap(find.byTooltip('Kapat'));
+        await tester.pumpAndSettle();
+        // The summary sits below the calendar in the same scroll view.
+        await tester.scrollUntilVisible(
+          find.byType(AppMetricRow),
+          200,
+          scrollable: find.byWidget(
+            find
+                .ancestor(
+                  of: find.byType(HistoryCalendar),
+                  matching: find.byType(Scrollable),
+                )
+                .first
+                .evaluate()
+                .first
+                .widget,
+          ),
+        );
         await tester.pumpAndSettle();
         expect(find.byType(AppMetricRow), findsOneWidget);
         await capture(tester, 'd3a_history_summary_$variant');

@@ -12,6 +12,7 @@ import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/models/employee_request.dart';
 import 'package:ngsplusapp/widgets/ui/ui.dart';
+import 'package:ngsplusapp/widgets/history/history_calendar.dart';
 import 'package:ngsplusapp/providers/attendance_provider.dart';
 import 'package:ngsplusapp/providers/auth_provider.dart';
 import 'package:ngsplusapp/providers/door_operation_provider.dart';
@@ -143,6 +144,10 @@ final shots = <Shot>[
   const Shot('requests', 'filled', variant: 'corrections'),
   const Shot('history', 'filled', variant: 'overview'),
   const Shot('history', 'filled', variant: 'calendar'),
+  const Shot('history', 'filled', variant: 'calendar', dark: true),
+  const Shot('history', 'filled', variant: 'calendar', scale: 2),
+  const Shot('history', 'filled', variant: 'day_sheet'),
+  const Shot('history', 'filled', variant: 'day_sheet', dark: true),
   const Shot('qr', 'loading'),
   const Shot('qr', 'error'),
   const Shot('qr', 'filled', variant: 'expired'),
@@ -636,7 +641,24 @@ ${rows.join('\n')}
         await selectSegment(l10n.requestsCorrection);
       }
       if (shot.variant == 'overview') {
-        await selectSegment(l10n.historyTabStats);
+        // The month summary sits below the calendar.
+        await selectSegment(l10n.historyTabThisMonth);
+        await tester.scrollUntilVisible(
+          find.byType(AppMetricRow),
+          200,
+          scrollable: find.byWidget(
+            find
+                .ancestor(
+                  of: find.byType(HistoryCalendar),
+                  matching: find.byType(Scrollable),
+                )
+                .first
+                .evaluate()
+                .first
+                .widget,
+          ),
+        );
+        await tester.pumpAndSettle();
       }
       if (shot.variant == 'calendar') {
         await selectSegment(l10n.historyTabThisMonth);
@@ -649,6 +671,11 @@ ${rows.join('\n')}
         } else if (shot.width == 320) {
           expect(rect.width, greaterThan(200));
         }
+      }
+      if (shot.variant == 'day_sheet') {
+        await selectSegment(l10n.historyTabThisMonth);
+        await tester.tap(find.byKey(const Key('history-day-2026-11-04')));
+        await tester.pumpAndSettle();
       }
       if (shot.variant == 'camera_placeholder') {
         await selectSegment(l10n.qrTabScan);

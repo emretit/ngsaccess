@@ -572,12 +572,6 @@ abstract class AppLocalizations {
   /// **'Takvim'**
   String get historyTabThisMonth;
 
-  /// No description provided for @historyTabStats.
-  ///
-  /// In tr, this message translates to:
-  /// **'Özet'**
-  String get historyTabStats;
-
   /// No description provided for @historyLoading.
   ///
   /// In tr, this message translates to:
@@ -605,7 +599,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyMonthSummary.
   ///
   /// In tr, this message translates to:
-  /// **'Bu ayın özeti'**
+  /// **'Ay özeti'**
   String get historyMonthSummary;
 
   /// No description provided for @historyActiveDays.
@@ -613,18 +607,6 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Giriş günü'**
   String get historyActiveDays;
-
-  /// No description provided for @historyThisWeek.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bu hafta'**
-  String get historyThisWeek;
-
-  /// No description provided for @historyWeeklySummary.
-  ///
-  /// In tr, this message translates to:
-  /// **'Haftalık özet'**
-  String get historyWeeklySummary;
 
   /// No description provided for @historyUnknownDevice.
   ///
@@ -1784,18 +1766,6 @@ abstract class AppLocalizations {
   /// **'Seçtiğiniz tarih veya cihaz için kayıt bulunmuyor.'**
   String get historyFilteredEmptyHint;
 
-  /// No description provided for @historyCalendarLegend.
-  ///
-  /// In tr, this message translates to:
-  /// **'Noktalı günlerde kayıt var.'**
-  String get historyCalendarLegend;
-
-  /// No description provided for @historySelectDayHint.
-  ///
-  /// In tr, this message translates to:
-  /// **'Kayıtlarını görmek için bir gün seçin.'**
-  String get historySelectDayHint;
-
   /// No description provided for @historyNoActivity.
   ///
   /// In tr, this message translates to:
@@ -1817,7 +1787,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyUnknownCount.
   ///
   /// In tr, this message translates to:
-  /// **'Belirsiz'**
+  /// **'Yönü belirsiz'**
   String get historyUnknownCount;
 
   /// No description provided for @historyLoadedDevices.
@@ -1831,12 +1801,6 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Bu kayıtlar için kapı seçeneği yok.'**
   String get historyNoDeviceOptions;
-
-  /// No description provided for @historyTabThisMonthPeriod.
-  ///
-  /// In tr, this message translates to:
-  /// **'Bu ay'**
-  String get historyTabThisMonthPeriod;
 
   /// No description provided for @visitorPeopleSection.
   ///
@@ -2485,6 +2449,72 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'Yetkili aktivasyonu bekleniyor'**
   String get visitorPreRegistered;
+
+  /// No description provided for @historyDayFirstEntry.
+  ///
+  /// In tr, this message translates to:
+  /// **'İlk giriş'**
+  String get historyDayFirstEntry;
+
+  /// No description provided for @historyDayLastExit.
+  ///
+  /// In tr, this message translates to:
+  /// **'Son çıkış'**
+  String get historyDayLastExit;
+
+  /// No description provided for @historyDayViewRecords.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıtları gör'**
+  String get historyDayViewRecords;
+
+  /// No description provided for @historyDayNoRecords.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu gün kayıt yok'**
+  String get historyDayNoRecords;
+
+  /// No description provided for @historyDayUnavailable.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu günün özeti alınamadı.'**
+  String get historyDayUnavailable;
+
+  /// No description provided for @historyLegendRecords.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıt var'**
+  String get historyLegendRecords;
+
+  /// No description provided for @historyLegendDenied.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ret var'**
+  String get historyLegendDenied;
+
+  /// No description provided for @historyLegendMissingExit.
+  ///
+  /// In tr, this message translates to:
+  /// **'Çıkış yok'**
+  String get historyLegendMissingExit;
+
+  /// Calendar day semantics: denied access count.
+  ///
+  /// In tr, this message translates to:
+  /// **'{count} reddedilen'**
+  String historyDayDenied(int count);
+
+  /// No description provided for @historyDayMissingExit.
+  ///
+  /// In tr, this message translates to:
+  /// **'çıkış kaydı yok'**
+  String get historyDayMissingExit;
+
+  /// No description provided for @historyBackToToday.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bugün'**
+  String get historyBackToToday;
 }
 
 class _AppLocalizationsDelegate

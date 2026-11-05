@@ -126,7 +126,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       brandMark: const BrandMark.band(),
       consumeTopInset: false,
       title: l10n.homeGreetingLine(_getGreeting(l10n), name),
-      subtitle: user?.projectName,
       trailing: user == null
           ? null
           : CircleAvatar(

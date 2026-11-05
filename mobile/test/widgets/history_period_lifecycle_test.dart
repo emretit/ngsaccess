@@ -68,10 +68,7 @@ void main() {
       await tester.tap(find.text('Calendar'));
       await tester.pumpAndSettle();
       expect(find.text('October 2026'), findsOneWidget);
-      expect(provider.ranges, [
-        '2026-10-01/2026-10-31',
-        '2026-10-26/2026-11-01',
-      ]);
+      expect(provider.ranges, ['2026-10-01/2026-10-31']);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       // The UTC date has not changed; the Istanbul date is now November 1.
@@ -87,9 +84,7 @@ void main() {
       expect(calendar.today?.day, 1);
       expect(provider.ranges, [
         '2026-10-01/2026-10-31',
-        '2026-10-26/2026-11-01',
         '2026-11-01/2026-11-30',
-        '2026-10-26/2026-11-01',
       ]);
       expect(provider.filters, [
         (startDate: null, endDate: null, deviceId: null),
@@ -119,37 +114,37 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     provider.publish();
     await tester.pumpAndSettle();
-    expect(provider.ranges.length, 2);
+    expect(provider.ranges.length, 1);
 
     branch.value = 1;
     await tester.pumpAndSettle();
     expect(tester.state(find.byType(HistoryScreen)), same(retainedState));
     expect(find.text('November 2026'), findsOneWidget);
-    expect(provider.ranges.length, 4);
-    expect(provider.ranges[2], '2026-11-01/2026-11-30');
+    expect(provider.ranges.length, 2);
+    expect(provider.ranges[1], '2026-11-01/2026-11-30');
 
     branch.value = 0;
     await tester.pumpAndSettle();
     branch.value = 1;
     await tester.pumpAndSettle();
-    expect(provider.ranges.length, 4);
+    expect(provider.ranges.length, 2);
     expect(provider.filters.length, 1);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Sunday to Monday updates the retained weekly overview', (
+  testWidgets('month rollover updates the summary below the calendar', (
     tester,
   ) async {
-    var now = DateTime.utc(2026, 11, 1, 20, 59, 59);
+    var now = DateTime.utc(2026, 10, 31, 20, 59, 59);
     final provider = HistoryTestProvider()
-      ..summaries['2026-10-26/2026-11-01'] = summary(
-        '2026-10-26',
-        '2026-11-01',
+      ..summaries['2026-10-01/2026-10-31'] = summary(
+        '2026-10-01',
+        '2026-10-31',
         125,
       )
-      ..summaries['2026-11-02/2026-11-08'] = summary(
-        '2026-11-02',
-        '2026-11-08',
+      ..summaries['2026-11-01/2026-11-30'] = summary(
+        '2026-11-01',
+        '2026-11-30',
         126,
       );
     final branch = ValueNotifier(1);
@@ -157,30 +152,29 @@ void main() {
     addTearDown(branch.dispose);
     await tester.pumpWidget(periodScreen(provider, branch, () => now));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Overview'));
+    await tester.tap(find.text('Calendar'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('This week'));
-    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('125'),
+      200,
+      scrollable: _calendarScroll(),
+    );
     expect(find.text('125'), findsOneWidget);
 
     branch.value = 0;
     await tester.pumpAndSettle();
-    now = DateTime.utc(2026, 11, 1, 21);
+    now = DateTime.utc(2026, 10, 31, 21);
     branch.value = 1;
     await tester.pumpAndSettle();
 
-    expect(provider.ranges, [
-      '2026-11-01/2026-11-30',
-      '2026-10-26/2026-11-01',
-      '2026-11-01/2026-11-30',
-      '2026-11-02/2026-11-08',
-    ]);
+    expect(provider.ranges, ['2026-10-01/2026-10-31', '2026-11-01/2026-11-30']);
+    expect(find.text('November 2026'), findsOneWidget);
     expect(find.text('126'), findsOneWidget);
     expect(find.text('125'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('new day refreshes same week and month and calendar today', (
+  testWidgets('new day refreshes the month summary and calendar today', (
     tester,
   ) async {
     var now = DateTime.utc(2026, 10, 20, 20, 59, 59);
@@ -210,12 +204,7 @@ void main() {
       tester.widget<HistoryCalendar>(find.byType(HistoryCalendar)).today?.day,
       21,
     );
-    expect(provider.ranges, [
-      '2026-10-01/2026-10-31',
-      '2026-10-19/2026-10-25',
-      '2026-10-01/2026-10-31',
-      '2026-10-19/2026-10-25',
-    ]);
+    expect(provider.ranges, ['2026-10-01/2026-10-31', '2026-10-01/2026-10-31']);
     expect(tester.takeException(), isNull);
   });
 
@@ -286,10 +275,10 @@ void main() {
     now = DateTime.utc(2026, 11, 1, 6);
     branch.value = 1;
     await tester.pumpAndSettle();
-    expect(provider.ranges.length, 2);
+    expect(provider.ranges.length, 1);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
-    expect(provider.ranges.length, 4);
+    expect(provider.ranges.length, 2);
     expect(provider.filters, selectedFilters);
     expect(provider.refreshCalls, 0);
 
@@ -325,7 +314,20 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pumpAndSettle();
-    expect(provider.ranges.length, 2);
+    expect(provider.ranges.length, 1);
     expect(tester.takeException(), isNull);
   });
 }
+
+// Resolve once: the calendar itself scrolls out of the tree on long pages.
+Finder _calendarScroll() => find.byWidget(
+  find
+      .ancestor(
+        of: find.byType(HistoryCalendar),
+        matching: find.byType(Scrollable),
+      )
+      .first
+      .evaluate()
+      .first
+      .widget,
+);
