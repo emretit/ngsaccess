@@ -1,4 +1,3 @@
-import { NativeSelect } from "@/components/ui/native-select";
 import { useState } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
@@ -7,6 +6,7 @@ import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { DateInput, MonthPicker } from "@/components/ui/date-picker";
 import { formatDateString, parseDateString } from "@/lib/date";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmployeePicker } from "./EmployeePicker";
 import { leaveTypes, monthRange, readFilters, validDate } from "./lib/leaveState";
 
@@ -39,10 +39,13 @@ export function LeaveFilters({ projectId, filters, onChange, onClear }: {
         </FilterField>
       </QuerySectionBoundary>
       <FilterField label="İzin türü" htmlFor="leave-filter-type">
-        <NativeSelect id="leave-filter-type" className="w-full min-w-0" value={filters.leaveType ?? ""} onChange={event => onChange({ type: event.target.value })}>
-          <option value="">Tüm türler</option>
-          {Object.entries(leaveTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </NativeSelect>
+        <Select value={filters.leaveType ?? "all"} onValueChange={value => onChange({ type: value === "all" ? "" : value })}>
+          <SelectTrigger id="leave-filter-type" className="w-full min-w-0"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tüm türler</SelectItem>
+            {Object.entries(leaveTypes).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </FilterField>
       <FilterField label="Dönem" htmlFor="leave-month">
         <MonthPicker id="leave-month" className="w-full min-w-0" date={parseDateString(`${filters.period === "custom" ? filters.rangeStart.slice(0, 7) : filters.period}-01`)} onSelect={date => {

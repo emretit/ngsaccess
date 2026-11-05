@@ -30,40 +30,41 @@ type RedistributeControlsProps = Pick<
   setError: (error: string) => void;
 };
 
-export function RedistributeBar({
-  selected,
+type RedistributeActionProps = Pick<RedistributeControlsProps, "sending" | "setError" | "setAction">;
+
+/** Seçim varken görünür; mobilde liste altına yapışır, bu yüzden filtre satırının dışında durur. */
+export function RedistributeSelected({ selected, sending, setError, setAction }: RedistributeActionProps & Pick<RedistributeControlsProps, "selected">) {
+  if (selected.length === 0) return null;
+  return (
+    <div className="flex sticky bottom-2 z-10 bg-background border rounded-md p-2 lg:static lg:border-0 lg:p-0" aria-label="Seçili kayıt işlemleri">
+      <Button className="whitespace-normal h-auto min-h-11" disabled={sending} onClick={() => { setError(""); setAction("selected"); }}>
+        Seçili {selected.length} kaydı yeniden gönder
+      </Button>
+    </div>
+  );
+}
+
+export function RedistributeMenu({
   sending,
   projectCounts,
   setError,
   setAction,
   canManageDevices = false,
-}: Pick<
-  RedistributeControlsProps,
-  "selected" | "sending" | "projectCounts" | "setError" | "setAction" | "canManageDevices"
->) {
+}: RedistributeActionProps & Pick<RedistributeControlsProps, "projectCounts" | "canManageDevices">) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {selected.length > 0 && (
-        <div className="flex sticky bottom-2 z-10 bg-background border rounded-md p-2 lg:static lg:border-0 lg:p-0" aria-label="Seçili kayıt işlemleri">
-          <Button className="whitespace-normal h-auto min-h-11" disabled={sending} onClick={() => { setError(""); setAction("selected"); }}>
-            Seçili {selected.length} kaydı yeniden gönder
-          </Button>
-        </div>
-      )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button className="min-h-11" variant="ghost" disabled={sending}>Diğer gönderim işlemleri</Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuItem className="min-h-11" disabled={sending || !projectCounts?.failed} onSelect={() => { setError(""); setAction("failed"); }}>
-            Hatalıları yeniden dağıt ({countText(projectCounts?.failed ?? 0, projectCounts?.capped ?? false)})
-          </DropdownMenuItem>
-          {canManageDevices && <DropdownMenuItem className="min-h-11" disabled={sending || !projectCounts} onSelect={() => { setError(""); setAction("all"); }}>
-            Tümünü yeniden dağıt
-          </DropdownMenuItem>}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button className="min-h-11" variant="ghost" disabled={sending}>Diğer gönderim işlemleri</Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem className="min-h-11" disabled={sending || !projectCounts?.failed} onSelect={() => { setError(""); setAction("failed"); }}>
+          Hatalıları yeniden dağıt ({countText(projectCounts?.failed ?? 0, projectCounts?.capped ?? false)})
+        </DropdownMenuItem>
+        {canManageDevices && <DropdownMenuItem className="min-h-11" disabled={sending || !projectCounts} onSelect={() => { setError(""); setAction("all"); }}>
+          Tümünü yeniden dağıt
+        </DropdownMenuItem>}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

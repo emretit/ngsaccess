@@ -26,7 +26,7 @@ interface DeviceFiltersProps {
 export function DeviceFilters({ onClearFilters, locationActive, statusCounts, typeCounts,
   search, onSearchChange, statusFilter, onStatusFilterChange, typeFilter, onTypeFilterChange, deviceTypes }: DeviceFiltersProps) {
   return <FilterBar search={search} onSearchChange={onSearchChange}
-    searchLabel="Cihaz adı, seri numarası veya UUID ile ara" placeholder="Ad, seri no veya UUID ara…"
+    searchLabel="Cihaz ara" placeholder="Ad, seri no veya UUID ara…"
     hasFilters={statusFilter !== "all" || typeFilter !== "all" || !!locationActive} onClear={() => onClearFilters?.()}>
     <FilterField label="Bağlantı" htmlFor="device-status"><Select value={statusFilter} onValueChange={onStatusFilterChange}>
       <SelectTrigger id="device-status" className="w-full min-w-0"><SelectValue /></SelectTrigger>

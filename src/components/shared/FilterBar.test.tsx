@@ -20,7 +20,7 @@ describe("FilterBar", () => {
     expect(html).toContain('value="Ayşe"');
     expect(html).toContain('placeholder="Ad soyad"');
     expect(html).toContain('flex flex-wrap items-end gap-3');
-    expect(html).toContain('grid w-full min-w-0 gap-1 text-xs min-[761px]:w-[260px]');
+    expect(html).toContain('grid w-full min-w-0 gap-1 text-xs min-[761px]:w-auto min-[761px]:flex-[1_1_200px] min-[761px]:max-w-[260px]');
     expect(html).not.toContain('disabled=""');
     expect(html).toContain('<div class="ml-auto flex flex-wrap items-center gap-2"><span>Actions</span></div>');
   });

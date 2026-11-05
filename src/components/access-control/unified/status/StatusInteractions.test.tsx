@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { useStatusFilters } from "./StatusPage";
-import { RedistributeBar, RedistributeDialog } from "./RedistributeControls";
+import { RedistributeDialog, RedistributeMenu, RedistributeSelected } from "./RedistributeControls";
 import { EmployeeGrantSheet } from "./EmployeeGrantSheet";
 import { StatusFilters } from "./StatusFilters";
 import { GrantRows } from "./StatusViews";
@@ -92,12 +92,12 @@ describe("Yetki Durumu etkileşimleri", () => {
     expect(html).not.toContain("kişi×cihaz");
   });
   it("cihaz yönetim yetkisi yoksa tümünü gönder düğmesi sunulmaz", () => {
-    const props = { selected: [row], sending: false, projectCounts: counts, setError: vi.fn(), setAction: vi.fn() };
-    expect(render(<RedistributeBar {...props} canManageDevices={false} />)).not.toContain("Tümünü yeniden dağıt");
-    expect(render(<RedistributeBar {...props} canManageDevices />)).toContain("Tümünü yeniden dağıt");
+    const props = { sending: false, projectCounts: counts, setError: vi.fn(), setAction: vi.fn() };
+    expect(render(<RedistributeMenu {...props} canManageDevices={false} />)).not.toContain("Tümünü yeniden dağıt");
+    expect(render(<RedistributeMenu {...props} canManageDevices />)).toContain("Tümünü yeniden dağıt");
   });
   it("seçim yokken seçili gönderimi gizler; bakım işlemlerini menüye toplar", () => {
-    const html = render(<RedistributeBar selected={[]} sending={false} projectCounts={counts} setError={() => {}} setAction={() => {}} canManageDevices />);
+    const html = render(<><RedistributeSelected selected={[]} sending={false} setError={() => {}} setAction={() => {}} /><RedistributeMenu sending={false} projectCounts={counts} setError={() => {}} setAction={() => {}} canManageDevices /></>);
     expect(html).not.toContain("Seçili 0");
     expect(html).toContain("Diğer gönderim işlemleri");
     expect(html).toContain("Hatalıları yeniden dağıt");

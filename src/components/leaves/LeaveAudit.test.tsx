@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { LeaveFilters } from "./LeaveFilters";
 import { EmployeePicker } from "./EmployeePicker";
 import { readFilters } from "./lib/leaveState";
@@ -7,6 +8,11 @@ import type { Id } from "../../../convex/_generated/dataModel";
 const mocks = vi.hoisted(() => ({ mobile: false, query: vi.fn() }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => mocks.mobile }));
 vi.mock("convex/react", () => ({ useQuery: mocks.query }));
+vi.mock("@/components/ui/select", async original => ({
+  ...await original<typeof import("@/components/ui/select")>(),
+  SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children }: { children: ReactNode }) => <div role="option">{children}</div>,
+}));
 const projectId = "project" as Id<"projects">;
 const filters = readFilters(new URLSearchParams("period=2026-10"));
 beforeEach(() => { mocks.mobile = false; mocks.query.mockReturnValue({ options: [], selected: null, truncated: false }); });
@@ -14,7 +20,8 @@ const renderFilters = () => renderToStaticMarkup(<LeaveFilters projectId={projec
 describe("leave audit controls", () => {
   it("combines search and person selection in one named combobox", () => {
     const html = renderFilters();
-    expect(html.match(/role="combobox"/g)).toHaveLength(1);
+    // Kişi + izin türü; kişi araması ayrı bir combobox açmaz.
+    expect(html.match(/role="combobox"/g)).toHaveLength(2);
     expect(html).toContain('id="leave-filter-person"');
     expect(html).not.toContain('type="search"');
     expect(html).not.toContain('leave-filter-person-search');

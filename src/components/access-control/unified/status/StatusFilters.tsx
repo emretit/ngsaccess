@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
 import { FilterBar, FilterField } from "@/components/shared/FilterBar";
 import {
@@ -58,6 +58,7 @@ export function StatusFilters({
   setSearch,
   change,
   clear,
+  actions,
 }: {
   filters: Filters;
   options: Options;
@@ -65,6 +66,7 @@ export function StatusFilters({
   setSearch: (search: string) => void;
   change: (patch: Partial<Filters>) => void;
   clear: () => void;
+  actions?: ReactNode;
 }) {
   const activeCount = Object.entries(filters).filter(
     ([key, value]) => key !== "search" && key !== "state" && Boolean(value),
@@ -78,6 +80,7 @@ export function StatusFilters({
         placeholder="Ad ara"
         onClear={clear}
         hasFilters={activeCount > 0 || Boolean(filters.state)}
+        end={actions}
       >
         <CollapsibleFilters desktopDisplay="contents" activeCount={activeCount}>
 

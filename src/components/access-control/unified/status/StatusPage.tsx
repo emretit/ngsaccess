@@ -22,7 +22,7 @@ import { RunNotice } from "./RunNotice";
 import { StatusCounters } from "./StatusCounters";
 import { StatusFilters } from "./StatusFilters";
 import { StatusResults, StatusViewToggle } from "./StatusResults";
-import { RedistributeBar, RedistributeDialog } from "./RedistributeControls";
+import { RedistributeDialog, RedistributeMenu, RedistributeSelected } from "./RedistributeControls";
 import { EmployeeGrantSheet } from "./EmployeeGrantSheet";
 import { useStatusOptions, useDeviceCounts, type StatusScope } from "./useStatusData";
 import { useRedistribution } from "./useRedistribution";
@@ -90,18 +90,20 @@ function StatusContent({ projectId }: { projectId: Id<"projects"> }) {
             setSearch={setSearch}
             change={change}
             clear={clear}
+            actions={<>
+              <StatusViewToggle view={view} setView={setView} />
+              <RedistributeMenu
+                canManageDevices={canManageDevices}
+                sending={sending}
+                projectCounts={projectCounts}
+                setError={setError}
+                setAction={setAction}
+              />
+            </>}
           />
         </div>
       </div>
-      <StatusViewToggle view={view} setView={setView} />
-      <RedistributeBar
-        canManageDevices={canManageDevices}
-        selected={selected}
-        sending={sending}
-        projectCounts={projectCounts}
-        setError={setError}
-        setAction={setAction}
-      />
+      <RedistributeSelected selected={selected} sending={sending} setError={setError} setAction={setAction} />
       {error && !action && (
         <p role="alert" className="text-danger break-words">
           {error}

@@ -33,7 +33,7 @@ type FilterBarProps = SearchProps & {
 export function FilterBar({ search, onSearchChange, searchLabel = "Ara", placeholder = "Ara…", children, onClear, hasFilters = false, end, label = "Liste filtreleri", layout = "wrap" }: FilterBarProps) {
   const id = useId();
   const grid = layout === "grid";
-  const searchInput = onSearchChange && <div className={grid ? "min-w-0" : "grid w-full min-w-0 gap-1 text-xs min-[761px]:w-[260px]"}>
+  const searchInput = onSearchChange && <div className={grid ? "min-w-0" : "grid w-full min-w-0 gap-1 text-xs min-[761px]:w-auto min-[761px]:flex-[1_1_200px] min-[761px]:max-w-[260px]"}>
     {grid ? <Label className="sr-only" htmlFor={id}>{searchLabel}</Label> : <label htmlFor={id}>{searchLabel}</label>}
     <Input id={id} type="search" value={search} placeholder={placeholder} onChange={event => onSearchChange(event.target.value)} />
   </div>;
