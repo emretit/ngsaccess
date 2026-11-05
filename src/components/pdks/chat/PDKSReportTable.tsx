@@ -8,7 +8,7 @@ interface PDKSReportTableProps {
 
 export function PDKSReportTable({ data }: PDKSReportTableProps) {
   return (
-    <Table resizeKey="pdks-chat-report">
+    <Table framed resizeKey="pdks-chat-report">
       <TableHeader>
         <TableRow>
           <TableHead columnId="name" className="w-[200px]">Çalışan</TableHead>
