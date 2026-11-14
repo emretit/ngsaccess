@@ -1,5 +1,5 @@
-import { requirePermission } from "./lib/permissions";
-import { listAccessRules, listAccessRuleMemberships } from "./lib/accessRuleRead";
+import { hasPermission, requirePermission } from "./lib/permissions";
+import { listAccessRules, listAccessRuleMemberships, ruleMemberEmployee } from "./lib/accessRuleRead";
 import { createAccessRuleWithGroups } from "./lib/accessRuleWrite";
 import { planRemovedEmployeeHik, reconcileRemovedEmployeeHik, snapshotRuleHikEmployees, resolveRuleDeviceTargets, hikSnapshotValidator, type HikSnapshot } from "./lib/peopleHikSnapshot";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -587,7 +587,9 @@ export const listSummaries = authedQuery({
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
     const search = args.search?.trim() ?? "";
-    const searchBy = args.searchBy ?? "rule";
+    // Kişi adıyla arama, personeli görme yetkisi olmayana isim→kural çıkarımı vermesin.
+    const searchBy = args.searchBy === "person" && !(await hasPermission(ctx, ctx.user, args.projectId, "employees.view"))
+      ? "rule" : args.searchBy ?? "rule";
     const status = args.status ?? "all";
     const type = args.type ?? "all";
     const matchedIds =
@@ -699,20 +701,13 @@ export const getDetails = authedQuery({
         .take(RULE_DETAILS_MEMBER_LIMIT + 1),
       readRuleScope(ctx, rule, true),
     ]);
+    const canViewEmployees = await hasPermission(ctx, ctx.user, rule.projectId, "employees.view");
     const groupMembers = await Promise.all(
       members.slice(0, RULE_DETAILS_MEMBER_LIMIT).map(async (member) => {
         const employee = await ctx.db.get(member.employeeId);
         return {
           ...member,
-          employees:
-            employee && employee.projectId === rule.projectId
-              ? {
-                  id: employee._id,
-                  firstName: employee.firstName,
-                  lastName: employee.lastName,
-                  email: employee.email,
-                }
-              : null,
+          employees: ruleMemberEmployee(employee?.projectId === rule.projectId ? employee : null, canViewEmployees),
         };
       }),
     );
@@ -737,10 +732,10 @@ export const listRuleMembers = authedQuery({
       const result = await ctx.db.query("groupMembers")
         .withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", rule._id))
         .paginate(paginationOpts);
+      const canViewEmployees = await hasPermission(ctx, ctx.user, rule.projectId, "employees.view");
       const page = await Promise.all(result.page.map(async member => {
         const employee = await ctx.db.get(member.employeeId);
-        return { ...member, employees: employee && employee.projectId === rule.projectId
-          ? { id: employee._id, firstName: employee.firstName, lastName: employee.lastName, email: employee.email } : null };
+        return { ...member, employees: ruleMemberEmployee(employee?.projectId === rule.projectId ? employee : null, canViewEmployees) };
       }));
       return { ...result, kind: "people" as const, page };
     }

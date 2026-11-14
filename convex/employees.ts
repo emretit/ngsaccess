@@ -1,6 +1,6 @@
 import { syncPlanRefs } from "./lib/shiftAssign";
 import { writeAudit } from "./lib/audit";
-import { toUtcISO, trDateKey, trDayRangeISO } from "./lib/trDate";
+import { toUtcISO, trDateKey, trDayRangeISO, trTodayKey } from "./lib/trDate";
 import { getProjectIdsWithPermission, hasPermission, requirePermission } from "./lib/permissions";
 import { scheduleFingerprintPurge, scheduleEmployeeCardChange } from "./lib/employeeCardChange";
 import { canSeePayInProject, maskPay } from "./lib/payVisibility";
@@ -19,7 +19,7 @@ import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, QueryCtx } from "./_generated/server";
 import { cascadeRemoveEmployeePII, deleteUnusedEmployeePhoto } from "./lib/employeeCascade";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
-import { writeEmployeePassword } from "./lib/employeeAuth";
+import { revokeEmployeeSessions, writeEmployeePassword } from "./lib/employeeAuth";
 import { visitorSensitiveFields } from "./lib/visitorStatus";
 import { cardConflictMessage, findDuplicateCard } from "./lib/cardIdentity";
 import { assertNoEmployeeTransfer } from "./lib/transferGuard";
@@ -378,7 +378,12 @@ export const update = authedMutation({
     validatePay(updates.hourlyRate, updates.monthlySalary);
     const previousHikSnapshot = updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber
       ? await snapshotEmployeeHikDevices(ctx, emp) : undefined;
-    await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, updatedAt: new Date().toISOString() });
+    const deactivating = emp.isActive === true && updates.isActive === false;
+    const reactivating = emp.isActive === false && updates.isActive === true;
+    const activityDates = deactivating ? { deactivatedAt: trTodayKey() }
+      : reactivating ? { deactivatedAt: undefined } : {};
+    await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, ...activityDates, updatedAt: new Date().toISOString() });
+    if (deactivating) await revokeEmployeeSessions(ctx, employeeId);
     if (emp.photoStorageId && (updates.photoStorageId !== undefined || updates.photoUrl === null)) {
       await deleteUnusedEmployeePhoto(ctx, emp.photoStorageId);
     }

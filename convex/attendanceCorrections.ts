@@ -69,15 +69,24 @@ export const listPending = authedQuery({
     if (args.projectId && !isProjectAllowed(memberships, args.projectId)) throw new ConvexError("Bu projeye erişim yetkiniz yok");
     const allowed = await getProjectIdsWithPermission(ctx, ctx.user, "attendance.approve");
     if (args.projectId && !isProjectAllowed(allowed, args.projectId)) throw new ConvexError("Bu projeye erişim yetkiniz yok");
-    const projects = args.projectId ? [args.projectId] : allowed;
-    // Proje başına en fazla 200 kayıt okunur; sınıra ulaşan projeler için hasMore kesilmeyi bildirir.
-    const projectRows = await Promise.all(projects.map(projectId => ctx.db.query("attendanceCorrections").withIndex("by_project_status", q => q.eq("projectId", projectId).eq("status", "pending")).order("desc").take(200)));
+    const withNames = async (page: Doc<"attendanceCorrections">[]) => {
+      const employees = await Promise.all(page.map(row => ctx.db.get(row.employeeId)));
+      return page.map((row, index) => ({ ...row, employeeName: employees[index] ? `${employees[index].firstName} ${employees[index].lastName}` : "Silinmiş çalışan" }));
+    };
+    // Tek proje: gerçek index cursor'ı; kuyruğun en eski talebine de sayfalayarak ulaşılır.
+    if (args.projectId) {
+      const projectId = args.projectId;
+      const result = await ctx.db.query("attendanceCorrections").withIndex("by_project_status", q => q.eq("projectId", projectId).eq("status", "pending")).order("desc")
+        .paginate({ ...args.paginationOpts, numItems: Math.max(1, Math.min(100, args.paginationOpts.numItems)) });
+      return { page: await withNames(result.page), isDone: result.isDone, hasMore: false, continueCursor: result.continueCursor };
+    }
+    // Çoklu proje özeti: proje başına en fazla 200 kayıt; hasMore kesilmeyi bildirir, okunan küme bitince isDone.
+    const projectRows = await Promise.all(allowed.map(projectId => ctx.db.query("attendanceCorrections").withIndex("by_project_status", q => q.eq("projectId", projectId).eq("status", "pending")).order("desc").take(200)));
     const hasMore = projectRows.some(rows => rows.length === 200);
     const all = projectRows.flat().sort((a, b) => b._creationTime - a._creationTime);
     const start = args.paginationOpts.cursor ? Number(args.paginationOpts.cursor) : 0;
     const page = all.slice(start, start + Math.min(args.paginationOpts.numItems, 100));
-    const employees = await Promise.all(page.map(row => ctx.db.get(row.employeeId)));
-    return { page: page.map((row, index) => ({ ...row, employeeName: employees[index] ? `${employees[index].firstName} ${employees[index].lastName}` : "Silinmiş çalışan" })), isDone: start + page.length >= all.length && !hasMore, hasMore, continueCursor: String(start + page.length) };
+    return { page: await withNames(page), isDone: start + page.length >= all.length, hasMore, continueCursor: String(start + page.length) };
   },
 });
 

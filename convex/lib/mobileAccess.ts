@@ -1,6 +1,6 @@
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { accessScheduleError } from "./accessRuleUx";
 import { employmentEnded } from "./employment";
 import { trDateKey } from "./trDate";
@@ -170,6 +170,56 @@ export async function genericReaderTokenAllowed(ctx: QueryCtx, employee: Doc<"em
 }
 
 export const MOBILE_COMMAND_TTL_MS = 30_000;
+
+export function mobileOperationTerminal(row: Pick<Doc<"mobileAccessOperations">, "status">): boolean {
+  return row.status === "confirmed" || row.status === "failed" || row.status === "unknown";
+}
+
+/** Persisted terminal outcomes survive transport queue retention. */
+export async function mobileOperationOutcome(ctx: QueryCtx, row: Doc<"mobileAccessOperations">) {
+  let status = row.status;
+  let errorCode = row.errorCode;
+  if (row.status === "unknown") {
+    const command = row.ideOperationId ? await ctx.db.get(row.ideOperationId)
+      : row.hikOperationId ? await ctx.db.get(row.hikOperationId) : null;
+    if (command && (command._id === row.ideOperationId || command._id === row.hikOperationId) &&
+        command.deviceId === row.deviceId && command.projectId === row.projectId &&
+        mobileOperationId(command.payload) === row._id &&
+        (command.status === "acked" || command.status === "done")) return { status: "confirmed" as const };
+  }
+  if (!mobileOperationTerminal(row)) {
+    if (row.ideOperationId) {
+      const command = await ctx.db.get(row.ideOperationId);
+      status = !command ? "unknown" : command.status === "acked" ? "confirmed"
+        : command.status === "failed" ? command.attempts > 0 ? "unknown" : "failed" : command.status;
+    }
+    if (row.hikOperationId) {
+      const command = await ctx.db.get(row.hikOperationId);
+      status = !command ? "unknown" : command.status === "done" ? "confirmed"
+        : command.status === "processing" ? "sent"
+        : command.status === "failed" ? command.attemptCount > 0 ? "unknown" : "failed" : "pending";
+    }
+    if ((status === "pending" || status === "sent") && Date.now() - Date.parse(row.requestedAt) >= MOBILE_COMMAND_TTL_MS) {
+      status = status === "sent" ? "unknown" : "failed";
+      errorCode = status === "unknown" ? "COMMAND_OUTCOME_UNKNOWN" : "COMMAND_EXPIRED";
+    }
+  }
+  if (status === "unknown") errorCode ??= "COMMAND_OUTCOME_UNKNOWN";
+  if (status === "failed") errorCode ??= "COMMAND_FAILED";
+  return { status, ...(errorCode ? { errorCode } : {}) };
+}
+
+export async function settleMobileIdeOperation(ctx: MutationCtx, command: Doc<"idePendingOperations">, status: "acked" | "failed") {
+  const marker = mobileOperationId(command.payload);
+  const id = marker === undefined ? null : ctx.db.normalizeId("mobileAccessOperations", marker);
+  const row = id ? await ctx.db.get(id) : null;
+  if (!row || (mobileOperationTerminal(row) && !(row.status === "unknown" && status === "acked")) || row.ideOperationId !== command._id ||
+      row.deviceId !== command.deviceId || row.projectId !== command.projectId) return;
+  const outcome = status === "acked" ? { status: "confirmed" as const, errorCode: undefined }
+    : command.attempts > 0 ? { status: "unknown" as const, errorCode: row.errorCode ?? "COMMAND_OUTCOME_UNKNOWN" }
+    : { status: "failed" as const, errorCode: row.errorCode ?? "COMMAND_FAILED" };
+  await ctx.db.patch(row._id, outcome);
+}
 
 export function mobileOperationId(payload: unknown): string | undefined {
   if (typeof payload !== "object" || payload === null || !("mobileOperationId" in payload)) return undefined;

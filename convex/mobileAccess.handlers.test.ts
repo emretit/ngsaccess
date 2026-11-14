@@ -267,3 +267,151 @@ describe("mobile access with real employee authentication and persisted transact
   });
 
 });
+
+
+describe("persisted mobile outcomes and retention", () => {
+  it.each(["success", "fail", "timeout", "cron", "revoked"] as const)("persists IDE %s and ignores subsequent ACKs", async result => {
+    const { t, deviceId, doorId, sessionId } = await fixture();
+    const args = { sessionToken: "session-a", requestId, deviceId, doorId };
+    const opened = await t.mutation(api.mobileAccess.requestOpen, args);
+    const command = await t.run(ctx => ctx.db.query("idePendingOperations").first());
+    if (!command) throw new Error("Missing command");
+    if (result === "revoked") {
+      await t.run(ctx => ctx.db.delete(sessionId));
+      await t.mutation(internal.ideSync.pollForBridge, {});
+    } else {
+      await t.mutation(internal.ideSync.markSent, { opId: command._id, msxId: 42 });
+      if (result === "cron") {
+        vi.setSystemTime(Date.now() + 120_000);
+        await t.mutation(internal.ideSync.requeueTimedOut, {});
+      } else {
+        await t.mutation(internal.ideSync.markAck, { opId: command._id, msxId: 42, result });
+      }
+    }
+    const stored = await t.run(ctx => ctx.db.query("mobileAccessOperations").first());
+    expect(stored).toMatchObject(result === "success" ? { status: "confirmed" }
+      : result === "revoked" ? { status: "failed", errorCode: "COMMAND_FAILED" }
+      : { status: "unknown", errorCode: "COMMAND_OUTCOME_UNKNOWN" });
+    await t.mutation(internal.ideSync.markAck, { opId: command._id, msxId: 42, result: "success" });
+    expect(await t.run(ctx => ctx.db.query("mobileAccessOperations").first())).toEqual(stored);
+    await t.run(ctx => ctx.db.delete(command._id));
+    if (result !== "revoked") {
+      expect(await t.query(api.mobileAccess.getOperation, { sessionToken: "session-a", operationId: opened.operationId }))
+        .toMatchObject({ status: stored?.status });
+    }
+  });
+
+  it.each(["pending", "sent", "acked", "failed", "missing", "hikProcessing", "hikDone", "hikFailed", "gatewaySent"] as const)("persists expired %s outcomes", async state => {
+    const { t, deviceId, doorId } = await fixture();
+    await t.mutation(api.mobileAccess.requestOpen, { sessionToken: "session-a", requestId, deviceId, doorId });
+    const row = await t.run(ctx => ctx.db.query("mobileAccessOperations").first());
+    if (!row?.ideOperationId) throw new Error("Missing mobile command");
+    const ideOperationId = row.ideOperationId;
+    await t.run(async ctx => {
+      if (state.startsWith("hik")) {
+        const hikOperationId = await ctx.db.insert("hikPendingOperations", {
+          projectId: row.projectId, deviceId, operation: "openDoor", payload: { mobileOperationId: row._id },
+          status: state === "hikDone" ? "done" : state === "hikFailed" ? "failed" : "processing",
+          attemptCount: 1, nextRetryAt: Date.now(), createdAt: Date.now(),
+        });
+        await ctx.db.patch(row._id, { ideOperationId: undefined, hikOperationId, transport: "hik_local_bridge" });
+      } else if (state === "gatewaySent") {
+        await ctx.db.patch(row._id, { ideOperationId: undefined, transport: "hik_gateway", status: "sent" });
+      } else if (state === "missing") {
+        await ctx.db.delete(ideOperationId);
+      } else if (state === "pending" || state === "sent" || state === "acked" || state === "failed") {
+        await ctx.db.patch(ideOperationId, { status: state, attempts: state === "pending" ? 0 : 1 });
+      }
+    });
+    vi.setSystemTime(Date.now() + 30_000);
+    await t.mutation(internal.mobileAccess.expireQueue, { operationId: row._id });
+    const status = state === "acked" || state === "hikDone" ? "confirmed" : state === "pending" ? "failed" : "unknown";
+    const stored = await t.run(ctx => ctx.db.get(row._id));
+    expect(stored).toMatchObject({ status, ...(status === "confirmed" ? {} : { errorCode: status === "failed" ? "COMMAND_EXPIRED" : "COMMAND_OUTCOME_UNKNOWN" }) });
+    await t.mutation(internal.mobileAccess.expireQueue, { operationId: row._id });
+    expect(await t.run(ctx => ctx.db.get(row._id))).toEqual(stored);
+  });
+
+  it("purges old pending/sent operations through the bounded access retention chain", async () => {
+    const { t, deviceId, doorId } = await fixture();
+    await t.mutation(api.mobileAccess.requestOpen, { sessionToken: "session-a", requestId, deviceId, doorId });
+    const row = await t.run(ctx => ctx.db.query("mobileAccessOperations").first());
+    if (!row) throw new Error("Missing operation");
+    await t.run(async ctx => {
+      const { _id, _creationTime, ...fields } = row;
+      await ctx.db.patch(_id, { requestedAt: "2026-01-01T00:00:00.000Z" });
+      await ctx.db.insert("mobileAccessOperations", { ...fields, requestId: "old-sent-request", requestedAt: "2026-01-01T00:00:00.000Z", status: "sent", transport: "hik_gateway", ideOperationId: undefined });
+      await ctx.db.insert("mobileAccessOperations", { ...fields, requestId: "recent-sent-request", status: "sent", transport: "hik_gateway", ideOperationId: undefined });
+    });
+    await t.mutation(internal.privacyRetention.startDailyPurge, { group: "access" });
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    expect(await t.run(ctx => ctx.db.query("mobileAccessOperations").take(20)))
+      .toEqual([expect.objectContaining({ requestId: "recent-sent-request", status: "sent" })]);
+  });
+});
+
+
+it.each(["unknown", "failed"] as const)("accepts a 60-second IDE success only after %s when allowed", async initialStatus => {
+  const { t, deviceId, doorId } = await fixture();
+  await t.mutation(api.mobileAccess.requestOpen, { sessionToken: "session-a", requestId, deviceId, doorId });
+  const row = await t.run(ctx => ctx.db.query("mobileAccessOperations").first());
+  if (!row?.ideOperationId) throw new Error("Missing IDE operation");
+  await t.mutation(internal.ideSync.markSent, { opId: row.ideOperationId, msxId: 42 });
+  vi.setSystemTime(Date.now() + 30_000);
+  await t.mutation(internal.mobileAccess.expireQueue, { operationId: row._id });
+  expect(await t.run(ctx => ctx.db.get(row._id))).toMatchObject({ status: "unknown" });
+  if (initialStatus === "failed") await t.run(ctx => ctx.db.patch(row._id, { status: "failed", errorCode: "COMMAND_FAILED" }));
+  const expired = await t.run(ctx => ctx.db.get(row._id));
+  vi.setSystemTime(Date.now() + 30_000);
+  await t.mutation(internal.ideSync.markAck, { opId: row.ideOperationId, msxId: 42, result: "success" });
+  const settled = await t.run(ctx => ctx.db.get(row._id));
+  if (initialStatus === "failed") expect(settled).toEqual(expired);
+  else {
+    expect(settled).toMatchObject({ status: "confirmed" });
+    expect(settled?.errorCode).toBeUndefined();
+  }
+  await t.mutation(internal.mobileAccess.expireQueue, { operationId: row._id });
+  expect(await t.run(ctx => ctx.db.get(row._id))).toEqual(settled);
+});
+
+it.each(["unknown", "failed", "confirmed"] as const)("keeps gateway %s monotonic on late completions", async status => {
+  const { t, deviceId, doorId } = await fixture();
+  await t.mutation(api.mobileAccess.requestOpen, { sessionToken: "session-a", requestId, deviceId, doorId });
+  const row = await t.run(ctx => ctx.db.query("mobileAccessOperations").first());
+  if (!row) throw new Error("Missing operation");
+  await t.run(ctx => ctx.db.patch(row._id, { transport: "hik_gateway", ideOperationId: undefined, status: "sent" }));
+  vi.setSystemTime(Date.now() + 30_000);
+  await t.mutation(internal.mobileAccess.expireQueue, { operationId: row._id });
+  expect(await t.run(ctx => ctx.db.get(row._id))).toMatchObject({ status: "unknown" });
+  if (status !== "unknown") await t.run(ctx => ctx.db.patch(row._id, { status }));
+  vi.setSystemTime(Date.now() + 30_000);
+  await t.mutation(internal.mobileAccess.finishGateway, { operationId: row._id, status: "confirmed" });
+  expect(await t.run(ctx => ctx.db.get(row._id))).toMatchObject({ status: status === "failed" ? "failed" : "confirmed" });
+  const settled = await t.run(ctx => ctx.db.get(row._id));
+  await t.mutation(internal.mobileAccess.finishGateway, { operationId: row._id, status: "unknown" });
+  expect(await t.run(ctx => ctx.db.get(row._id))).toEqual(settled);
+});
+
+it.each([true, false])("upgrades unknown only for the bound Hik done command (matching=%s)", async matching => {
+  const { t, deviceId, doorId } = await fixture();
+  await t.mutation(api.mobileAccess.requestOpen, { sessionToken: "session-a", requestId, deviceId, doorId });
+  const row = await t.run(ctx => ctx.db.query("mobileAccessOperations").first());
+  if (!row) throw new Error("Missing operation");
+  const hikOperationId = await t.run(async ctx => {
+    const id = await ctx.db.insert("hikPendingOperations", {
+      projectId: row.projectId, deviceId, operation: "openDoor", payload: { mobileOperationId: matching ? row._id : "wrong-operation" },
+      status: "processing", attemptCount: 1, createdAt: Date.now(), nextRetryAt: Date.now(),
+    });
+    await ctx.db.patch(row._id, { ideOperationId: undefined, hikOperationId: id, transport: "hik_local_bridge" });
+    return id;
+  });
+  vi.setSystemTime(Date.now() + 30_000);
+  await t.mutation(internal.mobileAccess.expireQueue, { operationId: row._id });
+  expect(await t.run(ctx => ctx.db.get(row._id))).toMatchObject({ status: "unknown" });
+  vi.setSystemTime(Date.now() + 30_000);
+  await t.run(ctx => ctx.db.patch(hikOperationId, { status: "done" }));
+  expect(await t.query(api.mobileAccess.getOperation, { sessionToken: "session-a", operationId: row._id }))
+    .toMatchObject({ status: matching ? "confirmed" : "unknown" });
+  await t.mutation(internal.mobileAccess.expireQueue, { operationId: row._id });
+  expect(await t.run(ctx => ctx.db.get(row._id))).toMatchObject({ status: matching ? "confirmed" : "unknown" });
+});

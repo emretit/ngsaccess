@@ -6,7 +6,7 @@ import { cardNumericKey } from "./lib/cardIdentity";
 import { accessEndsAtMs } from "./lib/accessEnd";
 import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule } from "./lib/accessSchedule";
 import { boundedScheduleRows, scheduleRuleDevices } from "./lib/ruleDevices";
-import { mobileOperationId, mobileQueueAllowed, accessError } from "./lib/mobileAccess";
+import { mobileOperationId, mobileQueueAllowed, settleMobileIdeOperation, accessError } from "./lib/mobileAccess";
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -508,6 +508,7 @@ export const pollForBridge = internalMutation({
       const reason = await undeliverableReason(ctx, op);
       if (reason) {
         await ctx.db.patch(op._id, { status: "failed", lastError: reason });
+        await settleMobileIdeOperation(ctx, op, "failed");
         if (op.opType === "deleteUser") await transferOperationFailed(ctx, op, reason);
         await grantStatusForOperation(ctx, op, "failed", reason);
       }
@@ -547,6 +548,7 @@ export const markSent = internalMutation({
     }
     if (doorCommandExpired(op)) {
       await ctx.db.patch(op._id, { status: "failed", lastError: "Komut süresi doldu" });
+      await settleMobileIdeOperation(ctx, op, "failed");
       return false;
     }
     await ctx.db.patch(args.opId, {
@@ -625,6 +627,7 @@ export const markAck = internalMutation({
         responseMessage: args.message,
         lastError: undefined,
       });
+      await settleMobileIdeOperation(ctx, op, "acked");
       // Panel roster yansımasını güncelle (idePanelUsers): upsertUser → kart panelde,
       // deleteUser → panelden gitti. reconcilePanelRosterIde bu tabloyla "panelde olan −
       // yetkili" farkını hesaplar. ideUuid bazlı (re-claim'e dayanıklı).
@@ -704,6 +707,7 @@ export const markAck = internalMutation({
         status: "failed",
         lastError: args.message ?? args.result,
       });
+      await settleMobileIdeOperation(ctx, op, "failed");
     } else {
       await ctx.db.patch(args.opId, {
         status: "pending",
@@ -736,6 +740,7 @@ export const requeueTimedOut = internalMutation({
         const maxAttempts = (op.opType === "openDoor" || mobileOperationId(op.payload) !== undefined) ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
         if (!(op.opType === "upsertUser" && op.msxId === undefined) && op.attempts >= maxAttempts) {
           await ctx.db.patch(op._id, { status: "failed", lastError: "ack timeout (cron)" });
+          await settleMobileIdeOperation(ctx, op, "failed");
           if (op.opType === "deleteUser") await transferOperationFailed(ctx, op, "ack timeout (cron)");
           if (op.opType === "upsertUser" || op.opType === "deleteUser") await grantStatusForOperation(ctx, op, "failed", "ack timeout (cron)");
         } else {

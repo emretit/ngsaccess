@@ -341,9 +341,17 @@ export const purgeMobileOperations = internalMutation({
     if (!valid(args, "purgeMobileOperations")) return null;
     const value = stages[args.stage][1];
     const status = value === "confirmed" || value === "unknown" ? value : "failed";
-    const page = await ctx.db.query("mobileAccessOperations").withIndex("by_status_and_requestedAt", q => q.eq("status", status).lt("requestedAt", isoCutoff(args, MOBILE_OPERATION_RETENTION_DAYS))).paginate(opts(args));
+    const staleStatus = status === "failed" ? "pending" : status === "unknown" ? "sent" : null;
+    const batchSize = staleStatus ? PURGE_BATCH_SIZE / 2 : PURGE_BATCH_SIZE;
+    const before = isoCutoff(args, MOBILE_OPERATION_RETENTION_DAYS);
+    const page = await ctx.db.query("mobileAccessOperations").withIndex("by_status_and_requestedAt", q => q.eq("status", status).lt("requestedAt", before))
+      .paginate({ ...opts(args), numItems: batchSize });
     for (const row of page.page) await ctx.db.delete(row._id);
-    await advance(ctx, args, page.isDone, page.continueCursor);
+    // Share the existing stages' batch budget so visitor stage indices and capacity stay stable.
+    const stale = staleStatus ? await ctx.db.query("mobileAccessOperations")
+      .withIndex("by_status_and_requestedAt", q => q.eq("status", staleStatus).lt("requestedAt", before)).take(batchSize) : [];
+    for (const row of stale) await ctx.db.delete(row._id);
+    await advance(ctx, args, page.isDone && stale.length < batchSize, page.continueCursor);
     return null;
   },
 });

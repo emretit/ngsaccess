@@ -107,6 +107,7 @@ export default defineSchema({
     photoStorageId: v.optional(v.id("_storage")),
     isActive: v.optional(v.boolean()),
     employmentEndDate: v.optional(v.string()),
+    deactivatedAt: v.optional(v.string()),
     terminationType: v.optional(v.union(
       v.literal("resignation"), v.literal("employerTermination"),
       v.literal("retirement"), v.literal("contractEnd"), v.literal("other"), v.literal("transfer"),

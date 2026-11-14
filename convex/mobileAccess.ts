@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { internalMutation, mutation } from "./_generated/server";
 import { employeeAuthedQuery } from "./lib/customFunctions";
-import { accessError, listMobileTargets, resolveMobileTarget, MOBILE_COMMAND_TTL_MS, mobileOperationAllowed } from "./lib/mobileAccess";
+import { accessError, listMobileTargets, resolveMobileTarget, MOBILE_COMMAND_TTL_MS, mobileOperationAllowed, mobileOperationOutcome } from "./lib/mobileAccess";
 import { getCurrentEmployee } from "./lib/employeeAuth";
 import { scheduleBridgeWakeForProject } from "./hikBridge";
 
@@ -17,7 +17,6 @@ export type OperationResult = {
   requestedAt: string;
   errorCode?: string;
 };
-const OPERATION_LIFETIME_MS = MOBILE_COMMAND_TTL_MS;
 
 export const listTargets = employeeAuthedQuery({
   args: {},
@@ -25,27 +24,7 @@ export const listTargets = employeeAuthedQuery({
 });
 
 async function operationResult(ctx: QueryCtx, row: Doc<"mobileAccessOperations">): Promise<OperationResult> {
-  let status = row.status;
-  let errorCode = row.errorCode;
-  const now = Date.now();
-  if (row.ideOperationId) {
-    const command = await ctx.db.get(row.ideOperationId);
-    status = !command ? "unknown" : command.status === "acked" ? "confirmed"
-      : command.status === "failed" ? command.attempts > 0 ? "unknown" : "failed"
-      : command.status;
-  }
-  if (row.hikOperationId) {
-    const command = await ctx.db.get(row.hikOperationId);
-    status = !command ? "unknown" : command.status === "done" ? "confirmed"
-      : command.status === "processing" ? "sent"
-      : command.status === "failed" ? command.attemptCount > 0 ? "unknown" : "failed" : "pending";
-  }
-  if ((status === "pending" || status === "sent") && now - Date.parse(row.requestedAt) >= OPERATION_LIFETIME_MS) {
-    status = status === "sent" ? "unknown" : "failed";
-    errorCode = status === "unknown" ? "COMMAND_OUTCOME_UNKNOWN" : "COMMAND_EXPIRED";
-  }
-  if (status === "unknown") errorCode ??= "COMMAND_OUTCOME_UNKNOWN";
-  if (status === "failed") errorCode ??= "COMMAND_FAILED";
+  const { status, errorCode } = await mobileOperationOutcome(ctx, row);
   return {
     operationId: row._id, status, deviceId: row.deviceId, ...(row.doorId ? { doorId: row.doorId } : {}),
     deviceName: row.deviceName, requestedAt: row.requestedAt, ...(errorCode ? { errorCode } : {}),
@@ -151,8 +130,8 @@ export const finishGateway = internalMutation({
   args: { operationId: v.id("mobileAccessOperations"), status: v.union(v.literal("confirmed"), v.literal("unknown")) },
   handler: async (ctx, args): Promise<null> => {
     const row = await ctx.db.get(args.operationId);
-    if (row?.transport === "hik_gateway" && row.status === "sent") {
-      await ctx.db.patch(row._id, { status: args.status, ...(args.status === "unknown" ? { errorCode: "COMMAND_OUTCOME_UNKNOWN" } : {}) });
+    if (row?.transport === "hik_gateway" && (row.status === "sent" || (row.status === "unknown" && args.status === "confirmed"))) {
+      await ctx.db.patch(row._id, { status: args.status, errorCode: args.status === "unknown" ? "COMMAND_OUTCOME_UNKNOWN" : undefined });
     }
     return null;
   },
@@ -163,8 +142,13 @@ export const expireQueue = internalMutation({
   args: { operationId: v.id("mobileAccessOperations") },
   handler: async (ctx, { operationId }): Promise<null> => {
     const row = await ctx.db.get(operationId);
-    if (!row || row.status !== "pending" || Date.now() - Date.parse(row.requestedAt) < MOBILE_COMMAND_TTL_MS) return null;
-    let unsent = row.transport === "hik_gateway";
+    if (!row || row.status === "confirmed" || row.status === "failed" || Date.now() - Date.parse(row.requestedAt) < MOBILE_COMMAND_TTL_MS) return null;
+    if (row.status === "unknown") {
+      const outcome = await mobileOperationOutcome(ctx, row);
+      if (outcome.status === "confirmed") await ctx.db.patch(row._id, { status: "confirmed", errorCode: undefined });
+      return null;
+    }
+    let unsent = row.transport === "hik_gateway" && row.status === "pending";
     if (row.ideOperationId) {
       const command = await ctx.db.get(row.ideOperationId);
       if (command?.status === "pending") {
@@ -179,7 +163,9 @@ export const expireQueue = internalMutation({
         unsent = true;
       }
     }
-    if (unsent) await ctx.db.patch(row._id, { status: "failed", errorCode: "COMMAND_EXPIRED" });
+    const outcome = unsent ? { status: "failed" as const, errorCode: "COMMAND_EXPIRED" }
+      : await mobileOperationOutcome(ctx, row);
+    await ctx.db.patch(row._id, outcome);
     return null;
   },
 });

@@ -3,11 +3,13 @@ export type Employment = {
   isActive?: boolean;
   isVisitor?: boolean;
   employmentEndDate?: string;
+  deactivatedAt?: string;
 };
 
 export function employedOn(employee: Employment, dateKey: string): boolean {
   if (employee.isVisitor === true) return employee.isActive === true;
   if (employee.employmentEndDate) return dateKey <= employee.employmentEndDate;
+  if (employee.isActive === false && employee.deactivatedAt) return dateKey <= employee.deactivatedAt;
   return employee.isActive === true;
 }
 

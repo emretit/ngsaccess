@@ -1,13 +1,25 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { resolveProjectScope } from "./projectScope";
+import { getProjectIdsWithPermission } from "./permissions";
 
-/** Membership-level read per roles inventory; writes require accessRules.manage in accessRules. */
+/** Rule member projection: names and e-mail only with employees.view in the rule's project. */
+export function ruleMemberEmployee(employee: Doc<"employees"> | null, canViewEmployees: boolean) {
+  if (!employee) return null;
+  if (!canViewEmployees) return { id: employee._id };
+  return { id: employee._id, firstName: employee.firstName, lastName: employee.lastName, email: employee.email };
+}
+
+/**
+ * Membership-level read per roles inventory; writes require accessRules.manage in accessRules.
+ * Member names/e-mail need employees.view in the rule's project; otherwise only the id is returned.
+ */
 export async function listAccessRules(
   ctx: QueryCtx & { user: Doc<"users"> },
   args: { projectId?: Id<"projects"> },
 ) {
   const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+  const viewableProjectIds = new Set(await getProjectIdsWithPermission(ctx, ctx.user, "employees.view"));
   const rules = (await Promise.all(allowedProjectIds.map(projectId =>
     ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
   ))).flat();
@@ -26,14 +38,7 @@ export async function listAccessRules(
           const employee = await ctx.db.get(gm.employeeId);
           return {
             ...gm,
-            employees: employee
-              ? {
-                  id: employee._id,
-                  firstName: employee.firstName,
-                  lastName: employee.lastName,
-                  email: employee.email,
-                }
-              : null,
+            employees: ruleMemberEmployee(employee, !!rule.projectId && viewableProjectIds.has(rule.projectId)),
           };
         })
       );

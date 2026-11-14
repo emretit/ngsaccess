@@ -8,6 +8,7 @@ import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeAudit } from "./lib/audit";
+import { revokeEmployeeSessions } from "./lib/employeeAuth";
 import { trTodayKey } from "./lib/trDate";
 import { enqueueTransferDeletion, invalidateTransferAdditions, transferPreflightData } from "./lib/accessTransfer";
 import { advanceTransfer, assertNoEmployeeTransfer, employeeTransfer, operationPayload, transferBound, transferError, transferTargets, TRANSFER_LIMIT, TRANSFER_WINDOW_MS } from "./lib/transferGuard";
@@ -31,7 +32,8 @@ async function accessibleEmployee(ctx: MutationCtx & { user: Doc<"users"> }, emp
 export async function closeAccess(ctx: MutationCtx, employee: Doc<"employees">, now: string, transferDevices?: Doc<"devices">[], transferId?: Id<"accessTransfers">) {
   // Panelleri aktif erişim grafından, pasife çekmeden önce çöz.
   const deviceIds = await resolveEmployeeIdeDeviceIds(ctx, employee._id, employee.projectId);
-  await ctx.db.patch(employee._id, { isActive: false, updatedAt: now });
+  await ctx.db.patch(employee._id, { isActive: false, deactivatedAt: trTodayKey(), updatedAt: now });
+  await revokeEmployeeSessions(ctx, employee._id);
   await scheduleFingerprintPurge(ctx, employee._id, employee.cardNumber, { deleteTemplates: true });
   if (transferDevices && transferId) {
     for (const device of transferDevices) await enqueueTransferDeletion(ctx, employee, device, transferId);
@@ -103,7 +105,7 @@ export const reinstate = authedMutation({
     await ctx.db.patch(employeeId, {
       employmentEndDate: undefined, terminationType: undefined, terminationReason: undefined,
       sgkExitCode: undefined, terminatedAt: undefined, terminatedBy: undefined,
-      isActive: true, updatedAt: new Date().toISOString(),
+      isActive: true, deactivatedAt: undefined, updatedAt: new Date().toISOString(),
     });
     await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
     await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
@@ -272,7 +274,7 @@ export const cancelTransfer = authedMutation({
         for (const op of ops) if (op.opType === "deleteUser" && operationPayload(op.payload).employeeId === source._id) await ctx.db.patch(op._id, { status: "acked", ackedAt: Date.now(), lastError: "Taşıma iptal edildi" });
       }
     }
-    await ctx.db.patch(source._id, { employmentEndDate: undefined, terminationType: undefined, terminationReason: undefined, sgkExitCode: undefined, terminatedAt: undefined, terminatedBy: undefined, transferredToEmployeeId: undefined, isActive: true, updatedAt: new Date().toISOString() });
+    await ctx.db.patch(source._id, { employmentEndDate: undefined, terminationType: undefined, terminationReason: undefined, sgkExitCode: undefined, terminatedAt: undefined, terminatedBy: undefined, transferredToEmployeeId: undefined, isActive: true, deactivatedAt: undefined, updatedAt: new Date().toISOString() });
     for (const ruleId of transfer.sourceAccessRuleIds) {
       const rule = await ctx.db.get(ruleId);
       if (rule?.projectId === source.projectId) await upsertGroupMembership(ctx, source._id, ruleId, source.projectId);

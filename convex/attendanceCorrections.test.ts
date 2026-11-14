@@ -39,7 +39,12 @@ function fixture(role: User["role"] = "project_admin", memberships: Id<"projects
     const selected = () => (table === "userProjects" ? memberships.map(projectId => ({ _id: `m-${projectId}`, _creationTime: 1, table, userId: user._id, projectId })) : rows).filter(row => row.table === table && filters.every(filter => filter(row)));
     const chain = {
       withIndex: (_name: string, build: (builder: typeof q) => unknown) => { build(q); return chain; }, order: () => chain,
-      take: async (count: number) => selected().slice(0, count), first: async () => selected()[0] ?? null, unique: async () => selected()[0] ?? null,
+      take: async (count: number) => selected().slice(0, count),
+      paginate: async ({ cursor, numItems }: { cursor: string | null; numItems: number }) => {
+        const all = selected(); const start = cursor ? Number(cursor) : 0; const page = all.slice(start, start + numItems);
+        return { page, isDone: start + page.length >= all.length, continueCursor: String(start + page.length) };
+      },
+      first: async () => selected()[0] ?? null, unique: async () => selected()[0] ?? null,
     };
     return chain;
   };
@@ -131,7 +136,27 @@ describe("attendanceCorrections", () => {
     const page = await listPending(f.ctx, { paginationOpts: { numItems: 100, cursor: "100" } }) as { isDone: boolean; hasMore: boolean; page: Row[] };
     expect(page.page).toHaveLength(100);
     expect(page.hasMore).toBe(true);
-    expect(page.isDone).toBe(false);
+    // Okunan küme bitti: sonraki boş sayfayı sonsuza dek istemesin.
+    expect(page.isDone).toBe(true);
+  });
+
+  it("pages a single project past 200 pending requests to the oldest one", async () => {
+    const f = fixture();
+    for (let index = 0; index < 201; index += 1) {
+      f.rows.push({ table: "attendanceCorrections", _id: `pending-${index}`, _creationTime: index, employeeId: f.employeeId, projectId: f.projectId, date: today(), status: "pending" });
+    }
+    type Page = { isDone: boolean; hasMore: boolean; page: Row[]; continueCursor: string };
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let guard = 0; guard < 5; guard += 1) {
+      const page = await listPending(f.ctx, { projectId: f.projectId, paginationOpts: { numItems: 100, cursor } }) as Page;
+      seen.push(...page.page.map(row => row._id));
+      expect(page.hasMore).toBe(false);
+      if (page.isDone) break;
+      cursor = page.continueCursor;
+    }
+    expect(seen).toHaveLength(201);
+    expect(seen).toContain("pending-0");
   });
 
   it("blocks project_user and out-of-scope project admins from decisions", async () => {

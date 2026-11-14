@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { mobileError } from "./mobileErrors";
 import { employmentEnded } from "./employment";
 import { trTodayKey } from "./trDate";
@@ -35,6 +35,17 @@ export async function getCurrentEmployee(
     throw mobileError("SESSION_REVOKED");
   }
   return employee;
+}
+
+/** Revoke all mobile credentials without scanning sessions or changing the password. */
+export async function revokeEmployeeSessions(ctx: MutationCtx, employeeId: Id<"employees">): Promise<void> {
+  const auth = await ctx.db.query("employeeAuth")
+    .withIndex("by_employee", q => q.eq("employeeId", employeeId))
+    .first();
+  if (auth) await ctx.db.patch(auth._id, {
+    passwordVersion: (auth.passwordVersion ?? 0) + 1,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 /** Password and revision are committed together; no unbounded session scan. */

@@ -203,3 +203,55 @@ describe("termination audit regressions", () => {
     expect(aphb.xml).toContain(`<eksikGunSayisi>${missingDays}</eksikGunSayisi>`);
   });
 });
+
+async function mobileSession(f: Awaited<ReturnType<typeof fixture>>, version?: number) {
+  return f.t.run(async ctx => {
+    const authId = await ctx.db.insert("employeeAuth", {
+      employeeId: f.employeeId, passwordHash: "unchanged-hash", passwordVersion: version, createdAt: "", updatedAt: "",
+    });
+    await ctx.db.insert("employeeSessions", {
+      employeeId: f.employeeId, token: "old-token", passwordVersion: version, createdAt: "", expiresAt: "2030-01-01T00:00:00Z",
+    });
+    return authId;
+  });
+}
+
+it.each([undefined, 4])("form deactivation stamps the TR day, revokes version %s permanently and leaves unrelated edits alone", async version => {
+  vi.setSystemTime(new Date("2026-11-09T21:05:00Z"));
+  const f = await fixture();
+  const authId = await mobileSession(f, version);
+  await f.caller.mutation(api.employees.update, { employeeId: f.employeeId, isActive: false });
+  expect(await f.t.run(ctx => ctx.db.get(f.employeeId))).toMatchObject({ isActive: false, deactivatedAt: "2026-11-10" });
+  expect(await f.t.run(ctx => ctx.db.get(authId))).toMatchObject({ passwordHash: "unchanged-hash", passwordVersion: (version ?? 0) + 1 });
+  await f.t.run(ctx => ctx.db.patch(f.sessionId, { expirationTime: Date.parse("2026-12-01T00:00:00Z") }));
+  vi.setSystemTime(new Date("2026-11-11T12:00:00Z"));
+  await f.caller.mutation(api.employees.update, { employeeId: f.employeeId, isActive: false, firstName: "Edited" });
+  expect((await f.t.run(ctx => ctx.db.get(f.employeeId)))?.deactivatedAt).toBe("2026-11-10");
+  expect((await f.t.run(ctx => ctx.db.get(authId)))?.passwordVersion).toBe((version ?? 0) + 1);
+  await f.caller.mutation(api.employees.update, { employeeId: f.employeeId, isActive: true });
+  expect((await f.t.run(ctx => ctx.db.get(f.employeeId)))?.deactivatedAt).toBeUndefined();
+  await expect(f.t.query(api.employeeAuth.me, { sessionToken: "old-token" })).rejects.toMatchObject({ data: { code: "SESSION_REVOKED" } });
+});
+
+it("closeAccess revokes sessions across reinstatement", async () => {
+  const f = await fixture();
+  const authId = await mobileSession(f, 2);
+  await f.caller.mutation(api.employeeTermination.terminate, { employeeId: f.employeeId, ...termination });
+  expect((await f.t.run(ctx => ctx.db.get(authId)))?.passwordVersion).toBe(3);
+  expect((await f.t.run(ctx => ctx.db.get(f.employeeId)))?.deactivatedAt).toBe("2026-10-21");
+  await f.caller.mutation(api.employeeTermination.reinstate, { employeeId: f.employeeId });
+  expect((await f.t.run(ctx => ctx.db.get(f.employeeId)))?.deactivatedAt).toBeUndefined();
+  await expect(f.t.query(api.employeeAuth.me, { sessionToken: "old-token" })).rejects.toMatchObject({ data: { code: "SESSION_REVOKED" } });
+});
+
+it("transfer revokes source sessions permanently even if the transfer is cancelled", async () => {
+  const f = await fixture("super_admin");
+  const authId = await mobileSession(f, 3);
+  await f.t.run(ctx => ctx.db.patch(f.deviceId, { lastSeen: new Date().toISOString() }));
+  const result = await f.caller.mutation(api.employeeTermination.startTransfer, { employeeId: f.employeeId, targetProjectId: f.foreignId, accessRuleIds: [] });
+  expect(await f.t.run(ctx => ctx.db.get(authId))).toBeNull();
+  await f.caller.mutation(api.employeeTermination.cancelTransfer, { transferId: result.transferId });
+  expect(await f.t.run(ctx => ctx.db.get(f.employeeId))).toMatchObject({ isActive: true });
+  expect((await f.t.run(ctx => ctx.db.get(f.employeeId)))?.deactivatedAt).toBeUndefined();
+  await expect(f.t.query(api.employeeAuth.me, { sessionToken: "old-token" })).rejects.toMatchObject({ data: { code: "SESSION_INVALID" } });
+});

@@ -41,18 +41,18 @@ async function insert(ctx: MutationCtx, ids: Ids, stage: number, time = old, act
   if (stage === 7) return ctx.db.insert("deviceEvents", { source: "system", eventTime: iso(time), category: "status", severity: "info", label: "Test", createdAt: iso(time), updatedAt: iso(time) });
   if (stage < 10) return ctx.db.insert("checkInTokens", { employeeId: ids.employeeId, token: crypto.randomUUID(), createdAt: iso(old), expiresAt: iso(active ? runAt + DAY_MS : stage === 9 ? runAt + DAY_MS : time), usedAt: stage === 9 && !active ? iso(time) : undefined });
   if (stage === 10) return ctx.db.insert("employeeSessions", { employeeId: ids.employeeId, token: crypto.randomUUID(), createdAt: iso(old), expiresAt: iso(active ? runAt + DAY_MS : time) });
-  return ctx.db.insert("mobileAccessOperations", { projectId: ids.projectId, employeeId: ids.employeeId, sessionId: ids.sessionId, deviceId: ids.deviceId, deviceName: "Test", authVersion: 0, requestId: crypto.randomUUID(), requestedAt: iso(time), status: active ? "pending" : stage === 11 ? "confirmed" : stage === 12 ? "failed" : "unknown", transport: "ide_mqtt", actuator: 1 });
+  return ctx.db.insert("mobileAccessOperations", { projectId: ids.projectId, employeeId: ids.employeeId, sessionId: ids.sessionId, deviceId: ids.deviceId, deviceName: "Test", authVersion: 0, requestId: crypto.randomUUID(), requestedAt: iso(time), status: active ? "pending" : stage === 11 ? "confirmed" : stage === 12 ? "failed" : stage === 14 ? "pending" : stage === 15 ? "sent" : "unknown", transport: "ide_mqtt", actuator: 1 });
 }
 afterEach(() => vi.useRealTimers());
-it.each(cases)("%s stage %i deletes 450 old records in three batches and keeps recent/active records", async (name, stage) => {
+it.each(cases)("%s stage %i deletes 450 old records in bounded batches and keeps recent/active records", async (name, stage) => {
   const { t, ids } = await fixture();
   const { expired, recent, active } = await t.run(async ctx => {
     const expired = [];
     for (let i = 0; i < 450; i++) expired.push(await insert(ctx, ids, stage));
-    return { expired, recent: await insert(ctx, ids, stage, runAt), active: stage === 7 ? null : await insert(ctx, ids, stage, old, true) };
+    return { expired, recent: await insert(ctx, ids, stage, runAt), active: stage === 7 ? null : await insert(ctx, ids, stage, stage >= 11 ? runAt : old, true) };
   });
   await t.mutation(ref(name), { stage, batch: 0, runAt });
-  expect(await t.run(async ctx => (await Promise.all(expired.map(id => ctx.db.get(id)))).filter(row => row !== null).length)).toBe(250);
+  expect(await t.run(async ctx => (await Promise.all(expired.map(id => ctx.db.get(id)))).filter(row => row !== null).length)).toBe(stage === 12 || stage === 13 ? 350 : 250);
   const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
   expect(jobs).toHaveLength(1);
   expect(jobs[0].name).toBe(`privacyRetention:${name}`);
@@ -61,8 +61,8 @@ it.each(cases)("%s stage %i deletes 450 old records in three batches and keeps r
   expect(await t.run(ctx => ctx.db.get(recent))).not.toBeNull();
   if (active) expect(await t.run(ctx => ctx.db.get(active))).not.toBeNull();
   const allJobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
-  // Run pages can need a final empty read; exactly three nonempty pages always suffice.
-  expect(allJobs.filter(job => job.name === `privacyRetention:${name}` && job.args[0].stage === stage)).toHaveLength(2);
+  // Mobile failed/unknown stages share each batch with stale pending/sent rows.
+  expect(allJobs.filter(job => job.name === `privacyRetention:${name}` && job.args[0].stage === stage)).toHaveLength(stage === 12 || stage === 13 ? 4 : 2);
   expect(allJobs.length + 1).toBeLessThanOrEqual(20);
 });
 it("keeps recent terminal updates and unresolved failed revocations", async () => {
@@ -111,7 +111,7 @@ it("preserves all active operation states and recently used expired tokens acros
   const keep = await t.run(async ctx => {
     const processing = await insert(ctx, ids, 0); await ctx.db.patch(processing, { status: "processing" });
     const pending = await insert(ctx, ids, 2); await ctx.db.patch(pending, { status: "pending" });
-    const sent = await insert(ctx, ids, 11); await ctx.db.patch(sent, { status: "sent" });
+    const sent = await insert(ctx, ids, 11, runAt); await ctx.db.patch(sent, { status: "sent" });
     const token = await insert(ctx, ids, 8); await ctx.db.patch(token, { usedAt: iso(runAt) });
     return [processing, pending, sent, token];
   });
@@ -372,4 +372,27 @@ it("audits failed retention deletion, rolls back its partial cascade and continu
   expect(audit.some(row => row.targetId === data.blocked && row.note?.startsWith("Saklama silmesi atlandı: ") && row.note.includes("talep geçmişi"))).toBe(true);
   const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
   expect(jobs.some(job => job.name.includes("deleteEmployeeFromDevicesInternal") && job.args[0].employeeId === data.blocked)).toBe(false);
+});
+
+
+it.each([12, 13])("shares mobile stage %i batches with stale operations without shifting visitors", async stage => {
+  const { t, ids } = await fixture();
+  const rows = await t.run(async ctx => {
+    const terminal = [];
+    const stale = [];
+    for (let i = 0; i < 450; i++) {
+      terminal.push(await insert(ctx, ids, stage));
+      stale.push(await insert(ctx, ids, stage === 12 ? 14 : 15));
+    }
+    return { terminal, stale };
+  });
+  await t.mutation(internal.privacyRetention.purgeMobileOperations, { stage, batch: 0, runAt });
+  for (const group of [rows.terminal, rows.stale]) {
+    expect(await t.run(async ctx => (await Promise.all(group.map(id => ctx.db.get(id)))).filter(row => row !== null).length)).toBe(350);
+  }
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  for (const id of [...rows.terminal, ...rows.stale]) expect(await t.run(ctx => ctx.db.get(id))).toBeNull();
+  const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+  expect(jobs.some(job => job.name === "privacyRetention:purgeVisitors" && job.args[0].stage === 14)).toBe(true);
+  expect(jobs.length + 1).toBeLessThanOrEqual(20);
 });

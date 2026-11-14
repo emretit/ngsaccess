@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LEGACY_PDKS_POLICY } from "./pdksRules";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   DEFAULT_OVERTIME_RATES,
@@ -549,4 +550,20 @@ it("does not count the gap between shift buckets as a break", () => {
   const empReadings = ["08:00", "12:00", "14:00", "18:00"].map((time, index) => reading(`${MONDAY}T${time}:00+03:00`, { direction: index % 2 === 0 ? "entry" : "exit" }));
   const result = computePdksTableRow(rowParams({ empReadings, viewMode: "matrix", includePunches: true, resolveShift: () => shifts[0] ?? null, resolvePlan: () => ({ kind: "shifts", shifts, source: "department", calendar: "plan", origin: "weekly" }) }));
   expect(result.days[0]?.detail).toMatchObject({ pairs: [{ in: "08:00", out: "12:00" }, { in: "14:00", out: "18:00" }], breaks: [], breakMinutes: 0 });
+});
+
+it.each([false, true])("keeps October readings/manual hours under requirements after November deactivation (manual=%s)", isManual => {
+  const date = "2026-10-05";
+  const shift = { startTime: "09:00", endTime: "18:00" } as Doc<"shifts">;
+  const row = computePdksTableRow(rowParams({
+    employee: employee({ isActive: false, deactivatedAt: "2026-11-10" }),
+    startDate: date, periodDateKeys: [date], firstRecordDate: date,
+    availableDateKeys: new Set([date]), viewMode: "matrix",
+    policyFor: () => ({ ...LEGACY_PDKS_POLICY, punchMode: "requirements", requireCheckIn: true, requireCheckOut: true }),
+    resolveShift: () => shift,
+    empReadings: isManual ? [] : [reading(`${date}T06:00:00Z`, { direction: "entry" }), reading(`${date}T15:00:00Z`, { direction: "exit" })],
+    manualPdksByEmpDate: isManual ? new Map([[`${EMP_ID}__${date}`, manual(date, "09:00", "18:00")]]) : new Map(),
+  }));
+  expect(row.days[0]?.status).not.toBe("notEmployed");
+  expect(row.days[0]?.totalMinutes).toBeGreaterThan(0);
 });

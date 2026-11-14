@@ -34,7 +34,9 @@ function Members({
               <li key={row._id} className="py-2 break-words">
                 {"employees" in row
                   ? row.employees
-                    ? `${row.employees.firstName} ${row.employees.lastName}`
+                    ? "firstName" in row.employees
+                      ? `${row.employees.firstName} ${row.employees.lastName}`
+                      : "Kişi (görüntüleme yetkiniz yok)"
                     : "Kişi kaydı bulunamadı"
                   : "devices" in row
                     ? (row.devices?.name ?? "Cihaz kaydı bulunamadı")

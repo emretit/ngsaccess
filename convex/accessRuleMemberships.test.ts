@@ -95,6 +95,19 @@ describe("accessRules.listMemberships", () => {
     }
   });
 
+  it("hides member names and e-mail from list when employees.view is removed from the role", async () => {
+    const f = await fixture("project_user");
+    const named = (await f.caller.query(api.accessRules.list, { projectId: f.projectId })).find(rule => rule._id === f.ruleId);
+    expect(named?.groupMembers.map(member => member.employees)).toContainEqual({ id: f.employeeId, firstName: "Ada", lastName: "Test", email: "ada@test" });
+    await f.t.run(ctx => ctx.db.insert("projectRolePermissions", { projectId: f.projectId, role: "viewer", permissions: ["reports.view", "doors.open"], updatedAt: Date.now(), updatedBy: f.userId }));
+    const hidden = (await f.caller.query(api.accessRules.list, { projectId: f.projectId })).find(rule => rule._id === f.ruleId);
+    expect(hidden?.groupMembers.map(member => member.employees)).toEqual([{ id: f.employeeId }, { id: f.employeeId }, null]);
+    const details = await f.caller.query(api.accessRules.getDetails, { ruleId: f.ruleId, projectId: f.projectId });
+    expect(details.groupMembers.map(member => member.employees)).toEqual([{ id: f.employeeId }, { id: f.employeeId }, null]);
+    const members = await f.caller.query(api.accessRules.listRuleMembers, { ruleId: f.ruleId, kind: "people", paginationOpts: { numItems: 10, cursor: null } });
+    expect(members.kind === "people" ? members.page.map(member => member.employees) : []).toEqual([{ id: f.employeeId }, { id: f.employeeId }, null]);
+  });
+
   it("requires a valid authenticated session, just like list", async () => {
     const f = await fixture();
     for (const query of [api.accessRules.list, api.accessRules.listMemberships]) {

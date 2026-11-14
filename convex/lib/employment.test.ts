@@ -33,3 +33,15 @@ describe("employment period", () => {
     expect(employmentEnded({ isActive, isVisitor: true, employmentEndDate: "2026-10-15" }, "2026-10-16")).toBe(false);
   });
 });
+
+it("preserves history through the inclusive deactivation day with explicit termination taking priority", () => {
+  const employee = { isActive: false, deactivatedAt: "2026-11-10" };
+  for (const day of ["2026-10-05", "2026-11-10"]) expect(employedOn(employee, day)).toBe(true);
+  expect(employedOn(employee, "2026-11-11")).toBe(false);
+  expect(employedDuring(employee, "2026-10-01", "2026-10-31")).toBe(true);
+  expect(employedDuring(employee, "2026-11-11", "2026-11-30")).toBe(false);
+  expect(employedOn({ ...employee, employmentEndDate: "2026-10-01" }, "2026-10-05")).toBe(false);
+  expect(employedOn({ ...employee, employmentEndDate: "2026-11-20" }, "2026-11-11")).toBe(true);
+  expect(employmentEnded(employee, "2026-11-11")).toBe(false);
+  expect(employedOn({ ...employee, isVisitor: true }, "2026-10-05")).toBe(false);
+});
