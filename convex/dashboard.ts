@@ -1,5 +1,5 @@
 import { resolveReadingScope, MONITORING_READING_PERMISSIONS, REPORT_READING_PERMISSIONS } from "./lib/readingAccess";
-import { scopedPdksPlan, shiftForInstant, usesPlanDayRules, splitReadingsByShift } from "./lib/pdksMultiShift";
+import { computePdksPlannedDay, scopedPdksPlan, shiftForInstant, usesPlanDayRules, splitReadingsByShift } from "./lib/pdksMultiShift";
 import { buildPeriodDateKeys } from "./lib/pdksCalc";
 import { hasFixedShiftRules, usesShiftDayRules } from "./lib/pdksFixedRules";
 import { loadRuleReportDays } from "./lib/reportAttendance";
@@ -28,7 +28,7 @@ import {
   isoTimeToTRMinutes,
   dailyOvertimeForShift,
 } from "./lib/pdksHelpers";
-import { netWorkMinutes } from "./lib/breakDeduction";
+import type { PdksDayPolicy, PdksProjectPolicies } from "./lib/pdksRules";
 import {
   bucketWeeklyOvertime,
   type DayEntry,
@@ -177,6 +177,8 @@ async function loadPdksDataset(
   shiftResolver: ShiftResolver;
   workSettings: EffectiveWorkSettings;
   ruleRows: Map<Id<"employees">, PdksTableRow>;
+  policies: PdksProjectPolicies;
+  workSettingsProjectId: Id<"projects"> | undefined;
 }> {
   const allowedProjectIds = await resolveReadingScope(ctx, filters.projectId, REPORT_READING_PERMISSIONS);
   let employees: Doc<"employees">[] = [];
@@ -294,7 +296,7 @@ async function loadPdksDataset(
       versioned.push(...(evidence.durationMeasured ? selected : selected.slice(0, 1)));
     }
   }
-  return { employees, readings: [...legacy, ...versioned], activityReadings: filtered, leaves, deptNameById, shiftResolver, workSettings, ruleRows: ruleReport.ruleRows };
+  return { employees, readings: [...legacy, ...versioned], activityReadings: filtered, leaves, deptNameById, shiftResolver, workSettings, ruleRows: ruleReport.ruleRows, policies: ruleReport.policies, workSettingsProjectId: settingsProjectId };
 }
 
 /** Keep the legacy boundary resolver for ordinary person-days, even with versioned policies. */
@@ -425,6 +427,35 @@ export function computePdksCoreInMemory(
   };
 }
 
+/** Ordinary days retain weekly settlement; rule-managed days use their existing table totals.
+ * Net minutes and work-date attribution always come from the shared PDKS engine. */
+export function annualOvertimeDayEntries(params: {
+  employeeId: Id<"employees">;
+  readings: readonly Doc<"cardReadings">[];
+  shiftResolver: ShiftResolver;
+  workSettings: EffectiveWorkSettings;
+  policyFor: (date: string) => PdksDayPolicy;
+  startDate: string;
+  endDate: string;
+  managedDates?: ReadonlySet<string>;
+}): DayEntry[] {
+  const { employeeId, shiftResolver, workSettings, policyFor } = params;
+  const days = groupPdksWorkDays(params.readings, employeeId, shiftResolver.resolve,
+    undefined, undefined, shiftResolver.resolveLast, policyFor);
+  const entries: DayEntry[] = [];
+  for (const [date, readings] of days) {
+    if (date < params.startDate || date > params.endDate || params.managedDates?.has(date)) continue;
+    const day = computePdksPlannedDay({
+      date, readings, policy: policyFor(date), workSettings,
+      shift: shiftResolver.resolve(employeeId, date),
+      dayPlan: shiftResolver.resolvePlan(employeeId, date),
+      nextDayKind: shiftResolver.resolvePlan(employeeId, addWorkDate(date, 1)).kind === "rest" ? "rest" : "work",
+    });
+    if (!day.noShift) entries.push({ date, netMinutes: day.totalMinutes, classification: day.classification });
+  }
+  return entries;
+}
+
 export const getAnnualOvertimeBalance = authedQuery({
   args: {
     year: v.optional(v.number()),
@@ -435,40 +466,35 @@ export const getAnnualOvertimeBalance = authedQuery({
     const targetYear = args.year ?? Number(trTodayKey().slice(0, 4));
     const { startISO, endISO } = trDayRangeISO(`${targetYear}-01-01`, `${targetYear}-12-31`);
 
-    const { employees, readings, shiftResolver, ruleRows } =
+    const { employees, activityReadings, shiftResolver, ruleRows, policies, workSettings, workSettingsProjectId } =
       await loadPdksDataset(ctx, startISO, endISO, { projectId: args.projectId });
 
-    const targetEmployees = employees.filter(e => (!args.employeeId || e._id === args.employeeId) && buildPeriodDateKeys(`${targetYear}-01-01`, `${targetYear}-12-31`).some(date => shiftResolver.resolvePlan(e._id, date).kind !== "none"));
-
-    const readingsByEmpDay = new Map<string, Map<string, Doc<"cardReadings">[]>>();
-    for (const r of readings) {
-      if (r.accessStatus !== "izin_verildi" || !r.employeeId) continue;
-      const empKey = String(r.employeeId);
-      const dateKey = trDateKey(r.accessTime);
-      if (!readingsByEmpDay.has(empKey)) readingsByEmpDay.set(empKey, new Map());
-      const dayMap = readingsByEmpDay.get(empKey)!;
-      if (!dayMap.has(dateKey)) dayMap.set(dateKey, []);
-      dayMap.get(dateKey)!.push(r);
+    const dates = buildPeriodDateKeys(`${targetYear}-01-01`, `${targetYear}-12-31`);
+    const targetEmployees = employees.filter(e => (!args.employeeId || e._id === args.employeeId) && dates.some(date => shiftResolver.resolvePlan(e._id, date).kind !== "none"));
+    // Load once per project, rather than once per employee or person-day.
+    const settingsByProject = new Map(await Promise.all([...new Set(targetEmployees.map(e => e.projectId))].map(async projectId =>
+      [projectId, projectId === workSettingsProjectId ? workSettings : projectId ? await getEffectiveWorkSettings(ctx, projectId) : DEFAULT_WORK_SETTINGS] as const,
+    )));
+    const employeesByCard = new Map(targetEmployees.map(employee => [`${employee.projectId}__${employee.cardNumber}`, employee._id]));
+    const readingsByEmployee = new Map<Id<"employees">, Doc<"cardReadings">[]>();
+    for (const reading of activityReadings) {
+      const employeeId = reading.employeeId ?? employeesByCard.get(`${reading.projectId}__${reading.cardNo}`);
+      if (!employeeId) continue;
+      const list = readingsByEmployee.get(employeeId) ?? [];
+      list.push(reading);
+      readingsByEmployee.set(employeeId, list);
     }
 
     const out = targetEmployees.map((emp) => {
-      const dayMap =
-        readingsByEmpDay.get(String(emp._id)) ?? new Map<string, Doc<"cardReadings">[]>();
-      const dayEntries: DayEntry[] = [];
-      for (const [date, list] of dayMap) {
-        list.sort((a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime());
-        const first = list[0];
-        const last = list[list.length - 1];
-        if (!first || first === last) continue;
-        const rawMin = Math.floor(
-          (new Date(last.accessTime).getTime() - new Date(first.accessTime).getTime()) / 60000,
-        );
-        const shift = shiftResolver.resolve(emp._id, date);
-        const net = netWorkMinutes(rawMin, shift);
-        const dow = new Date(`${date}T00:00:00.000Z`).getUTCDay();
-        const classification: DayEntry["classification"] = dow === 0 || dow === 6 ? "weekend" : "workday";
-        if (!ruleRows.get(emp._id)?.days.some(day => day.date === date)) dayEntries.push({ date, netMinutes: net, classification });
-      }
+      const dayEntries = annualOvertimeDayEntries({
+        employeeId: emp._id,
+        readings: readingsByEmployee.get(emp._id) ?? [],
+        shiftResolver,
+        workSettings: settingsByProject.get(emp.projectId) ?? DEFAULT_WORK_SETTINGS,
+        policyFor: date => policies(emp.projectId, date),
+        startDate: dates[0], endDate: dates[dates.length - 1],
+        managedDates: new Set(ruleRows.get(emp._id)?.days.map(day => day.date)),
+      });
       const buckets = bucketWeeklyOvertime(dayEntries);
       const totalMin = buckets.reduce((s, b) => s + b.overtimeMinutes + b.premiumMinutes, 0) + (ruleRows.get(emp._id)?.days.reduce((sum, day) => sum + day.overtimeMinutes, 0) ?? 0);
       const limitMin = ANNUAL_OVERTIME_LIMIT_MINUTES;
