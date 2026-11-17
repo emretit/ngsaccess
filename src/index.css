@@ -108,6 +108,7 @@
     }
 
     .dark {
+        color-scheme: dark;
         --canvas: 222.2 84% 4.9%;
         --surface: 222.2 84% 4.9%;
         --subtle: 217.2 32.6% 17.5%;
