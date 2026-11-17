@@ -8,7 +8,7 @@ export function dailySource(days: DailyCell[]): DailySourceRow {
   return { excludedUnknownReadings: 0, id: 'employee-a', name: 'Ayşe Yılmaz', employeeId: '123', cardNumber: '123', payrollCode: 'N', payrollEmployeeCode: 'P01', department: 'Üretim', firstEntry: '09:05', lastExit: '18:00', totalHours: '8 sa 55 dk', totalMinutes: 535, overtimeMinutes: 0, overtime: '0m', overtimeHours: 0, overtimeMultiplier: 1, overtimePayTRY: null, hourlyRate: null, yearlyOvertimeLimit: 270, leaveType: '-', status: 'present', isLate: false, isEarlyExit: false, isManual: false, manualNote: null, manualEditedBy: null, detailedLogs: [], days };
 }
 export function monthlySheet(employeeKey = 'employee-a'): MonthlySheet {
-  return { year: 2026, month: 10, days: ['2026-10-19'], rows: [{ employeeId: employeeKey as Id<'employees'>, payrollCode: 'P01', name: 'Ayşe Yılmaz', cardNumber: '123', department: 'Üretim', hourlyRate: null,
+  return { year: 2026, month: 10, isClosed: false, days: ['2026-10-19'], rows: [{ employeeId: employeeKey as Id<'employees'>, payrollCode: 'P01', name: 'Ayşe Yılmaz', cardNumber: '123', department: 'Üretim', hourlyRate: null,
     cells: [{ date: '2026-10-19', status: 'present', payrollCode: 'N', totalMinutes: 535, rawTotalMinutes: 535, nightMinutes: 0, overtimeMinutes: 0, multiplier: 0, overtimePayTRY: null, isLate: false, isEarlyExit: false, isManual: false, classification: 'workday' }],
     totals: { totalMinutes: 535, overtimeMinutes: 0, overtimePayTRY: null, leaveDays: 0, absentDays: 0, lateDays: 0, exceedsDaily11h: [] } }] };
 }

@@ -17,6 +17,40 @@ import { shiftRuleFields, shiftRulesValidator } from "./lib/shiftVersions";
 export default defineSchema({
   ...authTables,
 
+  payrollPeriods: defineTable({
+    projectId: v.id("projects"),
+    period: v.string(),
+    status: v.union(v.literal("closed"), v.literal("reopened")),
+    closedAt: v.number(),
+    closedBy: v.id("users"),
+    reopenedAt: v.optional(v.number()),
+    reopenedBy: v.optional(v.id("users")),
+    // The period is locked immediately; readers wait until every frozen row is stored.
+    snapshotReady: v.boolean(),
+    availableDates: v.optional(v.array(v.string())),
+    expectedRows: v.number(),
+    storedRows: v.number(),
+  }).index("by_projectId_and_period", ["projectId", "period"]),
+
+  payrollSnapshotJobs: defineTable({
+    periodId: v.id("payrollPeriods"),
+    cursor: v.union(v.string(), v.null()),
+    processedRows: v.number(),
+    completed: v.boolean(),
+    scheduledId: v.optional(v.id("_scheduled_functions")),
+  }).index("by_periodId", ["periodId"]),
+
+  payrollPeriodRows: defineTable({
+    periodId: v.id("payrollPeriods"),
+    employeeId: v.id("employees"),
+    companyId: v.optional(v.id("companies")),
+    // Versioned internal serialization of the shared engine row, including every day cell.
+    formatVersion: v.literal(1),
+    rowJson: v.string(),
+    workedDays: v.number(),
+    totalMinutes: v.number(),
+  }).index("by_periodId_and_employeeId", ["periodId", "employeeId"]),
+
   // ═══════ 1 · KİMLİK · PROJE · YETKİLENDİRME ═══════════════════════════
   // users tablosunu authTables'tan override ediyoruz, custom alanlar ekleniyor
   users: defineTable({

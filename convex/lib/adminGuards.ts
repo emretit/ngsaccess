@@ -83,6 +83,8 @@ export const projectDeletionMatrix = [
   { table: "employeeAuth", index: "scan", label: "Kişi kimlik bilgileri", policy: "delete" },
   { table: "idePanelUsers", index: "scan", label: "Panel kişi kopyaları", policy: "preserve" },
   { table: "auditLog", index: "by_project_timestamp", label: "Denetim geçmişi", policy: "preserve" },
+  // payrollPeriodRows has no projectId; its periodId-linked snapshots remain with this history.
+  { table: "payrollPeriods", index: "by_projectId_and_period", label: "Bordro dönem geçmişi", policy: "preserve" },
   { table: "accessGrantStatus", index: "by_project_state", label: "Yetki geçmişi", policy: "preserve" },
   { table: "deviceSyncRuns", index: "by_project_started", label: "Cihaz gönderim geçmişi", policy: "preserve" },
   { table: "mobileAccessOperations", index: "scan", label: "Mobil işlem geçmişi", policy: "preserve" },
@@ -170,6 +172,7 @@ function projectDeletionTableQuery(
   if (entry.index === "by_project_device") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_project_group") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_project_status") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_and_period") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_projectId_and_role") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_projectId_and_effectiveFrom") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_project_timestamp") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));

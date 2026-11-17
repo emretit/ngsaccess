@@ -1,6 +1,8 @@
 import { scopedPdksPlan } from "./pdksMultiShift";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { loadPdksRulePolicy } from "./pdksRules";
+import type { PdksProjectPolicies } from "./pdksRules";
 import { loadPdksPolicies } from "./pdksRules";
 import { employedDuring, employedOn } from "./employment";
 import { canSeePayInProject } from "./payVisibility";
@@ -12,6 +14,7 @@ import { buildPeriodDateKeys } from "./pdksCalc";
 import { addWorkDate, buildPdksWorkDateResolver, hasFlexiblePdksShift, pdksWorkDayRange, groupPdksWorkDays } from "./pdksWorkDay";
 import { withPdksDeviceAvailability, pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import { trDayRangeISO, trDateKey } from "./trDate";
+import { isPdksIncludedReading } from "./pdksSource";
 import { filterPdksReadings } from "./pdksSource";
 import { buildPdksEmployeeReadingMap } from "./pdksTable";
 import { computePayrollCell } from "./pdksPayroll";
@@ -46,9 +49,14 @@ const reportHelpers: PayrollHelpers = {
   },
 };
 
+// Snapshot metadata is shared by the monthly table and report consumers.
+export type MonthlyPayrollSheet = Awaited<ReturnType<typeof loadPayrollPeriod>> & {
+  year: number; month: number; isClosed: boolean; snapshotPending?: boolean; snapshotTruncated?: boolean;
+};
+
 export async function getMonthlyPayrollSheet(
   ctx: QueryCtx & { user: Doc<"users"> }, args: PdksPayrollQueryArgs, helpers: PayrollHelpers,
-) {
+): Promise<MonthlyPayrollSheet> {
   if (!Number.isInteger(args.year) || args.year < 1000 || args.year > 9999 || !Number.isInteger(args.month) || args.month < 1 || args.month > 12) {
     throw new Error("Geçerli bir yıl ve ay seçin");
   }
@@ -56,8 +64,22 @@ export async function getMonthlyPayrollSheet(
   const lastDay = new Date(Date.UTC(args.year, args.month, 0)).getUTCDate();
   const startDate = `${args.year}-${monthStr}-01`;
   const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+  await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
+  const closedPeriod = await ctx.db.query("payrollPeriods")
+    .withIndex("by_projectId_and_period", q => q.eq("projectId", args.projectId).eq("period", `${args.year}-${monthStr}`)).order("desc").first();
+  if (closedPeriod?.status === "closed") {
+    if (!closedPeriod.snapshotReady) return { days: buildPeriodDateKeys(startDate, endDate), rows: [], year: args.year, month: args.month, isClosed: true, snapshotPending: true };
+    const page = await ctx.db.query("payrollPeriodRows").withIndex("by_periodId_and_employeeId", q => q.eq("periodId", closedPeriod._id)).paginate({ numItems: 25, cursor: null, maximumBytesRead: 1000000 });
+    const saved = page.page;
+    const payVisible = await canSeePayInProject(ctx, ctx.user, args.projectId);
+    const rows = saved.filter(row => !args.companyId || row.companyId === args.companyId).map(saved => {
+      const row = JSON.parse(saved.rowJson) as Awaited<ReturnType<typeof loadPayrollPeriod>>["rows"][number];
+      return payVisible ? row : { ...row, hourlyRate: null, cells: row.cells.map(cell => ({ ...cell, overtimePayTRY: null })), totals: { ...row.totals, overtimePayTRY: null } };
+    }).sort((a, b) => a.name.localeCompare(b.name, "tr"));
+    return { days: buildPeriodDateKeys(startDate, endDate), rows, year: args.year, month: args.month, isClosed: true, snapshotTruncated: !page.isDone };
+  }
   const result = await loadPayrollPeriod(ctx, { ...args, startDate, endDate }, helpers);
-  return { ...result, year: args.year, month: args.month };
+  return { ...result, year: args.year, month: args.month, isClosed: false };
 }
 
 /** Reports and payroll settle the same net day segments, including preceding week context. */
@@ -65,7 +87,7 @@ export async function loadPayrollPeriod(
   ctx: QueryCtx & { user: Doc<"users"> },
   args: { projectId: Id<"projects">; startDate: string; endDate: string; companyId?: Id<"companies"> },
   helpers: PayrollHelpers = reportHelpers,
-  preloaded: { employees?: Doc<"employees">[]; shiftResolver?: ShiftResolver; readings?: PayrollReadings } = {},
+  preloaded: { employees?: Doc<"employees">[]; shiftResolver?: ShiftResolver; readings?: PayrollReadings; availableDates?: readonly string[]; snapshotAt?: number } = {},
 ) {
   const { scopedPdksShift, flexiblePreviousReadings } = helpers;
   const allowedProjectIds = await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
@@ -149,6 +171,7 @@ export async function loadPayrollPeriod(
   const payrollEmployeeReadings = buildPdksEmployeeReadingMap({ employees, readings });
   const payrollWorkDate = [...payrollShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId)) : payrollBoundaryWorkDate;
   const payrollAvailableDates = pdksAvailableDatesByProject(readings, payrollWorkDate);
+  if (preloaded.availableDates) payrollAvailableDates.set(args.projectId, new Set(preloaded.availableDates));
   await Promise.all([...new Set(employees.map(employee => employee.projectId))].map(async projectId => {
     payrollAvailableDates.set(projectId, await withPdksDeviceAvailability(ctx, projectId, payrollAvailableDates.get(projectId) ?? new Set(), policies, overtimeRange.endDate));
   }));
@@ -177,7 +200,7 @@ export async function loadPayrollPeriod(
         monthlyHoursBase: workSettings.monthlyHoursBase,
       }) : null;
 
-      const firstRecordDate = await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate, policies);
+      const firstRecordDate = preloaded.snapshotAt !== undefined ? await snapshotFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate, policies, preloaded.snapshotAt) : await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate, policies);
       const availableDateKeys = payrollAvailableDates.get(emp.projectId) ?? new Set<string>();
       const allCells = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).filter(date => employedOn(emp, date)).map((d) =>
         computePayrollCell({
@@ -260,4 +283,22 @@ export async function loadPayrollPeriod(
     days,
     rows: rows.filter(row => row.cells.some(cell => !cell.noShift)).sort((a, b) => a.name.localeCompare(b.name, "tr")),
   };
+}
+
+/** Same first-record evidence as live payroll, excluding history ingested after closure. */
+async function snapshotFirstRecordDate(ctx: QueryCtx, employee: Doc<"employees">, readings: readonly Doc<"cardReadings">[], manualDates: readonly string[], workDay: (reading: Doc<"cardReadings">) => string, policies: PdksProjectPolicies, cutoff: number) {
+  const candidates: Doc<"cardReadings">[] = [];
+  let inspected = 0;
+  for await (const reading of ctx.db.query("cardReadings").withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", employee._id)).order("asc")) {
+    if (++inspected > 2000) throw new Error("Kapanış öncesi ilk kayıt arama sınırı aşıldı; dönemi yeniden açıp geçmişi inceleyin");
+    if (reading._creationTime <= cutoff) candidates.push(reading);
+    if (candidates.length === 20) break;
+  }
+  const historical = new Map<string, Awaited<ReturnType<typeof loadPdksRulePolicy>>>();
+  const historyStart = policies.historyStart(employee.projectId);
+  if (historyStart) await Promise.all([...new Set(candidates.map(workDay).filter(date => date < historyStart))].map(async date => historical.set(date, await loadPdksRulePolicy(ctx, employee.projectId, date, date))));
+  const eligible = (reading: Doc<"cardReadings">) => isPdksIncludedReading(reading, employee.projectId, historical.get(workDay(reading))?.(workDay(reading)) ?? policies(reading.projectId, workDay(reading)));
+  const oldReadings = candidates.filter(eligible), periodReadings = readings.filter(eligible).filter(reading => reading.employeeId === employee._id || reading.cardNo === employee.cardNumber);
+  const allowed = [...oldReadings, ...periodReadings].filter(reading => reading.accessStatus === "izin_verildi");
+  return [...manualDates, ...(allowed.length ? allowed : [...oldReadings.slice(0, 1), ...periodReadings]).map(workDay)].sort()[0] ?? null;
 }

@@ -1,3 +1,4 @@
+import { MonthlyPayrollView } from "./MonthlyPayrollView";
 import type { PdksRecordsView } from "./usePdksRecordsView";
 import { PdksCounters } from "./PdksCounters";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -59,7 +60,7 @@ export function PdksRecordsResults({ view }: { view: PdksRecordsView }) {
         />
       ) : (
         <>
-          {!isLoading && <PdksCounters {...view} />}
+          {!isLoading && filters.reportType !== "monthly" && <PdksCounters {...view} />}
           <BulkBar
             count={selectedIds.size}
             onClear={() => setSelection({ scope, ids: new Set() })}
@@ -68,7 +69,9 @@ export function PdksRecordsResults({ view }: { view: PdksRecordsView }) {
               Dışa aktar menüsü seçili satırları kullanır.
             </span>
           </BulkBar>
-          {filters.reportType === "daily" ? (
+          {filters.reportType === "monthly" ? (
+            <MonthlyPayrollView projectId={projectId} period={startDate.slice(0, 7)} visibleEmployeeIds={hasFilters ? new Set(records.map(row => row.id)) : undefined} onCellClick={openDetail} />
+          ) : filters.reportType === "daily" ? (
             <PDKSTableView
               records={records}
               loading={isLoading}
@@ -90,7 +93,7 @@ export function PdksRecordsResults({ view }: { view: PdksRecordsView }) {
               onCellClick={openDetail}
             />
           )}
-          {!isLoading && (
+          {!isLoading && filters.reportType !== "monthly" && (
             <p className="text-xs text-muted-foreground">
               {records.length} personel gösteriliyor · Saatler İstanbul saatidir.
             </p>

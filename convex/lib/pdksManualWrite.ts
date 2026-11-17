@@ -28,6 +28,10 @@ export async function writeManualPdksRecord(
   args: { user: Doc<"users">; employee: Doc<"employees">; date: string; existing: Doc<"pdksRecords"> | null; input: ValidManualPdks; audit: boolean; batchId?: string },
 ): Promise<{ id: Id<"pdksRecords">; created: boolean }> {
   const { user, employee, date, existing, input, audit } = args;
+  const projectId = employee.projectId;
+  const period = projectId ? await ctx.db.query("payrollPeriods")
+    .withIndex("by_projectId_and_period", q => q.eq("projectId", projectId).eq("period", date.slice(0, 7))).order("desc").first() : null;
+  if (period?.status === "closed") throw new Error("Dönem kapalı; manuel PDKS düzeltmesi yapılamaz");
   const now = new Date().toISOString();
   const status = "present" as const;
   const values = { entryTime: input.entryTime, exitTime: input.exitTime, status, manualEntry: true, manualNote: input.note, editedBy: user._id, editedAt: Date.now(), updatedAt: now };

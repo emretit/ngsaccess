@@ -10,7 +10,7 @@ const input = { entryTime: "08:10", exitTime: "17:05", note: "Kart unutuldu" };
 function createCtx() {
   const insert = vi.fn(async (table: string, _doc: Record<string, unknown>) => (table === "pdksRecords" ? "r-new" : "audit-1"));
   const patch = vi.fn(async () => undefined);
-  return { ctx: { db: { insert, patch } } as unknown as MutationCtx, insert, patch };
+  return { ctx: { db: { insert, patch, query: () => ({ withIndex: () => ({ order: () => ({ first: async () => null }) }) }) } } as unknown as MutationCtx, insert, patch };
 }
 
 describe("writeManualPdksRecord", () => {
