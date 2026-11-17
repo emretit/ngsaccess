@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
+import { initializeHeartbeatMonitoring } from "./lib/deviceConnection";
 
 const modules = import.meta.glob("./**/*.ts");
 const now = Date.parse("2026-10-22T12:00:00Z");
@@ -63,6 +64,56 @@ async function heartbeat(f: Fixture, path: Path) {
 }
 
 describe("connectivity writers", () => {
+  it("rollout seeds an existing offline panel once without changing its last signal", async () => {
+    const f = await pathFixture("ideCommand", now - 600000);
+    for (let i = 0; i < 2; i++) await f.t.run(async ctx => {
+      const device = await ctx.db.get(f.deviceId);
+      if (device) await initializeHeartbeatMonitoring(ctx, device);
+    });
+    const before = await f.t.run(ctx => ctx.db.get(f.deviceId));
+    expect(before?.lastSeen).toBe(new Date(now - 600000).toISOString());
+    expect(before?.heartbeatCheckAt).toBe(now);
+    expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").take(10))).toHaveLength(1);
+    await f.t.mutation(internal.devices.checkHeartbeatOffline, { deviceId: f.deviceId, checkAt: now });
+    const active = await alarms(f);
+    expect(active).toHaveLength(1);
+    expect(active[0].resolvedAt).toBeUndefined();
+  });
+  it.each(["gateway", "never", "inactive"] as const)("rollout does not arm %s devices", async kind => {
+    const f = await fixture({ brand: kind === "gateway" ? "hikvision" : "ide_smart", lastSeen: kind === "never" ? undefined : new Date(now - 600000).toISOString(), isActive: kind !== "inactive" });
+    await f.t.run(async ctx => {
+      const device = await ctx.db.get(f.deviceId);
+      if (device) await initializeHeartbeatMonitoring(ctx, device);
+    });
+    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.heartbeatCheckAt).toBeUndefined();
+  });
+  it.each(["ideCommand", "localBridge"] as const)("%s detects an outage before reconnection and resolves the same event", async path => {
+    const f = await pathFixture(path, now);
+    await heartbeat(f, path);
+    const device = await f.t.run(ctx => ctx.db.get(f.deviceId));
+    expect(device?.heartbeatCheckAt).toBe(now + 300001);
+    vi.setSystemTime(now + 300001);
+    await f.t.mutation(internal.devices.checkHeartbeatOffline, { deviceId: f.deviceId, checkAt: now + 300001 });
+    const before = await alarms(f);
+    expect(before).toHaveLength(1);
+    expect(before[0].resolvedAt).toBeUndefined();
+    vi.setSystemTime(now + 600000);
+    await heartbeat(f, path);
+    const after = await alarms(f);
+    expect(after).toHaveLength(1);
+    expect(after[0]._id).toBe(before[0]._id);
+    expect(after[0].resolvedAt).toBe(new Date(now + 600000).toISOString());
+  });
+  it("new successful signals postpone the one pending heartbeat check", async () => {
+    const f = await pathFixture("ideCommand", now);
+    await heartbeat(f, "ideCommand");
+    vi.setSystemTime(now + 120000);
+    await heartbeat(f, "ideCommand");
+    vi.setSystemTime(now + 300001);
+    await f.t.mutation(internal.devices.checkHeartbeatOffline, { deviceId: f.deviceId, checkAt: now + 300001 });
+    expect(await alarms(f)).toHaveLength(0);
+    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.heartbeatCheckAt).toBe(now + 420001);
+  });
   it("gateway quiet gap without an offline hint is not an outage (card-event-only signal)", async () => {
     const f = await pathFixture("gateway", now - 6 * 60000);
     await heartbeat(f, "gateway");

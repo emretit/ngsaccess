@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { AssignmentPatternEditor } from '../AssignmentPatternEditor';
 import { bulkAssignmentFormSchema, type BulkAssignmentFormValues } from '../assignmentFormSchema';
-import { assignmentFields, bulkAssignmentRequest, departmentAssignmentRequest, planPreview, withPlan } from './planForm';
+import { assignmentFields, bulkAssignmentRequest, departmentAssignmentRequest, planPreview, withPlan, withShiftSchedule } from './planForm';
 import { DEFAULT_WORKING_DAYS, type Shift } from './planning';
 
 const shiftId = 'shift' as Id<'shifts'>;
@@ -43,4 +43,16 @@ describe('Haftalık çalışma günleri', () => {
     expect(bulkAssignmentFormSchema.safeParse({ ...cycle, weekPattern: [] }).success).toBe(true);
     expect(withPlan({ ...cycle, weekPattern: [] }, { kind: 'weekly', shiftIds: [shiftId] }).weekPattern).toEqual(DEFAULT_WORKING_DAYS);
   });
+});
+
+it("takes the saved definition schedule for both people and departments and anchors cycles on the selected start date", () => {
+  const cycle: Shift = { ...shift, scheduleMode: "cycle", dayPlan: [true, false, false] };
+  const current = withShiftSchedule(values, [cycle]);
+  expect(current.plan).toEqual({ kind: "dayCycle", anchorDate: values.startDate, slots: [[shiftId], [], []] });
+  expect(assignmentFields(current).weekPattern).toBeUndefined();
+  const department = withShiftSchedule({ ...values, target: "department", departmentId: "department", startDate: "2026-10-20" }, [cycle]);
+  expect(department.plan).toMatchObject({ anchorDate: "2026-10-20" });
+  const weekly = withShiftSchedule(current, [{ ...shift, scheduleMode: "weekly", dayPlan: [true, true, true, true, true, false, false] }]);
+  expect(weekly.plan).toBeUndefined();
+  expect(weekly.weekPattern).toEqual(DEFAULT_WORKING_DAYS);
 });

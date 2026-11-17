@@ -95,6 +95,7 @@ function transaction(memberIds: string[], deviceCount = 0, doorCount = 0) {
     groupDevices: Array.from({ length: deviceCount }, (_, i) => ({ _id: `link-device-${i}`, deviceId: `device-${i}` })),
     groupDoors: Array.from({ length: doorCount }, (_, i) => ({ _id: `link-door-${i}`, doorId: `door-${i}` })),
     doors: [],
+    auditLog: [],
   };
   const take = vi.fn(); const collect = vi.fn();
   const db = {
@@ -123,7 +124,8 @@ describe("actual updateWithGroups transaction contract", () => {
     await updateHandler(tx.ctx, { ruleId, relationDiff: diff });
     expect(tx.rows.groupMembers.map(row => row.employeeId)).toEqual(["b", "concurrent", "new"]);
     expect(tx.db.delete.mock.calls).toEqual([["member-a"]]);
-    expect(tx.db.insert).toHaveBeenCalledTimes(1);
+    expect(tx.db.insert.mock.calls.filter(([table]) => table === "groupMembers")).toHaveLength(1);
+    expect(tx.rows.auditLog).toHaveLength(1);
     expect(tx.runAfter).not.toHaveBeenCalled();
     expect(graph.tracked).toHaveBeenCalledWith(tx.ctx, expect.objectContaining({
       ruleId, startedBy: "admin", plan: { added: ["new"], removed: ["a"], syncMembers: ["new"], syncRule: false, reconcileRoster: false },

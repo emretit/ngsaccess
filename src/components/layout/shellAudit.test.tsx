@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AppHeader } from "./AppHeader";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { AppSidebarNav } from "./AppSidebarNav";
+import { resolveRouteContext } from "@/lib/routeMeta";
 
 const state = vi.hoisted(() => ({
   projects: [{ _id: "p1", name: "Proje A" }],
@@ -69,3 +70,12 @@ describe("Kabuk denetimi", () => {
 });
 
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, role: "admin", loading: false }) }));
+
+it("renders nested report breadcrumbs with linked ancestors and only the leaf current", () => {
+  const context = resolveRouteContext("/reports/gunluk");
+  const html = render(<AppHeader title={context.title} breadcrumbs={context.breadcrumbs} />);
+  expect(html).toContain('href="/reports"');
+  expect(html).toContain("Raporlar");
+  expect(html).toMatch(/aria-current="page"[^>]*>Günlük Raporları/);
+  expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+});

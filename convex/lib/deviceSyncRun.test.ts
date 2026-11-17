@@ -76,6 +76,7 @@ function memory() {
     const chain = {
       withIndex: (name: string, callback: (q: typeof bounds) => unknown) => { indexes.push(name); callback(bounds); return chain; },
       take: async (limit: number) => rows.slice(0, limit),
+      first: async () => rows[0] ?? null,
       order: () => { rows.sort((a, b) => Number(b.startedAt) - Number(a.startedAt)); return chain; },
     };
     return chain;
@@ -197,12 +198,23 @@ describe("run-wide refresh and IDE dispatch", () => {
       { _id: "p-hik", runId: "project-run", deviceId: "hik", status: "sent" },
       { _id: "p-other", runId: "project-run", deviceId: "other", status: "skipped" },
     );
+    for (let i = 0; i < 25; i++) f.tables.deviceSyncRuns.push({
+      _id: `unrelated-${i}`, projectId: "project", kind: "rule_sync", ruleId: "another-rule", startedAt: 3000 + i,
+    });
     const result = await invoke<Row & { targets: Row[] }>(runs.latestForRule, f.ctx, { ruleId: "rule" });
     expect(result._id).toBe("project-run");
     expect(result.status).toBe("done");
     expect(result.targets.map(target => target.deviceId)).toEqual(["hik"]);
+    expect(f.indexes).toContain("by_project_kind_startedAt");
+    f.tables.groupDevices.push({ projectId: "project", groupId: "rule", deviceId: "new-device" });
+    f.tables.devices.push({ _id: "new-device", projectId: "project" });
+    expect(await invoke<Row>(runs.latestForRule, f.ctx, { ruleId: "rule" })).toMatchObject({ uncoveredDeviceCount: 1, status: "partial" });
     f.tables.accessRules[0].isActive = false;
     expect((await invoke<Row>(runs.latestForRule, f.ctx, { ruleId: "rule" }))._id).toBe("run");
+    f.tables.accessRules[0].isActive = true;
+    f.tables.accessRules[0].createdAt = "1970-01-01T00:00:02.001Z";
+    f.run.ruleId = "another-rule";
+    expect(await invoke(runs.latestForRule, f.ctx, { ruleId: "rule" })).toBeNull();
   });
 });
 
@@ -325,7 +337,7 @@ describe("diff operation correlation at the action boundary", () => {
   const rule = { _id: "rule", name: "Rule", projectId: "project", hikWeekPlanNo: 2 };
   const employee = { _id: "new", cardNumber: "123", firstName: "New", lastName: "Person", projectId: "project", isActive: true };
   it("stamps plan/person operations and restricts the actual Hik employee action to the target", async () => {
-    const runMutation = vi.fn(async (_ref: Ref, _args: object) => "op");
+    const runMutation = vi.fn(async (ref: Ref, _args: object) => getFunctionName(ref) === "hikvisionSync:beginGatewayGrants" ? [] : "op");
     const runQuery = vi.fn(async () => ({ employee, deviceRules: [{ device, rule }, { device: { ...device, _id: "other" }, rule }] }));
     await invoke(syncEmployeeToDevicesInternal, { runQuery, runMutation }, { employeeId: "new", runId: "run", targetDeviceIds: ["bridge"] });
     const writes = runMutation.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:enqueueLocalBridgeOperation");
@@ -346,7 +358,7 @@ describe("diff operation correlation at the action boundary", () => {
     const runQuery = vi.fn(async (ref: Ref, args: { employeeIds?: string[] }) => getFunctionName(ref) === "hikvisionSync:getEmployeesWithDevices"
       ? args.employeeIds?.map(id => ({ employee: { ...employee, _id: id }, deviceRules: [{ device, rule }] }))
       : { rule, devices: [device], employees: [employee, { ...employee, _id: "unchanged" }] });
-    const runMutation = vi.fn(async (_ref: Ref, _args: object) => "op");
+    const runMutation = vi.fn(async (ref: Ref, _args: object) => getFunctionName(ref) === "hikvisionSync:beginGatewayGrants" ? [] : "op");
     await invoke(syncWeekPlanToDevicesInternal, { runQuery, runMutation }, { accessRuleId: "rule", runId: "run", targetEmployeeIds: [] });
     const writes = () => runMutation.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:enqueueLocalBridgeOperation").map(([, args]) => args);
     expect(writes()).toEqual([expect.objectContaining({ operation: "syncWeekPlan", runId: "run" })]);

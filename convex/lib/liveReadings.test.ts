@@ -152,7 +152,8 @@ describe("public handlers through real auth wrappers", () => {
     expect(f.employee.cardNumber).toBe("001234");
     expect(f.patch).toHaveBeenCalledWith(employeeId, expect.objectContaining({ cardNumber: "001234" }));
     expect(f.runAfter).toHaveBeenCalledTimes(2);
-    expect(f.tables.auditLog[0]).toMatchObject({ targetTable: "employees", oldValue: { cardNumber: "old" }, newValue: { cardNumber: "001234", readingId } });
+    expect(f.tables.auditLog[0]).toMatchObject({ targetTable: "employees", newValue: { cardChanged: true, readingId } });
+    expect(JSON.stringify(f.tables.auditLog[0])).not.toContain("001234");
     expect(row).toEqual(reading());
   });
   it("both outer and nested permission checks reject members", async () => {

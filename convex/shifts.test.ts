@@ -16,7 +16,7 @@ async function fixture(role: 'project_admin' | 'project_user' = 'project_admin')
     const employeeId = await ctx.db.insert('employees', { projectId, firstName: 'Ayşe', lastName: 'Test', email: 'test@example.test', cardNumber: 'test' });
     const foreignEmployeeId = await ctx.db.insert('employees', { projectId: foreignId, firstName: 'Other', lastName: 'Test', email: 'other@example.test', cardNumber: 'other' });
     const shiftId = await ctx.db.insert('shifts', { projectId, name: 'Gündüz', startTime: '09:00', endTime: '17:00', createdAt: 'original', updatedAt: 'original' });
-    return { projectId, userId, sessionId, employeeId, foreignEmployeeId, shiftId };
+    return { projectId, foreignId, userId, sessionId, employeeId, foreignEmployeeId, shiftId };
   });
   const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
   const args = { projectId: ids.projectId, employeeIds: [ids.employeeId], startDate: '2025-03-10', endDate: '2025-03-20' };
@@ -26,6 +26,78 @@ async function fixture(role: 'project_admin' | 'project_user' = 'project_admin')
   return { t, caller, args, insert, ...ids };
 }
 describe('shift bulk clear', () => {
+  it('clears all project dates and department assignments in batches, with plan references and project isolation', async () => {
+    const f = await fixture();
+    await f.insert('2020-01-01', '9999-12-31', 205);
+    const keep = await f.t.run(async ctx => {
+      const departmentId = await ctx.db.insert('departments', { name: 'Operasyon', projectId: f.projectId });
+      const departmentAssignmentId = await ctx.db.insert('departmentShiftAssignments', {
+        departmentId, projectId: f.projectId, shiftId: f.shiftId,
+        startDate: '2030-01-01', endDate: '9999-12-31', createdAt: 'original', updatedAt: 'original',
+      });
+      await ctx.db.insert('shiftPlanRefs', { projectId: f.projectId, shiftId: f.shiftId, departmentAssignmentId });
+      const personal = await ctx.db.query('shiftAssignments').first();
+      if (!personal) throw new Error('Missing fixture assignment');
+      await ctx.db.insert('shiftPlanRefs', { projectId: f.projectId, shiftId: f.shiftId, assignmentId: personal._id });
+      const foreignShiftId = await ctx.db.insert('shifts', { projectId: f.foreignId, name: 'Other', startTime: '09:00', endTime: '17:00', createdAt: 'original', updatedAt: 'original' });
+      const foreignAssignmentId = await ctx.db.insert('shiftAssignments', {
+        employeeId: f.foreignEmployeeId, projectId: f.foreignId, shiftId: foreignShiftId,
+        startDate: '2020-01-01', endDate: '9999-12-31', createdAt: 'original', updatedAt: 'original',
+      });
+      const foreignRefId = await ctx.db.insert('shiftPlanRefs', { projectId: f.foreignId, shiftId: foreignShiftId, assignmentId: foreignAssignmentId });
+      return { foreignAssignmentId, foreignRefId };
+    });
+    let deleted = 0;
+    for (let batch = 0; batch < 3; batch++) {
+      const result = await f.caller.mutation(api.shifts.clearAllAssignments, { projectId: f.projectId });
+      deleted += result.deleted;
+      expect(result.isDone).toBe(batch === 2);
+    }
+    expect(deleted).toBe(206);
+    const remaining = await f.t.run(async ctx => ({
+      personal: await ctx.db.query('shiftAssignments').take(10),
+      departments: await ctx.db.query('departmentShiftAssignments').take(10),
+      refs: await ctx.db.query('shiftPlanRefs').take(10),
+      definition: await ctx.db.get(f.shiftId),
+      logs: await ctx.db.query('auditLog').take(10),
+    }));
+    expect(remaining.personal.map(row => row._id)).toEqual([keep.foreignAssignmentId]);
+    expect(remaining.departments).toHaveLength(0);
+    expect(remaining.refs.map(row => row._id)).toEqual([keep.foreignRefId]);
+    expect(remaining.definition?._id).toBe(f.shiftId);
+    expect(remaining.logs).toHaveLength(3);
+    expect(await f.caller.mutation(api.shifts.clearAllAssignments, { projectId: f.projectId })).toEqual({ deleted: 0, isDone: true });
+  });
+  it('keeps an assignment and its references together when a batch reaches its write budget', async () => {
+    const f = await fixture();
+    await f.insert('2025-01-01', '9999-12-31', 2);
+    const rows = await f.t.run(async ctx => {
+      const assignments = await ctx.db.query('shiftAssignments').take(2);
+      for (const assignment of assignments) {
+        for (let i = 0; i < 2100; i++) await ctx.db.insert('shiftPlanRefs', {
+          projectId: f.projectId, shiftId: f.shiftId, assignmentId: assignment._id,
+        });
+      }
+      return assignments;
+    });
+    expect(await f.caller.mutation(api.shifts.clearAllAssignments, { projectId: f.projectId })).toEqual({ deleted: 1, isDone: false });
+    const remaining = await f.t.run(async ctx => ({
+      assignments: await ctx.db.query('shiftAssignments').take(2),
+      refs: await ctx.db.query('shiftPlanRefs').take(4201),
+    }));
+    expect(remaining.assignments.map(row => row._id)).toEqual([rows[1]._id]);
+    expect(remaining.refs).toHaveLength(2100);
+    expect(remaining.refs.every(ref => ref.assignmentId === rows[1]._id)).toBe(true);
+    expect(await f.caller.mutation(api.shifts.clearAllAssignments, { projectId: f.projectId })).toEqual({ deleted: 1, isDone: true });
+  });
+  it('requires management permission in the target project before clearing all assignments', async () => {
+    const reader = await fixture('project_user');
+    await reader.insert('2025-01-01', '9999-12-31');
+    await expect(reader.caller.mutation(api.shifts.clearAllAssignments, { projectId: reader.projectId })).rejects.toThrow('yetkiniz yok');
+    const manager = await fixture();
+    await expect(manager.caller.mutation(api.shifts.clearAllAssignments, { projectId: manager.foreignId })).rejects.toThrow('yetkiniz yok');
+    expect(await reader.t.run(ctx => ctx.db.query('shiftAssignments').take(2))).toHaveLength(1);
+  });
   it('deletes, trims either edge, splits and preserves external rows; preview equals mutation and one audit', async () => {
     const f = await fixture();
     for (const [start, end] of [['12','18'], ['01','15'], ['15','28'], ['01','28'], ['01','05']]) await f.insert(`2025-03-${start}`, `2025-03-${end}`);
@@ -48,7 +120,7 @@ describe('shift bulk clear', () => {
   });
   it('rejects foreign employee and invalid, duplicate, excessive selections or date ranges', async () => {
     const f = await fixture();
-    for (const patch of [{ employeeIds: [f.foreignEmployeeId] }, { employeeIds: [f.employeeId, f.employeeId] }, { employeeIds: Array.from({ length: 501 }, () => f.employeeId) }, { startDate: '2025-02-30' }, { endDate: '2026-03-11' }]) {
+    for (const patch of [{ employeeIds: [f.foreignEmployeeId] }, { employeeIds: [f.employeeId, f.employeeId] }, { employeeIds: Array.from({ length: 501 }, () => f.employeeId) }, { startDate: '2025-02-30' }, { endDate: '2025-03-09' }]) {
       await expect(f.caller.query(api.shifts.previewClearAssignments, { ...f.args, ...patch })).rejects.toThrow();
       await expect(f.caller.mutation(api.shifts.clearAssignments, { ...f.args, ...patch })).rejects.toThrow();
     }

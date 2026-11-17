@@ -1,3 +1,4 @@
+import { PageTemplate } from "@/components/shared/PageTemplate";
 import { usePermissions } from "@/hooks/usePermissions";
 
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -15,12 +16,11 @@ export default function Profile() {
 
 
   if (!user || !profile) {
-    return <LoadingSpinner text="Profil bilgileri yükleniyor..." />;
+    return <PageTemplate title="Profil Bilgilerim" width="form"><LoadingSpinner text="Profil bilgileri yükleniyor..." /></PageTemplate>;
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Profil Bilgilerim</h1>
+    <PageTemplate title="Profil Bilgilerim" width="form">
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Sol Kart: Profil Fotoğrafı */}
@@ -47,6 +47,6 @@ export default function Profile() {
 
       {/* Güvenlik Kartı */}
       <SecurityCard />
-    </div>
+    </PageTemplate>
   );
 }

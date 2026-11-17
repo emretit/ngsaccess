@@ -1,16 +1,13 @@
-import { shiftForInstant } from "./pdksMultiShift";
+import { notifyLateReading } from "./lateReading";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { internal } from "../_generated/api";
 import { employeeWithinAccessEpoch, genericReaderTokenAllowed } from "./mobileAccess";
 import { inferAccessStatus, inferDenialReason } from "./hikEventCodes";
 import { ideResultGranted } from "./cardReaderParse";
 import { canEmployeeAccessDevice } from "./accessDecision";
 import { ideTimeToISO, resolveDirection, resolveActiveMatchingRuleIds, type AccessDirection } from "./cardReadingProcess";
 import { isVirtualReader, READER_TOKEN_PATTERN, type ReaderScanDenial } from "./virtualReader";
-import { getEffectiveWorkSettings, isoTimeToTRMinutes } from "./pdksHelpers";
-import { buildShiftResolver, thresholdsForShift } from "./shiftResolver";
-import { toUtcISO, trDateKey } from "./trDate";
+import { toUtcISO } from "./trDate";
 
 export interface ProcessCardReadingArgs {
   cardNo: string;
@@ -453,7 +450,7 @@ async function processGenericCardReading(
     employeeId: employee._id,
     nowISO: accessTime,
   });
-  await ctx.db.insert("cardReadings", {
+  const readingId = await ctx.db.insert("cardReadings", {
     projectId: projectForRow(employee.projectId, device.projectId),
     deviceId: device._id,
     employeeId: employee._id,
@@ -471,7 +468,7 @@ async function processGenericCardReading(
 
   // 6. Geç kalma bildirimi (hasAccess + geç giriş)
   if (hasAccess) {
-    await notifyLateReading(ctx, employee, accessTime, cardDirection);
+    await notifyLateReading(ctx, employee, readingId);
   }
 
   return { granted: hasAccess };
@@ -503,41 +500,4 @@ async function decideReadingAccess(
   });
 
   return { hasAccess, activeRuleIds };
-}
-
-async function notifyLateReading(ctx: MutationCtx, employee: Doc<"employees">, accessTime: string, direction?: string) {
-  const settings = await getEffectiveWorkSettings(ctx, employee.projectId);
-  const date = trDateKey(accessTime);
-  const dayShiftResolver = await buildShiftResolver(ctx, [employee], { start: date, end: date });
-  const plan = dayShiftResolver.resolvePlan(employee._id, date);
-  if (plan.kind !== "shifts") return;
-  const dayShift = shiftForInstant(date, accessTime, plan, direction);
-  const { lateThresholdMin } = thresholdsForShift(dayShift, settings);
-  const isLate = isoTimeToTRMinutes(accessTime) > lateThresholdMin;
-  if (isLate && employee.projectId) {
-    const projectId = employee.projectId;
-    const notifSettings = await ctx.db
-      .query("notificationSettings")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
-      .first();
-    const generalSettings = await ctx.db
-      .query("generalSettings")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
-      .first();
-    const notifyEmail = generalSettings?.email ?? process.env.NOTIFICATION_EMAIL;
-    if (
-      notifSettings?.lateNotifications !== false &&
-      notifyEmail
-    ) {
-      ctx.scheduler.runAfter(0, internal.actions.sendEmail.sendLateNotification, {
-        to: notifyEmail,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
-        lateTime: new Date(accessTime).toLocaleTimeString("tr-TR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        projectId: employee.projectId,
-      });
-    }
-  }
 }

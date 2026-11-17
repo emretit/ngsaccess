@@ -98,23 +98,23 @@ export function DeviceList({
 
   return (
     <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
-      <div className="h-[88px] overflow-auto border-b border-line sm:h-[53px]">
-        {canManage && selectedDevices.length > 0 ? (
+      {canManage && selectedDevices.length > 0 ? (
+        <div className="max-md:[&_button]:min-h-11">
           <DeviceBulkActions
             selectedCount={selectedDevices.length}
             onDelete={() => setShowDeleteDialog(true)}
             onClear={() => handleSelectAll(false)}
           />
-        ) : (
-          <p className="px-3 py-4 text-xs text-muted-foreground">
+        </div>
+      ) : (
+          <p className="border-b border-line px-3 py-2 text-xs text-muted-foreground">
             {canManage
               ? "Cihaz seçerek toplu işlem yapabilirsiniz."
               : "Cihaz ayrıntılarını satır menüsünden görüntüleyebilirsiniz."}
           </p>
-        )}
-      </div>
+      )}
 
-      <Table scrollLabel="Cihaz listesi, yatay kaydırılabilir" resizeKey={showProject ? "devices-all-projects" : "devices"} density="compact" className="w-full table-fixed">
+      <Table scrollLabel="Cihaz listesi, yatay kaydırılabilir" resizeKey={showProject ? "devices-all-projects" : "devices"} density="compact" className="w-full table-fixed text-sm [&_th]:text-xs [&_td:nth-last-child(2)>div]:text-xs max-md:[&_[role=checkbox]]:after:-inset-3.5">
         <TableHeader className="bg-subtle">
           <TableRow>
             <TableHead columnId="select" resizable={false} resizeLabel="Cihaz seçimi" className="w-9 px-2 md:w-10 md:px-3">
@@ -126,21 +126,21 @@ export function DeviceList({
               />
             </TableHead>
             {showProject && (
-              <TableHead columnId="project" className="hidden lg:table-cell">Proje</TableHead>
+              <TableHead columnId="project" minWidth={140} className="hidden lg:table-cell">Proje</TableHead>
             )}
-            <TableHead columnId="name" className="px-2 md:w-[220px] md:px-4">Cihaz adı</TableHead>
-            <TableHead columnId="model" className="hidden md:table-cell w-[180px]">
+            <TableHead columnId="name" minWidth={160} className="px-2 md:w-[220px] md:px-4">Cihaz adı</TableHead>
+            <TableHead columnId="model" minWidth={160} className="hidden md:table-cell w-[180px]">
               Marka / model
             </TableHead>
-            <TableHead columnId="serial" className="hidden xl:table-cell w-[170px]">
+            <TableHead columnId="serial" minWidth={160} className="hidden xl:table-cell w-[170px]">
               Seri no / UUID
             </TableHead>
             {!(hideLocation || hideZoneColumn) && (
-              <TableHead columnId="zone" className="hidden lg:table-cell w-[140px]">
+              <TableHead columnId="zone" minWidth={120} className="hidden lg:table-cell w-[140px]">
                 Bölge
               </TableHead>
             )}
-            <TableHead columnId="connection" className="w-[112px] px-1 md:w-[132px] md:px-3">
+            <TableHead columnId="connection" minWidth={112} className="w-[112px] px-1 md:w-[132px] md:px-3">
               Bağlantı
             </TableHead>
             <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-11 px-0 md:px-1">

@@ -109,6 +109,51 @@ async function setup() {
   return { t, ...ids, member };
 }
 describe("door plans", () => {
+  it("calendar edits invalidate only matching plans and preserve verify acknowledgements", async () => {
+    const f = await setup();
+    const caller = await f.member("admin");
+    const savedAt = "2026-01-01T00:00:00.000Z";
+    await f.t.run(async ctx => {
+      for (const id of [f.doorId, f.otherDoorId]) await ctx.db.patch(id, {
+        hikDoorHolidayPlan: { enabled: true, year: 2026, mode: "remainClosed" },
+        hikDoorStatusPlan: plan, hikPlanRevision: 3, hikPlanSavedAt: savedAt,
+        hikVerifyPlan: { enabled: true, beginTime: "08:00", endTime: "18:00", verifyMode: "card" },
+        hikVerifyPlanSavedAt: savedAt,
+        hikPlanResults: { status: { revision: 3, appliedAt: savedAt }, verify: { revision: 3, appliedAt: savedAt } },
+      });
+    });
+    const holidayId = await caller.mutation(api.holidays.create, { projectId: f.projectId, date: "2026-10-29", name: "Tatil" });
+    const door = await f.t.run(ctx => ctx.db.get(f.doorId));
+    expect(door).toMatchObject({ hikPlanRevision: 4, hikPlanPendingReason: expect.stringContaining("Tatil takvimi değişti"), hikPlanResults: { verify: { revision: 4, appliedAt: savedAt } } });
+    expect(door?.hikPlanResults?.status).toBeUndefined();
+    expect((await f.t.run(ctx => ctx.db.get(f.otherDoorId)))?.hikPlanRevision).toBe(3);
+    expect((await caller.query(api.doors.listPlanTargets, { projectId: f.projectId })).find(target => target.doorId === f.doorId)?.plansPending).toBe(true);
+    expect((await caller.query(api.doors.listPlanTargets, { projectId: f.projectId })).find(target => target.doorId === f.doorId)?.pendingKeys).toEqual(["status"]);
+    await f.t.mutation(internal.doors.recordPlanResult, { doorId: f.doorId, revision: 4, key: "status" });
+    expect((await f.t.run(ctx => ctx.db.get(f.doorId)))?.hikPlanPendingReason).toBeUndefined();
+    await caller.mutation(api.holidays.remove, { id: holidayId });
+    expect((await f.t.run(ctx => ctx.db.get(f.doorId)))?.hikPlanRevision).toBe(5);
+    // A send begun before the removal can never acknowledge the new calendar.
+    await f.t.mutation(internal.doors.recordPlanResult, { doorId: f.doorId, revision: 4, key: "status" });
+    expect((await caller.query(api.doors.listPlanTargets, { projectId: f.projectId })).find(target => target.doorId === f.doorId)?.plansPending).toBe(true);
+    expect((await f.t.run(ctx => ctx.db.get(f.doorId)))?.hikPlanResults?.verify?.appliedAt).toBe(savedAt);
+  });
+
+  it("global calendar changes reach all projects, but not another plan year", async () => {
+    const f = await setup();
+    const identity = await f.t.run(async ctx => {
+      const userId = await ctx.db.insert("users", { role: "super_admin" });
+      const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 86400000 });
+      for (const id of [f.doorId, f.otherDoorId, f.bridgeDoorId]) await ctx.db.patch(id, {
+        hikDoorHolidayPlan: { enabled: true, year: id === f.bridgeDoorId ? 2027 : 2026, mode: "remainClosed" },
+      });
+      return { subject: `${userId}|${sessionId}` };
+    });
+    await f.t.withIdentity(identity).mutation(api.holidays.create, { date: "2026-10-29", name: "Global tatil" });
+    expect((await f.t.run(ctx => ctx.db.get(f.doorId)))?.hikPlanRevision).toBe(1);
+    expect((await f.t.run(ctx => ctx.db.get(f.otherDoorId)))?.hikPlanRevision).toBe(1);
+    expect((await f.t.run(ctx => ctx.db.get(f.bridgeDoorId)))?.hikPlanRevision).toBeUndefined();
+  });
   it("accessRules.manage alone saves normalized plans and preserves other fields", async () => {
     const f = await setup();
     const caller = await f.member("technician", ["accessRules.manage"]);

@@ -1,10 +1,10 @@
 import { expectLabel } from "@/test-utils/filterLabel";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { ReactElement, ReactNode } from "react";
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Select } from "@/components/ui/select";
-import { alarmListArgs, AlarmAcknowledgeButton, AlarmFilters, type AlarmFiltersValue } from "./AlarmFilters";
+import { alarmListArgs, AlarmAcknowledgeButton, AlarmDeviceOptions, AlarmFilters, type AlarmFiltersValue } from "./AlarmFilters";
 
 type ElementNode = ReactElement<{ children?: unknown; onChange?: (event: { target: { value: string } }) => void; onValueChange?: (value: string) => void; value?: string; id?: string; onClick?: () => void; "aria-label"?: string }>;
 function findElement(node: unknown, predicate: (element: ElementNode) => boolean): ElementNode | undefined {
@@ -15,6 +15,7 @@ function findElement(node: unknown, predicate: (element: ElementNode) => boolean
   if (!node || typeof node !== "object" || !("type" in node) || !("props" in node)) return undefined;
   const element = node as ElementNode;
   if (predicate(element)) return element;
+  if (isValidElement<Parameters<typeof AlarmDeviceOptions>[0]>(node) && node.type === AlarmDeviceOptions) return findElement(AlarmDeviceOptions(node.props), predicate);
   return findElement(element.props.children, predicate);
 }
 

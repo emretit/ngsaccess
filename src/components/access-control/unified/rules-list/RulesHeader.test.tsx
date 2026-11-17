@@ -7,14 +7,14 @@ vi.mock("./RulesPage", () => ({ RulesPage: () => <p>Sayfa 1 · 2 kural gösteril
 vi.mock("./RulesFilters", () => ({ RulesFilters: () => null }));
 vi.mock("../SyncRuns", () => ({ ProjectSyncButton: () => <button>Gönder</button>, RecentRuns: () => null, RuleLastRun: () => null }));
 import AccessRulesList from "../AccessRulesList";
-it("sekme adını ve açıklamayı gösterir, sayacı yalnız sayfalama satırında tutar", () => {
+it("yerel başlık ve eylemleri kaldırır, sayacı yalnız sayfalama satırında tutar", () => {
   const html = renderToStaticMarkup(<AccessRulesList onCreateRule={() => undefined} />);
-  expect(html).toContain('<h1 class="text-xl font-semibold">Kurallar</h1>');
-  expect(html).toContain("Kişilerin hangi kapılardan hangi gün ve saatlerde geçebileceğini belirleyin.");
+  expect(html).not.toContain("<h1");
+  expect(html).not.toContain("Kişilerin hangi kapılardan");
   expect(html).not.toContain("Bu sayfada");
   expect(html).toContain("Sayfa 1 · 2 kural gösteriliyor");
-  expect(html).toContain("Yeni kural");
-  expect(html).toContain("Gönder");
+  expect(html).not.toContain("Yeni kural");
+  expect(html).not.toContain("Gönder");
 });
 
 vi.mock("convex/react", () => ({

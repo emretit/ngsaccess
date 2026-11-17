@@ -62,7 +62,7 @@ vi.mock("@/components/shared/ConfirmAction", () => ({
 it("proje gönderim onayını sade dille açıklar", () => {
   const html = renderToStaticMarkup(<ProjectSyncButton projectId={"p" as Id<"projects">} />);
   expect(html).toContain("Cihaz aldığını bildirene kadar “Gönderildi” görünür.");
-  expect(html).toContain("Diğer işlemler");
+  expect(html).toContain("Tüm cihazlara gönder");
   expect(html).toContain("cihaz · tüm proje · filtreler uygulanmaz");
   expect(html).not.toContain("Marka dağılımı");
   expect(html).not.toContain("Hikvision gönderimi teslim kanıtı");

@@ -3,7 +3,7 @@ import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { send } from "./sendAlarmEmail";
 
-vi.mock("../_generated/api", () => ({ internal: { alarms: { claimEmail: "claimEmail", recordEmailResult: "recordEmailResult" } } }));
+vi.mock("../_generated/api", () => ({ internal: { alarms: { claimEmail: "claimEmail", freezeEmailContent: "freezeEmailContent", recordEmailResult: "recordEmailResult" } } }));
 const sendHandler = (send as unknown as { _handler: (ctx: ActionCtx, args: { eventId: Id<"deviceEvents">; attempt?: number }) => Promise<null> })._handler;
 const originalFetch = globalThis.fetch;
 const originalApiKey = process.env.RESEND_API_KEY;
@@ -11,7 +11,7 @@ function payload() {
   return { event: { severity: "critical", label: "<img src=x onerror='alert(1)'>", eventTime: "2026-10-19T10:00:00.000Z" }, device: { name: "A&B <Kapı>" }, recipients: ["one@example.com", "two@example.com"] };
 }
 function context(value: ReturnType<typeof payload> | null = payload()) {
-  const runMutation = vi.fn().mockResolvedValueOnce(value).mockResolvedValue(null);
+  const runMutation = vi.fn(async (name: string, args: { content?: unknown }) => name === "claimEmail" ? value : name === "freezeEmailContent" ? args.content : null);
   return { ctx: { runMutation } as unknown as ActionCtx, runMutation };
 }
 const args = { eventId: "e1" as Id<"deviceEvents"> };

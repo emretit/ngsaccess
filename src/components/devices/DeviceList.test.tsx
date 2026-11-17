@@ -34,16 +34,15 @@ beforeEach(() => {
   mocks.selected = [];
 });
 describe("cihaz listesi toplu seçim şeridi", () => {
-  it("boş ve kısmi seçimde aynı yükseklikte yer ayırır ve mixed durumu kullanır", () => {
+  it("yalnız seçimde toplu işlemleri gösterir ve mixed durumu kullanır", () => {
     const emptySelection = render();
     mocks.selected = [device._id];
     const partialSelection = render();
-    expect(emptySelection).toContain(
-      'class="h-[88px] overflow-auto border-b border-line sm:h-[53px]"',
-    );
-    expect(partialSelection).toContain(
-      'class="h-[88px] overflow-auto border-b border-line sm:h-[53px]"',
-    );
+    expect(emptySelection).not.toContain('aria-label="Seçili kayıt işlemleri"');
+    expect(emptySelection).toContain("Cihaz seçerek toplu işlem yapabilirsiniz.");
+    expect(emptySelection).not.toContain("h-[88px]");
+    expect(partialSelection).toContain('aria-label="Seçili kayıt işlemleri"');
+    expect(partialSelection).not.toContain("Cihaz seçerek toplu işlem yapabilirsiniz.");
     expect(partialSelection).toContain('aria-checked="mixed"');
     expect(partialSelection).toContain("data-[state=indeterminate]:before:h-0.5");
     expect(partialSelection).toContain("Seçilenleri sil");

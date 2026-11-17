@@ -1,0 +1,6 @@
+## Görev: Alarm + Denetim kaydı + Bakım modülü audit'i
+- Rapor dosyası: `docs/genel-audit-2026-11-03/06-alarm-denetim.md` · Bulgu ID öneki: `ALM-`
+- Kapsam (backend): `convex/alarms.ts`, `deviceEvents.ts`, `auditLog.ts`, `maintenance.ts`, `convex/actions/sendAlarmEmail.ts`, `convex/actions/sendEmail.ts`, `convex/actions/projectMail.ts` (alarm e-postası kısmı), denetim kaydı yazan yardımcılar (`convex/lib/audit*` vb.), ilgili cron'lar.
+- Kapsam (web): `src/pages/Alarms.tsx`, `src/pages/AuditLog.tsx`, `src/components/alarms/**`, `src/components/audit/**`.
+- Hik kıyası: `KIYAS.md` Alarm + Maintenance satırları + `HIKCONNECT_SAYFALAR.md` Alarm modülü (Alarm Center, Alarm Search, Basic Alarm Settings, Receiving Schedule Template, Alarm Custom Settings, Email Linkage Template) + Maintenance System Log (Device Log, Operation Log, User Login Report) + Access Control Event Notification.
+- Özel dikkat: genel-akış Faz 1.4 (çalışan PDKS denetim geçmişinde proje + çalışan kontrolü) kapandı mı; denetim kaydı kapsamı (hangi kritik mutation'lar log yazmıyor — kişi silme, kural değişikliği, rol değişikliği, kapı açma, sır değişikliği); log'a sır/kişisel veri yazılıyor mu (KVKK); alarm e-postasında alıcı/proje izolasyonu ve e-posta fırtınası (aynı olay için tekrar tekrar mail) riski; alarm onay yetkisi; deviceEvents tablosunun büyümesi ve saklama/temizlik.

@@ -28,16 +28,20 @@ type RedistributeControlsProps = Pick<
   projectCounts: Counts | null;
   error: string;
   setError: (error: string) => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
+  fallbackFocusRef?: RefObject<HTMLElement | null>;
 };
 
-type RedistributeActionProps = Pick<RedistributeControlsProps, "sending" | "setError" | "setAction">;
+type RedistributeActionProps = Pick<RedistributeControlsProps, "sending" | "setError" | "setAction"> & {
+  triggerRef?: RefObject<HTMLButtonElement | null>;
+};
 
 /** Seçim varken görünür; mobilde liste altına yapışır, bu yüzden filtre satırının dışında durur. */
-export function RedistributeSelected({ selected, sending, setError, setAction }: RedistributeActionProps & Pick<RedistributeControlsProps, "selected">) {
+export function RedistributeSelected({ selected, sending, setError, setAction, triggerRef }: RedistributeActionProps & Pick<RedistributeControlsProps, "selected">) {
   if (selected.length === 0) return null;
   return (
     <div className="flex sticky bottom-2 z-10 bg-background border rounded-md p-2 lg:static lg:border-0 lg:p-0" aria-label="Seçili kayıt işlemleri">
-      <Button className="whitespace-normal h-auto min-h-11" disabled={sending} onClick={() => { setError(""); setAction("selected"); }}>
+      <Button ref={triggerRef} className="whitespace-normal h-auto min-h-11" disabled={sending} onClick={() => { setError(""); setAction("selected"); }}>
         Seçili {selected.length} kaydı yeniden gönder
       </Button>
     </div>
@@ -50,11 +54,12 @@ export function RedistributeMenu({
   setError,
   setAction,
   canManageDevices = false,
+  triggerRef,
 }: RedistributeActionProps & Pick<RedistributeControlsProps, "projectCounts" | "canManageDevices">) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button className="min-h-11" variant="ghost" disabled={sending}>Diğer gönderim işlemleri</Button>
+        <Button ref={triggerRef} className="min-h-11" variant="ghost" disabled={sending}>Diğer gönderim işlemleri</Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem className="min-h-11" disabled={sending || !projectCounts?.failed} onSelect={() => { setError(""); setAction("failed"); }}>
@@ -79,6 +84,8 @@ export function RedistributeDialog({
   setError,
   projectName = "Seçili proje",
   selectedRows = [],
+  returnFocusRef,
+  fallbackFocusRef,
 }: RedistributeControlsProps) {
   return (
     <Dialog
@@ -90,7 +97,13 @@ export function RedistributeDialog({
         }
       }}
     >
-      <DialogContent className="w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto" onCloseAutoFocus={(event) => {
+        const target = returnFocusRef?.current?.isConnected ? returnFocusRef.current : fallbackFocusRef?.current;
+        if (target?.isConnected) {
+          event.preventDefault();
+          target.focus();
+        }
+      }}>
         <DialogHeader>
           <DialogTitle>Yeniden dağıtım onayı</DialogTitle>
           <DialogDescription>
@@ -144,3 +157,4 @@ export function RedistributeDialog({
     </Dialog>
   );
 }
+import type { RefObject } from "react";

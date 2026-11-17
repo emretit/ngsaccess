@@ -1,3 +1,5 @@
+import { reconcileEmployeeDepartmentRules } from "./lib/departmentAccess";
+import { recordDepartmentChange } from "./lib/employeeDepartmentHistory";
 import { requirePermission } from "./lib/permissions";
 import { scheduleFingerprintPurge } from "./lib/employeeCardChange";
 import { ConvexError, v } from "convex/values";
@@ -107,6 +109,7 @@ export const reinstate = authedMutation({
       sgkExitCode: undefined, terminatedAt: undefined, terminatedBy: undefined,
       isActive: true, deactivatedAt: undefined, updatedAt: new Date().toISOString(),
     });
+    await reconcileEmployeeDepartmentRules(ctx, employeeId);
     await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
     await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
     await writeAudit(ctx, { user: ctx.user, projectId: employee.projectId, action: "update", targetTable: "employees", targetId: employeeId, oldValue: employee, newValue: await ctx.db.get(employeeId), note: "İşten ayrılma geri alındı" });
@@ -241,6 +244,8 @@ async function finishTransfer(ctx: MutationCtx, transferId: Id<"accessTransfers"
   const now = new Date().toISOString();
   await ctx.db.patch(source._id, { cardNumber: "", transferredCardNumber: transfer.cardNumber, updatedAt: now });
   await ctx.db.patch(target._id, { cardNumber: transfer.cardNumber, departmentId: transfer.targetPlan.departmentId, companyId, updatedAt: now });
+  await recordDepartmentChange(ctx, target._id);
+  await reconcileEmployeeDepartmentRules(ctx, target._id);
   for (const ruleId of transfer.targetPlan.accessRuleIds) await upsertGroupMembership(ctx, target._id, ruleId, transfer.targetProjectId);
   await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: target._id });
   await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId: target._id });

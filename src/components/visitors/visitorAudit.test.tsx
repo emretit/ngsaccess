@@ -22,12 +22,13 @@ const mutationNames = vi.hoisted(() => [] as string[]);
 vi.mock("@/hooks/useVisitors", () => ({ useVisitors: () => ({ page: pageData.value }) }));
 vi.mock("convex/react", () => ({ useQuery: () => notice.value, useMutation: (ref: FunctionReference<"mutation">) => { mutationNames.push(getFunctionName(ref)); return vi.fn(); } }));
 vi.mock("./VisitorCardCapture", () => ({ default: () => <div>Kart okuyucusu</div> }));
+vi.mock("@/components/access-control/unified/components/ZoneDeviceTree", () => ({ ZoneDeviceTree: () => <div>Kapı ağacı</div> }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => permissions.manage }) }));
 const renderToStaticMarkup = (children: ReactNode) => renderMarkup(<MemoryRouter>{children}</MemoryRouter>);
 const noop = () => undefined;
 const form: VisitorFormData = {
   firstName: "", lastName: "", visitorPhone: "", visitorCompany: "", visitPurpose: "", hostEmployeeId: null,
-  cardNumber: "", presetRuleId: null, accessExpiresAt: "2030-01-01T12:00", isActive: true, notes: "", kvkkConsent: false,
+  cardNumber: "", selected_doors: [], selected_devices: [], accessExpiresAt: "2030-01-01T12:00", isActive: true, notes: "", kvkkConsent: false,
   projectId: "project" as Id<"projects">,
 };
 const detail: VisitorDetail = {
@@ -69,14 +70,14 @@ describe("visitor audit fixes", () => {
     expect(visitorReaderLabel({ name: "Giriş", brand: "ide_smart", deviceType: "Erişim Paneli" })).toBe("Giriş · IDE Smart · Erişim Paneli");
   });
   it("puts required access fields first and groups names; additional fields use the shared collapsible", () => {
-    const html = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} presetRules={[]} hostEmployees={[]} isEditing={false} onNewZone={noop} />);
-    for (const id of ["v_zone", "v_expires", "v_card"]) expect(html.indexOf(`id="${id}"`)).toBeLessThan(html.indexOf('id="v_first_name"'));
+    const html = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} hostEmployees={[]} isEditing={false} />);
+    for (const id of ["v_doors", "v_expires", "v_card"]) expect(html.indexOf(`id="${id}"`)).toBeLessThan(html.indexOf('id="v_first_name"'));
     expect(html).toContain("min-[761px]:grid-cols-2");
     expect(html).not.toContain("<details");
     expect(html).toContain('aria-expanded="false"');
   });
   it("displays the configured notice and version, with a clear fallback when unconfigured", () => {
-    const render = () => renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} presetRules={[]} hostEmployees={[]} isEditing={false} onNewZone={noop} />);
+    const render = () => renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} hostEmployees={[]} isEditing={false} />);
     notice.value = { url: null, version: null };
     expect(render()).toContain("Aydınlatma metni tanımlı değil.");
     expect(render().match(/<button[^>]*id="v_kvkk"[^>]*>/)?.[0]).toMatch(/\sdisabled[\s=>]/);
@@ -94,8 +95,10 @@ describe("visitor audit fixes", () => {
     expect(html).toContain("Sürüm 2026-1");
     notice.value = { url: null, version: null };
   });
-  it("marks invalid region and card controls visibly and semantically", () => {
-    const html = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} presetRules={[]} hostEmployees={[]} isEditing={false} onNewZone={noop} errors={{ presetRuleId: "Bölge seçin", cardNumber: "Kart girin" }} />);
+  it("marks invalid door and card controls visibly and semantically", () => {
+    const html = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} hostEmployees={[]} isEditing={false} errors={{ doors: "Kapı seçin", cardNumber: "Kart girin" }} />);
+    expect(html).toMatch(/id="v_doors"[^>]*aria-invalid="true"/);
+    expect(html).toContain('aria-describedby="v_doors-error"');
     expect(html).toContain("border-destructive");
     expect(html).toMatch(/id="v_card"[^>]*aria-invalid="true"/);
     expect(html).toContain('aria-describedby="v_card-error"');
@@ -122,9 +125,9 @@ it("hides redacted visitor reading fields without breaking the detail or list", 
 });
 
 it.each([false, true])("keeps access controls for new/inactive records, hides them only for active edits (%s)", isCurrentlyActive => {
-  const html = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} presetRules={[]} hostEmployees={[]} isEditing isCurrentlyActive={isCurrentlyActive} onNewZone={noop} />);
+  const html = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} hostEmployees={[]} isEditing isCurrentlyActive={isCurrentlyActive} />);
   expect(html.includes('id="v_active"')).toBe(!isCurrentlyActive);
   expect(html.includes("Erişimi kapatmak için ayrıntıdaki")).toBe(isCurrentlyActive);
-  const newHtml = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} presetRules={[]} hostEmployees={[]} isEditing={false} onNewZone={noop} />);
+  const newHtml = renderToStaticMarkup(<VisitorFormFields formData={form} setFormData={noop} hostEmployees={[]} isEditing={false} />);
   expect(newHtml).toContain('id="v_active"');
 });

@@ -46,6 +46,9 @@ describe("okuma sayfalarına doğrudan erişim", () => {
     expect(readingRouteAccess("/pdks-records/settings", "", only("schedule.manage"))).toBeNull();
   });
   it("vardiya planı schedule.manage ile de açılır", () => {
+    expect(readingRouteAccess("/pdks-records/plan", "", only("schedule.manage"))).toBe(true);
+    expect(readingRouteAccess("/pdks-records/plan", "", only("reports.view"))).toBe(true);
+    expect(readingRouteAccess("/pdks-records/plan", "", only("employees.view"))).toBe(false);
     expect(readingRouteAccess("/pdks-records", "?plan=1", only("schedule.manage"))).toBe(true);
     expect(readingRouteAccess("/pdks-records", "?plan=1", only("employees.view"))).toBe(false);
   });

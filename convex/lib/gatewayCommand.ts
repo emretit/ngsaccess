@@ -33,12 +33,13 @@ import {
   type HikCardReaderSnapshot,
 } from "./hikGateway";
 
-export async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; error?: string }>(
-  ctx: ActionCtx,
+export async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; error?: string; operationId?: string }>(
+  ctx: ActionCtx & { user?: Pick<Doc<"users">, "_id"> },
   deviceId: Id<"devices">,
   label: string,
   run: () => Promise<T>,
   summarize?: (result: T) => string | undefined,
+  command?: { doorId?: Id<"doors">; channel?: number },
 ): Promise<T> {
   let result: T;
   try {
@@ -47,6 +48,7 @@ export async function auditDeviceCommand<T extends { ok: boolean; queued?: boole
     try {
       await ctx.runMutation(internal.deviceEvents.recordOperationInternal, {
         deviceId, label: `${label}: başarısız`, ok: false,
+        actorId: ctx.user?._id, ...command,
         summary: (error instanceof Error ? error.message : "Bilinmeyen hata").replace(/\d{6,}/g, "…").slice(0, 200),
       });
     } catch {
@@ -59,6 +61,7 @@ export async function auditDeviceCommand<T extends { ok: boolean; queued?: boole
       deviceId,
       label: `${label}: ${result.ok ? result.queued ? "sıraya alındı" : "komut iletildi" : "başarısız"}`,
       ok: result.ok,
+      actorId: ctx.user?._id, ...command, queued: result.queued, operationId: result.operationId,
       summary: result.ok ? summarize?.(result) : result.error?.replace(/\d{6,}/g, "…").slice(0, 200),
     });
   } catch {
@@ -296,7 +299,7 @@ export async function runFetchDeviceCapabilities(
 export async function runRemoteOpenDoor(
   ctx: ActionCtx & { user: Doc<"users"> },
   args: { deviceId: Id<"devices">; doorNo?: number }
-): Promise<{ ok: boolean; queued?: boolean; error?: string }> {
+): Promise<{ ok: boolean; queued?: boolean; error?: string; operationId?: string }> {
   const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
     internal.users.listProjectIdsForCurrentUser,
     {},
@@ -310,15 +313,15 @@ export async function runRemoteOpenDoor(
   }
   const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "doors.open" });
   if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
-  return await auditDeviceCommand(ctx, args.deviceId, "Kapı aç", async (): Promise<{ ok: boolean; queued?: boolean; error?: string }> => {
+  const { operationId: _operationId, ...result } = await auditDeviceCommand(ctx, args.deviceId, "Kapı aç", async (): Promise<{ ok: boolean; queued?: boolean; error?: string; operationId?: string }> => {
     if (device.hikTransport === "localBridge") {
-      await ctx.runMutation(internal.hikvisionSync.enqueueLocalBridgeOperation, {
+      const operationId = await ctx.runMutation(internal.hikvisionSync.enqueueLocalBridgeOperation, {
         deviceId: device._id,
         projectId: device.projectId,
         operation: "openDoor",
         payload: { doorNo: args.doorNo ?? 1 },
       });
-      return { ok: true, queued: true };
+      return { ok: true, queued: true, operationId: String(operationId) };
     }
     if (!device.hikDevIndex) {
       return {
@@ -327,7 +330,8 @@ export async function runRemoteOpenDoor(
       };
     }
     return await openDoor(device.hikDevIndex, args.doorNo ?? 1);
-  });
+  }, undefined, { channel: args.doorNo ?? 1 });
+  return result;
 }
 
 export async function runRebootDevice(
@@ -781,31 +785,35 @@ export async function sendStoredDoorStatusPlan(
           const ranges = await ctx.runQuery(internal.doors.getPlanHolidays, {
             doorId: door._id,
           });
-          if (!ranges.length) throw new Error("Seçilen yılda uygulanacak tatil yok");
-          const max = await getHolidayCapacity(devIndex, doorNo);
-          const slots = await ctx.runMutation(
-            internal.doors.reserveHolidaySlots,
-            { doorId: door._id, count: ranges.length, max },
-          );
-          for (const [index, range] of ranges.entries()) {
-            const slot = slots[index];
-            if (slot === undefined)
-              throw new Error("Tatil planı slotu bulunamadı");
-            const result = await setDoorStatusHolidayPlan(
-              devIndex,
-              slot,
-              range,
-              holiday.mode,
+          if (!ranges.length && !door.hikPlanPendingReason) throw new Error("Seçilen yılda uygulanacak tatil yok");
+          // Removing the last date must detach the old device calendar on resend.
+          if (!ranges.length && !plan?.enabled) return await linkDoorStatusPlan(devIndex, doorNo, 0);
+          if (ranges.length) {
+            const max = await getHolidayCapacity(devIndex, doorNo);
+            const slots = await ctx.runMutation(
+              internal.doors.reserveHolidaySlots,
+              { doorId: door._id, count: ranges.length, max },
             );
-            if (!result.ok) return result;
+            for (const [index, range] of ranges.entries()) {
+              const slot = slots[index];
+              if (slot === undefined)
+                throw new Error("Tatil planı slotu bulunamadı");
+              const result = await setDoorStatusHolidayPlan(
+                devIndex,
+                slot,
+                range,
+                holiday.mode,
+              );
+              if (!result.ok) return result;
+            }
+            const group = await setDoorStatusHolidayGroup(
+              devIndex,
+              doorNo,
+              slots,
+            );
+            if (!group.ok) return group;
+            holidayGroupNo = doorNo;
           }
-          const group = await setDoorStatusHolidayGroup(
-            devIndex,
-            doorNo,
-            slots,
-          );
-          if (!group.ok) return group;
-          holidayGroupNo = doorNo;
         }
 
         const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);

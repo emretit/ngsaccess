@@ -1,3 +1,4 @@
+import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FilterBar, FilterField } from "@/components/shared/FilterBar";
 
@@ -25,9 +26,13 @@ interface DeviceFiltersProps {
 
 export function DeviceFilters({ onClearFilters, locationActive, statusCounts, typeCounts,
   search, onSearchChange, statusFilter, onStatusFilterChange, typeFilter, onTypeFilterChange, deviceTypes }: DeviceFiltersProps) {
-  return <FilterBar search={search} onSearchChange={onSearchChange}
+  const activeCount = Number(Boolean(search.trim())) + Number(statusFilter !== "all") + Number(typeFilter !== "all") + Number(Boolean(locationActive));
+  return <div className="max-md:[&_input]:min-h-11 max-md:[&_button]:min-h-11 max-md:[&_[role=combobox]]:min-h-11">
+  <FilterBar search={search} onSearchChange={onSearchChange}
     searchLabel="Cihaz ara" placeholder="Ad, seri no veya UUID ara…"
     hasFilters={statusFilter !== "all" || typeFilter !== "all" || !!locationActive} onClear={() => onClearFilters?.()}>
+    <CollapsibleFilters activeCount={activeCount} desktopDisplay="contents" buttonClassName="min-h-11">
+    <div className="grid gap-3 md:contents">
     <FilterField label="Bağlantı" htmlFor="device-status"><Select value={statusFilter} onValueChange={onStatusFilterChange}>
       <SelectTrigger id="device-status" className="w-full min-w-0"><SelectValue /></SelectTrigger>
       <SelectContent>
@@ -43,5 +48,7 @@ export function DeviceFilters({ onClearFilters, locationActive, statusCounts, ty
         {deviceTypes.map(type => <SelectItem key={type} value={type}>{type} ({typeCounts[type] ?? 0})</SelectItem>)}
       </SelectContent>
     </Select></FilterField>
-  </FilterBar>;
+    </div>
+    </CollapsibleFilters>
+  </FilterBar></div>;
 }

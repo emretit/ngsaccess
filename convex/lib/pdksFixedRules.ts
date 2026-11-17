@@ -74,12 +74,23 @@ export function fixedPunchEvidence(params: {
   let outsideWindow = false;
   const accepts = (iso: string, direction: "entry" | "exit") => !window || validFixedPunch(window, date, iso, direction);
   const readings: Doc<"cardReadings">[] = [];
+  const firstEntry = params.manual.entryISO && accepts(params.manual.entryISO, "entry") ? params.manual.entryISO : undefined;
+  let sessionEntry = firstEntry;
+  let lastExit: string | undefined;
   for (const reading of params.readings) {
     const point = resolvePdksCheckpoint(reading, policy)?.pointType;
     const direction = point === "entry" || point === "exit" ? point : reading.direction;
     if (direction === "entry" || direction === "exit") {
-      if (accepts(reading.accessTime, direction)) readings.push({ ...reading, direction });
-      else outsideWindow = true;
+      // The check-in window opens the session; bounded returns reopen a completed visit.
+      const returning = policy.calculationMode === "eachPunch" && direction === "entry"
+        && sessionEntry !== undefined && lastExit !== undefined
+        && Date.parse(reading.accessTime) > Date.parse(lastExit)
+        && accepts(reading.accessTime, "exit");
+      if (accepts(reading.accessTime, direction) || returning) {
+        readings.push({ ...reading, direction });
+        if (direction === "entry") { sessionEntry ??= reading.accessTime; lastExit = undefined; }
+        else if (sessionEntry && Date.parse(reading.accessTime) > Date.parse(sessionEntry)) lastExit = reading.accessTime;
+      } else outsideWindow = true;
     } else if (window && policy.punchMode === "legacy" && policy.calculationMode !== "eachPunch") {
       // Legacy undirected readers retain first/last inference, within each window.
       const canEnter = accepts(reading.accessTime, "entry"), canExit = accepts(reading.accessTime, "exit");

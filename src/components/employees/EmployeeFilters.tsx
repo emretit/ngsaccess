@@ -1,3 +1,4 @@
+import { CollapsibleFilters } from "@/components/shared/CollapsibleFilters";
 import type { ReactNode } from "react";
 import { FilterBar, FilterField } from "@/components/shared/FilterBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,7 +15,12 @@ interface Props {
   actions?: ReactNode;
 }
 export function EmployeeFilters(p: Props) {
-  return <FilterBar search={p.searchQuery} onSearchChange={p.onSearchChange} searchLabel="Personel ara" placeholder="Ad, e-posta, kart veya bordro…" onClear={p.onClear} hasFilters={p.hasFilters} end={p.actions}>
+  const localCount = Number(Boolean(p.searchQuery.trim())) + Number(p.status !== "all");
+  const activeCount = localCount + Number(p.hasFilters && localCount === 0);
+  return <div className="max-md:[&_input]:min-h-11 max-md:[&_button]:min-h-11 max-md:[&_[role=combobox]]:min-h-11">
+  <FilterBar search={p.searchQuery} onSearchChange={p.onSearchChange} searchLabel="Personel ara" placeholder="Ad, e-posta, kart veya bordro…" onClear={p.onClear} hasFilters={p.hasFilters} end={p.actions}>
+    <CollapsibleFilters activeCount={activeCount} desktopDisplay="contents" buttonClassName="min-h-11">
+    <div className="grid gap-3 md:contents">
     <FilterField label="Personel durumu" htmlFor="employee-status"><Select value={p.status} onValueChange={p.onStatusChange}>
       <SelectTrigger id="employee-status" className="w-full min-w-0"><SelectValue /></SelectTrigger>
       <SelectContent>
@@ -33,5 +39,7 @@ export function EmployeeFilters(p: Props) {
         </SelectContent>
       </Select></FilterField>
     </div>
-  </FilterBar>;
+    </div>
+    </CollapsibleFilters>
+  </FilterBar></div>;
 }

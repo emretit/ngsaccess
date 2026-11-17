@@ -155,7 +155,7 @@ export const summary = employeeAuthedQuery({
     const manualByDate = new Map(manual.filter(record => record.manualEntry && record.projectId === projectId).map(record => [`${employee._id}__${record.date}`, record]));
     const workDate = buildPdksWorkDateResolver([employee], resolveShift, hasFlexible ? {
       readings: rows.page, manualEntryFor: (id, date) => manualByDate.get(`${id}__${date}`)?.entryTime,
-      eligibleEntry: reading => filterPdksReadings([reading], projectId, r => policyFor(trDateKey(r.accessTime))).length > 0,
+      eligibleEntry: (reading, date) => filterPdksReadings([reading], projectId, r => policyFor(date ?? trDateKey(r.accessTime))).length > 0,
     } : undefined, (_reading, date) => policyFor(date), resolveLast);
     const included = filterPdksReadings(rows.page, projectId, reading => policyFor(workDate(reading)));
     const row = computePdksTableRow({

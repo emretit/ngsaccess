@@ -62,6 +62,7 @@ export function computePayrollCell(params: {
     classification: day.classification,
     pendingUntil: day.pendingUntil,
     durationMeasured: day.durationMeasured,
+    punchQuality: day.punchQuality,
     attendanceDecision: day.attendanceDecision,
     hasAttendance: day.hasAttendance,
     hasLeave: params.hasLeave,

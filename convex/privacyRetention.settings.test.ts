@@ -56,14 +56,14 @@ describe('visitor retention admin settings', () => {
     const { ctx, insert } = fixture();
     expect(await invoke(getVisitorRetention, ctx, { projectId })).toEqual({ visitorRetentionDays: null });
     await invoke(setVisitorRetention, ctx, { projectId, days: 90 });
-    expect(insert).toHaveBeenCalledWith('projectPrivacySettings', expect.objectContaining({ projectId, visitorRetentionDays: 90 }));
+    expect(insert).toHaveBeenCalledWith('projectPrivacySettings', expect.objectContaining({ projectId, visitorRetentionDays: 90, visitorRetentionLastProcessedAt: 0 }));
     expect(mocks.audit).toHaveBeenCalledWith(ctx, expect.objectContaining({ oldValue: { visitorRetentionDays: null }, newValue: { visitorRetentionDays: 90 } }));
   });
   it('clears retention without altering the notice or other settings', async () => {
     mocks.row = { _id: 'privacy', visitorRetentionDays: 90, visitorKvkkVersion: 'v2' };
     const { ctx, patch } = fixture();
     await invoke(setVisitorRetention, ctx, { projectId, days: null });
-    expect(patch).toHaveBeenCalledWith('privacy', { visitorRetentionDays: undefined, updatedAt: expect.any(String) });
+    expect(patch).toHaveBeenCalledWith('privacy', { visitorRetentionDays: undefined, visitorRetentionLastProcessedAt: undefined, visitorRetentionCursor: undefined, visitorRetentionRunAt: undefined, visitorRetentionCursorDays: undefined, updatedAt: expect.any(String) });
   });
   it.each([29, 3651, 30.5, NaN, Infinity])('rejects invalid days %s without writing', async days => {
     const { ctx, insert, patch } = fixture();

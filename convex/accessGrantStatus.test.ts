@@ -201,6 +201,29 @@ describe("grant status queries", () => {
     expect(await status()).toEqual(original);
     expect((await admin.query(api.accessGrantStatus.byEmployee, { employeeId: ids.employeeId })).rows.find(row => row.deviceId === ids.ideId)?.stale).toBe(true);
   });
+  it("diagnoses current rule hours separately from the stored delivery state", async () => {
+    const f = await fixture();
+    await f.write("effective");
+    await f.t.run(ctx => ctx.db.patch(f.ids.ruleId, { days: ["Thursday"], startTime: "10:00", endTime: "18:00" }));
+    const read = async () => (await f.admin.query(api.accessGrantStatus.byEmployee, { employeeId: f.ids.employeeId })).rows.find(row => row.deviceId === f.ids.ideId);
+    expect(await read()).toMatchObject({ state: "effective", scheduleAllowedNow: true, validityAllowedNow: true, checkedAt: Date.now() });
+    vi.setSystemTime(new Date("2026-10-22T16:00:00Z"));
+    expect(await read()).toMatchObject({ state: "effective", scheduleAllowedNow: false });
+  });
+  it("marks removed and re-added membership stale without a rule timestamp change", async () => {
+    const f = await fixture();
+    await f.write("effective");
+    const args = { projectId: f.ids.projectId, paginationOpts: { numItems: 50, cursor: null } };
+    const read = async () => (await f.admin.query(api.accessGrantStatus.listByProject, args)).page[0];
+    expect((await read())?.stale).toBe(false);
+    await f.t.run(async ctx => {
+      const member = await ctx.db.query("groupMembers").withIndex("by_employee", q => q.eq("employeeId", f.ids.employeeId)).first();
+      if (member) await ctx.db.delete(member._id);
+    });
+    expect((await read())?.stale).toBe(true);
+    await f.t.run(ctx => ctx.db.insert("groupMembers", { projectId: f.ids.projectId, groupId: f.ids.ruleId, employeeId: f.ids.employeeId, createdAt: new Date(Date.now() + 1).toISOString() }));
+    expect((await read())?.stale).toBe(true);
+  });
   it("byEmployee separates unknown, removalRequired, and unauthorized doors", async () => {
     const { t, ids, admin, write } = await fixture();
     const initial = await admin.query(api.accessGrantStatus.byEmployee, { employeeId: ids.employeeId });
@@ -359,7 +382,8 @@ describe("grant write call budgets", () => {
     const fn = kind === "person" ? syncEmployeeToDevicesInternal : syncWeekPlanToDevicesInternal;
     const handler = (fn as unknown as { _handler: (ctx: ActionCtx, args: object) => Promise<unknown> })._handler;
     await handler(ctx, kind === "person" ? { employeeId: ids.employeeId } : { accessRuleId: ids.ruleId });
-    const batches = mutationCalls.mock.calls.filter(([ref]) => getFunctionName(ref) === "accessGrantStatus:recordGrantResults");
+    const batches = mutationCalls.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:finishGatewayGrants");
+    expect(mutationCalls.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:beginGatewayGrants")).toHaveLength(1);
     expect(batches).toHaveLength(1);
     expect(batches[0]?.[1].results).toHaveLength(2);
   });
@@ -495,7 +519,7 @@ describe("W4.2a audit regressions", () => {
     const opId = await enqueue("Old");
     await t.mutation(internal.hikvisionSync.claimLocalBridgeOperations, { token: "token" });
     expect(await enqueue("New")).toBe(opId);
-    expect(await t.mutation(internal.hikvisionSync.ackLocalBridgeOperation, { token: "token", opId, ok: true })).toEqual({ ok: true });
+    expect(await t.mutation(internal.hikvisionSync.ackLocalBridgeOperation, { token: "token", opId, ok: true })).toMatchObject({ ok: false, error: "stale attempt", requiresAttempt: true });
     expect((await t.run(ctx => ctx.db.get(opId)))?.status).toBe("pending");
     expect((await status(ids.bridgeId))?.state).toBe("pending");
     const next = await t.mutation(internal.hikvisionSync.claimLocalBridgeOperations, { token: "token" });
@@ -577,7 +601,10 @@ describe("W4.2a audit regressions", () => {
     const handler = (syncWeekPlanToDevicesInternal as unknown as { _handler: (ctx: ActionCtx, args: object) => Promise<unknown> })._handler;
     await handler(ctx, { accessRuleId: ids.ruleId, targetDeviceIds: [ids.hikId] });
     expect(wire.card).toHaveBeenCalledTimes(1200);
-    const batches = mutationCalls.mock.calls.filter(([ref]) => getFunctionName(ref) === "accessGrantStatus:recordGrantResults");
+    const begins = mutationCalls.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:beginGatewayGrants");
+    expect(begins).toHaveLength(60);
+    expect(begins.every(([, args]) => Array.isArray(args.pairs) && args.pairs.length <= 500)).toBe(true);
+    const batches = mutationCalls.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:finishGatewayGrants");
     expect(batches.map(([, args]) => Array.isArray(args.results) ? args.results.length : 0)).toEqual([500, 500, 200]);
   }, 30000);
 });

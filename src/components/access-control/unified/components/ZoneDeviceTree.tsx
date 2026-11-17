@@ -160,6 +160,16 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
             const deviceOpen = Boolean(searchText) || expanded.has(deviceKey);
             const doorIds = scopedDoors.map((door) => door._id);
             const noDoors = scopedDoors.length === 0 ? [device._id] : [];
+            const singleDoor = scopedDoors.length === 1 && deviceDoors(device._id).length === 1 ? scopedDoors[0] : undefined;
+            if (singleDoor) return (
+              <div key={device._id} className="flex items-center gap-2 py-1 pl-3">
+                <Checkbox id={`${deviceId}-${singleDoor._id}`} checked={effective.includes(singleDoor._id)}
+                  onCheckedChange={checked => changeScope([singleDoor._id], [], checked === true)} />
+                <Label htmlFor={`${deviceId}-${singleDoor._id}`} className="flex flex-1 min-h-11 items-center cursor-pointer min-w-0 break-words font-normal">
+                  {deviceName} · {singleDoor.name}
+                </Label>
+              </div>
+            );
             return (
               <div key={device._id}>
                 <div className="flex items-center gap-2">

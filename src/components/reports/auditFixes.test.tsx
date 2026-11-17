@@ -96,3 +96,11 @@ it('shows the break filter and enables clearing a URL-only violation selection',
   expect(html).toContain('for="report-break"');
   expect(html).toMatch(/<button(?![^>]* disabled=)[^>]*>Filtreleri temizle<\/button>/);
 });
+
+it.each(['/reports', '/reports/gunluk', '/reports/gunluk/gec-kalanlar', '/reports/resmi', '/reports/missing'])('keeps one global heading before local navigation: %s', path => {
+  const html = renderToStaticMarkup(<MemoryRouter initialEntries={[path]}><Routes><Route path="/reports/:group?/:slug?" element={<Reports />} /></Routes></MemoryRouter>);
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
+  const navigation = html.indexOf('<nav');
+  if (navigation >= 0) expect(html.indexOf('<h1')).toBeLessThan(navigation);
+  expect(html).not.toContain('lg:grid-cols-[184px_minmax(0,1fr)]');
+});

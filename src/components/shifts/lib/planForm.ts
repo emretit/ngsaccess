@@ -1,3 +1,4 @@
+import { scheduleForAssignment } from "../../../../convex/lib/shiftSchedule";
 import type { RefObject } from "react";
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { MAX_DAY_CYCLE, MAX_WEEK_CYCLE, slotForDate, validateDayShifts, validateShiftPlan, validPlanDate, type ShiftPlan } from '../../../../convex/lib/shiftPlan';
@@ -72,4 +73,11 @@ export function focusAssignmentError(planErrorRef: RefObject<Pick<HTMLElement, "
 
 export function departmentAssignmentRequest(values: BulkAssignmentFormValues, projectId: Id<'projects'>, forceConfirm: boolean) {
   return { projectId, departmentId: values.departmentId as Id<'departments'>, ...assignmentFields(values), forceConfirm };
+}
+
+/** Yeni atamalar seçilen vardiya tanımındaki gün deseninin anlık görüntüsünü alır. */
+export function withShiftSchedule(values: BulkAssignmentFormValues, shifts: Shift[]): BulkAssignmentFormValues {
+  const shift = shifts.find(item => item._id === values.shiftId);
+  if (!shift) return { ...values, plan: undefined, weekPattern: [...DEFAULT_WORKING_DAYS] };
+  return { ...values, plan: undefined, ...scheduleForAssignment(shift, values.startDate) };
 }

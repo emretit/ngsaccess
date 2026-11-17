@@ -6,6 +6,7 @@ import { classifyImportPerson, importedValidity, splitDevicePersonName, type Imp
 import { findDuplicateCard } from "./lib/cardIdentity";
 import { upsertGroupMembership } from "./employees";
 import { writeAudit } from "./lib/audit";
+import { recordDepartmentChange } from "./lib/employeeDepartmentHistory";
 import { validateFingerNo } from "./fingerprintEnrollment";
 import { MAX_FINGERPRINTS_PER_EMPLOYEE } from "./lib/fingerprintSlots";
 import { requirePermission } from "./lib/permissions";
@@ -63,6 +64,7 @@ export const createPerson = internalMutation({
       projectId: device.projectId, ...validity, ...(row.cards.length === 0 ? { hikCardless: true } : {}), createdAt: now, updatedAt: now,
     });
     let ruleId: Id<"accessRules"> | undefined;
+    await recordDepartmentChange(ctx, employeeId);
     if (args.grantFullDeviceAccess && validity.isActive) {
       const name = `${device.name} mevcut kişiler`;
       for await (const rule of ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", device.projectId))) {

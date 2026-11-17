@@ -38,7 +38,7 @@ export function CalendarSelectAll({ selection, label }: {
       <input
         ref={input}
         type="checkbox"
-        className="size-6 shrink-0 accent-primary"
+        className="size-4 shrink-0 rounded accent-primary"
         checked={selection.checked === true}
         onChange={selection.onToggle}
         aria-label="Görünen tüm çalışanları seç"
@@ -80,7 +80,7 @@ export function ShiftCalendarGrid({
   }, [firstDay, compact]);
   return (
     <div>
-      {overflowing && <p className="text-xs text-muted-foreground mb-2">
+      {overflowing && <p className="text-xs text-muted-foreground border-b px-4 py-2">
         Diğer günler için takvimi yatay kaydırın.
       </p>}
       <div
@@ -88,15 +88,15 @@ export function ShiftCalendarGrid({
         role="region"
         aria-label="Vardiya takvimi"
         tabIndex={0}
-        className="max-w-full max-h-[65dvh] overflow-auto rounded-md border focus-visible:outline-2 focus-visible:outline-primary"
+        className="max-w-full max-h-[65dvh] overflow-auto focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <table className="w-full table-fixed text-sm" style={{ minWidth: 176 + days.length * (compact ? 64 : 104) }}>
+        <table className="w-full table-fixed text-sm" style={{ minWidth: 200 + days.length * (compact ? 64 : 104) }}>
           <caption className="sr-only">
             Çalışanlara göre {days[0] ? dayLabel(days[0]) : ""} – {days[days.length - 1] ? dayLabel(days[days.length - 1] ?? "") : ""} vardiya planı
           </caption>
           <thead className="sticky top-0 z-20 bg-surface">
             <tr>
-              <th scope="col" className="sticky left-0 z-20 bg-subtle w-[176px] px-2 py-1 text-left">
+              <th scope="col" className="sticky left-0 z-20 bg-subtle w-[200px] px-3 py-1 text-left">
                 {selectAll ? <CalendarSelectAll selection={selectAll} label="Çalışan" /> : "Çalışan"}
               </th>
               {days.map((day, index) => (
@@ -107,7 +107,10 @@ export function ShiftCalendarGrid({
                   data-today={day === today || undefined}
                   className={`px-1 py-2 text-xs border-l whitespace-nowrap ${day === today ? "bg-primary/5 font-bold" : `${mutedDays[index] ? "bg-subtle/60" : "bg-surface"} font-medium`}`}
                 >
-                  <span aria-hidden="true">{calendarDayLabel(day)}</span>
+                  <span aria-hidden="true" className="flex items-center justify-center gap-1.5">
+                    <span className="text-muted-foreground">{calendarDayLabel(day).split(" ")[0]}</span>
+                    <span className={day === today ? "grid size-7 place-items-center rounded-full bg-primary text-primary-foreground" : "grid size-7 place-items-center font-semibold"}>{Number(day.slice(8))}</span>
+                  </span>
                   <span className="sr-only">{dayLabel(day)}</span>
                   {day === today && <span className="sr-only">Bugün</span>}
                 </th>
@@ -116,11 +119,11 @@ export function ShiftCalendarGrid({
           </thead>
           <tbody>
             {loading ? <TableStateRow colSpan={1 + days.length} state="loading" label={loadingLabel ?? "Plan, izin ve tatiller kontrol ediliyor"} /> : emptyState ? <TableStateRow colSpan={1 + days.length} state="custom">{emptyState}</TableStateRow> : rows.map(({ employee, cells }) => (
-              <tr key={employee._id} className="border-t">
-                <th scope="row" className="sticky left-0 z-10 bg-surface px-2 py-1 text-left font-normal">
+              <tr key={employee._id} className="border-t hover:bg-subtle/30">
+                <th scope="row" className="sticky left-0 z-10 bg-surface px-3 py-1 text-left font-normal">
                   <label className={`flex min-h-11 gap-2 items-center ${onSelect ? "cursor-pointer" : ""}`}>
                     {onSelect && <input
-                      type="checkbox" className="size-6 shrink-0 accent-primary"
+                      type="checkbox" className="size-4 shrink-0 rounded accent-primary"
                       checked={selected.has(employee._id)}
                       onChange={() => onSelect(employee._id)}
                       aria-label={`${employee.firstName} ${employee.lastName} seç`}

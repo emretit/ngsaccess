@@ -6,16 +6,19 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { AppSidebarNav } from "./AppSidebarNav";
 
 
 export function AppSidebar() {
+  const { closeMobileForNavigation } = useSidebar();
   return (
     <Sidebar collapsible="none" side="left">
       <SidebarHeader>
         <Link
           to="/home"
+          onClick={closeMobileForNavigation}
           className="flex h-full w-full items-center gap-2 text-sidebar-foreground"
         >
           {/* Koyu bordo kenar çubuğunda marka kuralı: beyaz logo. */}

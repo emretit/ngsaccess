@@ -20,6 +20,8 @@ import { ManualPdksEditDialog } from "../ManualPdksEditDialog";
 import { statusMetaFor } from "../statusMeta";
 import {
   reviewHint,
+  reviewExplanation,
+  formatDuration,
   leaveLabel,
   displayTime,
   displayDuration,
@@ -141,7 +143,15 @@ function Detail({
           </div>
           <PdksPlanSummary day={day} />
           {!day.noShift && <PdksFlexibleTarget day={day} className="block text-sm tabular-nums" />}
-          {reviewHint(day) && <p className="text-sm text-muted-foreground">{reviewHint(day)}</p>}
+          {reviewHint(day) && <div className="space-y-1 border-l-2 pl-3 text-sm">
+            <p className="font-medium">{reviewHint(day)}</p>
+            <p className="text-muted-foreground">{reviewExplanation(day)}</p>
+          </div>}
+          {day.status === "future" && day.durationMeasured && (
+            <p className="text-sm text-muted-foreground">
+              Tamamlanan çalışma {formatDuration(day.totalMinutes)}. Açık giriş–çıkış aralığının süresi henüz bu toplama dahil değil.
+            </p>
+          )}
           <DetailFieldList columns={2} fields={[
             { key: "entry", label: "İlk giriş", value: displayTime(day.firstEntry) },
             { key: "exit", label: "Son çıkış", value: `${displayTime(day.lastExit)}${day.exitNextDay ? " (ertesi gün)" : ""}` },
@@ -213,7 +223,9 @@ function Detail({
             />
           </details>
           {canManage && day.status !== "future" && (
-            <Button onClick={event => { setManualTrigger(event.currentTarget); setEditing(day.date); }}>Manuel düzelt</Button>
+            <Button onClick={event => { setManualTrigger(event.currentTarget); setEditing(day.date); }}>
+              {day.punchQuality === "missingExit" || (day.punchQuality === "missingEntry" && !day.firstEntry) ? "Eksik kaydı tamamla" : "Manuel düzelt"}
+            </Button>
           )}
           {editing === day.date && day.status !== "future" && (
             <ManualPdksEditDialog
@@ -223,6 +235,8 @@ function Detail({
               employeeName={name}
               date={day.date}
               isOvernightShift={day.isOvernightShift}
+              plannedExitReferenceTime={day.plannedExitReferenceTime}
+              punchQuality={day.punchQuality}
               initialEntry={day.firstEntry ?? ""}
               initialExit={day.lastExit ?? ""}
               onClose={() => setEditing(null)}

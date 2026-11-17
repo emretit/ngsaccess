@@ -47,15 +47,6 @@ export const bulkAssignmentFormSchema = z
         path: ["endDate"],
         message: "Bitiş tarihi başlangıçtan önce olamaz",
       });
-    if (
-      (Date.parse(value.endDate) - Date.parse(value.startDate)) / 86400000 >
-      365
-    )
-      ctx.addIssue({
-        code: "custom",
-        path: ["endDate"],
-        message: "Tarih farkı en fazla 365 gün olabilir (366 dahil gün)",
-      });
     if ((!value.plan || value.plan.kind === "weekly") && !value.weekPattern.length)
       ctx.addIssue({
         code: "custom",

@@ -1,3 +1,4 @@
+import { OPEN_SHIFT_END } from "../../../../convex/lib/shiftRange";
 import { formatTrDate } from "@/lib/date";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../../convex/_generated/api";
@@ -162,6 +163,7 @@ export type DayData = ReturnType<typeof cellData> & {
 
 export { shiftTimeLabel } from "../../../../convex/lib/shiftUx";
 export function shortDate(day: string) {
+  if (day === OPEN_SHIFT_END) return "Süresiz";
   const date = new Date(`${day}T12:00:00Z`);
   return Number.isFinite(date.getTime()) ? formatTrDate(date) : "Tarih seçilmedi";
 }

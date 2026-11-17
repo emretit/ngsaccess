@@ -1,4 +1,6 @@
 import { requirePermission } from "./lib/permissions";
+import { reconcileDepartmentProject } from "./departmentAccess";
+import { recordDepartmentChange } from "./lib/employeeDepartmentHistory";
 import { assertDepartmentAncestors } from "./lib/departmentTree";
 import { assertPeopleProject } from "./lib/peopleScope";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -94,6 +96,7 @@ export const update = authedMutation({
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+    if (args.parentId !== undefined && args.parentId !== dept.parentId && dept.projectId) await reconcileDepartmentProject(ctx, dept.projectId);
   },
 });
 
@@ -112,6 +115,8 @@ export const remove = authedMutation({
     const employees = await ctx.db.query("employees").withIndex("by_department", q => q.eq("departmentId", args.departmentId)).take(1);
     const children = await ctx.db.query("departments").withIndex("by_parent", q => q.eq("parentId", args.departmentId)).take(1);
     if (employees.length || children.length) throw new Error("Departman silinemez: bağlı çalışan veya alt departman var. Önce bağlı kayıtları taşıyın.");
+    const [rule] = await ctx.db.query("groupDepartments").withIndex("by_department", q => q.eq("departmentId", args.departmentId)).take(1);
+    if (rule) throw new Error("Departman silinemez: geçiş kuralında seçili. Önce kuraldaki departman seçimini kaldırın.");
     await ctx.db.delete(args.departmentId);
   },
 });
@@ -145,7 +150,10 @@ export const setCompany = authedMutation({
       moved += employees.length;
       if (moved > COMPANY_MOVE_LIMIT) throw new ConvexError(`Tek seferde en fazla ${COMPANY_MOVE_LIMIT} kişi taşınabilir`);
       for (const employee of employees) {
-        if (employee.companyId !== companyId) await ctx.db.patch(employee._id, { companyId, updatedAt: now });
+        if (employee.companyId !== companyId) {
+          await ctx.db.patch(employee._id, { companyId, updatedAt: now });
+          await recordDepartmentChange(ctx, employee._id, employee);
+        }
       }
     }
     return null;

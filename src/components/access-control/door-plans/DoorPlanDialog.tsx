@@ -79,7 +79,7 @@ export function DoorPlanDialog({
 }: DoorPlanDialogProps) {
   const navigate = useNavigate();
   const [saved, setSaved] = useState(false);
-  const [persistedSendResolved, setPersistedSendResolved] = useState(false);
+  const [resolvedRevision, setResolvedRevision] = useState<number>();
   const [planResults, setPlanResults] = useState<PlanResult[]>([]);
   const [timeErrors, setTimeErrors] = useState<Record<string, string>>({});
 
@@ -137,19 +137,19 @@ export function DoorPlanDialog({
   if (door.hikVerifyPlan) persistedKeys.push("verify");
   // Gönderilecek kayıtlı plan yoksa eski hata/bekleyen bayrağı için yapılacak bir şey yok.
   const persistedSendPending =
-    !persistedSendResolved &&
+    resolvedRevision !== (door.planRevision ?? 0) &&
     persistedKeys.length > 0 &&
     !!(door.plansPending || door.hikPlanApplyError);
   const failedResults = planResults.filter((result) => !result.ok);
   const failedKeys = failedResults.map((result) => result.key);
-  const pendingKeys = persistedSendPending ? persistedKeys : [];
+  const pendingKeys = persistedSendPending ? door.pendingKeys ?? persistedKeys : [];
   const retryKeys = [...new Set([...failedKeys, ...pendingKeys])];
   const statusMessage =
     failedKeys.length > 0
       ? "Cihaza gönderilemedi"
       : door.hikPlanApplyError
         ? `Son gönderim başarısız · ${pastAttemptText(door.hikPlanFailedAt, door.hikPlanApplyError)}`
-        : "Kaydedildi ama cihaza gönderilmedi";
+        : door.pendingReason ?? "Kaydedildi ama cihaza gönderilmedi";
 
   const sendPlans = async (keys: PlanKey[]) => {
     const results = await applySelectedDoorPlans(
@@ -187,7 +187,7 @@ export function DoorPlanDialog({
         return;
       }
       setSaved(keys.length > 0);
-      setPersistedSendResolved(true);
+      setResolvedRevision(door.planRevision ?? 0);
       if (!(await sendPlans(keysToSend))) return;
       notify.success(
         keys.length > 0
@@ -203,7 +203,7 @@ export function DoorPlanDialog({
   const retryAction = useAsyncAction(
     async () => {
       if (retryKeys.length === 0) return;
-      setPersistedSendResolved(true);
+      setResolvedRevision(door.planRevision ?? 0);
       if (await sendPlans(retryKeys)) {
         notify.success("Zaman planları cihaza uygulandı");
         // Üst bileşenin onSuccess çağrısı da formu kapatabildiği için düzenleme varken çağırma.
@@ -368,21 +368,21 @@ export function DoorPlanDialog({
                     </p>
                   )}
                   {holiday.enabled && holidayRanges?.length === 0 && (
-                    <div className="space-y-2">
-                      <p role="alert">Seçilen yılda uygulanacak tatil yok</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          guard.requestClose(() => {
-                            onOpenChange(false);
-                            navigate(PDKS_SETTINGS_PATH);
-                          })
-                        }
-                      >
-                        Tatil takvimini aç
-                      </Button>
-                    </div>
+                    <p role="alert">Seçilen yılda uygulanacak tatil yok</p>
+                  )}
+                  {holiday.enabled && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        guard.requestClose(() => {
+                          onOpenChange(false);
+                          navigate(PDKS_SETTINGS_PATH);
+                        })
+                      }
+                    >
+                      Tatil takvimini aç
+                    </Button>
                   )}
                   {holiday.enabled &&
                     holidayRanges &&

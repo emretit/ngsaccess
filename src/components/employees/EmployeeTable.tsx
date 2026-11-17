@@ -235,9 +235,10 @@ export default function EmployeeTable({
   });
   const handleBulkSyncToDevices = bulkSyncAction.run;
 
-  const column = (key: string, label: string, className?: string) => (
+  const column = (key: string, label: string, className?: string, minWidth?: number) => (
     <EmployeeSortColumn
       columnKey={key}
+      minWidth={minWidth}
       label={label}
       className={className}
       sort={sort}
@@ -320,7 +321,7 @@ export default function EmployeeTable({
           )}
         </div>
       )}
-      <Table framed resizeKey="employees" className="w-full table-fixed text-xs">
+      <Table framed scrollLabel="Personel listesi, yatay kaydırılabilir" resizeKey="employees" className="w-full table-fixed text-sm [&_th]:text-xs max-[759px]:[&_th_[role=checkbox]]:after:-inset-3.5">
         <TableHeader>
           <TableRow className="h-9 bg-muted/50">
             <EmployeeSelectAll
@@ -335,27 +336,29 @@ export default function EmployeeTable({
               checked={employeeSelectionState(employees, selectedEmployees)}
               onSelectAll={handleSelectAll}
             />
-            {column("name", "Ad soyad", "min-[760px]:w-[240px]")}
-            {column("email", "E-posta", "hidden min-[1100px]:table-cell")}
+            {column("name", "Ad soyad", "w-[160px] min-[760px]:w-[240px]", 160)}
+            {column("email", "E-posta", "hidden w-[220px] min-[1100px]:table-cell", 200)}
             {showCompany &&
-              column("company", "Şirket", "hidden min-[1100px]:table-cell")}
+              column("company", "Şirket", "hidden w-[160px] min-[1100px]:table-cell", 140)}
             {showDepartment &&
               column(
                 "department",
                 "Departman",
-                "hidden min-[760px]:table-cell",
+                "hidden w-[160px] min-[760px]:table-cell",
+                140,
               )}
-            {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
-            {column("card", "Kart no", "hidden min-[760px]:table-cell")}
+            {column("position", "Pozisyon", "hidden w-[160px] min-[1100px]:table-cell", 140)}
+            {column("card", "Kart no", "hidden w-[140px] min-[760px]:table-cell", 120)}
             {canSeeBiometrics && (
               <TableHead
                 columnId="biometrics"
+                minWidth={96}
                 className="hidden w-[96px] min-[760px]:table-cell"
               >
                 Biyometrik
               </TableHead>
             )}
-            {column("status", "Durum", "w-[180px]")}
+            {column("status", "Durum", "w-[100px] min-[760px]:w-[180px]", 100)}
             <TableHead columnId="actions" resizable={false} className="w-11">
               <span className="sr-only">İşlemler</span>
             </TableHead>

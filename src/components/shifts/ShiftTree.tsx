@@ -47,13 +47,13 @@ export function ShiftTree({ projectId, selectedShiftId, onSelectShift, createOpe
         {canManage && <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>Vardiya ekle</Button>}
       </div> : [...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime)).map(shift => {
         return <div key={shift._id} className={cn("group flex min-w-0 items-center rounded-sm pl-2 hover:bg-muted", selectedShiftId === shift._id && "bg-selected text-primary")}>
-          <button type="button" className={cn(TREE_NAME_BUTTON, "py-1")} aria-pressed={selectedShiftId === shift._id}
+          <button type="button" className={cn(TREE_NAME_BUTTON, "min-h-12 py-2")} aria-pressed={selectedShiftId === shift._id}
             onClick={() => onSelectShift(selectedShiftId === shift._id ? undefined : shift._id)}>
             <span className="flex min-w-0 items-center gap-2">
               <span className="truncate">{shift.name}</span>
               {shift.isActive === false && <span className="text-[10px] text-muted-foreground">Pasif</span>}
             </span>
-            <span className="block text-xs font-normal text-muted-foreground">{shiftTimeLabel(shift)}</span>
+            <span className="mt-0.5 block text-[11px] font-normal tabular-nums text-muted-foreground">{shiftTimeLabel(shift)}</span>
           </button>
           {canManage && <div className={TREE_ROW_ACTIONS}><RowActions label={`${shift.name} işlemleri`}>
             <DropdownMenuItem onSelect={() => setEditing(shift)}>Düzenle</DropdownMenuItem>

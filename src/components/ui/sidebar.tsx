@@ -30,6 +30,8 @@ type SidebarContext = {
   isMobile: boolean
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
+  closeMobileForNavigation: (event: React.MouseEvent<HTMLAnchorElement>) => void
+  onMobileCloseAutoFocus: (event: Event) => void
 }
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
@@ -65,6 +67,28 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const [isMobile, setIsMobile] = React.useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches)
     const [openMobile, setOpenMobile] = React.useState(false)
+    const mobileNavigation = React.useRef(false)
+    React.useEffect(() => {
+      if (openMobile) mobileNavigation.current = false
+    }, [openMobile])
+    const closeMobileForNavigation = React.useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (!isMobile || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey ||
+        (event.currentTarget.target && event.currentTarget.target !== "_self") || event.currentTarget.hasAttribute("download")) return
+      mobileNavigation.current = true
+      setOpenMobile(false)
+    }, [isMobile])
+    const onMobileCloseAutoFocus = React.useCallback((event: Event) => {
+      event.preventDefault()
+      const navigated = mobileNavigation.current
+      mobileNavigation.current = false
+      // A blocked route can open an unsaved-changes confirmation while this
+      // sheet exits. Its focus scope owns focus until that dialog is dismissed.
+      if (document.querySelector('[role="alertdialog"][data-state="open"], [role="dialog"][data-state="open"]:not(#app-sidebar)')) return
+      // Radix invokes this after the exit lifecycle: route focus must win over
+      // the usual trigger restoration, without a second timing-based effect.
+      if (navigated) document.getElementById("main")?.focus({ preventScroll: true })
+      else document.querySelector<HTMLButtonElement>('[data-sidebar="trigger"]')?.focus({ preventScroll: true })
+    }, [])
     React.useEffect(() => {
       const media = window.matchMedia("(max-width: 760px)")
       const update = () => { setIsMobile(media.matches); if (!media.matches) setOpenMobile(false) }
@@ -123,9 +147,9 @@ const SidebarProvider = React.forwardRef<
         open,
         setOpen,
         toggleSidebar,
-        isMobile, openMobile, setOpenMobile,
+        isMobile, openMobile, setOpenMobile, closeMobileForNavigation, onMobileCloseAutoFocus,
       }),
-      [state, open, setOpen, toggleSidebar, isMobile, openMobile]
+      [state, open, setOpen, toggleSidebar, isMobile, openMobile, closeMobileForNavigation, onMobileCloseAutoFocus]
     )
 
     return (
@@ -174,15 +198,12 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { state, isMobile, openMobile, setOpenMobile } = useSidebar()
+    const { state, isMobile, openMobile, setOpenMobile, onMobileCloseAutoFocus } = useSidebar()
     if (isMobile) {
       return <Sheet open={openMobile} onOpenChange={setOpenMobile}>
         <SheetContent side={side} id="app-sidebar" data-sidebar="sidebar"
           className="flex w-[248px] max-w-[calc(100vw-32px)] flex-col gap-0 border-0 bg-sidebar p-0 text-sidebar-foreground"
-          onCloseAutoFocus={event => {
-            event.preventDefault()
-            document.querySelector<HTMLButtonElement>('[data-sidebar="trigger"]')?.focus()
-          }}>
+          onCloseAutoFocus={onMobileCloseAutoFocus}>
           <SheetTitle className="sr-only">Ana menü</SheetTitle>
           {children}
         </SheetContent>

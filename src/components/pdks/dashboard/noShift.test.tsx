@@ -7,9 +7,11 @@ import { filterPdksRows, periodTotals } from "../lib/presentation";
 import { PDKSTableView } from "./PDKSTableView";
 import { PDKSHeatmapView } from "./PDKSHeatmapView";
 
-const mocks = vi.hoisted(() => ({ allowed: true, params: new URLSearchParams("project=abc&status=late") }));
+const mocks = vi.hoisted(() => ({ allowed: true, navigate: vi.fn(), params: new URLSearchParams("project=abc&status=late") }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => permission === "schedule.manage" && mocks.allowed }) }));
 vi.mock("react-router-dom", async importOriginal => ({ ...await importOriginal<typeof import("react-router-dom")>(),
+  useNavigate: () => mocks.navigate,
+  useLocation: () => ({ pathname: "/pdks-records" }),
   useSearchParams: () => [mocks.params, (update: (previous: URLSearchParams) => URLSearchParams) => { mocks.params = update(mocks.params); }],
 }));
 beforeEach(() => { mocks.allowed = true; mocks.params = new URLSearchParams("project=abc&status=late"); });
@@ -47,14 +49,15 @@ it("partial periods label unassigned cells and exclude them from filters and tot
   expect(filterPdksRows([row, partial], "present")).toEqual([partial]);
 });
 
-it("assignment button keeps search parameters and only appears with schedule.manage", () => {
+it("assignment button navigates to the plan and only appears with schedule.manage", () => {
   const element = NoShiftStatus();
   const button: unknown = element.props.children[1];
   if (!isValidElement<{ onClick: (event: { stopPropagation: () => void }) => void }>(button)) throw new Error("Assignment button missing");
   const stopPropagation = vi.fn();
   button.props.onClick({ stopPropagation });
   expect(stopPropagation).toHaveBeenCalledOnce();
-  expect(mocks.params.toString()).toBe("project=abc&status=late&plan=1");
+  expect(mocks.navigate).toHaveBeenCalledWith("/pdks-records/plan", { state: { fromRecords: true } });
+  expect(mocks.params.toString()).toBe("project=abc&status=late");
   mocks.allowed = false;
   const html = renderToStaticMarkup(<NoShiftStatus />);
   expect(html).toContain("Vardiya atanmamış");

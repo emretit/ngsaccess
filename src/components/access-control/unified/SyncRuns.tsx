@@ -1,10 +1,5 @@
 import { pastAttemptText } from "@/lib/pastAttempt";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import type { RuleSaveResult } from "@/hooks/access-rules/useComplexAccessRuleMutations";
 import { useState } from "react";
@@ -215,6 +210,8 @@ export function RuleLastRun({ ruleId }: { ruleId: Id<"accessRules"> }) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <RunHeader run={run} />
           </div>
+          {run.ruleChangedSinceRun && <p className="text-xs text-warning">Kural bu gönderimden sonra değişti; bu sonuç güncel kuralın cihaza ulaştığını göstermez.</p>}
+          {!!run.uncoveredDeviceCount && <p className="text-xs text-warning">Güncel kapsamdaki {run.uncoveredDeviceCount} cihaz bu gönderimde yer almıyor.</p>}
           {problems.length > 0 && (
             <ul className="space-y-0.5 text-xs text-muted-foreground">
               {problems.map((target) => (
@@ -248,22 +245,11 @@ export function ProjectSyncButton({
   );
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="min-h-11 md:min-h-9">
-            Diğer işlemler
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            className="max-sm:min-h-11"
-            disabled={!counts || counts.total === 0 || send.pending}
-            onSelect={() => setConfirm(true)}
-          >
-            Tüm proje cihazlarına gönder
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button variant="outline" className="min-h-11 md:min-h-9"
+        disabled={!counts || counts.total === 0 || send.pending}
+        onClick={() => setConfirm(true)}>
+        Tüm cihazlara gönder
+      </Button>
       <ConfirmAction
         open={confirm}
         onOpenChange={(open) => {

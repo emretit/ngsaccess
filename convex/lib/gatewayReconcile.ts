@@ -35,7 +35,9 @@ export async function collectAllPages<TItem, TPage extends DrainPage>(opts: {
 
     items.push(...opts.itemsFromPage(page));
     pageCount++;
-    if (page.numMatches === 0 || !page.hasMore) break;
+    if (!page.hasMore) return { ok: true, items };
+    if (page.numMatches <= 0 || !Number.isFinite(page.nextPosition) || page.nextPosition <= position)
+      return { ok: false, items, error: "Cihaz taraması ilerlemedi; sonuçlar eksik" };
     position = page.nextPosition;
   }
 
@@ -45,7 +47,7 @@ export async function collectAllPages<TItem, TPage extends DrainPage>(opts: {
     );
   }
 
-  return { ok: true, items };
+  return { ok: false, items, error: `Cihaz taraması tamamlanamadı (${opts.maxPages} sayfa sınırı)` };
 }
 
 type DrainPage = {

@@ -3,6 +3,7 @@ import { internalMutation, internalQuery, type QueryCtx } from "./_generated/ser
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { requirePermission } from "./lib/permissions";
+import { getCurrentUser } from "./lib/auth";
 import { writeAudit } from "./lib/audit";
 import { requiresNewPassword, type ProjectSmtpConfig } from "./lib/smtpConfig";
 
@@ -23,8 +24,13 @@ function toSendConfig(row: Doc<"mailSettings"> | null): ProjectSmtpConfig | null
 }
 
 async function requireCaller(ctx: QueryCtx, callerId: Id<"users">, projectId: Id<"projects">) {
-  const user = await ctx.db.get(callerId);
-  if (!user) throw new ConvexError("Giriş yapmanız gerekiyor");
+  // The action may have waited on encryption: authenticate its live session again
+  // inside the transaction that commits the settings. This also checks freeze,
+  // expiry, verification and sessionsRevokedThrough against current database state.
+  const user = await getCurrentUser(ctx);
+  if (user._id !== callerId) throw new ConvexError("Giriş yapmanız gerekiyor");
+  const project = await ctx.db.get(projectId);
+  if (!project || project.isActive === false) throw new ConvexError("Proje etkin değil");
   await requirePermission(ctx, user, projectId, "admin.manage");
   return user;
 }

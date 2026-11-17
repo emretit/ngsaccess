@@ -87,7 +87,7 @@ describe("bulk manual validation and audit", () => {
       entryTime: "09:00", exitTime: undefined, status: "present", manualNote: "Kart unutuldu", manualEntry: true,
     }));
     expect(writeAudit).toHaveBeenCalledWith(ctx, expect.objectContaining({
-      note: "Kart unutuldu", newValue: { inserted: 1, updated: 1, errors: 2, touched: 2 },
+      note: "Kart unutuldu", newValue: { inserted: 1, updated: 1, errors: 2, touched: 2, batchId: expect.any(String) },
     }));
   });
 });

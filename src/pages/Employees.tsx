@@ -1,4 +1,4 @@
-import { MasterDetailListLayout } from "@/components/shared/MasterDetailListLayout";
+import { PageTemplate } from "@/components/shared/PageTemplate";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
@@ -19,7 +19,7 @@ import { useEmployees } from "@/hooks/useEmployees";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { AccessDenied } from "@/components/shared/AccessDenied";
 import { EmployeeAddMenu } from "@/components/employees/EmployeeAddMenu";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import {
@@ -28,20 +28,25 @@ import {
   safeSearchParam,
 } from "@/components/employees/lib/employeeList";
 import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { EmployeeImportDialog } from "@/components/employees/import/EmployeeImportDialog";
 import { EmployeeExportDialog } from "@/components/employees/import/EmployeeExportDialog";
 import { EMPLOYEE_EXPORT_MAX_ROWS } from "@/lib/employees/exportEmployeesXlsx";
 import { downloadEmployeeImportTemplate } from "@/lib/employees/importTemplate";
 export default function Employees() {
-  const { projectId } = useActiveProjectScope();
+  const { projectId, activeProject } = useActiveProjectScope();
   const { can, loading } = usePermissions();
-  if (loading) return <SectionSkeleton label="Personel bilgileri yükleniyor…" />;
-  if (!can("employees.view")) return <AccessDenied message="Personel görüntüleme yetkiniz yok. Proje yöneticinizle iletişime geçin." />;
+  if (loading) return <PageTemplate title="Kişiler"><SectionSkeleton label="Personel bilgileri yükleniyor…" /></PageTemplate>;
+  if (!can("employees.view")) return <PageTemplate title="Kişiler"><AccessDenied message="Personel görüntüleme yetkiniz yok. Proje yöneticinizle iletişime geçin." /></PageTemplate>;
   return (
     <QuerySectionBoundary
       resetKey={projectId}
       title="Personel listesi yüklenemedi"
       description="Bağlantınızı kontrol edip yeniden deneyin."
+      renderFallback={retry => <PageTemplate title="Kişiler" scope={activeProject?.name}>
+        <ErrorState title="Personel listesi yüklenemedi" description="Bağlantınızı kontrol edip yeniden deneyin." compact onRetry={retry} />
+      </PageTemplate>}
     >
       <EmployeePage />
     </QuerySectionBoundary>
@@ -159,13 +164,13 @@ function EmployeePage() {
     setIsPanelOpen(true);
   };
   if (projectLoading && !isPanelOpen)
-    return <SectionSkeleton label="Personel bilgileri yükleniyor…" />;
+    return <PageTemplate title="Kişiler" scope={activeProject?.name}><SectionSkeleton label="Personel bilgileri yükleniyor…" /></PageTemplate>;
   if (!hasProjectAccess)
     return (
-      <AccessDenied message="Bu projenin personel kayıtlarını görüntüleme yetkiniz yok." />
+      <PageTemplate title="Kişiler" scope={activeProject?.name}><AccessDenied message="Bu projenin personel kayıtlarını görüntüleme yetkiniz yok." /></PageTemplate>
     );
   if (!projectId)
-    return <EmptyState title="Personelleri görmek için proje seçin." />;
+    return <PageTemplate title="Kişiler"><EmptyState title="Personelleri görmek için proje seçin." /></PageTemplate>;
   const hasFilters = !!q || !!department || !!company || status !== "all";
   const exportTooLarge = filtered.length > EMPLOYEE_EXPORT_MAX_ROWS;
   const activeCount = employees.filter((employee) => employee.isActive).length;
@@ -176,16 +181,28 @@ function EmployeePage() {
     terminated: employees.filter(employee => !!employee.employmentEndDate).length,
   };
   return (
-    <div className="min-w-0 space-y-6">
-      <PageHeader title="Kişiler">
-        {canManage && <EmployeeAddMenu onAddNew={() => open(null)} />}
-      </PageHeader>
-      <MasterDetailListLayout sidebar={<DepartmentTree
+    <PageTemplate
+      title="Kişiler"
+      scope={activeProject?.name}
+      primaryAction={canManage && <EmployeeAddMenu onAddNew={() => open(null)} />}
+      secondaryActions={(canManage || canExport) && <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="min-h-11 gap-1.5 md:min-h-8">İşlemler<ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {canManage && <DropdownMenuItem onSelect={() => setImportDialogOpen(true)}>İçe aktar</DropdownMenuItem>}
+          {canExport && <DropdownMenuItem disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onSelect={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</DropdownMenuItem>}
+          {canManage && <DropdownMenuItem onSelect={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</DropdownMenuItem>}
+        </DropdownMenuContent>
+      </DropdownMenu>}
+      notice={exportError && <p role="alert" className="text-sm text-destructive">{exportError}</p>}
+      aside={{ label: "Şirket ve departman kapsamı", content: <DepartmentTree
           selectedValue={department}
           selectedCompany={company}
           onSelectDepartment={(id) => update({ department: id ?? "", company: "" })}
           onSelectCompany={(id) => update({ company: id, department: "" })}
-        />}>
+        /> }}
+      filters={
         <EmployeeFilters
           searchQuery={q}
           onSearchChange={(value) => {
@@ -202,64 +219,9 @@ function EmployeePage() {
             setPrivateQuery(null);
             update({ q: "", department: "", company: "", status: "" });
           }}
-          actions={(canManage || canExport) && <>
-            {canManage && <Button variant="outline" onClick={() => setImportDialogOpen(true)}>İçe aktar</Button>}
-            {canExport && <Button variant="outline" disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onClick={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</Button>}
-            {canManage && <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>}
-          </>}
         />
-        {exportError && <p role="alert" className="text-sm text-destructive">{exportError}</p>}
-        <EmployeeTable
-          key={`${projectId}/${q}/${department}/${company}/${status}/${sort}/${page}/${size}`}
-          loading={isLoading}
-          emptyState={
-            employees.length === 0 ? (
-              <EmptyState
-                title="Henüz personel eklenmedi"
-                description={`${activeProject?.name ?? "Bu proje"} için ilk personel kaydını oluşturun.`}
-              />
-            ) : (
-              <EmptyState
-                title={
-                  q
-                    ? "Aramanızla eşleşen personel yok"
-                    : department && status === "all"
-                      ? "Bu departmanda doğrudan bağlı kişi yok"
-                      : company && status === "all"
-                        ? "Bu şirkette kişi yok"
-                        : "Seçili filtrelerle eşleşen personel yok"
-                }
-                description="Aramayı veya şirket ve departman seçimini değiştirin."
-                action={{
-                  label:
-                    (department || company) &&
-                    !q &&
-                    status === "all"
-                      ? "Tüm personele dön"
-                      : "Filtreleri temizle",
-                  onClick: () => {
-                    setPrivateQuery(null);
-                    update({
-                      q: "",
-                      department: "",
-                      company: "",
-                      status: "",
-                    });
-                  },
-                }}
-              />
-            )
-          }
-          sort={sort}
-          onSortChange={(value) => update({ sort: value })}
-          showDepartment={!department}
-          showCompany={
-            !company && !department && employees.some((item) => item.companies)
-          }
-          employees={filtered.slice((page - 1) * size, page * size)}
-          onViewDetails={(employee) => open(employee)}
-          onRefresh={refetch}
-        />
+      }
+      footer={
         <PaginationBar
           summary={filtered.length === 0 ? "0 sonuç" : `${employees.length} personelden ${filtered.length} sonuç · ${pageRange(filtered.length, page, size)} gösteriliyor`}
           page={page}
@@ -271,25 +233,79 @@ function EmployeePage() {
           onPageSizeChange={(value) => update({ size: String(value) })}
           pageSizeLabel="Sayfadaki personel sayısı"
         />
-      </MasterDetailListLayout>
-      <SlideOverPanel
-        isOpen={isPanelOpen}
-        onClose={close}
-        employee={editingEmployee}
-        loadingEmployee={continuingEmployeeId !== null}
-        onContinue={({ employeeId }) => {
-          refetch();
-          const saved = employees.find(item => item._id === employeeId);
-          if (saved) setEditingEmployee(saved);
-          else setContinuingEmployeeId(employeeId);
-        }}
-        onSave={() => {
-          refetch();
-          if (!editingEmployee) close();
-        }}
+      }
+      overlays={<>
+        <SlideOverPanel
+          isOpen={isPanelOpen}
+          onClose={close}
+          employee={editingEmployee}
+          loadingEmployee={continuingEmployeeId !== null}
+          onContinue={({ employeeId }) => {
+            refetch();
+            const saved = employees.find(item => item._id === employeeId);
+            if (saved) setEditingEmployee(saved);
+            else setContinuingEmployeeId(employeeId);
+          }}
+          onSave={() => {
+            refetch();
+            if (!editingEmployee) close();
+          }}
+        />
+        {importDialogOpen && canManage && <EmployeeImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} projectId={projectId} />}
+        {exportDialogOpen && canExport && <EmployeeExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} projectId={projectId} employees={filtered} onError={setExportError} />}
+      </>}
+    >
+      <EmployeeTable
+        key={`${projectId}/${q}/${department}/${company}/${status}/${sort}/${page}/${size}`}
+        loading={isLoading}
+        emptyState={
+          employees.length === 0 ? (
+            <EmptyState
+              title="Henüz personel eklenmedi"
+              description={`${activeProject?.name ?? "Bu proje"} için ilk personel kaydını oluşturun.`}
+            />
+          ) : (
+            <EmptyState
+              title={
+                q
+                  ? "Aramanızla eşleşen personel yok"
+                  : department && status === "all"
+                    ? "Bu departmanda doğrudan bağlı kişi yok"
+                    : company && status === "all"
+                      ? "Bu şirkette kişi yok"
+                      : "Seçili filtrelerle eşleşen personel yok"
+              }
+              description="Aramayı veya şirket ve departman seçimini değiştirin."
+              action={{
+                label:
+                  (department || company) &&
+                  !q &&
+                  status === "all"
+                    ? "Tüm personele dön"
+                    : "Filtreleri temizle",
+                onClick: () => {
+                  setPrivateQuery(null);
+                  update({
+                    q: "",
+                    department: "",
+                    company: "",
+                    status: "",
+                  });
+                },
+              }}
+            />
+          )
+        }
+        sort={sort}
+        onSortChange={(value) => update({ sort: value })}
+        showDepartment={!department}
+        showCompany={
+          !company && !department && employees.some((item) => item.companies)
+        }
+        employees={filtered.slice((page - 1) * size, page * size)}
+        onViewDetails={(employee) => open(employee)}
+        onRefresh={refetch}
       />
-      {importDialogOpen && canManage && <EmployeeImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} projectId={projectId} />}
-      {exportDialogOpen && canExport && <EmployeeExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} projectId={projectId} employees={filtered} onError={setExportError} />}
-    </div>
+    </PageTemplate>
   );
 }

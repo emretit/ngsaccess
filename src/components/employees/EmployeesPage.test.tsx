@@ -5,15 +5,22 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import Employees from "@/pages/Employees";
 vi.mock("convex/react", () => ({ useQuery: () => undefined }));
-vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p", isAdmin: true }) }));
+vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ ...projectState, isAdmin: true }) }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ activeProject: { name: "Proje" } }) }));
-vi.mock("@/hooks/useEmployees", () => ({ useEmployees: () => ({ employees: [{ _id: "e", firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", departmentId: "d", isActive: true }], isLoading: navigation.loading, hasProjectAccess: true }) }));
+vi.mock("@/hooks/useEmployees", () => ({ useEmployees: () => ({ employees: [{ _id: "e", firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", departmentId: "d", isActive: true }], isLoading: navigation.loading, hasProjectAccess: projectState.hasProjectAccess }) }));
 vi.mock("@/components/departments/DepartmentTree", () => ({ default: () => null }));
 vi.mock("./SlideOverPanel", () => ({ default: () => null }));
 vi.mock("./EmployeeTable", () => ({ default: ({ employees, emptyState }: { employees: unknown[]; emptyState?: ReactNode }) => <table><thead><tr><th>Ad soyad</th></tr></thead><tbody><tr><td>{employees.length === 0 ? emptyState : null}</td></tr></tbody></table> }));
-vi.mock("@/components/shared/QuerySectionBoundary", () => ({ QuerySectionBoundary: ({ children }: { children: ReactNode }) => <>{children}</> }));
+vi.mock("@/components/shared/QuerySectionBoundary", () => ({ QuerySectionBoundary: ({ children, renderFallback }: { children: ReactNode; renderFallback?: (retry: () => void) => ReactNode }) => projectState.failed ? renderFallback?.(() => undefined) : <>{children}</> }));
+// Render portal content inline so permission assertions inspect every menu option.
+vi.mock("@/components/ui/dropdown-menu", async original => ({
+  ...await original<typeof import("@/components/ui/dropdown-menu")>(),
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, disabled, title }: { children: ReactNode; disabled?: boolean; title?: string }) => <button disabled={disabled} title={title}>{children}</button>,
+}));
+const projectState = vi.hoisted(() => ({ projectId: "p" as string | undefined, loading: false, hasProjectAccess: true, failed: false }));
 const permissionState = vi.hoisted(() => ({ allowed: null as string[] | null, loading: false }));
-afterEach(() => { permissionState.allowed = null; permissionState.loading = false; });
+afterEach(() => { permissionState.allowed = null; permissionState.loading = false; projectState.projectId = "p"; projectState.loading = false; projectState.hasProjectAccess = true; projectState.failed = false; });
 function render(query: string) { return renderToStaticMarkup(<MemoryRouter initialEntries={[`/employees?${query}`]}><Employees /></MemoryRouter>); }
 it("02-O1/D4: empty department explains direct membership and has one return action", () => {
   const html = render("department=empty");
@@ -40,21 +47,27 @@ it("personel yetkisi yüklenirken reddetmez, yetki yoksa listeyi oluşturmaz", (
   permissionState.loading = true;
   let html = render("");
   expect(html).toContain("Personel bilgileri yükleniyor");
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
   expect(html).not.toContain("Proje erişimi yok");
   permissionState.loading = false;
   html = render("");
   expect(html).toContain("Personel görüntüleme yetkiniz yok");
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
   expect(html).not.toContain("Personel ekle");
 });
 it.each([
   [["employees.view", "employees.manage"], true, false],
   [["employees.view", "reports.view"], false, true],
+  [["employees.view"], false, false],
 ] as const)("içe ve dışa aktarmayı ayrı yetkilerle gösterir: %j", (permissions, manage, reports) => {
   permissionState.allowed = [...permissions];
   const html = render("");
   expect(html.includes("İçe aktar")).toBe(manage);
   expect(html.includes("Dışa aktar")).toBe(reports);
   expect(html.includes("Personel ekle")).toBe(manage);
+  expect(html.includes("İşlemler")).toBe(manage || reports);
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
+  expect(html).toContain("Proje");
 });
 
 const navigation = vi.hoisted(() => ({
@@ -89,4 +102,26 @@ it.each([
     expect(navigation.navigate).toHaveBeenCalledWith({ pathname: "/employees", search: "" }, { replace: true, state: null });
   } else expect(navigation.navigate).not.toHaveBeenCalled();
   navigation.loading = false;
+});
+
+it.each(["loading", "denied", "no-project"])("keeps the page heading in project state: %s", state => {
+  projectState.loading = state === "loading";
+  projectState.hasProjectAccess = state !== "denied";
+  projectState.projectId = state === "no-project" ? undefined : "p";
+  const html = render("");
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
+  expect(html).toContain("Kişiler");
+  expect(html).not.toContain("İşlemler");
+  expect(html).toContain(state === "loading" ? "Personel bilgileri yükleniyor" : state === "denied" ? "Bu projenin personel kayıtlarını görüntüleme yetkiniz yok" : "Personelleri görmek için proje seçin");
+});
+
+it("keeps the employee page identity and retry action when the list boundary fails", () => {
+  projectState.failed = true;
+  const html = render("");
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
+  expect(html).toContain("Kişiler");
+  expect(html).toContain("Personel listesi yüklenemedi");
+  expect(html).toContain("Tekrar Dene");
+  expect(html).not.toMatch(/<main\b/);
+  expect(html).not.toContain("Personel ekle");
 });

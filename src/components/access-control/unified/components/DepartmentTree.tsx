@@ -17,6 +17,7 @@ import {
 
 interface DepartmentTreeFormData {
   selected_employees: string[];
+  department_selections?: { departmentId: string; includeChildren: boolean }[];
 }
 interface DepartmentTreeProps<T extends DepartmentTreeFormData> {
   formData: T;
@@ -34,6 +35,9 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
   const { employees, isLoading: employeesLoading } = useEmployees();
   const { departments, companies, isLoading: departmentsLoading } = useDepartments();
   const labels = departmentLabels(departments, companies);
+  const dynamic = formData.department_selections !== undefined;
+  const inheritedDepartments = new Set(formData.department_selections?.flatMap(selection =>
+    [...departmentScope(departments, selection.departmentId, selection.includeChildren)]) ?? []);
   const searchText = search.trim().toLocaleLowerCase("tr");
   const matches = (name: string) =>
     name.toLocaleLowerCase("tr").includes(searchText);
@@ -46,19 +50,22 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
         checked,
       ),
     }));
-  const renderEmployee = (employee: (typeof employees)[number]) => {
+  const renderEmployee = (employee: (typeof employees)[number], root = false) => {
     const id = `${prefix}-employee-${employee._id}`;
+    const inherited = !!employee.departmentId && inheritedDepartments.has(employee.departmentId);
     return (
-      <div key={employee._id} className="flex items-center gap-2 py-1 pl-3">
+      <div key={employee._id} className={`flex items-center gap-2 py-1 ${root ? "pl-[52px]" : "pl-3"}`}>
         <Checkbox
           id={id}
-          checked={formData.selected_employees.includes(employee._id)}
+          checked={inherited || formData.selected_employees.includes(employee._id)}
+          disabled={inherited && !formData.selected_employees.includes(employee._id)}
           onCheckedChange={(checked) =>
             change([employee._id], checked === true)
           }
         />
         <Label htmlFor={id} className="flex flex-1 min-h-11 items-center cursor-pointer min-w-0 break-words font-normal">
           {employee.firstName} {employee.lastName}
+          {inherited && <span className="ml-1 text-xs text-muted-foreground">· Departmandan</span>}
         </Label>
       </div>
     );
@@ -128,13 +135,19 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
           </Button>
           <Checkbox
             id={id}
-            checked={selectionState(
+            checked={dynamic ? formData.department_selections?.some(selection => selection.departmentId === department._id) : selectionState(
               scopedEmployees.map((employee) => employee._id),
               formData.selected_employees,
             )}
-            disabled={scopedEmployees.length === 0}
+            disabled={!dynamic && scopedEmployees.length === 0}
             onCheckedChange={(checked) =>
-              change(
+              dynamic ? setFormData(prev => ({
+                ...prev,
+                department_selections: [
+                  ...(prev.department_selections ?? []).filter(selection => selection.departmentId !== department._id),
+                  ...(checked === true ? [{ departmentId: department._id, includeChildren }] : []),
+                ],
+              })) : change(
                 scopedEmployees.map((employee) => employee._id),
                 checked === true,
               )
@@ -151,7 +164,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
                 departmentMatches ||
                 matches(`${employee.firstName} ${employee.lastName}`),
             )
-            .map(renderEmployee)}
+            .map((employee) => renderEmployee(employee))}
           {children.map((child) =>
             renderDepartment(child, new Set([...ancestors, department._id])),
           )}
@@ -186,15 +199,18 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
         <Checkbox
           id={`${prefix}-descendants`}
           checked={includeChildren}
-          onCheckedChange={(checked) => setIncludeChildren(checked === true)}
+          onCheckedChange={(checked) => {
+            setIncludeChildren(checked === true);
+            if (dynamic) setFormData(prev => ({ ...prev, department_selections: prev.department_selections?.map(selection => ({ ...selection, includeChildren: checked === true })) }));
+          }}
         />
         <Label htmlFor={`${prefix}-descendants`}>
           Alt departmanları dahil et
         </Label>
       </div>
       <p className="text-xs text-muted-foreground">
-        Seçim anındaki kişiler eklenir. Sonradan katılanlar otomatik eklenmez.{" "}
-        {formData.selected_employees.length} kişi seçili.
+        {dynamic ? "Seçili departmanlara sonradan katılanlar da otomatik eklenir. Departmandan ayrılanın yalnız bu yolla gelen yetkisi kaldırılır." : "Seçim anındaki kişiler eklenir. Sonradan katılanlar otomatik eklenmez."}{" "}
+        {formData.selected_employees.length} kişi elle seçili.
       </p>
       <Label htmlFor={`${prefix}-search`} className="sr-only">
         Kişi veya departman ara
@@ -210,7 +226,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
       ) : (
         <div className="rounded-md border p-2">
           {renderedDepartments}
-          {visibleOrphans.map(renderEmployee)}
+          {visibleOrphans.map((employee) => renderEmployee(employee, true))}
           {!hasResults && (
             <EmptyState
               title={

@@ -59,13 +59,23 @@ export function validFlexibleExit(schedule: FlexibleSchedule, minute: number, en
     && (entry === undefined || (minute > entry && minute - entry <= schedule.maxSpanMinutes));
 }
 /** Preserve directions and delegate the attendance decision to W5-A's resolver. */
-export function flexibleReadings<T extends { accessTime: string; direction?: string }>(schedule: FlexibleSchedule, date: string, readings: readonly T[], manualEntry?: string) {
+export function flexibleReadings<T extends { accessTime: string; direction?: string }>(schedule: FlexibleSchedule, date: string, readings: readonly T[], manualEntry?: string, eachPunch = false) {
   const entry = manualEntry ?? readings.find(r => r.direction !== "exit" && validFlexibleEntry(schedule, relativeMinute(date, r.accessTime)))?.accessTime;
   const entryMinute = entry ? relativeMinute(date, entry) : undefined;
+  let closedVisit = false;
   return readings.filter(reading => {
     const minute = relativeMinute(date, reading.accessTime);
-    if (reading.direction === "entry") return validFlexibleEntry(schedule, minute);
-    if (reading.direction === "exit") return validFlexibleExit(schedule, minute, entryMinute);
+    if (reading.direction === "entry") {
+      const accepted = validFlexibleEntry(schedule, minute) || eachPunch && closedVisit && entryMinute !== undefined
+        && validFlexibleExit(schedule, minute, entryMinute);
+      if (accepted) closedVisit = false;
+      return accepted;
+    }
+    if (reading.direction === "exit") {
+      const accepted = validFlexibleExit(schedule, minute, entryMinute);
+      if (accepted && entryMinute !== undefined && minute > entryMinute) closedVisit = true;
+      return accepted;
+    }
     return validFlexibleEntry(schedule, minute) || validFlexibleExit(schedule, minute, entryMinute);
   });
 }

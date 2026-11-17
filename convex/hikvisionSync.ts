@@ -4,8 +4,8 @@ import { requirePermission, getProjectIdsWithPermission } from "./lib/permission
 import { writeAudit } from "./lib/audit";
 import { internal } from "./_generated/api";
 import { snapshotEmployeeHikDevices, resolveRuleDeviceTargets, hasWritableHikCredential } from "./lib/peopleHikSnapshot";
-import { grantStatusForOperation } from "./lib/grantStatus";
-import { mobileOperationId, mobileQueueAllowed } from "./lib/mobileAccess";
+import { upsertGrantStatus, grantStatusForOperation } from "./lib/grantStatus";
+import { mobileOperationId, mobileQueueAllowed, settleMobileHikOperation } from "./lib/mobileAccess";
 import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } from "./lib/biometricGate";
 import { isBiometricEnabled } from "./lib/privacySettings";
 import { v } from "convex/values";
@@ -474,9 +474,15 @@ export async function enqueueLocalBridgeOperationInTransaction(ctx: MutationCtx,
           localBridgeOperationKey(op.deviceId, op.operation, op.payload) === newKey,
       );
       if (existing) {
+        // Retry count alone does not make a legacy ACK ambiguous: only a changed
+        // payload after delivery can let an old result close a different request.
+        const payloadChangedAfterClaim = (existing.hasBeenClaimed || existing.status === "processing") &&
+          stablePayloadKey(existing.payload) !== stablePayloadKey(args.payload);
         await ctx.db.patch(existing._id, {
           projectId: args.projectId,
           payload: args.payload,
+          attempt: (existing.attempt ?? 0) + 1,
+          legacyAckUnsafe: existing.legacyAckUnsafe || payloadChangedAfterClaim,
           status: "pending",
           attemptCount: 0,
           nextRetryAt: now,
@@ -568,13 +574,14 @@ export const claimLocalBridgeOperations = internalMutation({
     await Promise.all(
       processing
         .filter((op) => (op.processingStartedAt ?? op.createdAt) < staleCutoff)
-        .map((op) =>
-          ctx.db.patch(op._id, {
+        .map(async (op) => {
+          await ctx.db.patch(op._id, {
             status: mobileOperationId(op.payload) !== undefined ? "failed" : "pending",
             nextRetryAt: now,
             lastError: "Bridge claim timeout; pending'e alındı",
-          }),
-        ),
+          });
+          await settleMobileHikOperation(ctx, op, "failed");
+        }),
     );
 
     const requestedMax = Math.floor(args.max ?? 10);
@@ -593,8 +600,15 @@ export const claimLocalBridgeOperations = internalMutation({
         continue;
       }
       if ((op.nextRetryAt ?? 0) > now) continue;
+      if (op.legacyAckUnsafe && op.attemptCount >= 5) {
+        await ctx.db.patch(op._id, { status: "failed", lastError: "bridge_attempt_required" });
+        await grantStatusForOperation(ctx, op, "failed", "bridge_attempt_required");
+        await settleMobileHikOperation(ctx, op, "failed");
+        continue;
+      }
       if (!(await mobileQueueAllowed(ctx, op))) {
         await ctx.db.patch(op._id, { status: "failed", lastError: "MOBILE_COMMAND_NOT_DELIVERABLE" });
+        await settleMobileHikOperation(ctx, op, "failed");
         continue;
       }
       if (isBiometricAddition(op.operation) && (!biometricEnabled ||
@@ -621,6 +635,8 @@ export const claimLocalBridgeOperations = internalMutation({
         ctx.db.patch(op._id, {
           status: "processing",
           attemptCount: op.attemptCount + 1,
+          attempt: (op.attempt ?? 0) + 1,
+          hasBeenClaimed: true,
           processingStartedAt: now,
           lastError: undefined,
         }),
@@ -640,6 +656,7 @@ export const claimLocalBridgeOperations = internalMutation({
         opId: op._id,
         operation: op.operation,
         payload: op.payload,
+        attempt: (op.attempt ?? 0) + 1,
         attemptCount: op.attemptCount + 1,
         createdAt: op.createdAt,
       })),
@@ -665,6 +682,7 @@ export const ackLocalBridgeOperation = internalMutation({
   args: {
     token: v.string(),
     opId: v.id("hikPendingOperations"),
+    attempt: v.optional(v.number()),
     ok: v.boolean(),
     message: v.optional(v.string()),
   },
@@ -680,6 +698,8 @@ export const ackLocalBridgeOperation = internalMutation({
     if (!op || op.deviceId !== device._id) {
       return { ok: false, error: "operation not found" };
     }
+    if ((args.attempt !== undefined && args.attempt !== op.attempt) ||
+        (args.attempt === undefined && op.legacyAckUnsafe)) return { ok: false, error: "stale attempt", requiresAttempt: args.attempt === undefined };
     if (mobileOperationId(op.payload) !== undefined && op.status !== "processing") return { ok: false, error: "operation not processing" };
     // A dedupe may have replaced the in-flight payload; let the bridge fetch it again.
     if (op.status !== "processing") return { ok: true };
@@ -693,6 +713,7 @@ export const ackLocalBridgeOperation = internalMutation({
         completedAt: Date.now(),
         lastError: undefined,
       });
+      await settleMobileHikOperation(ctx, op, "acked");
       await resolveAcknowledgedDeletion(ctx, op);
       const identity = deletionIdentity(op);
       if (["addPerson", "updatePerson"].includes(op.operation) && identity) await supersedeCurrentCredentialDeletions(ctx, op.deviceId, identity);
@@ -702,6 +723,7 @@ export const ackLocalBridgeOperation = internalMutation({
       status: "failed",
       lastError: message ?? "Bridge operation failed",
     });
+    await settleMobileHikOperation(ctx, op, "failed");
     return { ok: true };
   },
 });
@@ -728,13 +750,14 @@ export const requeueStaleLocalBridgeOperations = internalMutation({
         (op.processingStartedAt ?? op.createdAt) < staleCutoff,
     );
     await Promise.all(
-      stale.map((op) =>
-        ctx.db.patch(op._id, {
+      stale.map(async (op) => {
+        await ctx.db.patch(op._id, {
           status: mobileOperationId(op.payload) !== undefined ? "failed" : "pending",
           nextRetryAt: now,
           lastError: "Bridge processing timeout; pending'e alındı",
-        }),
-      ),
+        });
+        await settleMobileHikOperation(ctx, op, "failed");
+      }),
     );
     return { requeued: stale.length };
   },
@@ -1259,4 +1282,53 @@ export async function pendingPersonDeletions(ctx: Pick<QueryCtx, "db">, args: { 
 export const getPendingPersonDeletions = internalQuery({
   args: { projectId: v.id("projects"), employeeId: v.id("employees"), deviceId: v.id("devices") },
   handler: pendingPersonDeletions,
+});
+
+/** Reserve grant generations before any gateway I/O. Every later grant write invalidates them. */
+export const beginGatewayGrants = internalMutation({
+  args: { employeeId: v.optional(v.id("employees")), deviceIds: v.optional(v.array(v.id("devices"))),
+    pairs: v.optional(v.array(v.object({ employeeId: v.id("employees"), deviceId: v.id("devices") }))) },
+  handler: async (ctx, args): Promise<{ employeeId: Id<"employees">; deviceId: Id<"devices">; generation: number }[]> => {
+    const employeeId = args.employeeId;
+    const pairs = args.pairs ?? (employeeId ? (args.deviceIds ?? []).map(deviceId => ({ employeeId, deviceId })) : []);
+    if (pairs.length > 500) throw new Error("Gateway grant batch exceeds 500");
+    const generations: { employeeId: Id<"employees">; deviceId: Id<"devices">; generation: number }[] = [];
+    const seen = new Set<string>();
+    for (const { employeeId, deviceId } of pairs) {
+      const key = `${employeeId}:${deviceId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const device = await ctx.db.get(deviceId);
+      if (!device?.projectId) continue;
+      const previous = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employeeId).eq("deviceId", deviceId)).unique();
+      await upsertGrantStatus(ctx, { projectId: device.projectId, employeeId, deviceId, state: "pending", ruleIds: previous?.ruleIds ?? [] }, { gatewayReservation: true });
+      const row = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employeeId).eq("deviceId", deviceId)).unique();
+      if (row) generations.push({ employeeId, deviceId, generation: row.syncGeneration ?? 0 });
+    }
+    return generations;
+  },
+});
+
+export const finishGatewayGrants = internalMutation({
+  args: { results: v.array(v.object({ projectId: v.id("projects"), employeeId: v.id("employees"), deviceId: v.id("devices"),
+    state: v.union(v.literal("pending"), v.literal("effective"), v.literal("failed"), v.literal("removed")),
+    expectedGeneration: v.optional(v.number()), ruleIds: v.optional(v.array(v.id("accessRules"))),
+    lastError: v.optional(v.string()), lastRunId: v.optional(v.id("deviceSyncRuns")), lastOperationId: v.optional(v.string()) })) },
+  handler: async (ctx, args): Promise<void> => {
+    if (args.results.length > 500) throw new Error("Gateway grant batch exceeds 500");
+    const reconciliations = new Map<Id<"employees">, { devices: Set<Id<"devices">>; projects: Set<Id<"projects">> }>();
+    for (const result of args.results) {
+      if (result.expectedGeneration === undefined) continue;
+      const outcome = await upsertGrantStatus(ctx, result);
+      if (!outcome) continue;
+      const { employeeId, deviceId, projectId } = outcome.reconcile;
+      const group = reconciliations.get(employeeId) ?? { devices: new Set<Id<"devices">>(), projects: new Set<Id<"projects">>() };
+      group.devices.add(deviceId);
+      group.projects.add(projectId);
+      reconciliations.set(employeeId, group);
+    }
+    for (const [employeeId, group] of reconciliations) await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
+      employeeId, targetDeviceIds: [...group.devices], allowedProjectIds: [...group.projects],
+    });
+  },
 });

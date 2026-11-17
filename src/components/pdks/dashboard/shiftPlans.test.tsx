@@ -38,6 +38,18 @@ function drawer(cell: PdksCell) {
   return render(<PDKSEmployeeDetailDrawer open onOpenChange={vi.fn()} employeeId={"e" as Id<"employees">} startDate={day.date} endDate={day.date} />);
 }
 describe("PDKS vardiya planı sunumu", () => {
+  it("explains a missing exit while showing the measurable part of the day", () => {
+    const html = drawer({ ...day, punchQuality: "missingExit", durationMeasured: true });
+    expect(html).toContain("Bir giriş okutmasının ardından çıkış kaydı bulunamadı");
+    expect(html).toContain("yalnızca tamamlanmış giriş–çıkış kayıtlarından");
+    expect(html).toContain("03 sa 50 dk");
+  });
+  it("shows measured completed work on an ongoing shift without a review warning", () => {
+    const html = drawer({ ...day, status: "future", punchQuality: "missingExit", durationMeasured: true, totalMinutes: 60 });
+    expect(html).toContain("Tamamlanan çalışma 01 sa 00 dk");
+    expect(html).not.toContain("Çıkış okutması yok");
+    expect(html).not.toContain("Bir giriş okutmasının ardından çıkış kaydı bulunamadı");
+  });
   it("tablo, mobil ve hücre çoklu adı, sayıyı ve sunucunun ilk/son saatlerini gösterir", () => {
     const record = { ...row, days: [{ ...day, segments }] };
     for (const html of [render(<PDKSTableView records={[record]} />), mobile(record), heatmap(record)]) {

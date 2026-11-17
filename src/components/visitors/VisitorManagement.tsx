@@ -6,8 +6,9 @@ import { useVisitors } from "@/hooks/useVisitors";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { AccessDenied } from "@/components/shared/AccessDenied";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { PageTemplate } from "@/components/shared/PageTemplate";
+import { PageHeaderPrimaryButton } from "@/components/shared/PageHeader";
+import { Plus } from "lucide-react";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { VisitorFilters, type VisitorStatusFilter } from "./VisitorFilters";
@@ -15,7 +16,6 @@ import { displayVisitorStatus, isVisitorStatus } from "./lib/status";
 import { VisitorStats } from "./VisitorStats";
 import VisitorTable from "./VisitorTable";
 import VisitorSlideOverPanel from "./VisitorSlideOverPanel";
-import VisitorZoneDialog from "./VisitorZoneDialog";
 import { useVisitorClock } from "./hooks/useVisitorClock";
 import { useStableQuery } from "./hooks/useStableQuery";
 import { PaginationBar } from "@/components/shared/PaginationBar";
@@ -31,9 +31,8 @@ export default function VisitorManagement() {
   const status: VisitorStatusFilter = isVisitorStatus(rawStatus) ? rawStatus : "all";
   const [pageSize, setPageSize] = useState(25);
   const [panel, setPanel] = useState<{ visitor: Visitor | null; projectId: typeof projectId } | null>(null);
-  const [zoneOpen, setZoneOpen] = useState(false);
   const { now, onNextExpiry } = useVisitorClock();
-  useEffect(() => { setPanel(null); setZoneOpen(false); }, [projectId]);
+  useEffect(() => { setPanel(null); }, [projectId]);
   const filter = (q: string, nextStatus: VisitorStatusFilter, replace = false) => {
     setParams(previous => {
       const next = new URLSearchParams(previous);
@@ -44,21 +43,19 @@ export default function VisitorManagement() {
   };
   const clear = () => filter("", "all");
   const resetKey = `${projectId}:${search}:${status}:${pageSize}`;
-  return <div className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
-    <PageHeader title="Ziyaretçiler" scope={`${activeProject?.name ?? "Proje seçin"} · Geçici erişim kayıtları`}
-      primaryAction={canManage && projectId ? { label: "Ziyaretçi kaydet", onClick: () => setPanel({ visitor: null, projectId }) } : undefined}>
-      {projectId && canView && can("devices.manage") && <Button variant="outline" size="sm" onClick={() => setZoneOpen(true)}>Erişim bölgesi oluştur</Button>}
-    </PageHeader>
+  const ready = !permissionsLoading && !loading && Boolean(projectId) && canView;
+  return <PageTemplate title="Ziyaretçiler" scope={`${activeProject?.name ?? "Proje seçin"} · Geçici erişim kayıtları`}
+      primaryAction={canManage && projectId ? <PageHeaderPrimaryButton onClick={() => setPanel({ visitor: null, projectId })}><Plus className="h-3.5 w-3.5" aria-hidden="true" />Ziyaretçi kaydet</PageHeaderPrimaryButton> : undefined}
+    summary={ready && (<QuerySectionBoundary title="Ziyaretçi özeti yüklenemedi" resetKey={projectId}><VisitorStats now={now} onNextExpiry={onNextExpiry} /></QuerySectionBoundary>)}
+    filters={ready && (<VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} />)}
+    overlays={ready && (panel && panel.projectId === projectId && <VisitorSlideOverPanel key={`${projectId}:${panel.visitor?._id ?? "new"}`} isOpen onClose={() => setPanel(null)} visitor={panel.visitor} onSave={() => setPanel(null)} now={now} canManage={canManage} />)}
+    >
     {permissionsLoading ? <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" /> : loading ? <VisitorTable visitors={[]} onOpen={() => {}} loading /> : !projectId ? !isSuperAdmin ? <AccessDenied compact /> : <EmptyState title="Proje seçin" description="Ziyaretçileri görmek için erişiminiz olan aktif bir proje seçin." /> : !canView ? <AccessDenied compact message="Ziyaretçileri görüntüleme yetkiniz yok. Proje yöneticinizle iletişime geçin." /> : <>
-      <QuerySectionBoundary title="Ziyaretçi özeti yüklenemedi" resetKey={projectId}><VisitorStats now={now} onNextExpiry={onNextExpiry} /></QuerySectionBoundary>
-      <VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} />
       <QuerySectionBoundary title="Ziyaretçiler yüklenemedi" description="Bağlantınızı kontrol edip tekrar deneyin." resetKey={resetKey}>
         <VisitorList key={resetKey} search={search} status={status} pageSize={pageSize} onPageSizeChange={setPageSize} now={now} onOpen={visitor => setPanel({ visitor, projectId })} onClear={clear} />
       </QuerySectionBoundary>
-      {panel && panel.projectId === projectId && <VisitorSlideOverPanel key={`${projectId}:${panel.visitor?._id ?? "new"}`} isOpen onClose={() => setPanel(null)} visitor={panel.visitor} onSave={() => setPanel(null)} now={now} canManage={canManage} />}
-      {zoneOpen && <QuerySectionBoundary title="Erişim bölgeleri yüklenemedi" resetKey={projectId}><VisitorZoneDialog isOpen onClose={() => setZoneOpen(false)} /></QuerySectionBoundary>}
     </>}
-  </div>;
+  </PageTemplate>;
 }
 
 export function VisitorList({ search, status, pageSize, onPageSizeChange, now, onOpen, onClear }: {

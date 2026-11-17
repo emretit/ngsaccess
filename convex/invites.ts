@@ -1,6 +1,5 @@
 import { getPasswordError } from "./lib/passwordPolicy";
 import { ConvexError, v } from "convex/values";
-import { invalidateSessions, modifyAccountCredentials } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -15,6 +14,7 @@ import { inviteRoleValidator, legacyRoleToProjectRole, projectRoleValidator } fr
 import { normalizeAuthEmail } from "./lib/authEmail";
 
 /** Davet bağlantısı 7 gün, şifre sıfırlama bağlantısı 24 saat geçerli. */
+const CLAIM_TTL_MS = 15 * 60 * 1000;
 const INVITE_TTL_MS = { invite: 7 * 24 * 60 * 60 * 1000, reset: 24 * 60 * 60 * 1000 } as const;
 
 /** Kullanılmamış ve süresi dolmamış davet. */
@@ -64,6 +64,14 @@ async function getResetAccount(ctx: QueryCtx | MutationCtx, email: string, proje
     throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH", message: "Bu hesap davetin projesine ait değil. Yöneticinizden yeni bağlantı isteyin." });
   }
   return user;
+}
+
+/** A live reservation serializes password takeover across every invite for this email. */
+async function hasLiveClaim(ctx: QueryCtx | MutationCtx, email: string) {
+  for await (const invite of ctx.db.query("invites").withIndex("by_email", q => q.eq("email", email))) {
+    if (!invite.used && invite.claimToken && (invite.claimExpiresAt ?? 0) > Date.now()) return true;
+  }
+  return false;
 }
 
 /**
@@ -200,25 +208,41 @@ export const setupAccountState = internalQuery({
       .first();
     if (!account) return { state: "none" as const, email: invite.email };
     const user = await ctx.db.get(account.userId);
-    if (user && (await isFreshSetupAccount(ctx, user))) {
+    if (user && (await isFreshSetupAccount(ctx, user)) && !(await hasLiveClaim(ctx, invite.email))) {
       return { state: "claimable" as const, email: invite.email, userId: user._id };
     }
     return { state: "taken" as const };
   },
 });
 
-/** Yeniden kontrol ve güvenli profil temizliği; hesabı silmez veya doğrulamaz. */
+/** Cleanup, credentials, revocation and a bounded claim commit in one transaction. */
 export const resetClaimedAccount = internalMutation({
-  args: { userId: v.id("users"), token: v.string() },
+  args: { userId: v.id("users"), token: v.string(), password: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const invite = await getOpenSetupInvite(ctx, args.token);
     await requireInviteCreator(ctx, invite);
     const user = await ctx.db.get(args.userId);
     if (user?.email?.toLowerCase() !== invite.email) throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH" });
-    if (!user || !(await isFreshSetupAccount(ctx, user))) {
+    if (!user || !(await isFreshSetupAccount(ctx, user)) || await hasLiveClaim(ctx, invite.email)) {
       throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS" });
     }
+    const passwordError = getPasswordError(args.password);
+    if (passwordError) throw new ConvexError({ code: "INVITE_WEAK_PASSWORD", message: passwordError });
+    const account = await ctx.db.query("authAccounts")
+      .withIndex("providerAndAccountId", q => q.eq("provider", "password").eq("providerAccountId", invite.email))
+      .unique();
+    if (account?.userId !== user._id) throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS" });
+    // Auth's public helpers only dispatch these store mutations. Calling them as
+    // nested mutations keeps all writes (and hashing failure rollback) atomic.
+    await ctx.runMutation(internal.auth.store, { args: {
+      type: "modifyAccount", provider: "password", account: { id: invite.email, secret: args.password },
+    } });
+    await ctx.runMutation(internal.auth.store, { args: { type: "invalidateSessions", userId: user._id } });
+    await ctx.db.patch(invite._id, {
+      claimToken: crypto.randomUUID(), claimUserId: user._id,
+      claimExpiresAt: Math.min(Date.now() + CLAIM_TTL_MS, Date.parse(invite.expiresAt)),
+    });
     await ctx.db.patch(user._id, {
       firstCompanyName: undefined,
       name: undefined,
@@ -244,14 +268,9 @@ export const claimSetupAccount = action({
     }
     if (state.state === "none") return { flow: "signUp" };
     if (state.state === "taken") throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS" });
-    // Recheck/cleanup commits before changing credentials. This avoids changing a password
-    // if the account became privileged after setupAccountState; cleanup clears stale signup data.
-    await ctx.runMutation(internal.invites.resetClaimedAccount, { userId: state.userId, token: args.token });
-    await modifyAccountCredentials(ctx, {
-      provider: "password",
-      account: { id: state.email, secret: args.password },
+    await ctx.runMutation(internal.invites.resetClaimedAccount, {
+      userId: state.userId, token: args.token, password: args.password,
     });
-    await invalidateSessions(ctx, { userId: state.userId });
     return { flow: "signIn" };
   },
 });
@@ -314,6 +333,12 @@ export const consume = mutation({
     }
 
     await requireInviteCreator(ctx, invite);
+    // Claims cannot finalize before their credential transaction commits. Old
+    // sessions were removed in that transaction; expired claims must be retried.
+    if (invite.claimToken) {
+      if (invite.claimUserId !== user._id) throw new ConvexError({ code: "INVITE_INVALID" });
+      if ((invite.claimExpiresAt ?? 0) <= Date.now()) throw new ConvexError({ code: "INVITE_CLAIM_EXPIRED" });
+    }
     const projectRole = legacyRoleToProjectRole(invite.role);
     if (await isFreshSetupAccount(ctx, user)) {
       await ctx.db.patch(user._id, {
@@ -343,8 +368,8 @@ export const consume = mutation({
       });
     }
 
-    // Daveti kullanıldı olarak işaretle
-    await ctx.db.patch(invite._id, { used: true });
+    // Consume and clear the reservation in the same transaction as membership.
+    await ctx.db.patch(invite._id, { used: true, claimToken: undefined, claimUserId: undefined, claimExpiresAt: undefined });
 
     return null;
   },

@@ -4,6 +4,7 @@
 // bunu tutamaz → bu süreç gateway'in yanında (Hetzner) kalıcı çalışır. Bkz. RUNBOOK.md.
 import { createHash, randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { openSpool } from './queue.mjs';
 
 const md5 = (value) => createHash('md5').update(value).digest('hex');
 
@@ -139,10 +140,10 @@ export function resolveToken(tokens, alert) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function createBridge(config, { log = (entry) => console.log(JSON.stringify({ time: new Date().toISOString(), ...entry })) } = {}) {
+export function createBridge(config, { log = (entry) => console.log(JSON.stringify({ time: new Date().toISOString(), ...entry })), wait = sleep } = {}) {
   const {
     gatewayUrl, username, password, convexSiteUrl, tokens,
-    maxAgeMs = 24 * 3600_000, heartbeatTimeoutMs = 30_000, maxQueue = 1000, eventTimeOffset,
+    maxAgeMs = 24 * 3600_000, heartbeatTimeoutMs = 30_000, maxQueue = 1000, eventTimeOffset, queueDir,
   } = config;
   let queue = Promise.resolve();
   let queued = 0;
@@ -150,6 +151,8 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
   let current = null;
   let snapshotPending = null;
   let lastSnapshotAt = null;
+  const spool = openSpool(queueDir);
+  const retryTimers = new Set();
 
   async function post(path, body, token) {
     const url = `${convexSiteUrl}${path}`;
@@ -162,15 +165,49 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
           signal: AbortSignal.timeout(15_000),
         });
         await res.body?.cancel();
-        if (res.ok || res.status < 500) return { status: res.status };
+        if (res.ok || (res.status < 500 && res.status !== 429)) return { status: res.status };
         log({ event: 'post_retry', attempt, status: res.status });
+        const retryAfter = res.headers.get('retry-after');
+        const seconds = Number(retryAfter);
+        const retryMs = retryAfter ? (Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - Date.now()) : NaN;
+        await wait(Number.isFinite(retryMs) ? Math.min(300_000, Math.max(0, retryMs)) : attempt * 2000);
+        continue;
       } catch (error) {
         log({ event: 'post_retry', attempt, error: String(error) });
       }
-      await sleep(attempt * 2000);
+      await wait(attempt * 2000);
     }
     return { status: 0 };
   }
+
+  function dispatch(job) {
+    queue = queue.then(async () => {
+      if (stopped) return;
+      const token = tokens[job.tokenKey];
+      const result = token ? await post(job.path, job.body, token) : { status: 0 };
+      if (result.status >= 200 && result.status < 300) {
+        if (spool) spool.remove(job.id);
+        queued--;
+        log({ event: 'forward', ...job.summary, status: result.status });
+      } else {
+        log({ event: 'post_pending', ...job.summary, status: result.status });
+        if (!stopped) {
+          const timer = setTimeout(() => { retryTimers.delete(timer); dispatch(job); }, 30_000);
+          timer.unref?.();
+          retryTimers.add(timer);
+        }
+      }
+    }).catch(error => {
+      // Keep the durable record if storage acknowledgement fails; replay is at least once.
+      log({ event: 'queue_error', error: String(error) });
+      if (!stopped) {
+        const timer = setTimeout(() => { retryTimers.delete(timer); dispatch(job); }, 30_000);
+        timer.unref?.(); retryTimers.add(timer);
+      }
+    });
+  }
+
+  for (const job of spool?.load() ?? []) { queued++; dispatch(job); }
 
   function enqueuePost(path, body, token, summary) {
     if (!token) {
@@ -181,11 +218,13 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
       log({ event: 'drop', reason: 'queue_full', ...summary });
       return false;
     }
+    if (stopped) return false;
+    const tokenKey = Object.keys(tokens).find(key => tokens[key] === token);
+    if (!tokenKey) return false;
+    const job = { path, body, tokenKey, summary };
+    const id = spool?.put(job);
     queued++;
-    queue = queue.then(async () => {
-      const result = await post(path, body, token);
-      log({ event: 'forward', ...summary, status: result.status });
-    }).finally(() => { queued--; });
+    dispatch({ ...job, id });
     return true;
   }
 
@@ -352,6 +391,8 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
 
   function stop() {
     stopped = true;
+    for (const timer of retryTimers) clearTimeout(timer);
+    retryTimers.clear();
     current?.abort(new Error('shutdown'));
   }
 
@@ -381,6 +422,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     maxAgeMs: (Number(process.env.MAX_EVENT_AGE_HOURS) || 24) * 3600_000,
     heartbeatTimeoutMs: Number(process.env.HEARTBEAT_TIMEOUT_MS) || 30_000,
     eventTimeOffset: process.env.EVENT_TIME_OFFSET || undefined,
+    queueDir: process.env.EVENT_QUEUE_DIR || '/var/lib/ngs-hik-event-bridge/queue',
   });
   console.log(JSON.stringify({ time: new Date().toISOString(), event: 'start', devices: Object.keys(tokens).length }));
   const shutdown = () => bridge.stop();

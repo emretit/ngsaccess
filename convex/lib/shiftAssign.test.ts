@@ -1,9 +1,11 @@
+import { scheduleIntervals } from "./shiftUx";
+import { OPEN_SHIFT_END } from "./shiftRange";
 import { describe, expect, it, vi } from "vitest";
 import type { RegisteredMutation, RegisteredQuery } from "convex/server";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import * as shifts from "../shifts";
 import type { Id } from "../_generated/dataModel";
-import { assignmentIntersectsRange, evaluateShiftAssignment, shiftDateOffset, validateAssignRange, type ExistingShiftAssignment } from "./shiftAssign";
+import { assignmentIntersectsRange, countScheduledOccurrences, evaluateShiftAssignment, shiftDateOffset, validateAssignRange, type ExistingShiftAssignment } from "./shiftAssign";
 
 const day = { startTime: "09:00", endTime: "18:00" };
 const night = { startTime: "22:00", endTime: "06:00" };
@@ -337,4 +339,25 @@ it("09-O4: gece çakışmasının gerekçesi de ortak ertesi gün etiketini kull
   const result = evaluateShiftAssignment({ ...base, shift: night, existing: [existing({ shift: night })] });
   expect(result.status).toBe("conflict");
   expect(result.reason).toContain("22:00–06:00 (+1 gün)");
+});
+
+it("counts long weekly and cycle assignments exactly without expanding the whole range", () => {
+  const shiftId = "shift" as Id<"shifts">;
+  for (const length of [1, 6, 7, 8, 31, 366, 2500]) {
+    for (const plan of [undefined, { kind: "dayCycle" as const, anchorDate: "2026-10-17", slots: [[shiftId], [], [shiftId]] }]) {
+      const sample = { startDate: range.startDate, endDate: shiftDateOffset(range.startDate, length - 1), shiftId, weekPattern: plan ? [] : range.weekPattern, plan };
+      expect(countScheduledOccurrences(sample, day)).toBe(scheduleIntervals(sample, day).length);
+    }
+  }
+  const unlimited = evaluateShiftAssignment({ ...base, range: { ...range, endDate: OPEN_SHIFT_END } });
+  expect(unlimited.status).toBe("will_assign");
+  expect(unlimited.occurrenceCount).toBeGreaterThan(100_000);
+});
+it("checks future leave, overnight holidays and future conflicts in an unlimited series", () => {
+  const range = { startDate: "2026-10-19", endDate: OPEN_SHIFT_END, weekPattern: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] };
+  const futureLeave = { ...leave, startDate: "2036-10-19", endDate: "2036-10-20" };
+  expect(evaluateShiftAssignment({ ...base, range, leaves: [futureLeave] })).toMatchObject({ status: "on_leave", leave: { date: futureLeave.startDate } });
+  expect(evaluateShiftAssignment({ ...base, range, existing: [existing({ startDate: "2040-01-01", endDate: "2040-01-31" })] }).status).toBe("conflict");
+  const futureHoliday = { ...holiday, date: "2036-10-19" };
+  expect(evaluateShiftAssignment({ ...base, range, shift: night, holidays: [futureHoliday] })).toMatchObject({ status: "holiday", holiday: { date: futureHoliday.date } });
 });

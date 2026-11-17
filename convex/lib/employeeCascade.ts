@@ -5,8 +5,27 @@ import { scheduleFingerprintPurge } from "./employeeCardChange";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { writeAudit } from "./audit";
+import { employeeAuditValues } from "./auditPrivacy";
+import { auditSearchText } from "./auditSearch";
 
 const CASCADE_BATCH_SIZE = 200;
+
+async function maskEmployeeAuditPage(ctx: MutationCtx, employeeId: Id<"employees">, afterTime = 0): Promise<void> {
+  const rows = await ctx.db.query("auditLog").withIndex("by_target", q =>
+    q.eq("targetTable", "employees").eq("targetId", employeeId).gt("_creationTime", afterTime)).take(CASCADE_BATCH_SIZE);
+  for (const row of rows) {
+    const values = employeeAuditValues(row.oldValue, row.newValue, row.action);
+    await ctx.db.patch(row._id, { ...values, note: "Kişi kaydı silindi; geçmiş kişisel veri kopyası kaldırıldı",
+      searchText: auditSearchText({ targetTable: "employees", userName: row.userName }) });
+  }
+  const last = rows[rows.length - 1];
+  if (rows.length === CASCADE_BATCH_SIZE && last) await ctx.scheduler.runAfter(0, internal.lib.employeeCascade.maskEmployeeAudit, { employeeId, afterTime: last._creationTime });
+}
+
+export const maskEmployeeAudit = internalMutation({
+  args: { employeeId: v.id("employees"), afterTime: v.optional(v.number()) },
+  handler: async (ctx, args): Promise<void> => maskEmployeeAuditPage(ctx, args.employeeId, args.afterTime),
+});
 
 /** Both employees and visitors store their profile photo on employees. */
 export async function deleteUnusedEmployeePhoto(ctx: MutationCtx, storageId: Id<"_storage">, excludeEmployeeId?: Id<"employees">) {
@@ -98,6 +117,9 @@ export async function cascadeRemoveEmployeePII(
   readingsAnonymized: number;
 }> {
   const employee = await ctx.db.get(employeeId);
+  const departmentHistory = await ctx.db.query("employeeDepartmentHistory").withIndex("by_employee_validFrom", q => q.eq("employeeId", employeeId)).take(201);
+  if (departmentHistory.length > 200) throw new ConvexError("Departman geçmişi silme sınırı aşıldı (200)");
+  for (const period of departmentHistory) await ctx.db.delete(period._id);
 
   // Her iki okuma da sınırlıdır; taşmada silme işleminin tamamı geri alınır.
   const requestLimit = 1000;
@@ -160,6 +182,7 @@ export async function cascadeRemoveEmployeePII(
   await clearHostedVisitorsPage(ctx, employeeId);
 
   // 5) Audit
+  await maskEmployeeAuditPage(ctx, employeeId);
   await writeAudit(ctx, {
     user: ctx.user,
     projectId: employee?.projectId ?? null,

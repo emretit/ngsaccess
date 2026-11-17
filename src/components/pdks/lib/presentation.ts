@@ -87,9 +87,23 @@ export function punchQualityHint(quality: string | undefined): string {
   }
 }
 /** Legacy rows also carry punchQuality; the hint is shown only where the rule decision needs it. */
-export function reviewHint(item: { noShift?: boolean; status: string; punchQuality?: string; durationMeasured?: boolean } | undefined): string {
-  if (!item || item.noShift || (item.status !== "incomplete" && item.durationMeasured !== false)) return "";
+type ReviewItem = { noShift?: boolean; status: string; punchQuality?: string; durationMeasured?: boolean };
+export function reviewHint(item: ReviewItem | undefined): string {
+  if (!item || item.noShift || item.status === "future" || (item.status !== "incomplete" && item.durationMeasured !== false)) return "";
   return punchQualityHint(item.punchQuality);
+}
+export function reviewExplanation(item: ReviewItem | undefined): string {
+  if (!item || !reviewHint(item)) return "";
+  const measuredPart = item.durationMeasured === true
+    ? " Gösterilen süre yalnızca tamamlanmış giriş–çıkış kayıtlarından hesaplandı."
+    : " Giriş ve çıkış tamamlanmadan çalışma süresi hesaplanamaz.";
+  switch (item.punchQuality) {
+    case "missingExit": return `Bir giriş okutmasının ardından çıkış kaydı bulunamadı.${measuredPart}`;
+    case "missingEntry": return `Bir çıkış okutmasına karşılık giriş kaydı bulunamadı.${measuredPart}`;
+    case "noPunch": return "Bu gün için PDKS hesabında kullanılabilecek giriş veya çıkış kaydı bulunamadı. İzin ve görev bilgilerini, ayrıca cihaz kayıtlarının aktarılıp aktarılmadığını kontrol edin.";
+    case "undirected": return "Okutmaların giriş mi çıkış mı olduğu belirlenemedi. Hareketlerin yönünü ve PDKS kaynak ayarlarını kontrol edin.";
+    default: return "";
+  }
 }
 export function displayTime(value: string | null): string {
   return timeMinutes(value) === null ? "—" : (value ?? "—");

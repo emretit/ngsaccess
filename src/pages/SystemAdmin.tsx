@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AccessDenied } from "@/components/shared/AccessDenied";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { PageTemplate } from "@/components/shared/PageTemplate";
+import { PageHeaderPrimaryButton } from "@/components/shared/PageHeader";
+import { Plus } from "lucide-react";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
@@ -25,44 +27,50 @@ export default function SystemAdmin() {
     if (!loading && !user) navigate("/login");
   }, [loading, user, navigate]);
   if (loading || (user && !profile))
-    return <SectionSkeleton label="Yetkiler yükleniyor" />;
+    return <PageTemplate title="Admin"><SectionSkeleton label="Yetkiler yükleniyor" /></PageTemplate>;
   if (!user || profile?.role !== "super_admin")
     return (
-      <AccessDenied message="Bu sayfa için süper admin yetkisi gerekli." />
+      <PageTemplate title="Admin"><AccessDenied compact message="Bu sayfa için süper admin yetkisi gerekli." /></PageTemplate>
     );
   return (
     <AdminPrimaryActionContext.Provider value={setPrimaryAction}>
-      <div className="min-w-0 space-y-6">
-        <PageHeader
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          const next = new URLSearchParams(params);
+          next.set("tab", value);
+          setParams(next);
+        }}
+        className="min-w-0"
+      >
+        <PageTemplate
           title="Admin"
-          primaryAction={primaryAction}
           scope="Global kapsam · Tüm kullanıcılar, projeler ve cihazlar. Üst çubuktaki proje seçimi bu listeleri daraltmaz."
-        />
-        <Tabs
-          value={tab}
-          onValueChange={(value) => {
-            const next = new URLSearchParams(params);
-            next.set("tab", value);
-            setParams(next);
-          }}
-          className="min-w-0"
+          primaryAction={primaryAction && (
+            <PageHeaderPrimaryButton onClick={primaryAction.onClick}>
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {primaryAction.label}
+            </PageHeaderPrimaryButton>
+          )}
+          navigation={
+            <TabsList className="h-auto max-w-full flex-wrap justify-start">
+              <TabsTrigger value="users">Kullanıcılar</TabsTrigger>
+              <TabsTrigger value="projects">Projeler</TabsTrigger>
+              <TabsTrigger value="devices">Cihaz havuzu</TabsTrigger>
+            </TabsList>
+          }
         >
-          <TabsList className="h-auto max-w-full flex-wrap justify-start">
-            <TabsTrigger value="users">Kullanıcılar</TabsTrigger>
-            <TabsTrigger value="projects">Projeler</TabsTrigger>
-            <TabsTrigger value="devices">Cihaz havuzu</TabsTrigger>
-          </TabsList>
-          <TabsContent value="users" className="mt-6 min-w-0">
+          <TabsContent value="users" className="mt-0 min-w-0">
             <AdminUsersPanel />
           </TabsContent>
-          <TabsContent value="projects" className="mt-6 min-w-0">
+          <TabsContent value="projects" className="mt-0 min-w-0">
             <AdminProjectsPanel />
           </TabsContent>
-          <TabsContent value="devices" className="mt-6 min-w-0">
+          <TabsContent value="devices" className="mt-0 min-w-0">
             <AdminDevicesPanel />
           </TabsContent>
-        </Tabs>
-      </div>
+        </PageTemplate>
+      </Tabs>
     </AdminPrimaryActionContext.Provider>
   );
 }

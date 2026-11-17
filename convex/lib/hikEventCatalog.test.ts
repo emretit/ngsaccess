@@ -9,6 +9,12 @@ const { DEVICE_ALARM, DEVICE_EVENT, DEVICE_EXCEPTION, DEVICE_OPERATION } =
   HIK_MAJOR_EVENT_TYPES;
 
 describe("hikEventCatalog - classifyHikEvent", () => {
+  it("marks forced-door and tamper events critical, with recoveries informational", () => {
+    expect(classifyHikEvent(DEVICE_ALARM, 1026).severity).toBe("critical");
+    expect(classifyHikEvent(DEVICE_ALARM, 1030).severity).toBe("critical");
+    expect(classifyHikEvent(DEVICE_ALARM, 1031).severity).toBe("info");
+    expect(classifyHikEvent(DEVICE_ALARM, 1027).severity).toBe("warning");
+  });
   it("access grant kodlarini cardReadings'e yonlendirir", () => {
     const event = classifyHikEvent(DEVICE_EVENT, 1);
 

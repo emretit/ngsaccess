@@ -43,13 +43,13 @@ describe("05 denetim düzeltmeleri", () => {
     expect(html.match(/<select aria-hidden="true"/g)).toHaveLength(3);
     expect(html.match(/role="combobox"/g)).toHaveLength(3);
     expect(html).toContain("min-h-11");
-    expect(html).toContain("max-md:[&amp;_button]:min-h-11");
+    expect(html).not.toContain("<h1");
     expect(html).not.toContain("Tür filtresi bu cursor");
   });
   it("proje gönderimi yalnız sunucu sayımını ister ve kapsamı dürüst belirtir", () => {
     state.queries.length = 0;
     const html = renderToStaticMarkup(<ProjectSyncButton projectId={projectId} />);
-    expect(html).toContain("Diğer işlemler");
+    expect(html).toContain("Tüm cihazlara gönder");
     expect(html).not.toContain("Tüm proje cihazlarına gönder");
     expect(state.queries.map(q => q.name)).toEqual(["accessRules:projectDeviceCounts"]);
   });

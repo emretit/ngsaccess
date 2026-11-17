@@ -14,7 +14,6 @@ export function validDay(value: string): boolean {
 export function validateRange(start: string, end: string) {
   if (!validDay(start) || !validDay(end)) throw new Error("Geçerli başlangıç ve bitiş tarihi seçin");
   if (start > end) throw new Error("Bitiş tarihi başlangıçtan önce olamaz");
-  if ((Date.parse(end) - Date.parse(start)) / DAY > 365) throw new Error("Aralık 365 günden fazla olamaz");
 }
 export function minute(time: string): number {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error("Saat HH:MM biçiminde olmalıdır");

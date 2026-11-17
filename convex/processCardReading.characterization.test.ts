@@ -174,10 +174,66 @@ describe("directions, repeats and notifications", () => {
     vi.setSystemTime(new Date(accessTime));
     expect(await f.t.mutation(internal.cardReadings.processCardReading, args())).toEqual({ granted: true });
     const expected = reading(f, { accessTime, createdAt: accessTime, updatedAt: accessTime, direction: kind === "exit" ? "exit" : "entry" });
-    await effects(f, [expected], ["disabled", "onTime", "noShift"].includes(kind) ? [] : [{
-      name: "actions/sendEmail:sendLateNotification", args: [{ to: kind === "environmentEmail" ? "fallback@example.test" : "project@example.test", employeeName: "Ada Test", lateTime: new Date(accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }), projectId: f.projectId }],
+    await effects(f, [expected], ["disabled", "onTime", "noShift", "exit"].includes(kind) ? [] : [{
+      name: "actions/sendEmail:sendLateNotification", args: [{ to: kind === "environmentEmail" ? "fallback@example.test" : "project@example.test", employeeName: "Ada Test", lateTime: new Date(accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" }), projectId: f.projectId }],
       scheduledTime: Date.parse(accessTime), state: { kind: "pending" },
     }]);
+  });
+});
+
+describe("late notification first eligible shift entry", () => {
+  async function planned(pieces: readonly [string, string][] = [["09:00", "18:00"]]) {
+    const f = await fixture();
+    vi.stubEnv("NOTIFICATION_EMAIL", "late@example.test");
+    await f.t.run(async ctx => {
+      await ctx.db.patch(f.ruleId, { startTime: "00:00", endTime: "23:59" });
+      const shiftIds = [];
+      for (const [startTime, endTime] of pieces) shiftIds.push(await ctx.db.insert("shifts", { projectId: f.projectId, name: startTime, startTime, endTime, createdAt: "", updatedAt: "" }));
+      await ctx.db.insert("shiftAssignments", { projectId: f.projectId, employeeId: f.employeeId, plan: { kind: "weekly", shiftIds }, shiftId: shiftIds[0], startDate: "2026-10-01", endDate: "2026-10-31", createdAt: "", updatedAt: "" });
+    });
+    return f;
+  }
+  async function scan(f: Fixture, time: string, direction: "entry" | "exit" = "entry") {
+    vi.setSystemTime(new Date(`2026-10-19T${time}:00+03:00`));
+    await f.t.run(ctx => ctx.db.patch(f.deviceId, { accessDirection: direction }));
+    await f.t.mutation(internal.cardReadings.processCardReading, args());
+  }
+  const notifications = (f: Fixture) => f.t.run(async ctx => (await ctx.db.system.query("_scheduled_functions").take(20)).filter(job => job.name === "actions/sendEmail:sendLateNotification"));
+  it("on-time entry followed by lunch return and normal exit never reports lateness", async () => {
+    const f = await planned();
+    await scan(f, "09:00");
+    await scan(f, "12:00", "exit");
+    await scan(f, "13:00");
+    await scan(f, "18:00", "exit");
+    expect(await notifications(f)).toHaveLength(0);
+  });
+  it("a late first entry schedules once, including identical-time repeats", async () => {
+    const f = await planned();
+    await scan(f, "09:30");
+    await scan(f, "09:30");
+    await scan(f, "10:00");
+    const jobs = await notifications(f);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].args).toMatchObject([{ lateTime: "09:30", to: "late@example.test" }]);
+  });
+  it("the next shift piece has its own first entry", async () => {
+    const f = await planned([["09:00", "12:00"], ["13:00", "17:00"]]);
+    await scan(f, "09:00");
+    await scan(f, "12:00", "exit");
+    await scan(f, "13:30");
+    await scan(f, "13:45");
+    const jobs = await notifications(f);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].args).toMatchObject([{ lateTime: "13:30" }]);
+  });
+  it("does not notify an entry rejected by the attendance window", async () => {
+    const f = await planned();
+    await f.t.run(async ctx => {
+      const assignment = await ctx.db.query("shiftAssignments").first();
+      if (assignment?.shiftId) await ctx.db.patch(assignment.shiftId, { validWindow: { checkInStart: "08:00", checkInEnd: "10:00", checkOutStart: "17:00", checkOutEnd: "19:00", checkOutEndDayOffset: 0 } });
+    });
+    await scan(f, "11:00");
+    expect(await notifications(f)).toHaveLength(0);
   });
 });
 

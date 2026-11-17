@@ -651,23 +651,29 @@ export const listPlanTargets = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
     if (!(await hasPermission(ctx, ctx.user, projectId, "accessRules.manage"))) return [];
-    const doors = await ctx.db.query("doors").withIndex("by_project", q => q.eq("projectId", projectId)).take(1000);
+    const doors = await ctx.db.query("doors").withIndex("by_project", q => q.eq("projectId", projectId)).take(1001);
+    if (doors.length > 1000) throw new ConvexError("Kapı planı listeleme sınırı aşıldı (1000); proje kapsamını daraltın");
     const targets = await Promise.all(doors.map(async door => {
       const device = door.deviceId ? await ctx.db.get(door.deviceId) : null;
       if (!device || device.projectId !== projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway") return null;
       const zone = door.zoneId ? await ctx.db.get(door.zoneId) : null;
+      const pendingKeys = (["status", "verify"] as const).filter(key => {
+        const result = key === "status" ? door.hikPlanResults?.status : door.hikPlanResults?.verify;
+        const plan = key === "status" ? door.hikDoorStatusPlan : door.hikVerifyPlanSavedAt && door.hikVerifyPlan;
+        return !!(plan || (key === "status" && door.hikDoorHolidayPlan?.enabled)) &&
+          !(result?.revision === (door.hikPlanRevision ?? 0) && !!result.appliedAt);
+      });
       return {
         projectId, hikDoorHolidayPlan: door.hikDoorHolidayPlan ?? null,
         holidaySupported: holidaySupportFromSnapshot(device.hikCapabilitiesSnapshot),
         hikPlanSavedAt: door.hikPlanSavedAt ?? null, hikPlanAppliedAt: door.hikPlanAppliedAt ?? null,
         hikPlanApplyError: door.hikPlanApplyError ?? null,
+        ...(door.hikPlanPendingReason ? { pendingReason: door.hikPlanPendingReason } : {}),
+        ...(door.hikPlanRevision !== undefined ? { planRevision: door.hikPlanRevision } : {}),
         hikPlanFailedAt: [door.hikPlanResults?.status, door.hikPlanResults?.verify]
           .filter(result => result?.error && result.failedAt).map(result => result?.failedAt ?? "").sort().pop() ?? null,
-        plansPending: !!door.hikPlanSavedAt && !["status", "verify"].every(key => {
-          const result = key === "status" ? door.hikPlanResults?.status : door.hikPlanResults?.verify;
-          const plan = key === "status" ? door.hikDoorStatusPlan : door.hikVerifyPlanSavedAt && door.hikVerifyPlan;
-          return !(plan || (key === "status" && door.hikDoorHolidayPlan?.enabled)) || (result?.revision === (door.hikPlanRevision ?? 0) && !!result.appliedAt);
-        }),
+        plansPending: !!door.hikPlanSavedAt && pendingKeys.length > 0,
+        ...(pendingKeys.length ? { pendingKeys } : {}),
         doorId: door._id, doorName: door.name, deviceName: device.name,
         zoneName: zone?.projectId === projectId ? zone.name : null,
         deviceOnline: deviceConnection(device, Date.now()) === "online",
@@ -691,7 +697,7 @@ export const recordPlanResult = internalMutation({
       // Conservatively require a resend instead of displaying a false success.
       const error = "Gönderim sırasında plan değişti; yeniden gönderin";
       await ctx.db.patch(door._id, {
-        hikPlanResults: { [args.key]: { revision: door.hikPlanRevision ?? 0, error, failedAt: new Date().toISOString() } },
+        hikPlanResults: { ...door.hikPlanResults, [args.key]: { revision: door.hikPlanRevision ?? 0, error, failedAt: new Date().toISOString() } },
         hikPlanApplyError: error,
       });
       return;
@@ -702,7 +708,7 @@ export const recordPlanResult = internalMutation({
     const error = [results.status?.error, results.verify?.error].filter((e): e is string => !!e).join("; ");
     const complete = (!(door.hikDoorStatusPlan || door.hikDoorHolidayPlan?.enabled) || !!results.status?.appliedAt) && (!(door.hikVerifyPlanSavedAt && door.hikVerifyPlan) || !!results.verify?.appliedAt);
     await ctx.db.patch(door._id, { hikPlanResults: results, hikPlanApplyError: error || undefined,
-      ...(complete && !error ? { hikPlanAppliedAt: now } : {}) });
+      ...(complete && !error ? { hikPlanAppliedAt: now, hikPlanPendingReason: undefined } : {}) });
   },
 });
 

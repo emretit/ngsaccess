@@ -7,7 +7,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { PageTemplate } from "@/components/shared/PageTemplate";
+import { PageHeaderPrimaryButton } from "@/components/shared/PageHeader";
+import { Plus } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { LeaveFilters } from "@/components/leaves/LeaveFilters";
@@ -32,20 +34,18 @@ export default function Leaves() {
   const canManage = can("attendance.approve");
   if (loading)
     return (
-      <div className="space-y-6">
-        <PageHeader title="İzinler" />
+      <PageTemplate title="İzinler">
         <SectionSkeleton rows={5} label="İzin kayıtları yükleniyor." />
-      </div>
+      </PageTemplate>
     );
   if (!projectId)
     return (
-      <div className="space-y-6">
-        <PageHeader title="İzinler" />
+      <PageTemplate title="İzinler">
         <EmptyState
           title="Bir proje seçin."
           description="İzin kayıtlarını görmek için üst çubuktan proje seçin."
         />
-      </div>
+      </PageTemplate>
     );
   return (
     <LeavesProject
@@ -125,17 +125,15 @@ function LeavesProject({
     ? (rows.find((row) => row._id === detail._id) ?? detail)
     : null;
   return (
-    <div className="min-w-0 space-y-6">
-      <PageHeader
+    <PageTemplate
         title="İzinler"
         scope={`${projectName} · ${dateLabel(filters.rangeStart)} – ${dateLabel(filters.rangeEnd)}`}
         primaryAction={
           canManage
-            ? { label: "İzin ekle", onClick: () => setEditor("new") }
+            ? <PageHeaderPrimaryButton onClick={() => setEditor("new")}><Plus className="h-3.5 w-3.5" aria-hidden="true" />İzin ekle</PageHeaderPrimaryButton>
             : undefined
         }
-      />
-      {canManage && (
+      navigation={canManage && (
         <SegmentedViewControl
           label="İzin görünümü"
           value={requests ? "requests" : "records"}
@@ -146,39 +144,13 @@ function LeavesProject({
           onChange={view => setRequests(view === "requests")}
         />
       )}
-      {canManage && requests ? (
-        <LeaveQueryBoundary scope={`requests:${projectId}`}>
-          <LeaveRequestsPanel key={projectId} projectId={projectId} />
-        </LeaveQueryBoundary>
-      ) : (
-        <>
-          <LeaveFilters
+      filters={!(canManage && requests) && (<LeaveFilters
             projectId={projectId}
             filters={filters}
             onChange={updateFilters}
             onClear={clear}
-          />
-          <p className="text-xs text-muted-foreground">
-            İzinler yöneticiler tarafından doğrudan onaylı kaydedilir. Dönem
-            filtresi izin süresini kısaltmaz.
-          </p>
-          <LeaveQueryBoundary scope={scope}>
-            <LeaveResults
-              key={scope}
-              filters={queryFilters}
-              pageSize={filters.pageSize}
-              canManage={canManage}
-              onCreate={() => setEditor("new")}
-              onClear={clear}
-              onDetails={onDetails}
-              onEdit={onEdit}
-              requestedId={params.get("leave") ?? undefined}
-              onRows={onRows}
-              onPageSizeChange={(size) => updateFilters({ size: String(size) })}
-            />
-          </LeaveQueryBoundary>
-        </>
-      )}
+          />)}
+      overlays={<>
       <LeaveDetails
         row={displayedDetail}
         canManage={canManage}
@@ -211,6 +183,35 @@ function LeavesProject({
           }}
         />
       )}
-    </div>
+      </>}
+      >
+      {canManage && requests ? (
+        <LeaveQueryBoundary scope={`requests:${projectId}`}>
+          <LeaveRequestsPanel key={projectId} projectId={projectId} />
+        </LeaveQueryBoundary>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            İzinler yöneticiler tarafından doğrudan onaylı kaydedilir. Dönem
+            filtresi izin süresini kısaltmaz.
+          </p>
+          <LeaveQueryBoundary scope={scope}>
+            <LeaveResults
+              key={scope}
+              filters={queryFilters}
+              pageSize={filters.pageSize}
+              canManage={canManage}
+              onCreate={() => setEditor("new")}
+              onClear={clear}
+              onDetails={onDetails}
+              onEdit={onEdit}
+              requestedId={params.get("leave") ?? undefined}
+              onRows={onRows}
+              onPageSizeChange={(size) => updateFilters({ size: String(size) })}
+            />
+          </LeaveQueryBoundary>
+        </>
+      )}
+    </PageTemplate>
   );
 }

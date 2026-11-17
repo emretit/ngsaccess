@@ -27,6 +27,8 @@ export function inviteSetupError(error: unknown, isReset = false): string {
       return 'Oturum açtığınız hesabın e-posta adresi davetle eşleşmiyor. Davet edilen hesabınızla giriş yapın.';
     case 'INVITE_WRONG_TYPE':
       return 'Bu bağlantı hesap daveti değil. Yöneticinizden yeni bir davet bağlantısı isteyin.';
+    case 'INVITE_CLAIM_EXPIRED':
+      return 'Kurulum süresi doldu, lütfen tekrar deneyin.';
     case 'INVITE_INVALID':
       return 'Davet kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni bir davet bağlantısı isteyin.';
     case 'INVITE_ACCOUNT_EXISTS':

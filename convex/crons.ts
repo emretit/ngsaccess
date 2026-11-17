@@ -104,4 +104,6 @@ crons.cron("purge-operational-retention", "40 0 * * *", internal.privacyRetentio
 crons.cron("purge-device-event-retention", "50 0 * * *", internal.privacyRetention.startDailyPurge, { group: "events" });
 crons.cron("purge-access-retention", "55 0 * * *", internal.privacyRetention.startDailyPurge, { group: "access" });
 
+crons.cron("purge-report-deliveries", "5 1 * * *", internal.privacyRetention.purgeReportDeliveries, {});
+
 export default crons;

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { PageHeader } from "./PageHeader";
+import { PageTemplate } from "./PageTemplate";
 
 describe("PageHeader primary action", () => {
   it("renders the label with the shared button classes and Plus icon", () => {
@@ -26,4 +27,29 @@ describe("PageHeader primary action", () => {
 
     expect(html).toContain(' disabled=""');
   });
+});
+
+it("supports primary slots without a forced icon and optional legacy icons", () => {
+  const slot = renderToStaticMarkup(<PageHeader title="Raporlar" primaryAction={<a href="/reports">Rapor aç</a>} />);
+  expect(slot).toContain('href="/reports"');
+  expect(slot).not.toContain("lucide-plus");
+  const legacy = renderToStaticMarkup(<PageHeader title="Raporlar" primaryAction={{ label: "Dışa aktar", onClick: vi.fn(), icon: null }} />);
+  expect(legacy).toContain("Dışa aktar");
+  expect(legacy).not.toContain("lucide-plus");
+});
+
+it("composes page slots in order with one heading and no extra main", () => {
+  const html = renderToStaticMarkup(<PageTemplate title="Kişiler" scope="Proje kapsamı"
+    backLink={<a href="/home">Geri bağlantısı</a>}
+    secondaryActions={<button>İşlemler menüsü</button>} primaryAction={<button>Yeni kişi</button>}
+    notice="Sayfa bildirimi" navigation="Yerel gezinme" summary="Sayfa özeti"
+    aside={{ label: "Departmanlar", content: "Kapsam ağacı" }} filters="Arama filtreleri"
+    footer="Sayfalama alanı" overlays="Ayrıntı paneli">Sonuç tablosu</PageTemplate>);
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
+  expect(html).not.toMatch(/<main\b/);
+  const slots = ["Geri bağlantısı", "Kişiler", "Proje kapsamı", "İşlemler menüsü", "Yeni kişi", "Sayfa bildirimi", "Yerel gezinme", "Sayfa özeti", "Kapsam ağacı", "Arama filtreleri", "Sonuç tablosu", "Sayfalama alanı", "Ayrıntı paneli"];
+  slots.slice(1).forEach((slot, index) => expect(html.indexOf(slot)).toBeGreaterThan(html.indexOf(slots[index])));
+  expect(html).toContain("space-y-6");
+  expect(html).not.toContain("max-w-[800px]");
+  expect(renderToStaticMarkup(<PageTemplate title="Ayarlar" width="form">Form</PageTemplate>)).toContain("max-w-[800px]");
 });

@@ -18,6 +18,7 @@ interface RuleFormData {
   description: string;
   target_type: "all" | "department" | "position" | "individual" | "visitor";
   selected_employees: string[];
+  department_selections?: { departmentId: string; includeChildren: boolean }[];
   selected_devices: string[];
   // IDE Smart permission.io kaynağı: kuralın etki ettiği kapılar (groupDoors).
   // Boşsa o cihazın tüm kapıları varsayılır (backend getRuleIoIdsForPanel fallback).
@@ -46,6 +47,7 @@ export const useRuleForm = (
     description: "",
     target_type: "individual",
     selected_employees: [],
+    department_selections: [],
     selected_devices: [],
     selected_doors: [],
     start_time: "",
@@ -67,6 +69,7 @@ export const useRuleForm = (
         // Convex returns camelCase: employeeId, deviceId
         const employeeIds =
           editingRule.groupMembers
+            ?.filter(gm => gm.source !== "department")
             ?.map((gm: GroupMember) => String(gm.employeeId || ""))
             .filter(Boolean) ?? [];
         const deviceIds =
@@ -94,6 +97,7 @@ export const useRuleForm = (
               ? editingRule.targetType
               : "individual",
           selected_employees: employeeIds,
+          department_selections: editingRule.departmentSelections?.map(({ departmentId, includeChildren }) => ({ departmentId, includeChildren })) ?? [],
           selected_devices: deviceIds,
           selected_doors: doorIds,
           start_time: editingRule.startTime || "",
@@ -114,6 +118,7 @@ export const useRuleForm = (
           description: "",
           target_type: "individual",
           selected_employees: [],
+          department_selections: [],
           selected_devices: [],
           selected_doors: [],
           start_time: "",
@@ -136,6 +141,7 @@ export const useRuleForm = (
         description: formData.description,
         targetType: formData.target_type,
         selectedEmployees: formData.selected_employees,
+        selectedDepartments: formData.department_selections,
         selectedDevices: formData.selected_devices,
         selectedZones: [],
         selectedDoors: formData.selected_doors,
@@ -160,6 +166,7 @@ export const useRuleForm = (
       if (editingRule) {
         await updateAccessRuleWithAdditionalMembers.mutateAsync({
           id: editingRule._id as Id<"accessRules">,
+          departmentSelections: formData.department_selections?.map(selection => ({ ...selection, departmentId: selection.departmentId as Id<"departments"> })),
           updates: {
             projectId,
             name: formData.name !== openingForm.current.name ? parsed.data.name : undefined,
@@ -187,6 +194,7 @@ export const useRuleForm = (
             endTime: formData.end_time || undefined,
           },
           employeeIds: formData.selected_employees as Id<"employees">[],
+          departmentSelections: formData.department_selections?.map(selection => ({ ...selection, departmentId: selection.departmentId as Id<"departments"> })),
           deviceIds,
           doorIds,
         });
@@ -202,6 +210,7 @@ export const useRuleForm = (
       description: formData.description,
       targetType: formData.target_type,
       selectedEmployees: formData.selected_employees,
+      selectedDepartments: formData.department_selections,
       selectedDevices: formData.selected_devices,
       selectedZones: [],
       selectedDoors: formData.selected_doors,

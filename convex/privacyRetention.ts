@@ -134,7 +134,15 @@ export const setVisitorRetention = authedMutation({
     await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     if (!validVisitorRetentionDays(days)) throw new ConvexError("Saklama süresi 30–3650 arasında tam gün olmalıdır.");
     const oldValue = (await getPrivacySettings(ctx, projectId)).visitorRetentionDays;
-    await upsertPrivacySettings(ctx, projectId, { visitorRetentionDays: days });
+    const row = await getPrivacyRow(ctx, projectId);
+    const patch = {
+      visitorRetentionDays: days ?? undefined,
+      visitorRetentionLastProcessedAt: days === null ? undefined : 0,
+      visitorRetentionCursor: undefined, visitorRetentionRunAt: undefined, visitorRetentionCursorDays: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    if (row) await ctx.db.patch(row._id, patch);
+    else await ctx.db.insert("projectPrivacySettings", { projectId, ...patch });
     await writeAudit(ctx, { user: ctx.user, projectId, action: "update", targetTable: "projectPrivacySettings", targetId: projectId,
       oldValue: { visitorRetentionDays: oldValue }, newValue: { visitorRetentionDays: days } });
     return null;
@@ -236,11 +244,41 @@ const elapsedRetryAt = (nextRetryAt: number | undefined, runAt: number) =>
   nextRetryAt !== undefined && nextRetryAt < Number.MAX_SAFE_INTEGER && nextRetryAt <= runAt ? nextRetryAt : 0;
 const opts = (args: BatchArgs) => ({ numItems: PURGE_BATCH_SIZE, cursor: args.cursor ?? null });
 
+/** Bounded pages seed pre-release enabled settings without ever touching disabled rows.
+ * The pagination cursor is transient scheduler state and is discarded after the final page.
+ */
+async function bootstrapVisitorQueue(ctx: MutationCtx, runAt: number, cursor?: string): Promise<void> {
+  const page = await ctx.db.query("projectPrivacySettings").withIndex("by_project")
+    .paginate({ numItems: 50, cursor: cursor ?? null });
+  for (const row of page.page) {
+    if (row.visitorRetentionDays !== undefined && validVisitorRetentionDays(row.visitorRetentionDays) &&
+        row.visitorRetentionLastProcessedAt === undefined) {
+      await ctx.db.patch(row._id, { visitorRetentionLastProcessedAt: 0 });
+    }
+  }
+  if (!page.isDone) await ctx.scheduler.runAfter(0, internal.privacyRetention.bootstrapVisitorRetentionQueue, {
+    runAt, cursor: page.continueCursor,
+  });
+  else await ctx.scheduler.runAfter(0, internal.privacyRetention.purgeCheckInTokens, {
+    stage: groups.access.first, batch: 0, runAt,
+  });
+}
+
+export const bootstrapVisitorRetentionQueue = internalMutation({
+  args: { runAt: v.number(), cursor: v.optional(v.string()) }, returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    await bootstrapVisitorQueue(ctx, args.runAt, args.cursor);
+    return null;
+  },
+});
+
 export const startDailyPurge = internalMutation({
   args: { group: v.optional(v.union(v.literal("operations"), v.literal("events"), v.literal("access"))) }, returns: v.null(),
   handler: async (ctx, args) => {
     const stage = groups[args.group ?? "operations"].first;
-    await ctx.scheduler.runAfter(0, internal.privacyRetention[stages[stage][0]], { stage, batch: 0, runAt: Date.now() });
+    const runAt = Date.now();
+    if (args.group === "access") await bootstrapVisitorQueue(ctx, runAt);
+    else await ctx.scheduler.runAfter(0, internal.privacyRetention[stages[stage][0]], { stage, batch: 0, runAt });
     return null;
   },
 });
@@ -361,36 +399,47 @@ export const purgeVisitors = internalMutation({
   args: { ...batchArgs, visitorProjectId: v.optional(v.id("projects")), days: v.optional(v.number()) }, returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
     if (!valid(args, "purgeVisitors")) return null;
-    let projectId = args.visitorProjectId;
-    let days: number | null = null;
-    if (args.cursor && projectId) {
-      days = (await getPrivacySettings(ctx, projectId)).visitorRetentionDays;
-    } else {
-      // Keyset through settings avoids a second paginate call in this mutation.
-      const after = projectId;
-      const settings = await ctx.db.query("projectPrivacySettings").withIndex("by_project", q => after ? q.gt("projectId", after) : q).take(50);
-      const enabled = settings.find(row => row.visitorRetentionDays !== undefined && validVisitorRetentionDays(row.visitorRetentionDays));
-      projectId = enabled?.projectId ?? settings[settings.length - 1]?.projectId;
-      days = enabled?.visitorRetentionDays ?? null;
-      if (!enabled && settings.length < 50) return null;
+    // Persist each project's index cursor, and spend only one page before rotating.
+    // Even a visitor whose cascade always fails cannot monopolize tomorrow's budget.
+    const enabled = await ctx.db.query("projectPrivacySettings")
+      .withIndex("by_visitorRetentionLastProcessedAt", q => q.gte("visitorRetentionLastProcessedAt", 0)).first();
+    if (!enabled) return null;
+    const days = enabled.visitorRetentionDays ?? 0;
+    if (!validVisitorRetentionDays(days)) {
+      await ctx.db.patch(enabled._id, {
+        visitorRetentionLastProcessedAt: undefined,
+        visitorRetentionCursor: undefined, visitorRetentionRunAt: undefined, visitorRetentionCursorDays: undefined,
+      });
+      await advance(ctx, args, false);
+      return null;
     }
-    if (!projectId) return null;
-    let cursor: string | undefined;
-    if (days !== null && validVisitorRetentionDays(days)) {
-      const page = await ctx.db.query("employees").withIndex("by_project_visitor_active_expiry", q =>
-        q.eq("projectId", projectId).eq("isVisitor", true).eq("isActive", false).lt("accessExpiresAt", visitorRetentionCutoff(days, args.runAt)),
-      ).paginate({ numItems: VISITOR_RETENTION_BATCH_SIZE, maximumRowsRead: VISITOR_RETENTION_BATCH_SIZE,
-        // A cursor belongs to the original index range, including its cutoff.
-        cursor: args.days === days ? args.cursor ?? null : null });
-      for (const row of page.page) {
-        if (!shouldPurgeVisitor(row, days, args.runAt)) continue;
-        await ctx.scheduler.runAfter(0, internal.privacyRetention.removeRetainedVisitor, { visitorId: row._id, projectId });
-      }
-      if (!page.isDone) cursor = page.continueCursor;
+    // Completed projects have no more work in this daily run. Preserve resumable pages.
+    if ((enabled.visitorRetentionLastProcessedAt ?? 0) >= args.runAt &&
+        enabled.visitorRetentionCursor === undefined) return null;
+    const resume = enabled.visitorRetentionCursor !== undefined &&
+      enabled.visitorRetentionCursorDays === days && enabled.visitorRetentionRunAt !== undefined;
+    const runAt = resume ? enabled.visitorRetentionRunAt ?? args.runAt : args.runAt;
+    const page = await ctx.db.query("employees").withIndex("by_project_visitor_active_expiry", q =>
+      q.eq("projectId", enabled.projectId).eq("isVisitor", true).eq("isActive", false)
+        .lt("accessExpiresAt", visitorRetentionCutoff(days, runAt)),
+    ).paginate({ numItems: VISITOR_RETENTION_BATCH_SIZE, maximumRowsRead: VISITOR_RETENTION_BATCH_SIZE,
+      cursor: resume ? enabled.visitorRetentionCursor ?? null : null });
+    for (const row of page.page) {
+      if (!shouldPurgeVisitor(row, days, runAt)) continue;
+      await ctx.scheduler.runAfter(0, internal.privacyRetention.removeRetainedVisitor, {
+        visitorId: row._id, projectId: enabled.projectId,
+      });
     }
+    // Strictly increase the timestamp even if several scheduled calls share a millisecond.
+    await ctx.db.patch(enabled._id, {
+      visitorRetentionLastProcessedAt: Math.max(Date.now(), (enabled.visitorRetentionLastProcessedAt ?? 0) + 1),
+      visitorRetentionCursor: page.isDone ? undefined : page.continueCursor,
+      visitorRetentionRunAt: page.isDone ? undefined : runAt,
+      visitorRetentionCursorDays: page.isDone ? undefined : days,
+    });
     const batch = args.batch + 1;
     if (batch < MAX_CHAIN_LENGTH) await ctx.scheduler.runAfter(0, internal.privacyRetention.purgeVisitors, {
-      stage: args.stage, batch, runAt: args.runAt, visitorProjectId: projectId, ...(cursor && days !== null ? { cursor, days } : {}),
+      stage: args.stage, batch, runAt: args.runAt,
     });
     return null;
   },
@@ -422,6 +471,30 @@ export const removeRetainedVisitorRecord = internalMutation({
     await removeEmployeeRecord(ctx, visitor, null);
     await writeAudit(ctx, { user: null, projectId, action: "delete", targetTable: "employees", targetId: visitorId,
       note: "Saklama süresi doldu (sistem)" });
+    return null;
+  },
+});
+
+
+// Independent daily delivery retention budget; it does not reduce visitor capacity.
+export const purgeReportDeliveries = internalMutation({
+  args: { runAt: v.optional(v.number()), batch: v.optional(v.number()) }, returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const runAt = args.runAt ?? Date.now();
+    const batch = args.batch ?? 0;
+    if (!Number.isInteger(batch) || batch < 0 || batch >= MAX_CHAIN_LENGTH) return null;
+    const before = new Date(runAt);
+    const day = before.getUTCDate();
+    before.setUTCDate(1);
+    before.setUTCMonth(before.getUTCMonth() - 13);
+    const lastDay = new Date(Date.UTC(before.getUTCFullYear(), before.getUTCMonth() + 1, 0)).getUTCDate();
+    before.setUTCDate(Math.min(day, lastDay));
+    const rows = await ctx.db.query("reportDeliveries")
+      .withIndex("by_lastAttemptAt", q => q.lt("lastAttemptAt", before.getTime())).take(PURGE_BATCH_SIZE);
+    for (const row of rows) await ctx.db.delete(row._id);
+    if (rows.length === PURGE_BATCH_SIZE && batch + 1 < MAX_CHAIN_LENGTH) {
+      await ctx.scheduler.runAfter(0, internal.privacyRetention.purgeReportDeliveries, { runAt, batch: batch + 1 });
+    }
     return null;
   },
 });

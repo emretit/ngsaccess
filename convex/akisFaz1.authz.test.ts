@@ -231,8 +231,12 @@ describe("PDKS çalışan geçmişi", () => {
     const f = await fixture("super_admin");
     await f.caller.mutation(api.pdksRecords.bulkUpsertManual, { note: "Test düzeltme nedeni", rows: [f.employeeId, f.otherEmployeeId].map(employeeId => ({ employeeId, date, entryTime: "09:00", exitTime: "18:00" })) });
     const audit = await f.t.run(ctx => ctx.db.query("auditLog").collect());
-    expect(audit.map(row => row.projectId).sort()).toEqual([f.projectId, f.otherProjectId].sort());
-    expect(audit.every(row => row.targetId === "bulk-upsert" && row.newValue.touched === 1)).toBe(true);
+    const summaries = audit.filter(row => row.targetId === "bulk-upsert");
+    expect(summaries.map(row => row.projectId).sort()).toEqual([f.projectId, f.otherProjectId].sort());
+    expect(summaries.every(row => row.newValue.touched === 1)).toBe(true);
+    const history = await f.caller.query(api.auditLog.getPdksAuditForEmployee, { employeeId: f.employeeId, ...range });
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ newValue: { date, entryTime: "09:00", exitTime: "18:00", batchId: expect.any(String) }, note: "Test düzeltme nedeni" });
   });
 });
 

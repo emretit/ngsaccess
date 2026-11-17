@@ -11,7 +11,7 @@ import { reportQueryKey } from '@/lib/reports/query';
 import { formatReportDate } from '@/lib/reports/rows';
 import { departmentLabels } from '@/lib/departmentLabel';
 import type { ReportDefinition } from '@/lib/reports/registry';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { PageTemplate, type PageTemplateProps } from '@/components/shared/PageTemplate';
 import { CollapsibleFilters } from '@/components/shared/CollapsibleFilters';
 import { FilterBar, FilterField } from '@/components/shared/FilterBar';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -92,9 +92,9 @@ function ScopedReport({ definition, projectId, projectName }: { definition: Repo
     {rangeError || unknownDepartment || unknownCompany ? null : (params.get('dept') && departments === undefined) || (params.get('company') && companies === undefined) ? <ReportPage definition={definition} projectId={projectId} rows={[]} loading meta={{ from, to, projectName }} /> : <QuerySectionBoundary resetKey={queryKey} title="Rapor yüklenemedi" description="Dönemi kontrol edip yeniden deneyebilirsiniz."><ReportResults violationsOnly={definition.filters.includes('breakViolation') && params.get('ihlal') === '1'} key={queryKey} definition={definition} onClear={clear} employeeId={transactions && params.get('employee') ? params.get('employee') as Id<'employees'> : undefined} projectId={projectId} projectName={projectName} from={from} to={to} companyId={company?._id} departmentId={department?._id} departmentName={department?.name} person={person} result={result} year={month?.year ?? 2000} month={month?.month ?? 1} /></QuerySectionBoundary>}
   </div>;
 }
-export function ReportScreen({ definition }: { definition: ReportDefinition }) {
+export function ReportScreen({ definition, aside, backLink }: { definition: ReportDefinition } & Pick<PageTemplateProps, "aside" | "backLink">) {
   const { projectId, activeProject, loading } = useActiveProjectScope();
-  return <div className="min-w-0 space-y-5"><PageHeader title={definition.title} scope={`${activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)`} /><p className="text-sm text-muted-foreground">{definition.description}</p>
+  return <PageTemplate title={definition.title} scope={`${activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)`} aside={aside} backLink={backLink} summary={<p className="text-sm text-muted-foreground">{definition.description}</p>}>
     {loading ? <SectionSkeleton label="Proje yükleniyor…" /> : !projectId ? <EmptyState title="Bir proje seçin" description="Raporları görmek için üst çubuktan bir proje seçin." /> : <QuerySectionBoundary resetKey={`${projectId}:${definition.slug}`} title="Rapor filtreleri yüklenemedi"><ScopedReport key={`${projectId}:${definition.slug}`} definition={definition} projectId={projectId} projectName={activeProject?.name} /></QuerySectionBoundary>}
-  </div>;
+  </PageTemplate>;
 }

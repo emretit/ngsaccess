@@ -6,10 +6,16 @@ export function ShiftCalendarView({
   projectId,
   projectName,
   openDefinitions,
+  shiftFilter,
+  onShiftFilterChange,
+  actionsContainer,
 }: {
   projectId: Id<"projects">;
   projectName: string;
   openDefinitions: (hasDefinitions: boolean) => void;
+  shiftFilter?: string;
+  onShiftFilterChange?: (value: string) => void;
+  actionsContainer?: HTMLDivElement | null;
 }) {
   const { employees, shifts } = useShiftCalendarDefinitions(projectId);
   return (
@@ -22,6 +28,9 @@ export function ShiftCalendarView({
         <ShiftCalendarPlan
           projectId={projectId}
           projectName={projectName}
+          actionsContainer={actionsContainer}
+          shiftFilter={shiftFilter}
+          onShiftFilterChange={onShiftFilterChange}
           employees={employees ?? []}
           shifts={shifts ?? []}
           definitionsLoading={employees === undefined || shifts === undefined}

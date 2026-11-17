@@ -631,3 +631,23 @@ describe("Hik revocation fix 2 regressions", () => {
   });
 
 });
+
+
+it("a stale effective transfer result still enqueues source deletion", async () => {
+  const f = await fixture("localBridge");
+  const reserved = await f.t.mutation(internal.hikvisionSync.beginGatewayGrants, { employeeId: f.ids.employeeId, deviceIds: [f.ids.deviceId] });
+  const transferId = await f.t.run(async ctx => {
+    const targetEmployeeId = await ctx.db.insert("employees", { projectId: f.ids.otherProjectId, firstName: "Target", lastName: "Person", email: "target@example.test", cardNumber: "" });
+    await ctx.db.patch(f.ids.employeeId, { isActive: false, terminationType: "transfer" });
+    const transferId = await ctx.db.insert("accessTransfers", { kind: "employee", status: "revoked", sourceProjectId: f.ids.projectId, targetProjectId: f.ids.otherProjectId,
+      employeeId: f.ids.employeeId, targetEmployeeId, cardNumber: "OLD", targetPlan: { accessRuleIds: [] }, sourceAccessRuleIds: [], requestedBy: f.ids.userId, requestedAt: Date.now(), deadlineAt: Date.now() + 86400000 });
+    const { upsertGrantStatus } = await import("./lib/grantStatus");
+    await upsertGrantStatus(ctx, { projectId: f.ids.projectId, employeeId: f.ids.employeeId, deviceId: f.ids.deviceId, state: "pending" });
+    return transferId;
+  });
+  await f.t.mutation(internal.hikvisionSync.finishGatewayGrants, { results: [{ projectId: f.ids.projectId, employeeId: f.ids.employeeId, deviceId: f.ids.deviceId,
+    state: "effective", expectedGeneration: reserved[0]?.generation }] });
+  expect((await f.operations()).some(op => op.operation === "deleteCard" && op.status === "pending" && (op.payload as { transferId?: string }).transferId === transferId)).toBe(true);
+  expect((await f.t.run(ctx => ctx.db.get(transferId)))?.status).toBe("revoking");
+  expect((await f.t.run(ctx => ctx.db.query("accessGrantStatus").first()))?.state).not.toBe("effective");
+});

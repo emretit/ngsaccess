@@ -3,27 +3,28 @@ import { ChevronLeft } from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { PageTemplate } from "@/components/shared/PageTemplate";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { PdksSettingsPanel } from "@/components/pdks/settings/PdksSettingsPanel";
-import { cameFromRecords } from "@/components/pdks/settings/route";
+import { cameFromShiftPlan } from "@/components/pdks/settings/route";
 
 export default function PdksSettings() {
   const navigate = useNavigate();
   const location = useLocation();
   const { can, loading: permissionsLoading } = usePermissions();
   const { projectId, activeProject, loading } = useActiveProjectScope();
-  const back = () => cameFromRecords(location.state) ? navigate(-1) : navigate("/pdks-records");
+  const back = () => cameFromShiftPlan(location.state) ? navigate(-1) : navigate("/pdks-records/plan");
   const content = loading || permissionsLoading ? <SectionSkeleton rows={4} label="PDKS ayarları yükleniyor." />
-    : !can("schedule.manage") ? <div role="status" className="space-y-3 py-8"><p className="text-base font-semibold">PDKS ayarlarını görüntüleme yetkiniz yok.</p><p className="text-sm text-muted-foreground">Bu sayfa vardiya yönetme yetkisi olanlar içindir.</p><Button variant="outline" asChild><Link to="/pdks-records">PDKS sayfasına dön</Link></Button></div>
+    : !can("schedule.manage") ? <div role="status" className="space-y-3 py-8"><p className="text-base font-semibold">PDKS ayarlarını görüntüleme yetkiniz yok.</p><p className="text-sm text-muted-foreground">Bu sayfa vardiya yönetme yetkisi olanlar içindir.</p><Button variant="outline" asChild><Link to="/pdks-records/plan">Vardiya planına dön</Link></Button></div>
     : !projectId ? <EmptyState title="Bir proje seçin." description="PDKS ayarlarını görmek için üst çubuktan proje seçin." />
     : <PdksSettingsPanel key={projectId} projectId={projectId} />;
-  return <div className="min-w-0 space-y-4">
-    <div className="space-y-2">
-      <Button variant="ghost" size="sm" className="-ml-2" onClick={back}><ChevronLeft className="h-4 w-4" aria-hidden="true" />PDKS</Button>
-      <PageHeader title="PDKS Ayarları" scope={activeProject?.name ?? "Proje seçin"} />
-    </div>
+  return <PageTemplate
+    title="PDKS Ayarları"
+    scope={activeProject?.name ?? "Proje seçin"}
+    width="form"
+    backLink={<Button variant="ghost" size="sm" className="-ml-2 min-h-11" onClick={back}><ChevronLeft className="h-4 w-4" aria-hidden="true" />Vardiya planı</Button>}
+  >
     {content}
-  </div>;
+  </PageTemplate>;
 }

@@ -26,7 +26,7 @@ describe("Sabit / Esnek vardiya formu", () => {
     const payload: ShiftFormPayload = shiftPayloadSchema.parse({ ...fixed, startTime: "", endTime: "", scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE });
     expect(payload).toMatchObject({ scheduleType: "flexible", startTime: "05:00", endTime: "22:00", breakStart: null, breakEnd: null, flexible: DEFAULT_FLEXIBLE });
     const html = render({ ...payload, _id: "shift" as Id<"shifts">, breakStart: undefined, breakEnd: undefined, lateToleranceMinutes: undefined, earlyExitToleranceMinutes: undefined, overtimeStartToleranceMinutes: undefined });
-    expect(html).toContain("Günlük net hedef (dk)");
+    expect(html).toContain("Günlük çalışma hedefi (dk)");
     expect(html).toContain("En geç çıkış günü");
     // Esnek de sabit gibi tarihli sürümle güncellenir; tür değişmedikçe yeni tanım açılmaz.
     expect(html).toContain("seçtiğiniz tarihten itibaren geçerlidir");
@@ -56,12 +56,15 @@ describe("Sabit / Esnek vardiya formu", () => {
   });
 });
 
-it("advanced rules hydrate in a closed section and blank fields clear through null", () => {
+it("rules hydrate in their named sections and blank fields clear through null", () => {
   const rules = { validWindow: { checkInStart: "07:00", checkInEnd: "09:00", checkOutStart: "16:00", checkOutEnd: "18:00", checkOutEndDayOffset: 0 as const }, absentAfterLateMinutes: 30, minWorkMinutes: 360, missingCheckInLateMinutes: 15, holidayWorkRequired: true };
   expect(shiftPayloadSchema.parse({ ...fixed, ...rules })).toMatchObject(rules);
   expect(shiftPayloadSchema.parse(fixed)).toMatchObject({ validWindow: null, absentAfterLateMinutes: null, minWorkMinutes: null, missingCheckInLateMinutes: null, holidayWorkRequired: null });
   const html = render({ ...fixed, ...rules, _id: "shift" as Id<"shifts"> });
-  expect(html).toContain("Gelişmiş");
+  for (const section of ["Çalışma saatleri", "Mola", "Kayıt kabul aralığı", "Geç giriş ve erken çıkış", "Fazla mesai", "Devamsızlık", "Resmi tatiller"]) {
+    expect(html).toContain(section);
+  }
+  expect(html).not.toContain("Gelişmiş");
   expect(html).not.toContain("<details open");
   expect(html).toContain('value="360"');
   expect(html).toContain('value="07:00"');
@@ -73,8 +76,9 @@ it("advanced rules hydrate in a closed section and blank fields clear through nu
   expect(payload).toMatchObject({ minWorkMinutes: 360, holidayWorkRequired: true });
   expect(shiftPayloadSchema.parse({ ...flexible, minWorkMinutes: undefined, holidayWorkRequired: undefined })).toMatchObject({ minWorkMinutes: null, holidayWorkRequired: null });
   const flexibleHtml = render({ ...flexible, _id: "shift" as Id<"shifts"> });
-  // Esnekte Gelişmiş: mesai toleransı + gün kuralları; saat bağımlı sabit kurallar görünmez.
-  expect(flexibleHtml).toContain("Gelişmiş");
+  expect(flexibleHtml).toContain("Devamsızlık");
+  expect(flexibleHtml).toContain("Kayıt kabul aralığı");
+  expect(flexibleHtml).not.toContain("Geç giriş ve erken çıkış");
   expect(flexibleHtml).toContain("shift-overtimeStartToleranceMinutes");
   expect(flexibleHtml).toContain("shift-minWorkMinutes");
   expect(flexibleHtml).toContain("Resmi tatilde çalışma zorunlu");
@@ -87,4 +91,20 @@ it("advanced rules validate limits, windows and zero without coercing blanks to 
   expect(shiftPayloadSchema.parse({ ...fixed, minWorkMinutes: 1440 }).minWorkMinutes).toBe(1440);
   expect(shiftPayloadSchema.safeParse({ ...fixed, minWorkMinutes: 1441 }).success).toBe(false);
   expect(shiftPayloadSchema.safeParse({ ...fixed, validWindow: { checkInStart: "09:00", checkInEnd: "10:00", checkOutStart: "16:00", checkOutEnd: "18:00", checkOutEndDayOffset: 0 } }).success).toBe(false);
+});
+
+it.each(["fixed", "flexible"] as const)("keeps a %s absence-threshold error on that field", scheduleType => {
+  const result = shiftFormSchema.safeParse({ ...fixed, scheduleType, flexible: DEFAULT_FLEXIBLE, minWorkMinutes: 2000 });
+  expect(result.success).toBe(false);
+  if (!result.success) expect(result.error.issues.map(issue => issue.path)).toEqual([["minWorkMinutes"]]);
+});
+
+it("hydrates and validates a schedule in both shift definition forms", () => {
+  expect(render(null)).toContain('aria-label="Vardiya deseni"');
+  const schedule = { scheduleMode: "cycle" as const, dayPlan: [true, true, false, false] };
+  expect(shiftPayloadSchema.parse({ ...fixed, ...schedule })).toMatchObject(schedule);
+  const html = render({ ...fixed, ...schedule, _id: "shift" as Id<"shifts"> });
+  expect(html).toContain("Döngü");
+  expect(html).toContain("Mevcut atamalar kayıtlı desenini korur.");
+  expect(shiftPayloadSchema.safeParse({ ...fixed, scheduleMode: "weekly", dayPlan: [true] }).success).toBe(false);
 });

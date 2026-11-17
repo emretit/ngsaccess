@@ -12,12 +12,12 @@ import Settings from "@/pages/Settings";
 import { SETTINGS_SECTIONS } from "./SettingsSidebar";
 import { holidaySchema } from "./sections/components/HolidayCalendarManager";
 
-const mocks = vi.hoisted(() => ({ role: "project_admin", query: vi.fn(), mutation: vi.fn() }));
+const mocks = vi.hoisted(() => ({ role: "project_admin", projectId: "project-a" as string | null, projectLoading: false, permissionsLoading: false, query: vi.fn(), mutation: vi.fn() }));
 vi.mock("@/components/auth/AuthProvider", () => ({ useAuth: () => ({ profile: { role: mocks.role } }) }));
-vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project-a", projectIds: ["project-a", "project-b"], activeProject: { name: "Merkez" }, isAdmin: true, loading: false }) }));
+vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: mocks.projectId, projectIds: ["project-a", "project-b"], activeProject: { name: "Merkez" }, isAdmin: true, loading: mocks.projectLoading }) }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useProjectChangeGuard: () => undefined }));
 vi.mock("convex/react", () => ({ useQuery: mocks.query, useMutation: () => mocks.mutation, useAction: () => mocks.mutation }));
-afterEach(() => { mocks.role = "project_admin"; mocks.query.mockReset(); });
+afterEach(() => { mocks.role = "project_admin"; mocks.query.mockReset(); mocks.projectId = "project-a"; mocks.projectLoading = false; mocks.permissionsLoading = false; });
 
 function draftSequence(steps: { source: { name: string; enabled: boolean }; edit?: { name?: string; enabled?: boolean }; reset?: boolean }[]) {
   const results = new Map<number, { values: { name: string; enabled: boolean }; dirty: boolean; remoteChanged: boolean }>();
@@ -124,6 +124,8 @@ describe("settings page permission boundary", () => {
     mocks.role = "project_user";
     const html = renderToStaticMarkup(<MemoryRouter initialEntries={["/settings?tab=mail"]}><Settings /></MemoryRouter>);
     expect(html).toContain("Bu ayar bölümünü görüntüleme yetkiniz yok");
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html).toContain("Ayarlar");
     expect(html).not.toContain("Ayar bölümleri");
     expect(mocks.query).not.toHaveBeenCalled();
   });
@@ -142,8 +144,22 @@ describe("settings page permission boundary", () => {
     expect(html.match(/<h1[ >]/g)).toHaveLength(1);
     expect(html.split(SETTINGS_SECTIONS[0].scope)).toHaveLength(2);
     expect(html).toContain("Henüz şirket bilgisi kaydedilmemiş");
+    expect(html).toMatch(/<h2[^>]*tabindex="-1"[^>]*>Genel<\/h2>/);
+    expect(html).toContain('aria-label="Ayar bölümleri"');
+    expect(html).toContain('for="settings-section"');
     expect(html).not.toContain("Genel ayarları kaydet");
   });
 });
 
-vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ role: mocks.role === "super_admin" ? "super_admin" : mocks.role === "project_admin" ? "admin" : "viewer", can: (permission: string) => mocks.role !== "project_user" || permission === "reports.view", loading: false }) }));
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ role: mocks.role === "super_admin" ? "super_admin" : mocks.role === "project_admin" ? "admin" : "viewer", can: (permission: string) => mocks.role !== "project_user" || permission === "reports.view", loading: mocks.permissionsLoading }) }));
+
+it.each(["permissions-loading", "project-loading", "no-project"])("keeps the settings heading in state: %s", state => {
+  mocks.permissionsLoading = state === "permissions-loading";
+  mocks.projectLoading = state === "project-loading";
+  mocks.projectId = state === "no-project" ? null : "project-a";
+  const html = renderToStaticMarkup(<MemoryRouter><Settings /></MemoryRouter>);
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
+  expect(html).toContain("Ayarlar");
+  expect(html).toContain(state === "permissions-loading" ? "Ayarlar yükleniyor" : state === "project-loading" ? "Proje yükleniyor" : "Proje ataması bekleniyor");
+  expect(mocks.query).not.toHaveBeenCalled();
+});

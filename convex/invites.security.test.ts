@@ -98,9 +98,131 @@ describe("Y-10 setup invitation authority", () => {
       await ctx.db.patch(f.recipient, { name: "Preserve me" });
     });
     const call = path === "setup" ? f.t.query(internal.invites.setupAccountState, { token: "token" })
-      : path === "reset" ? f.t.mutation(internal.invites.resetClaimedAccount, { userId: f.recipient, token: "token" })
+      : path === "reset" ? f.t.mutation(internal.invites.resetClaimedAccount, { userId: f.recipient, token: "token", password: "Strongpass1" })
       : f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Strongpass1" });
     await expect(call).rejects.toThrow("INVITE_INVALID");
     expect(await f.t.run(ctx => ctx.db.get(f.recipient))).toMatchObject({ name: "Preserve me", verified: false });
   });
+});
+
+async function setupClaim() {
+  const f = await setup();
+  await f.t.run(async ctx => {
+    await ctx.db.insert("authAccounts", { userId: f.recipient, provider: "password", providerAccountId: "recipient@example.test" });
+    await ctx.db.patch(f.recipient, { name: "Squatter", firstCompanyName: "Stale company", setupToken: "old-verification" });
+  });
+  await f.t.mutation(internal.auth.store, { args: {
+    type: "modifyAccount", provider: "password", account: { id: "recipient@example.test", secret: "Oldpassword1" },
+  } });
+  return f;
+}
+
+async function credentials(f: Awaited<ReturnType<typeof setupClaim>>, password: string) {
+  return await f.t.mutation(internal.auth.store, { args: {
+    type: "retrieveAccountWithCredentials", provider: "password", account: { id: "recipient@example.test", secret: password },
+  } });
+}
+
+async function freshRecipient(f: Awaited<ReturnType<typeof setupClaim>>) {
+  const session = await f.t.run(ctx => ctx.db.insert("authSessions", { userId: f.recipient, expirationTime: Date.now() + 3600000 }));
+  return f.t.withIdentity({ subject: `${f.recipient}|${session}` });
+}
+
+describe("C-01 atomic setup claims", () => {
+  it("allows only one concurrent claim and atomically replaces credentials, cleans the profile and revokes old sessions", async () => {
+    const f = await setupClaim();
+    const results = await Promise.allSettled([
+      f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Firstpassword1" }),
+      f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Secondpassword1" }),
+    ]);
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(result => result.status === "rejected")).toHaveLength(1);
+    expect(await credentials(f, "Oldpassword1")).toBe("InvalidSecret");
+    const winner = results[0].status === "fulfilled" ? "Firstpassword1" : "Secondpassword1";
+    expect(await credentials(f, winner)).toMatchObject({ user: { _id: f.recipient } });
+    await expect(f.recipientClient.mutation(api.invites.consume, { token: "token", email: "recipient@example.test" })).rejects.toThrow("INVITE_AUTH_REQUIRED");
+    await f.t.run(async ctx => {
+      expect(await ctx.db.get(f.session)).toBeNull();
+      const user = await ctx.db.get(f.recipient);
+      expect(user?.verified).toBe(false);
+      expect(user?.name).toBeUndefined();
+      expect(user?.setupToken).toBeUndefined();
+      expect(user?.firstCompanyName).toBeUndefined();
+      const invite = await ctx.db.get(f.invite);
+      expect(invite?.used).toBe(false);
+      expect(invite?.claimToken).toEqual(expect.any(String));
+      expect(invite?.claimUserId).toBe(f.recipient);
+      expect(invite?.claimExpiresAt).toBeGreaterThan(Date.now());
+      expect(invite?.claimExpiresAt).toBeLessThanOrEqual(Date.now() + 15 * 60 * 1000);
+    });
+    expect(await f.t.query(api.invites.verify, { token: "token" })).not.toHaveProperty("claimToken");
+  });
+
+  it("permits retry after reservation expiry and rejects stale finalize before retry", async () => {
+    const f = await setupClaim();
+    await f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Firstpassword1" });
+    const previousClaim = await f.t.run(ctx => ctx.db.get(f.invite));
+    await f.t.run(ctx => ctx.db.patch(f.invite, { claimExpiresAt: Date.now() - 1 }));
+    const client = await freshRecipient(f);
+    await expect(client.mutation(api.invites.consume, { token: "token", email: "recipient@example.test" })).rejects.toMatchObject({ data: { code: "INVITE_CLAIM_EXPIRED" } });
+    expect(await f.t.query(api.invites.verify, { token: "token" })).not.toBeNull();
+    expect((await f.t.run(ctx => ctx.db.get(f.invite)))?.used).toBe(false);
+    await expect(f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Secondpassword1" })).resolves.toEqual({ flow: "signIn" });
+    expect((await f.t.run(ctx => ctx.db.get(f.invite)))?.claimToken).not.toBe(previousClaim?.claimToken);
+    expect(await credentials(f, "Firstpassword1")).toBe("InvalidSecret");
+    expect(await credentials(f, "Secondpassword1")).toMatchObject({ user: { _id: f.recipient } });
+    await expect(client.mutation(api.invites.consume, { token: "token", email: "recipient@example.test" })).rejects.toThrow("INVITE_AUTH_REQUIRED");
+  });
+
+  it("consumes once and clears the reservation while granting membership", async () => {
+    const f = await setupClaim();
+    await f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Firstpassword1" });
+    const client = await freshRecipient(f);
+    const results = await Promise.allSettled([
+      client.mutation(api.invites.consume, { token: "token", email: "recipient@example.test" }),
+      client.mutation(api.invites.consume, { token: "token", email: "recipient@example.test" }),
+    ]);
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    await f.t.run(async ctx => {
+      const invite = await ctx.db.get(f.invite);
+      expect(invite?.used).toBe(true);
+      expect(invite?.claimToken).toBeUndefined();
+      expect(invite?.claimUserId).toBeUndefined();
+      expect(invite?.claimExpiresAt).toBeUndefined();
+      expect((await ctx.db.get(f.recipient))?.verified).toBe(true);
+      const memberships = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", f.recipient)).take(10);
+      expect(memberships).toHaveLength(1);
+      expect(memberships[0]).toMatchObject({ projectId: f.projectId, role: "admin" });
+    });
+    await expect(f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Secondpassword1" })).rejects.toThrow("INVITE_INVALID");
+  });
+
+  it("keeps the reservation when public email verification replaces the user's setup token", async () => {
+    const f = await setupClaim();
+    await f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Firstpassword1" });
+    const reservation = await f.t.run(ctx => ctx.db.get(f.invite));
+    await f.t.mutation(api.emailVerification.requestVerification, { email: "recipient@example.test" });
+    expect((await f.t.run(ctx => ctx.db.get(f.recipient)))?.setupToken).toEqual(expect.any(String));
+    expect((await f.t.run(ctx => ctx.db.get(f.invite)))?.claimToken).toBe(reservation?.claimToken);
+    await expect(f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Secondpassword1" })).rejects.toThrow("INVITE_ACCOUNT_EXISTS");
+    expect(await credentials(f, "Secondpassword1")).toBe("InvalidSecret");
+    expect(await credentials(f, "Firstpassword1")).toMatchObject({ user: { _id: f.recipient } });
+  });
+});
+
+it("C-01 prevents another project's live invite from overwriting the same account credentials", async () => {
+  const f = await setupClaim();
+  await f.t.run(async ctx => {
+    await ctx.db.insert("userProjects", { userId: f.creator, projectId: f.otherProjectId, role: "admin" });
+    await ctx.db.insert("invites", {
+      email: "recipient@example.test", token: "other-token", createdBy: f.creator,
+      projectId: f.otherProjectId, role: "viewer", used: false, createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    });
+  });
+  await f.t.action(api.invites.claimSetupAccount, { token: "token", password: "Firstpassword1" });
+  await expect(f.t.mutation(internal.invites.resetClaimedAccount, {
+    token: "other-token", userId: f.recipient, password: "Secondpassword1",
+  })).rejects.toThrow("INVITE_ACCOUNT_EXISTS");
+  expect(await credentials(f, "Firstpassword1")).toMatchObject({ user: { _id: f.recipient } });
 });

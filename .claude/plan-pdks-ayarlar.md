@@ -1,3 +1,5 @@
+> 2026-11-11 karar: eachPunch modunda tamamlanmış tek ziyaret ve ara okutma yoksa tanımlı sabit mola düşülür. Kullanıcı geçmiş tüm dönemlere uygulanmasını onayladı. Kayıtlı aralıkta ikinci kesinti yapılmaz. Aşağıdaki “mola kararı açık” notları tarihseldir; güncel kayıt todo.md.
+
 # Plan — PDKS ayarları → PDKS Kayıtları › Ayarlar alt sayfası (2026-10-23)
 
 ## >>> 15:20 GÜNCEL: CANLI ad025b13 (hepsi yayında), canlı tur GEÇTİ; kalan yalnız kart okutup hikCardReaderNo kontrolü + öğle arası kararı

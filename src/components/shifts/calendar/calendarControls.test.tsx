@@ -10,7 +10,7 @@ const permissions = vi.hoisted(() => ({ manage: false, reports: false }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (key: string) => key === "schedule.manage" ? permissions.manage : permissions.reports }) }));
 vi.mock("@/components/ui/dropdown-menu", () => {
   const Box = ({ children }: { children: ReactNode }) => <div>{children}</div>;
-  return Object.fromEntries(["DropdownMenu", "DropdownMenuTrigger", "DropdownMenuContent", "DropdownMenuItem", "DropdownMenuSub", "DropdownMenuSubTrigger", "DropdownMenuSubContent", "DropdownMenuLabel"].map(key => [key, Box]));
+  return Object.fromEntries(["DropdownMenu", "DropdownMenuTrigger", "DropdownMenuContent", "DropdownMenuItem", "DropdownMenuSub", "DropdownMenuSubTrigger", "DropdownMenuSubContent", "DropdownMenuLabel", "DropdownMenuSeparator"].map(key => [key, Box]));
 });
 const noOp = () => undefined;
 const employee = { _id: "employee", projectId: "project", firstName: "İpek", lastName: "Yıldız" } as Employee;
@@ -31,15 +31,17 @@ describe("Vardiya başlık ve araç çubuğu", () => {
     permissions.reports = true;
     const html = header();
     for (const text of ["İşlemler", "Dışa aktar", "Excel (.xlsx)", "CSV", "Görünen sayfa ve dönem"]) expect(html).toContain(text);
-    expect(html).not.toContain("Toplu temizle");
+    expect(html).not.toContain("Vardiya atamalarını kaldır");
   });
-  it("yöneticide temizleme vardır; aktif tanım yokken atama eylemi yoktur", () => {
+  it("yöneticide atama menüsü vardır; aktif tanım yokken vardiya ekleme açıklaması görünür", () => {
     permissions.manage = true;
     const html = header(0);
-    expect(html).toContain("Toplu temizle");
+    expect(html).toContain("Vardiya atamalarını kaldır");
     expect(html).not.toContain("Dışa aktar");
-    expect(html).not.toContain("Vardiya ata");
-    expect(header()).toContain("Vardiya ata");
+    expect(html).not.toContain("İşlemler");
+    expect(html).toContain("Vardiya ata");
+    expect(html).toContain("Önce bir vardiya ekleyin");
+    expect(header()).toContain("Çalışan, vardiya ve tarih seçin");
   });
   it("aralıklar kısa Türkçe biçiminde yazılır", () => {
     expect(calendarRangeLabel("2026-10-19", "2026-10-25", "week")).toBe("19–25 Ekim 2026");

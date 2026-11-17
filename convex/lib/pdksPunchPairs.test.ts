@@ -134,3 +134,45 @@ describe("display punch segments", () => {
     }
   });
 });
+
+
+describe("unrecorded fixed lunch in eachPunch reports", () => {
+  const shift: Doc<"shifts"> = { _id: "shift" as Id<"shifts">, _creationTime: 0, name: "Sabit", startTime: "08:00", endTime: "17:00", breakStart: "12:00", breakEnd: "13:00", createdAt: "", updatedAt: "" };
+  it.each(["2025-01-02", "2026-10-23"])("deducts the configured break without a date cutoff (%s)", dayDate => {
+    const items = readings(punch("08:00", "entry"), punch("17:00", "exit")).map(item => ({ ...item, accessTime: item.accessTime.replace(date, dayDate) }));
+    const day = run(items, { date: dayDate, shift });
+    expect(day).toMatchObject({ rawTotalMinutes: 540, breakMinutes: 60, totalMinutes: 480 });
+    expect(day.overtimeSegments.reduce((sum, part) => sum + part.netMinutes, 0)).toBe(480);
+  });
+  it("deducts only the attended part of lunch and no legal fallback outside its window", () => {
+    expect(run(readings(punch("12:30", "entry"), punch("17:00", "exit")), { shift })).toMatchObject({ totalMinutes: 240, breakMinutes: 30 });
+    expect(run(readings(punch("13:00", "entry"), punch("17:00", "exit")), { shift })).toMatchObject({ totalMinutes: 240, breakMinutes: 0 });
+    expect(run(readings(punch("08:00", "entry"), punch("17:00", "exit")))).toMatchObject({ totalMinutes: 540, breakMinutes: 0 });
+  });
+  it("never deducts a second break from recorded gaps or incomplete evidence", () => {
+    expect(run(readings(punch("08:00", "entry"), punch("12:00", "exit"), punch("12:30", "entry"), punch("17:00", "exit")), { shift })).toMatchObject({ totalMinutes: 510, breakMinutes: 0 });
+    expect(run(readings(punch("08:00", "entry"), punch("13:00", "exit"), punch("14:00", "entry")), { shift })).toMatchObject({ totalMinutes: 300, breakMinutes: 0, punchQuality: "missingExit" });
+    expect(run([], { shift })).toMatchObject({ totalMinutes: 0, breakMinutes: 0 });
+  });
+  it("applies fixed flexible duration once, caps it and conserves overtime portions", () => {
+    const flexible = { ...shift, scheduleType: "flexible" as const, flexible: { ...DEFAULT_FLEXIBLE }, overtimeStartToleranceMinutes: 0 };
+    const day = run(readings(punch("08:00", "entry"), punch("18:00", "exit")), { shift: flexible });
+    expect(day).toMatchObject({ rawTotalMinutes: 600, breakMinutes: 60, totalMinutes: 540, excessMinutes: 60, overtimeMinutes: 60 });
+    expect(day.overtimeSegments.reduce((sum, part) => sum + part.netMinutes, 0)).toBe(540);
+    expect(run(readings(punch("08:00", "entry"), punch("08:30", "exit")), { shift: flexible })).toMatchObject({ totalMinutes: 0, breakMinutes: 30 });
+  });
+  it("deducts an overnight lunch from the actual calendar and payable night minutes", () => {
+    const day = run(readings(punch("22:00", "entry"), { accessTime: "2026-10-24T06:00:00+03:00", direction: "exit" }), {
+      shift: { ...shift, startTime: "22:00", endTime: "06:00", breakStart: "02:00", breakEnd: "02:30" },
+      dayKind: "rest", hourlyRate: 100,
+      overtimeRates: { ...DEFAULT_OVERTIME_RATES, nightShiftStart: "22:00", nightShiftEnd: "06:00", nightShiftMultiplier: 2 },
+    });
+    expect(day).toMatchObject({ totalMinutes: 450, breakMinutes: 30, rawNightMinutes: 480, nightMinutes: 450, overtimeMinutes: 450, overtimePayTRY: 1500 });
+    expect(day.overtimeSegments.reduce((sum, part) => sum + part.netMinutes, 0)).toBe(450);
+  });
+  it("conserves integer minutes for fractional attendance intersecting lunch", () => {
+    const day = run(readings(punch("12:30:30", "entry"), punch("17:00:15", "exit")), { shift });
+    expect(day).toMatchObject({ rawTotalMinutes: 269, totalMinutes: 240, breakMinutes: 29 });
+    expect(day.overtimeSegments.reduce((sum, part) => sum + part.netMinutes, 0)).toBe(day.totalMinutes);
+  });
+});

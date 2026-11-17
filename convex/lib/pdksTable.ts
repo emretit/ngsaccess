@@ -45,6 +45,7 @@ export function classifyPdksDay(params: {
   noShift?: boolean;
   pendingUntil?: number;
   durationMeasured?: boolean;
+  punchQuality?: import("./pdksEvidence").PunchQuality;
   attendanceDecision?: "present" | "absent" | "incomplete";
   date: string;
   today?: string;
@@ -68,7 +69,8 @@ export function classifyPdksDay(params: {
     mode: "calendar",
     classification: params.classification === "halfDayHoliday" ? "holiday" : params.classification,
   });
-  if (params.pendingUntil !== undefined && !params.durationMeasured && !params.hasLeave
+  if (params.pendingUntil !== undefined && params.punchQuality !== "undirected"
+      && (!params.durationMeasured || params.punchQuality === "missingExit" && params.attendanceDecision !== "present") && !params.hasLeave
       && params.classification === "workday" && (params.now ?? Date.now()) <= params.pendingUntil) return "future";
   if (params.attendanceDecision !== undefined) {
     // Rest days and approved leave never become missing-data/review days.
@@ -288,7 +290,7 @@ export function computePdksTableRow(params: {
     return plan ? plan.kind !== "none" ? plan.shifts[plan.shifts.length - 1] ?? null : null : params.resolveShift(id, date);
   });
   const byDate = empId
-    ? groupPdksWorkDays(params.empReadings, empId, params.resolveShift, (id, date) => params.manualPdksByEmpDate.get(`${id}__${date}`)?.entryTime, undefined, resolveLast)
+    ? groupPdksWorkDays(params.empReadings, empId, params.resolveShift, (id, date) => params.manualPdksByEmpDate.get(`${id}__${date}`)?.entryTime, undefined, resolveLast, params.policyFor)
     : new Map<string, Doc<"cardReadings">[]>();
   const hourlyRate = resolveHourlyRate({
     hourlyRate: employee?.hourlyRate,
@@ -356,6 +358,7 @@ export function computePdksTableRow(params: {
       classification: day.classification,
       pendingUntil: day.pendingUntil,
       durationMeasured: day.durationMeasured,
+      punchQuality: day.punchQuality,
       attendanceDecision: day.attendanceDecision,
     hasAttendance: day.hasAttendance,
       hasLeave: !!leave,

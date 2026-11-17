@@ -23,7 +23,7 @@ function createCtx() {
         build(query);
         return {
           unique: async () => table === "alarmSettings" ? { emailEnabled: true, recipients: ["ops@example.com"], minSeverity: "warning" } : null,
-          order: () => ({ take: async () => state.events.filter(event => constraints.every(([op, field, value]) => op === "eq" ? event[field] === value : String(event[field]) >= String(value))) }),
+          order: () => ({ take: async (limit: number) => state.events.filter(event => constraints.every(([op, field, value]) => op === "eq" ? event[field] === value : event[field] !== undefined && String(event[field]) >= String(value))).slice(0, limit) }),
         };
       },
     })),
@@ -39,6 +39,13 @@ function row(id: string, overrides: Record<string, unknown> = {}) {
 beforeEach(() => { state.events = []; state.scheduled = 0; });
 
 describe("notifyAlarmIfNeeded", () => {
+  it("retains the debounce after more than 200 unrelated device events", async () => {
+    state.events = [row("repeat"), ...Array.from({ length: 250 }, (_, i) => row(`noise-${i}`, { label: "Başka olay", category: "status" })), row("first")];
+    const ctx = createCtx();
+    await notifyAlarmIfNeeded(ctx, "first" as Id<"deviceEvents">);
+    await notifyAlarmIfNeeded(ctx, "repeat" as Id<"deviceEvents">);
+    expect(state.scheduled).toBe(1);
+  });
   it("does not send stale alarms or schedule the same event twice", async () => {
     state.events = [row("stale", { eventTime: new Date(Date.now() - 11 * 60_000).toISOString() }), row("live")];
     const ctx = createCtx();

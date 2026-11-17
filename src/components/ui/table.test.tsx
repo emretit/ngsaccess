@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Table, TableHead, TableHeader, TableRow } from "./table";
-import { baseWidthFor, fitColumns, type HeaderLayout } from "./table-resize";
+import { baseWidthFor, columnWidth, fitColumns, type HeaderLayout } from "./table-resize";
 
 const header = (resizeKey?: string) =>
   renderToStaticMarkup(
@@ -58,4 +58,51 @@ describe("Table column fill", () => {
     const next = { ...widths, name: base };
     expect(next.name * fitColumns(header(840), next).scale).toBeCloseTo(300);
   });
+});
+
+
+describe("registered column minima", () => {
+  const layout: HeaderLayout = { container: 300, cells: [
+    { id: "name", fixed: false, measured: 0, minWidth: 160 },
+    { id: "email", fixed: false, measured: 0, minWidth: 200 },
+  ] };
+  it("floors old narrow saved values in render and fit without changing preferences", () => {
+    const saved = { name: 12, email: 280, hidden: 20 };
+    expect(columnWidth(saved.name, 160)).toBe(160);
+    expect(fitColumns(layout, saved)).toEqual({ fixedSum: 0, scalableSum: 440, scale: 1 });
+    expect(saved).toEqual({ name: 12, email: 280, hidden: 20 });
+    expect(columnWidth(undefined, 200)).toBe(200);
+  });
+  it("uses visible columns and their current minima for resize calculations", () => {
+    const saved = { name: 12, email: 280 };
+    const wide = { ...layout, container: 900 };
+    const base = baseWidthFor("email", 500, wide, saved);
+    expect(base * fitColumns(wide, { ...saved, email: base }).scale).toBeCloseTo(500);
+    const mobile = { container: 390, cells: [layout.cells[0]] };
+    expect(fitColumns(mobile, saved).scalableSum).toBe(160);
+    expect(fitColumns(mobile, saved).scale).toBeCloseTo(390 / 160);
+  });
+  it("exposes the same floor to headers and accessible resize handles", () => {
+    const html = renderToStaticMarkup(<Table resizeKey="minimum-test"><TableHeader><TableRow><TableHead columnId="name" minWidth={160}>Ad</TableHead></TableRow></TableHeader></Table>);
+    expect(html).toContain('data-column-min-width="160"');
+    expect(html).toContain('min-width:160px');
+    expect(html).toContain('aria-valuemin="160"');
+  });
+});
+
+it("replays a saved profile with registered floors while preserving its storage", () => {
+  const saved = JSON.stringify({ name: 12, email: 280 });
+  const setItem = vi.fn();
+  const removeItem = vi.fn();
+  vi.stubGlobal("window", { localStorage: { getItem: () => saved, setItem, removeItem } });
+  try {
+    const html = renderToStaticMarkup(<Table resizeKey="old-profile"><TableHeader><TableRow><TableHead columnId="name" minWidth={160}>Ad</TableHead><TableHead columnId="email" minWidth={200}>E-posta</TableHead></TableRow></TableHeader></Table>);
+    expect(html).toContain("width:calc(160px * var(--table-column-scale, 1))");
+    expect(html).toContain("width:calc(280px * var(--table-column-scale, 1))");
+    expect(html).toContain('aria-valuenow="160"');
+    expect(setItem).not.toHaveBeenCalled();
+    expect(removeItem).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

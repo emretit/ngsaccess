@@ -21,3 +21,29 @@ it("PDKS contains the plan and shift definitions without a separate shifts menu"
   expect(routeMeta.find(route => route.href === "/pdks-records")?.name).toBe("PDKS");
   expect(routeMeta.some(route => route.href === "/shifts")).toBe(false);
 });
+
+it("resolves PDKS nested titles without adding menu or permission entries", async () => {
+  const { resolveRouteContext } = await import("@/lib/routeMeta");
+  expect(resolveRouteContext("/pdks-records/plan")).toEqual({ title: "Vardiya planı", breadcrumbs: [
+    { name: "Ana Sayfa", href: "/home" }, { name: "PDKS", href: "/pdks-records" }, { name: "Vardiya planı" },
+  ] });
+  expect(resolveRouteContext("/pdks-records/settings").title).toBe("PDKS Ayarları");
+  expect(routeMeta.some(route => route.href === "/pdks-records/plan")).toBe(false);
+});
+
+it("resolves report groups and details from the actual report registry", async () => {
+  const { resolveRouteContext } = await import("@/lib/routeMeta");
+  const { REPORT_GROUPS, reportGroupPath } = await import("@/lib/reports/groups");
+  const { reportsInGroup } = await import("@/lib/reports/registry");
+  for (const group of REPORT_GROUPS) {
+    const context = resolveRouteContext(reportGroupPath(group.key));
+    expect(context.title).toBe(group.key === "resmi" ? "Muhasebe Raporları" : `${group.label} Raporları`);
+    for (const report of reportsInGroup(group.key)) {
+      const detail = resolveRouteContext(reportGroupPath(group.key, report.slug));
+      expect(detail.title).toBe(report.title);
+      expect(detail.breadcrumbs.slice(-2)).toEqual([{ name: group.label, href: reportGroupPath(group.key) }, { name: report.title }]);
+    }
+  }
+  expect(resolveRouteContext("/reports/no-group/no-report").title).toBe("Rapor bulunamadı");
+  expect(resolveRouteContext("/reports/gunluk/no-report").title).toBe("Rapor bulunamadı");
+});

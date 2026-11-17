@@ -1,3 +1,5 @@
+import { REPORT_GROUPS, isReportGroupKey, reportGroupPath } from "./reports/groups";
+import { getReport } from "./reports/registry";
 import { permissionCapabilities } from "./capabilities";
 import { ROLE_DEFAULTS, legacyRoleToProjectRole, type Permission } from "../../convex/lib/roleCatalog";
 import { Activity, BarChart3, BellRing, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, User, type LucideIcon } from "lucide-react";
@@ -45,9 +47,10 @@ export function visibleRoutes(role: string | undefined, includeProfile = false, 
 }
 
 /** Okuma verisi gösteren sayfaların doğrudan erişim kararı; korunmayan yolda null.
- * /pdks-records/settings kendi yetkisini (schedule.manage) denetler. Vardiya planı (?plan=1)
- * schedule.manage ile de açılır; PDKS tablo sorgusu reports.view yoksa zaten atlanır. */
+ * /pdks-records/settings kendi yetkisini (schedule.manage) denetler. Vardiya planı
+ * reports.view veya schedule.manage ile açılır. */
 export function readingRouteAccess(pathname: string, search: string, can: (permission: Permission) => boolean): boolean | null {
+  if (pathname === "/pdks-records/plan") return can("reports.view") || can("schedule.manage");
   const route = routeMeta.find(item => item.href === "/live-monitoring"
     ? pathname === item.href || pathname.startsWith(`${item.href}/`)
     : item.href === "/pdks-records" && pathname === item.href);
@@ -59,4 +62,31 @@ export function readingRouteAccess(pathname: string, search: string, can: (permi
 /** Navigation and direct route access share the same permission rules. */
 export function canAccessRoute(route: RouteMeta, can: (permission: Permission) => boolean): boolean {
   return (!route.permission || can(route.permission)) && (!route.anyPermission || route.anyPermission.some(can));
+}
+
+export interface RouteBreadcrumb { name: string; href?: string }
+
+/** Display context is independent of menu entries and permission metadata. */
+export function resolveRouteContext(pathname: string): { title: string; breadcrumbs: RouteBreadcrumb[] } {
+  const base = routeMeta.filter(item => pathname === item.href || pathname.startsWith(`${item.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+  if (!base) return { title: "", breadcrumbs: [] };
+  const breadcrumbs: RouteBreadcrumb[] = [{ name: "Ana Sayfa", href: "/home" }];
+  if (pathname === "/home") return { title: base.name, breadcrumbs: [{ name: base.name }] };
+  if (pathname === "/pdks-records/plan" || pathname === "/pdks-records/settings") {
+    const title = pathname.endsWith("/plan") ? "Vardiya planı" : "PDKS Ayarları";
+    return { title, breadcrumbs: [...breadcrumbs, { name: "PDKS", href: "/pdks-records" }, { name: title }] };
+  }
+  if (base.href === "/reports" && pathname !== base.href) {
+    const [, , group, slug, extra] = pathname.split("/");
+    const groupMeta = REPORT_GROUPS.find(item => item.key === group);
+    if (groupMeta && isReportGroupKey(group) && !extra) {
+      const report = slug ? getReport(group, slug) : undefined;
+      const title = slug ? report?.title ?? "Rapor bulunamadı" : group === "resmi" ? "Muhasebe Raporları" : `${groupMeta.label} Raporları`;
+      return { title, breadcrumbs: [...breadcrumbs, { name: "Raporlar", href: "/reports" },
+        ...(slug ? [{ name: groupMeta.label, href: reportGroupPath(group) }] : []), { name: title }] };
+    }
+    return { title: "Rapor bulunamadı", breadcrumbs: [...breadcrumbs, { name: "Raporlar", href: "/reports" }, { name: "Rapor bulunamadı" }] };
+  }
+  return { title: base.name, breadcrumbs: [...breadcrumbs, { name: base.name }] };
 }

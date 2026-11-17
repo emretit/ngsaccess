@@ -24,13 +24,14 @@ import { useProjectAccess } from '@/hooks/useProjectAccess';
 import { DeviceListErrorBoundary } from '@/components/devices/DeviceListErrorBoundary';
 import { readDeviceFilters, writeDeviceFilters, resetDeviceFiltersForProject } from '@/lib/deviceDisplay';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PageTemplate } from '@/components/shared/PageTemplate';
 import { AccessDenied } from '@/components/shared/AccessDenied';
 
 const Devices = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const syncDeviceUrl = useDeviceUrlSync();
   const requestedDeviceId = searchParams.get("deviceId");
-  const { projectId, loading: scopeLoading } = useActiveProjectScope();
+  const { projectId, activeProject, loading: scopeLoading } = useActiveProjectScope();
   const previousProject = useRef<string | null>(null);
   useEffect(() => {
     if (scopeLoading) return;
@@ -148,7 +149,7 @@ const Devices = () => {
 
   return (
     <>
-    {unavailable ?? (
+    {unavailable ? <PageTemplate title="Cihazlar" scope={activeProject?.name}>{unavailable}</PageTemplate> : (
     <div className="min-h-full min-w-0 space-y-4">
       <div className="flex-1 min-w-0 space-y-3">
         <DevicesContent

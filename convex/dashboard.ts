@@ -284,7 +284,7 @@ async function loadPdksDataset(
   });
   const versioned: Doc<"cardReadings">[] = [];
   for (const employee of employees) {
-    for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve, ruleReport.manualEntryFor, undefined, shiftResolver.resolveLast)) {
+    for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve, ruleReport.manualEntryFor, undefined, shiftResolver.resolveLast, date => ruleReport.policies(employee.projectId, date))) {
       const policy = ruleReport.policies(employee.projectId, date);
       if (policy.punchMode !== "requirements" && !usesPlanDayRules(shiftResolver.resolvePlan(employee._id, date)) && !usesShiftDayRules(shiftResolver.resolve(employee._id, date))) continue;
       const cell = ruleReport.ruleRows.get(employee._id)?.days.find(day => day.date === date);

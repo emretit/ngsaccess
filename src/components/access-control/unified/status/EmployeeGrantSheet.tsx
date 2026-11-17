@@ -47,7 +47,7 @@ export function EmployeeGrantSheet({
           ) : detail ? (
             <EmployeeStatus detail={detail} />
           ) : (
-            <p>Yükleniyor…</p>
+            <p role="status">Yükleniyor…</p>
           )}
         </div>
       </SheetContent>

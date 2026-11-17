@@ -130,8 +130,14 @@ describe("collectAllPages", () => {
     const loadPage = vi.fn<(position: number) => Promise<Page>>()
       .mockResolvedValue({ ok: true, rows: ["a"], numMatches: 1, nextPosition: 1, hasMore: true });
     expect(await collectAllPages({ label: "kart", deviceId, maxPages: 1, loadPage, itemsFromPage }))
-      .toEqual({ ok: true, items: ["a"] });
+      .toEqual({ ok: false, items: ["a"], error: "Cihaz taraması tamamlanamadı (1 sayfa sınırı)" });
     expect(loadPage).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith("[hik-reconcile] kart maxPages=1 aşıldı, device=device-test");
+  });
+  it("accepts completion exactly at the cap and rejects non-advancing pages", async () => {
+    const loadPage = vi.fn<(position: number) => Promise<Page>>().mockResolvedValue({ ok: true, rows: ["a"], numMatches: 1, nextPosition: 1, hasMore: false });
+    expect(await collectAllPages({ label: "kart", deviceId, maxPages: 1, loadPage, itemsFromPage })).toEqual({ ok: true, items: ["a"] });
+    loadPage.mockResolvedValue({ ok: true, rows: ["a"], numMatches: 1, nextPosition: 0, hasMore: true });
+    expect(await collectAllPages({ label: "kart", deviceId, maxPages: 5, loadPage, itemsFromPage })).toMatchObject({ ok: false, items: ["a"], error: expect.stringContaining("ilerlemedi") });
   });
 });

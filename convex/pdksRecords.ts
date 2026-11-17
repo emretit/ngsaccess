@@ -44,6 +44,7 @@ export const bulkUpsertManual = authedMutation({
   },
   handler: async (ctx, args) => {
     const batchNote = validateManualPdksNote(args.note);
+    const batchId = `bulk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     if (args.rows.length === 0) return { inserted: 0, updated: 0, errors: [] };
     if (args.rows.length > 500) {
       throw new Error("Tek seferde en fazla 500 satır gönderebilirsiniz");
@@ -78,7 +79,7 @@ export const bulkUpsertManual = authedMutation({
         const input = validateManualPdksInput({ ...row, note: batchNote }, shift?.projectId === employee.projectId ? shift : null);
 
         const existing = await findManualPdksRecord(ctx, row.employeeId, row.date);
-        const { id, created } = await writeManualPdksRecord(ctx, { user: ctx.user, employee, date: row.date, existing, input, audit: false });
+        const { id, created } = await writeManualPdksRecord(ctx, { user: ctx.user, employee, date: row.date, existing, input, audit: true, batchId });
         if (created) inserted += 1;
         else updated += 1;
         touchedIds.push(String(id));
@@ -123,8 +124,8 @@ export const bulkUpsertManual = authedMutation({
         targetTable: "pdksRecords",
         targetId: "bulk-upsert",
         newValue: projectIds.length === 1
-          ? { inserted, updated, errors: errors.length, touched: touchedIds.length }
-          : { touched },
+          ? { inserted, updated, errors: errors.length, touched: touchedIds.length, batchId }
+          : { touched, batchId },
         note: batchNote,
       });
     }

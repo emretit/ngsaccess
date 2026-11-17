@@ -53,3 +53,26 @@ it("Y-09 shows server duration without exposing or parsing raw employee data", (
     expect(html).not.toContain("invalid hidden data");
   } finally { state.results = []; }
 });
+
+it("places notification settings in the page header and omits empty bulk controls", () => {
+  state.admin = true;
+  state.manage = true;
+  state.results = [];
+  state.pageStatus = "Exhausted";
+  try {
+    const html = renderToStaticMarkup(<MemoryRouter><Alarms /></MemoryRouter>);
+    expect(html.indexOf("Bildirim ayarları")).toBeGreaterThan(html.indexOf("Alarmlar"));
+    expect(html.indexOf("Bildirim ayarları")).toBeLessThan(html.indexOf("Son yedi gün"));
+    expect(html).not.toContain("Seçilenleri onayla (0)");
+    expect(html).not.toContain('aria-label="Seçili kayıt işlemleri"');
+  } finally { state.admin = false; state.manage = false; }
+});
+
+it("names the horizontally scrollable alarm results and makes their wrapper keyboard focusable", () => {
+  const html = renderToStaticMarkup(<MemoryRouter><Alarms /></MemoryRouter>);
+  const wrapper = html.match(/<div[^>]*role="region"[^>]*aria-label="Alarm kayıtları"[^>]*>/)?.[0];
+  expect(wrapper).toBeDefined();
+  expect(wrapper).toContain('tabindex="0"');
+  expect(wrapper).toContain("overflow-auto");
+  expect(html).not.toMatch(/<table[^>]*aria-label="Alarm kayıtları"/);
+});

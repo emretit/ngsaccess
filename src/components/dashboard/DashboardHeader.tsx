@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import NumberFlow, { NumberFlowGroup } from "@number-flow/react";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { PageTemplate } from "@/components/shared/PageTemplate";
 import { useNow } from "@/hooks/useNow";
 
 const TIME_ZONE = "Europe/Istanbul";
@@ -7,13 +8,12 @@ const dateFormat = new Intl.DateTimeFormat("tr-TR", { timeZone: TIME_ZONE, day: 
 const clockFormat = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const TWO_DIGITS = { minimumIntegerDigits: 2 } as const;
 
-export default function DashboardHeader() {
+export default function DashboardHeader({ children }: { children?: ReactNode }) {
   const now = useNow(10_000);
   const clock = clockFormat.format(now);
   const [hour, minute] = clock.split(":").map(Number);
   return (
-    <PageHeader title="Ana Sayfa" scope={dateFormat.format(now)}>
-      {/* Dakika değişince rakamlar kayar; hareket azaltma tercihinde NumberFlow animasyonu kapatır. */}
+    <PageTemplate title="Ana Sayfa" scope={dateFormat.format(now)} secondaryActions={
       <p className="text-right">
         <span className="sr-only">İstanbul saati {clock}</span>
         <span aria-hidden="true" className="block text-[26px] font-[550] leading-[34px] tabular-nums tracking-[-0.025em]">
@@ -25,6 +25,6 @@ export default function DashboardHeader() {
         </span>
         <span aria-hidden="true" className="text-xs text-muted-foreground">İstanbul saati</span>
       </p>
-    </PageHeader>
+    }>{children}</PageTemplate>
   );
 }

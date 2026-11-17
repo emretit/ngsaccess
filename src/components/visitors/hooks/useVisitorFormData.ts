@@ -15,7 +15,9 @@ export interface VisitorFormData {
   visitPurpose: string;
   hostEmployeeId: Id<"employees"> | null;
   cardNumber: string;
-  presetRuleId: Id<"accessRules"> | null;
+  // ZoneDeviceTree seçimi; sunucu kapı setine göre ziyaretçi kuralını bulur ya da oluşturur.
+  selected_doors: string[];
+  selected_devices: string[];
   accessExpiresAt: string; // datetime-local (TR saati)
   isActive: boolean;
   notes: string;
@@ -32,7 +34,8 @@ const emptyForm = (projectId?: Id<"projects">): VisitorFormData => ({
   visitPurpose: "",
   hostEmployeeId: null,
   cardNumber: "",
-  presetRuleId: null,
+  selected_doors: [],
+  selected_devices: [],
   accessExpiresAt: defaultExpiryLocalInput(),
   isActive: true,
   notes: "",
@@ -47,7 +50,6 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
 
   const [initialData, setInitialData] = useState<VisitorFormData>(() => emptyForm(defaultProjectId));
 
-  const presetRulesData = useQuery(api.visitors.presetRules, !loading && defaultProjectId ? { projectId: defaultProjectId } : "skip");
   const [hostSearch, setHostSearch] = useState("");
   const [debouncedHostSearch, setDebouncedHostSearch] = useState("");
   useEffect(() => {
@@ -59,15 +61,8 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
     !loading && formData.projectId ? { projectId: formData.projectId, search: debouncedHostSearch } : "skip",
   );
 
-  const optionsLoading = presetRulesData === undefined;
   const hostsLoading = employeesData === undefined || hostSearch !== debouncedHostSearch;
 
-  const presetRules = (presetRulesData ?? [])
-    .filter((r) => r.isActive || r._id === visitor?.presetRuleId)
-    .map((r) => ({ id: r._id, name: !r.isActive ? `${r.name} (Pasif)` : r.hasDoors ? r.name : `${r.name} (Kapı yok)`, disabled: !r.isActive || !r.hasDoors }));
-  if (visitor?.presetRuleId && !presetRules.some(rule => rule.id === visitor.presetRuleId)) {
-    presetRules.push({ id: visitor.presetRuleId, name: visitor.presetRuleName ?? "Kayıtlı erişim bölgesi", disabled: true });
-  }
   const hostEmployees = (employeesData ?? []).map((e) => ({
     id: e._id,
     name: `${e.firstName} ${e.lastName}${e.isActive ? "" : " (Pasif)"}`,
@@ -88,7 +83,8 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
         hostEmployeeId: visitor.hostEmployeeId ?? null,
         // Maskeli, iade ve ön kayıt değerleri gerçek kart yerine kaydedilmez.
         cardNumber: visitor.sensitiveMasked || isVisitorCardPlaceholder(visitor.cardNumber) ? "" : visitor.cardNumber || "",
-        presetRuleId: visitor.presetRuleId ?? null,
+        selected_doors: [],
+        selected_devices: [],
         accessExpiresAt: visitor.visitEnd
           ? isoToLocalInput(visitor.visitEnd)
           : "",
@@ -109,5 +105,5 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visitor?._id, defaultProjectId]);
 
-  return { formData, setFormData, presetRules, hostEmployees, hostSearch, setHostSearch, hostsLoading, optionsLoading, isDirty: JSON.stringify(formData) !== JSON.stringify(initialData) };
+  return { formData, setFormData, hostEmployees, hostSearch, setHostSearch, hostsLoading, isDirty: JSON.stringify(formData) !== JSON.stringify(initialData) };
 };

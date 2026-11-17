@@ -36,28 +36,12 @@ vi.mock("@/hooks/useAsyncAction", () => ({
     pending: false,
   }),
 }));
-vi.mock("@/components/ui/dropdown-menu", () => {
-  const Wrapper = ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  );
-  return {
-    DropdownMenu: Wrapper,
-    DropdownMenuTrigger: Wrapper,
-    DropdownMenuContent: Wrapper,
-    DropdownMenuItem: ({
-      children,
-      onSelect,
-      disabled,
-    }: {
-      children: ReactNode;
-      onSelect: () => void;
-      disabled: boolean;
-    }) => {
-      state.select = disabled ? undefined : onSelect;
-      return <button disabled={disabled}>{children}</button>;
-    },
-  };
-});
+vi.mock("@/components/ui/button", () => ({
+  Button: ({ children, onClick, disabled }: { children: ReactNode; onClick: () => void; disabled: boolean }) => {
+    state.select = disabled ? undefined : onClick;
+    return <button disabled={disabled}>{children}</button>;
+  },
+}));
 vi.mock("@/components/shared/ConfirmAction", () => ({
   ConfirmAction: ({
     open,
@@ -92,8 +76,8 @@ beforeEach(() => {
   state.total = 3;
   state.start.mockReset().mockResolvedValue({ runId: "run" });
 });
-it("menü seçimi onayı açar, yalnız onaydan sonra proje gönderimini başlatır", async () => {
-  expect(render()).toContain("Diğer işlemler");
+it("Düğme onayı açar, yalnız onaydan sonra proje gönderimini başlatır", async () => {
+  expect(render()).toContain("Tüm cihazlara gönder");
   expect(state.send).toBeUndefined();
   expect(state.start).not.toHaveBeenCalled();
   state.select?.();
@@ -103,7 +87,7 @@ it("menü seçimi onayı açar, yalnız onaydan sonra proje gönderimini başlat
   expect(state.start).toHaveBeenCalledExactlyOnceWith({ projectId: "project" });
   expect(state.runId).toBe("run");
 });
-it("hedef cihaz yokken gönderim menü öğesini devre dışı bırakır", () => {
+it("hedef cihaz yokken gönderim düğmesini devre dışı bırakır", () => {
   state.total = 0;
   render();
   expect(state.select).toBeUndefined();

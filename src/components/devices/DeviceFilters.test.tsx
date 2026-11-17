@@ -22,3 +22,10 @@ it.each([0, 2])("keeps FIELD labels and clear visible for %s results", deviceCou
   expect(html).toContain("Filtreleri temizle");
   expect(html).not.toContain("]:hidden");
 });
+
+it("summarizes search, location, connection and type while advanced filters are folded", () => {
+  const html = renderToStaticMarkup(<DeviceFilters search="Panel" onSearchChange={() => {}} locationActive statusCounts={{ all: 2, online: 1, offline: 1, never: 0 }} typeCounts={{ Turnike: 2 }} statusFilter="online" onStatusFilterChange={() => {}} typeFilter="Turnike" onTypeFilterChange={() => {}} deviceTypes={["Turnike"]} onAddNew={() => {}} onAddFromCloud={() => {}} onClearFilters={() => {}} deviceCount={2} />);
+  expect(html).toContain("Filtreler (4)");
+  expect(html).toContain('aria-expanded="false"');
+  expect(html).toContain("Filtreleri temizle");
+});

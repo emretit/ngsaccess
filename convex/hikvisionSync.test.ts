@@ -258,7 +258,7 @@ it.each([false, true])("sync hook shares the graph query and rechecks the person
   const data = await f.t.query(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: f.employeeId });
   expect(data?.hasFingerprintTemplates).toBe(hasTemplates);
   const runQuery = vi.fn(async (reference: unknown) => getFunctionName(reference as typeof internal.hikvisionSync.getEmployeeWithDevices) === "hikvisionSync:getEmployeeDeliveryState" ? data?.employee : data);
-  const runMutation = vi.fn(async () => null);
+  const runMutation = vi.fn(async (reference: unknown) => getFunctionName(reference as typeof internal.hikvisionSync.beginGatewayGrants) === "hikvisionSync:beginGatewayGrants" ? [] : null);
   const runAfter = vi.fn(async () => null);
   const { syncEmployeeToDevicesInternal } = await import("./actions/hikvisionSync");
   const handler = (syncEmployeeToDevicesInternal as unknown as { _handler: (ctx: unknown, input: object) => Promise<unknown> })._handler;
@@ -412,4 +412,45 @@ it("cardless gateway people upsert normally and replay fingerprints without addi
   expect(wire.remove).not.toHaveBeenCalled();
   const jobs = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
   expect(jobs.some(job => job.name === "actions/hikFingerprint:pushFingerprintToDevices")).toBe(true);
+});
+
+it("a delayed gateway action cannot replace a newer removed grant", async () => {
+  const f = await fixture();
+  const { upsertGrantStatus } = await import("./lib/grantStatus");
+  let release: (() => void) | undefined;
+  let started: (() => void) | undefined;
+  const entered = new Promise<void>(resolve => { started = resolve; });
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  wire.person.mockImplementationOnce(async () => {
+    started?.();
+    await blocked;
+    return { ok: true };
+  });
+  const syncing = f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId });
+  await entered;
+  try {
+    await f.t.run(ctx => upsertGrantStatus(ctx, { projectId: f.projectId, employeeId: f.employeeId, deviceId: f.deviceId, state: "removed" }));
+  } finally { release?.(); }
+  await syncing;
+  expect((await f.t.run(ctx => ctx.db.query("accessGrantStatus").first()))?.state).toBe("removed");
+});
+
+
+it("a throw after reservation marks the matching grant failed", async () => {
+  const f = await fixture();
+  const handler = (actions.syncEmployeeToDevicesInternal as unknown as { _handler: (ctx: ActionCtx, args: { employeeId: typeof f.employeeId }) => Promise<unknown> })._handler;
+  await expect(f.t.action(ctx => handler({ ...ctx,
+    runMutation: new Proxy(ctx.runMutation, { apply(target, thisArg, args: Parameters<ActionCtx["runMutation"]>) {
+      if (getFunctionName(args[0]) === "hikvisionSync:assignWeekPlanNo") return Promise.reject(new Error("reservation test failure"));
+      return Reflect.apply(target, thisArg, args);
+    } }),
+  }, { employeeId: f.employeeId }))).rejects.toThrow("reservation test failure");
+  expect((await f.t.run(ctx => ctx.db.query("accessGrantStatus").first()))?.state).toBe("failed");
+});
+
+it("a failed prepared employee batch settles reserved grants", async () => {
+  const f = await fixture();
+  wire.person.mockRejectedValueOnce(new Error("batch delivery failure"));
+  await expect(f.t.action(internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: f.r1 })).rejects.toThrow("batch delivery failure");
+  expect((await f.t.run(ctx => ctx.db.query("accessGrantStatus").first()))?.state).toBe("failed");
 });

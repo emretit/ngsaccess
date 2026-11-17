@@ -1,5 +1,6 @@
 import { canSeePayInProject, maskPay } from "./lib/payVisibility";
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
@@ -310,11 +311,17 @@ export const getEnabledSchedules = internalQuery({
 });
 
 export const getReportSummaryForEmail = internalQuery({
-  args: { scheduleId: v.id("reportScheduleSettings"), year: v.number(), month: v.number() },
+  args: { scheduleId: v.id("reportScheduleSettings"), year: v.number(), month: v.number(), deliveryId: v.optional(v.id("reportDeliveries")) },
   handler: async (ctx, args) => {
     reportPeriod(args.year, args.month);
     const schedule = await ctx.db.get(args.scheduleId);
     if (!schedule?.enabled) return null;
+    if (args.deliveryId) {
+      const delivery = await ctx.db.get(args.deliveryId);
+      if (!delivery || delivery.scheduleId !== schedule._id || delivery.year !== args.year ||
+          delivery.month !== args.month || delivery.status !== "sending" ||
+          !matchesDelivery(schedule, delivery)) return null;
+    }
     const scope = await resolveScheduleScope(ctx, schedule);
     if (!scope) return null;
     const labels: Record<string, string> = {
@@ -333,12 +340,90 @@ export const getReportSummaryForEmail = internalQuery({
   },
 });
 
-export const markReportSent = internalMutation({
-  args: { scheduleId: v.id("reportScheduleSettings") },
-  handler: async (ctx, args) => {
+const REPORT_MAX_ATTEMPTS = 3;
+const REPORT_UNKNOWN_AFTER_MS = 60 * 60 * 1000;
+
+function matchesDelivery(schedule: Doc<"reportScheduleSettings">, delivery: Doc<"reportDeliveries">) {
+  return schedule.enabled && schedule.updatedAt === delivery.scheduleUpdatedAt &&
+    schedule.email === delivery.email && schedule.reportType === delivery.reportType &&
+    schedule.projectId === delivery.projectId;
+}
+
+/** A transactional period claim prevents concurrent cron/retry actions from double sending. */
+export const claimReportDelivery = internalMutation({
+  args: { scheduleId: v.id("reportScheduleSettings"), year: v.number(), month: v.number() },
+  handler: async (ctx, args): Promise<Doc<"reportDeliveries"> | null> => {
+    reportPeriod(args.year, args.month);
+    const now = Date.now();
+    const existing = await ctx.db.query("reportDeliveries")
+      .withIndex("by_scheduleId_and_year_and_month", q =>
+        q.eq("scheduleId", args.scheduleId).eq("year", args.year).eq("month", args.month)).unique();
+    if (existing?.status === "sending" && now - existing.lastAttemptAt >= REPORT_UNKNOWN_AFTER_MS) {
+      await ctx.db.patch(existing._id, { status: "failed", error: "outcome_unknown", nextRetryAt: undefined });
+      return null;
+    }
+    if (existing && (existing.status !== "retryScheduled" || existing.attempts >= REPORT_MAX_ATTEMPTS ||
+        (existing.nextRetryAt ?? Infinity) > now)) return null;
     const schedule = await ctx.db.get(args.scheduleId);
-    if (!schedule?.enabled || !await resolveScheduleScope(ctx, schedule)) return;
-    await ctx.db.patch(schedule._id, { lastSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    if (!schedule?.enabled || (existing && !matchesDelivery(schedule, existing)) ||
+        !await resolveScheduleScope(ctx, schedule)) {
+      if (existing) await ctx.db.patch(existing._id, { status: "skipped", error: "schedule_changed_or_inaccessible", nextRetryAt: undefined });
+      return null;
+    }
+    let deliveryId;
+    if (existing) {
+      deliveryId = existing._id;
+      await ctx.db.patch(deliveryId, { status: "sending", attempts: existing.attempts + 1,
+        lastAttemptAt: now, nextRetryAt: undefined, error: undefined });
+    } else {
+      deliveryId = await ctx.db.insert("reportDeliveries", { ...args,
+        scheduleUpdatedAt: schedule.updatedAt, email: schedule.email, reportType: schedule.reportType,
+        projectId: schedule.projectId, status: "sending", attempts: 1, lastAttemptAt: now });
+    }
+    const delivery = await ctx.db.get(deliveryId);
+    if (delivery) await ctx.scheduler.runAfter(REPORT_UNKNOWN_AFTER_MS, internal.reports.expireReportDelivery, {
+      deliveryId, attempt: delivery.attempts,
+    });
+    return delivery;
+  },
+});
+
+/** Never blindly resend a mail whose external outcome was lost after a process failure. */
+export const expireReportDelivery = internalMutation({
+  args: { deliveryId: v.id("reportDeliveries"), attempt: v.number() },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.deliveryId);
+    if (row?.status === "sending" && row.attempts === args.attempt &&
+        Date.now() - row.lastAttemptAt >= REPORT_UNKNOWN_AFTER_MS) {
+      await ctx.db.patch(row._id, { status: "failed", error: "outcome_unknown", nextRetryAt: undefined });
+    }
+  },
+});
+
+export const finishReportDelivery = internalMutation({
+  args: { deliveryId: v.id("reportDeliveries"), attempt: v.number(),
+    outcome: v.union(v.literal("sent"), v.literal("failed"), v.literal("skipped")), error: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.deliveryId);
+    if (!row || row.status !== "sending" || row.attempts !== args.attempt) return;
+    const now = Date.now();
+    if (args.outcome === "sent") {
+      await ctx.db.patch(row._id, { status: "sent", sentAt: now, error: undefined, nextRetryAt: undefined });
+      const schedule = await ctx.db.get(row.scheduleId);
+      // Record the actual recipient/version, without marking a changed schedule as sent.
+      if (schedule && matchesDelivery(schedule, row)) {
+        await ctx.db.patch(schedule._id, { lastSentAt: new Date(now).toISOString() });
+      }
+    } else if (args.outcome === "failed" && row.attempts < REPORT_MAX_ATTEMPTS) {
+      const delay = row.attempts === 1 ? 60_000 : 300_000;
+      await ctx.db.patch(row._id, { status: "retryScheduled", error: args.error?.slice(0, 1000),
+        nextRetryAt: now + delay });
+      await ctx.scheduler.runAfter(delay, internal.actions.sendScheduledReports.sendReportDelivery, {
+        scheduleId: row.scheduleId, year: row.year, month: row.month,
+      });
+    } else {
+      await ctx.db.patch(row._id, { status: args.outcome, error: args.error?.slice(0, 1000), nextRetryAt: undefined });
+    }
   },
 });
 

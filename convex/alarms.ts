@@ -59,7 +59,7 @@ export const list = authedQuery({
     const devices = (await Promise.all(deviceIds.map(id => ctx.db.get(id)))).filter((device): device is NonNullable<typeof device> => device !== null);
     const deviceMap = new Map(devices.map(device => [device._id, device]));
     return { ...result, page: result.page.map(event => {
-      const { alarmEmailRecipients: _recipients, cardNo, rawData, ...safeEvent } = event;
+      const { alarmEmailRecipients: _recipients, alarmEmailContent: _content, cardNo, rawData, ...safeEvent } = event;
       return { ...safeEvent, offlineDurationMs: offlineDuration(rawData), ...(canReadEmployees ? { cardNo, rawData } : {}), deviceName: event.deviceId ? deviceMap.get(event.deviceId)?.name ?? "Cihaz bulunamadı" : "—" };
     }), scannedCount, scanLimitReached: result.pageStatus === "SplitRequired" };
   },
@@ -188,6 +188,19 @@ export const claimEmail = internalMutation({
     await ctx.db.patch(event._id, { alarmEmailStatus: "sending", alarmEmailAttempts: args.attempt, alarmEmailAttemptAt: now, alarmEmailRetryAt: undefined, updatedAt: now });
     await ctx.scheduler.runAfter(10 * 60_000, internal.alarms.recoverEmail, { eventId: event._id, attempt: args.attempt });
     return { event, device: event.deviceId ? await ctx.db.get(event.deviceId) : null, recipients };
+  },
+});
+
+/** One immutable message body for every retry of the same logical delivery. */
+export const freezeEmailContent = internalMutation({
+  args: { eventId: v.id("deviceEvents"), content: v.object({ from: v.string(), subject: v.string(), html: v.string() }) },
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId);
+    if (!event || event.alarmEmailStatus !== "sending") return null;
+    if (event.alarmEmailContent) return event.alarmEmailContent;
+    if (args.content.from.length > 320 || args.content.subject.length > 500 || args.content.html.length > 16000) throw new Error("Alarm e-posta içeriği çok büyük");
+    await ctx.db.patch(event._id, { alarmEmailContent: args.content });
+    return args.content;
   },
 });
 

@@ -3,12 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { AssignmentEditDialog } from './AssignmentEditDialog';
 import type { Assignment, DepartmentAssignment } from './lib/planning';
-import type { BulkAssignmentFormValues } from './assignmentFormSchema';
 import { DEFAULT_WORKING_DAYS } from './lib/planning';
 
-const state = vi.hoisted(() => ({ pattern: undefined as BulkAssignmentFormValues | undefined }));
 vi.mock('convex/react', () => ({ useMutation: () => vi.fn() }));
-vi.mock('./AssignmentPatternEditor', () => ({ AssignmentPatternEditor: ({ values }: { values: BulkAssignmentFormValues }) => { state.pattern = values; return null; } }));
 vi.mock('./ShiftSelect', () => ({ ShiftSelect: () => null }));
 vi.mock('@/components/shared/UnsavedChangesDialog', () => ({ useUnsavedChangesGuard: () => ({ dialog: null, requestClose: vi.fn() }) }));
 vi.mock('@/components/shared/ConfirmDestructive', () => ({ ConfirmDestructive: () => null }));
@@ -20,20 +17,21 @@ const assignment = { _id: 'assignment', employeeId: 'person', shiftId: 'shift', 
 const department = { _id: 'departmentAssignment', departmentId: 'department', shiftId: 'shift', startDate: assignment.startDate, endDate: assignment.endDate } as DepartmentAssignment;
 
 describe('Eski haftalık atama düzenlemesi', () => {
-  it('plansız kişi satırı Pzt–Cum seçili açılır', () => {
+  it('plansız kişi satırı kayıtlı günleri salt okunur gösterir', () => {
     const html = renderToStaticMarkup(<AssignmentEditDialog open onOpenChange={() => {}} assignment={assignment} shifts={[]} shiftName="Gündüz" employeeName="Ada" />);
-    expect(html.match(/checked=""/g)).toHaveLength(5);
-    expect(html.match(/type="checkbox"/g)).toHaveLength(7);
+    expect(html).not.toContain('aria-label="Çalışma günleri"');
+    expect(html).toContain('Süresiz');
+    expect(html).toContain("Pzt, Sal, Çar, Per, Cum");
     expect(html).not.toContain('Belirli günler');
-    expect(html).toContain('Seçilmeyen günler hafta tatili sayılır.');
+    expect(html).not.toContain('Atama deseni');
   });
   it.each([assignment, department])('kayıtlı boş pattern kişi ve departmanda Pzt–Cum olur ($._id)', row => {
-    renderToStaticMarkup(<AssignmentEditDialog open onOpenChange={() => {}} assignment={{ ...row, weekPattern: [], plan: { kind: 'weekly', shiftIds: [row.shiftId] } }} shifts={[]} shiftName="Gündüz" employeeName="Ada" />);
-    expect(state.pattern?.weekPattern).toEqual(DEFAULT_WORKING_DAYS);
-    expect(state.pattern).not.toHaveProperty('specificDays');
+    const html = renderToStaticMarkup(<AssignmentEditDialog open onOpenChange={() => {}} assignment={{ ...row, weekPattern: [], plan: { kind: 'weekly', shiftIds: [row.shiftId] } }} shifts={[]} shiftName="Gündüz" employeeName="Ada" />);
+    expect(html).toContain("Pzt, Sal, Çar, Per, Cum");
+    expect(html).not.toContain("Atama deseni");
   });
   it('kayıtlı yedi gün seçimini korur', () => {
-    renderToStaticMarkup(<AssignmentEditDialog open onOpenChange={() => {}} assignment={{ ...department, weekPattern: [...DEFAULT_WORKING_DAYS, 'SAT', 'SUN'] }} shifts={[]} shiftName="Gündüz" employeeName="Ada" />);
-    expect(state.pattern?.weekPattern).toHaveLength(7);
+    const html = renderToStaticMarkup(<AssignmentEditDialog open onOpenChange={() => {}} assignment={{ ...department, weekPattern: [...DEFAULT_WORKING_DAYS, 'SAT', 'SUN'] }} shifts={[]} shiftName="Gündüz" employeeName="Ada" />);
+    expect(html).toContain("Pzt, Sal, Çar, Per, Cum, Cmt, Paz");
   });
 });

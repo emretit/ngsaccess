@@ -217,7 +217,7 @@ export default function CreateRuleDialog({
           <div className="px-4 py-2 border-t text-xs text-muted-foreground break-words">
             {formData.target_type === "visitor"
               ? "Ziyaretçi üyelikleri korunur"
-              : `${formData.selected_employees.length} kişi`}{" "}
+              : `${formData.selected_employees.length} kişi${formData.department_selections?.length ? ` elle seçili · ${formData.department_selections.length} departman otomatik` : ""}`}{" "}
             · {doorsLoading ? "Kapılar yükleniyor…" : doorScope} ·{" "}
             {`${ruleDaysSummary(formData.days)} ${formData.start_time || formData.end_time ? `${formData.start_time}–${formData.end_time}` : "tüm gün"}`}
           </div>

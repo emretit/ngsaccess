@@ -1,3 +1,5 @@
+import { reconcileEmployeeDepartmentRules } from "./lib/departmentAccess";
+import { recordDepartmentChange } from "./lib/employeeDepartmentHistory";
 import { syncPlanRefs } from "./lib/shiftAssign";
 import { writeAudit } from "./lib/audit";
 import { toUtcISO, trDateKey, trDayRangeISO, trTodayKey } from "./lib/trDate";
@@ -90,7 +92,10 @@ export async function upsertGroupMembership(
     )
     .filter((q) => q.eq(q.field("groupId"), accessRuleId))
     .first();
-  if (existing) return false;
+  if (existing) {
+    if (existing.source === "department") await ctx.db.patch(existing._id, { source: "manual" });
+    return false;
+  }
   await ctx.db.insert("groupMembers", {
     groupId: accessRuleId,
     employeeId,
@@ -269,6 +274,8 @@ export const create = authedMutation({
       targetId: id, newValue: { accessStartsAt: normalizeEmployeeAccessStart(args.accessStartsAt) }, note: "Erişim başlangıcı",
     });
     await upsertGroupMembership(ctx, id, args.accessRuleId, args.projectId);
+    await recordDepartmentChange(ctx, id);
+    await reconcileEmployeeDepartmentRules(ctx, id);
     // DB import gibi UI dışı insert akışlarında da push tetiklensin diye burada (idempotent).
     await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
       employeeId: id,
@@ -384,6 +391,7 @@ export const update = authedMutation({
       : reactivating ? { deactivatedAt: undefined } : {};
     await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, ...activityDates, updatedAt: new Date().toISOString() });
     if (deactivating) await revokeEmployeeSessions(ctx, employeeId);
+    if (updates.departmentId !== undefined || updates.companyId !== undefined) await recordDepartmentChange(ctx, employeeId, emp);
     if (emp.photoStorageId && (updates.photoStorageId !== undefined || updates.photoUrl === null)) {
       await deleteUnusedEmployeePhoto(ctx, emp.photoStorageId);
     }
@@ -407,6 +415,7 @@ export const update = authedMutation({
       updates.accessRuleId,
       emp.projectId,
     );
+    if (updates.departmentId !== undefined || updates.isActive !== undefined) await reconcileEmployeeDepartmentRules(ctx, employeeId);
 
     const cardChanged =
       updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber;
@@ -537,7 +546,11 @@ export const bulkUpdateDepartment = authedMutation({
       assertEmployeeRecord(emp);
     }
     for (const emp of employees) {
-      if (emp) await ctx.db.patch(emp._id, { departmentId: dept._id, updatedAt: new Date().toISOString() });
+      if (emp) {
+        await ctx.db.patch(emp._id, { departmentId: dept._id, updatedAt: new Date().toISOString() });
+        await recordDepartmentChange(ctx, emp._id, emp);
+        await reconcileEmployeeDepartmentRules(ctx, emp._id);
+      }
     }
     return { updatedCount: employees.length };
   },

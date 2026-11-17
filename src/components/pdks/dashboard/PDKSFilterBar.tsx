@@ -28,6 +28,7 @@ export function clearPdksFilters(values: FilterValues): FilterValues {
     companyId: undefined,
     departmentId: undefined,
     positionId: undefined,
+    shiftId: undefined,
     statusFilter: "all",
   };
 }
@@ -55,7 +56,7 @@ export function PDKSFilterBar({
   onChange: (values: FilterValues) => void;
   onClear?: () => void;
 }) {
-  const { departments, companies, positions } = usePdksFilterOptions();
+  const { departments, companies, positions, shifts } = usePdksFilterOptions();
 
   return (
     <CollapsibleFilters>
@@ -68,6 +69,7 @@ export function PDKSFilterBar({
         values.companyId ||
         values.departmentId ||
         values.positionId ||
+        values.shiftId ||
         values.statusFilter !== "all",
       )}
       onClear={() => {
@@ -83,6 +85,9 @@ export function PDKSFilterBar({
       </FilterSelect>
       <FilterSelect label="Pozisyon" value={values.positionId ?? "all"} onValueChange={value => onChange({ ...values, positionId: value === "all" ? undefined : value as Id<"positions"> })}>
         <OptionItems all="Tüm pozisyonlar" loading="Pozisyonlar yükleniyor…" selected={values.positionId} items={positions} />
+      </FilterSelect>
+      <FilterSelect label="Vardiya" value={values.shiftId ?? "all"} onValueChange={value => onChange({ ...values, shiftId: value === "all" ? undefined : value as Id<"shifts"> })}>
+        <OptionItems all="Tüm vardiyalar" loading="Vardiyalar yükleniyor…" selected={values.shiftId} items={shifts} />
       </FilterSelect>
       <FilterSelect label="Durum" value={values.statusFilter} onValueChange={value => onChange({ ...values, statusFilter: value as StatusFilter })}>
         {Object.entries(STATUS_FILTER_LABELS).map(([key, label]) => <SelectItem key={key} value={key}>{key === "all" ? "Tüm durumlar" : label}</SelectItem>)}

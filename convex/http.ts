@@ -461,11 +461,11 @@ http.route({
     const device = await ctx.runQuery(internal.devices.getByApiToken, { token });
     if (!device || device.hikTransport !== "localBridge") return jsonResponse({ ok: false, error: "unauthorized" }, 401);
     return handleBridgeInput(async () => {
-      const body = await readBridgeBody(request, z.object({ opId: z.string().min(1), ok: z.boolean(), message: z.string().nullable().optional() }));
+      const body = await readBridgeBody(request, z.object({ opId: z.string().min(1), attempt: z.number().int().nonnegative().optional(), ok: z.boolean(), message: z.string().nullable().optional() }));
       const opId = await ctx.runQuery(internal.http.normalizeOperationId, { table: "hikPendingOperations", id: body.opId });
       if (!opId) throw new HttpInputError(400, "Geçerli bir komut kimliği gönderin.");
-      const result = await ctx.runMutation(internal.hikvisionSync.ackLocalBridgeOperation, { token, opId: opId as Id<"hikPendingOperations">, ok: body.ok, message: body.message ?? undefined });
-      return jsonResponse(result, result.ok ? 200 : result.error === "unauthorized" ? 401 : 404);
+      const result = await ctx.runMutation(internal.hikvisionSync.ackLocalBridgeOperation, { token, opId: opId as Id<"hikPendingOperations">, ok: body.ok, attempt: body.attempt, message: body.message ?? undefined });
+      return jsonResponse(result, result.ok ? 200 : result.error === "stale attempt" ? 409 : result.error === "unauthorized" ? 401 : 404);
     });
   }),
 });

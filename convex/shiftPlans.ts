@@ -46,6 +46,7 @@ async function prepare(ctx: ReadCtx, args: DepartmentInput, excludeId?: Id<"depa
     const workToRestDates: string[] = [];
     if (ownsSameDate) for (let date = coveredStart; date <= coveredEnd; date = shiftDateOffset(date, 1)) {
       if (slotForDate(other, date)?.length && slotForDate(row, date)?.length === 0) workToRestDates.push(date);
+      if (date === coveredEnd) break;
     }
     if (ownsSameDate || intervalsOverlap(intervals, scheduleIntervals(range, shift, shifts))) sameDepartmentConflicts.push({
       departmentAssignmentId: other._id, departmentId: other.departmentId, shiftId: other.shiftId,
@@ -59,7 +60,10 @@ async function prepare(ctx: ReadCtx, args: DepartmentInput, excludeId?: Id<"depa
   const employees = bounded(await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(ASSIGNMENT_SCAN_LIMIT + 1))
     .filter(employee => departmentChain(employee.departmentId, employee.projectId, departments).includes(args.departmentId));
   const days: string[] = [];
-  for (let date = args.startDate; date <= args.endDate; date = shiftDateOffset(date, 1)) if (slotForDate(row, date) !== null) days.push(date);
+  for (let date = args.startDate; date <= args.endDate; date = shiftDateOffset(date, 1)) {
+    if (slotForDate(row, date) !== null) days.push(date);
+    if (date === args.endDate) break;
+  }
   const touched = new Set<string>();
   for (const [start, end] of intervals) for (let day = Math.floor(start / 1440); day * 1440 < end; day++) touched.add(new Date(day * 86_400_000).toISOString().slice(0, 10));
   let remaining = ASSIGNMENT_SCAN_LIMIT;
@@ -181,6 +185,7 @@ export const planCells = authedQuery({
           ...(plan.departmentId ? { departmentId: plan.departmentId } : {}),
         }),
       });
+      if (date === args.rangeEnd) break;
     }
     return cells;
   },

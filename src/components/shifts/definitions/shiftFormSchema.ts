@@ -1,20 +1,24 @@
 import { errorMessage } from "@/lib/notify";
 import { validateShift } from "../../../../convex/lib/shiftUx";
+import { validateShiftSchedule } from "../../../../convex/lib/shiftSchedule";
 import { z } from "zod";
 
+const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+const flexibleTimeSchema = z.string().regex(TIME_REGEX, "HH:MM formatında olmalı");
+
 export const flexibleFormSchema = z.object({
-  requiredNetMinutes: z.number({ message: "Hedef süre dakika olmalıdır" }),
-  checkInStart: z.string(), checkInEnd: z.string(), checkOutStart: z.string(), checkOutEnd: z.string(),
+  requiredNetMinutes: z.number({ message: "Hedef süre dakika olmalıdır" }).int("Hedef süre pozitif tam sayı dakika olmalıdır").positive("Hedef süre pozitif tam sayı dakika olmalıdır"),
+  checkInStart: flexibleTimeSchema, checkInEnd: flexibleTimeSchema, checkOutStart: flexibleTimeSchema, checkOutEnd: flexibleTimeSchema,
   checkOutEndDayOffset: z.union([z.literal(0), z.literal(1)]),
-  maxSpanMinutes: z.number({ message: "Azami oturum dakika olmalıdır" }),
+  maxSpanMinutes: z.number({ message: "Azami oturum dakika olmalıdır" }).int("Azami oturum 1–1440 arasında tam sayı dakika olmalıdır").min(1, "Azami oturum 1–1440 arasında tam sayı dakika olmalıdır").max(1440, "Azami oturum 1–1440 arasında tam sayı dakika olmalıdır"),
   breakMode: z.enum(["duration", "existingLegal"]),
   breakMinutes: z.number({ message: "Mola süresi dakika olmalıdır" }).optional(),
 });
 
-const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
-
 const rawShiftFormSchema = z
   .object({
+    scheduleMode: z.enum(["daily", "weekly", "cycle"]).optional(),
+    dayPlan: z.array(z.boolean()).max(31).optional(),
     name: z.string().trim().min(1, "Vardiya adı gereklidir").max(100),
     scheduleType: z.enum(["fixed", "flexible"]).optional(),
     flexible: flexibleFormSchema.optional(),
@@ -63,6 +67,10 @@ const rawShiftFormSchema = z
     isActive: z.boolean(),
   })
   .superRefine((data, ctx) => {
+    // Validate combined rules after individual fields pass, so their errors stay attached to the right controls.
+    if (ctx.issues.length > 0) return;
+    try { validateShiftSchedule(data); }
+    catch (error: unknown) { ctx.addIssue({ code: "custom", message: errorMessage(error), path: ["dayPlan"] }); }
     try {
       validateShift({
         ...data,
@@ -91,6 +99,7 @@ export const shiftFormSchema = z.preprocess((input: unknown) => {
     // Hidden fixed fields never block a switch to a flexible definition.
     return { ...input, validWindow: undefined, absentAfterLateMinutes: undefined, missingCheckInLateMinutes: undefined, startTime: "00:00", endTime: "00:00", breakStart: "", breakEnd: "", lateToleranceMinutes: undefined, earlyExitToleranceMinutes: undefined };
   }
+  if (typeof input === "object" && input !== null) return { ...input, flexible: undefined };
   return input;
 }, rawShiftFormSchema);
 export type ShiftFormValues = z.infer<typeof shiftFormSchema>;

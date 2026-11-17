@@ -11,12 +11,13 @@ import type { Id } from "../_generated/dataModel";
 import { buildIdePermissionRecord, capPermissionNos, ideUserAccessWindow, outOfRangeIoIds } from "../ideSync";
 
 /** Audit only executed commands; never persist gateway payloads or card lists. */
-async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; error?: string }>(
-  ctx: GenericActionCtx<DataModel>,
+async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; error?: string; operationId?: string }>(
+  ctx: GenericActionCtx<DataModel> & { user?: { _id: Id<"users"> } },
   deviceId: Id<"devices">,
   label: string,
   run: () => Promise<T>,
   summarize?: (result: T) => string | undefined,
+  command?: { doorId?: Id<"doors">; channel?: number },
 ): Promise<T> {
   let result: T;
   try {
@@ -25,6 +26,7 @@ async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; err
     try {
       await ctx.runMutation(internal.deviceEvents.recordOperationInternal, {
         deviceId, label: `${label}: başarısız`, ok: false,
+        actorId: ctx.user?._id, ...command,
         summary: (error instanceof Error ? error.message : "Bilinmeyen hata").replace(/\d{6,}/g, "…").slice(0, 200),
       });
     } catch {
@@ -37,6 +39,7 @@ async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; err
       deviceId,
       label: `${label}: ${result.ok ? result.queued ? "sıraya alındı" : "komut iletildi" : "başarısız"}`,
       ok: result.ok,
+      actorId: ctx.user?._id, ...command, queued: result.queued, operationId: result.operationId,
       summary: result.ok ? summarize?.(result) : result.error?.replace(/\d{6,}/g, "…").slice(0, 200),
     });
   } catch {
@@ -406,16 +409,17 @@ export const openIdeDoor = authedAction({
     const keep: 0 | 1 = args.keep === 0 ? 0 : 1;
 
     // Komut kuyruğa gider, bridge broker'a publish eder (panel LAN'da, MQTT ile bağlı).
-    return await auditDeviceCommand(ctx, args.deviceId, "Kapı aç", async () => {
-      await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+    const { operationId: _operationId, ...result } = await auditDeviceCommand(ctx, args.deviceId, "Kapı aç", async () => {
+      const operationId = await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
         deviceId: device._id,
         projectId: device.projectId,
         opType: "openDoor",
         payload: { ioId: door.ioId, keep, expiresAt: Date.now() + 30_000 },
         maxAttempts: 1,
       });
-      return { ok: true, queued: true };
-    });
+      return { ok: true, queued: true, operationId: String(operationId) };
+    }, undefined, { doorId: door._id, channel: door.ioId });
+    return result;
   },
 });
 

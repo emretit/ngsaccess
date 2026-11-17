@@ -26,6 +26,9 @@ describe("kullanılan erişim kuralı form şeması", () => {
         .success,
     ).toBe(false);
   });
+  it("henüz çalışanı olmayan dinamik departman seçimini kabul eder", () => {
+    expect(accessRuleSchema.safeParse({ ...input, targetType: "individual", selectedDepartments: [{ departmentId: "department", includeChildren: true }] }).success).toBe(true);
+  });
   it.each([
     { days: [] },
     { startTime: "09:00" },

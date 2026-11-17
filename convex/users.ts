@@ -1,3 +1,4 @@
+import { writeAudit } from "./lib/audit";
 import { accessBlockReason } from "./lib/accountAccess";
 import { hasOtherActiveAdmin, getProjectIdsWithPermission, membershipRole, requirePermission } from "./lib/permissions";
 import { projectRoleValidator, legacyRoleToProjectRole, type ProjectRole } from "./lib/roleCatalog";
@@ -131,6 +132,10 @@ export const updateRole = superAdminMutation({
       ...(args.role === "super_admin" || target.role === "super_admin" ? { role: args.role } : {}),
       updatedAt: new Date().toISOString(),
     });
+    await writeAudit(ctx, { user: ctx.user, action: "update", targetTable: "users", targetId: args.userId,
+      oldValue: { role: target.role, projectIds: memberships.map(row => row.projectId) },
+      newValue: { role: args.role === "super_admin" || target.role === "super_admin" ? args.role : target.role, requestedRole: args.role, projectIds: args.projectIds ?? memberships.map(row => row.projectId) },
+      note: "Platform rolü ve proje üyelikleri güncellendi" });
     return null;
   },
 });

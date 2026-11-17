@@ -97,7 +97,7 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
     const raw = flexible ? await readReportReadings(ctx, [projectId], startISO, endISO, { policies, raw: true }) : [];
     const workDate = buildPdksWorkDateResolver(allEmployees.filter(e => employedDuring(e, startDate, endDate)), (id, date) => { const shift = shiftResolver.resolve(id, date); return shift?.projectId === projectId || shift?.scheduleType === "flexible" && !shift.projectId ? shift : null; }, flexible ? {
       readings: raw, manualEntryFor: (id, date) => manualEntries.get(`${id}__${date}`)?.entryTime,
-      eligibleEntry: reading => filterPdksReadings([reading], projectId, r => policies(projectId, trDateKey(r.accessTime))).length > 0,
+      eligibleEntry: (reading, date) => filterPdksReadings([reading], projectId, r => policies(projectId, date ?? trDateKey(r.accessTime))).length > 0,
     } : undefined, (_reading, date) => policies(projectId, date), (id, date) => { const shift = shiftResolver.resolveLast(id, date); return shift?.projectId === projectId || shift?.scheduleType === "flexible" && !shift.projectId ? shift : null; });
     const readings = flexible ? filterPdksReadings(raw, projectId, r => policies(projectId, workDate(r))) : await readReportReadings(ctx, [projectId], startISO, endISO, { policies, workDate });
     const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
@@ -319,7 +319,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     }
     const flexibleWorkDate = flexible ? buildPdksWorkDateResolver(allEmployees, shifts.resolve, {
       readings: raw, manualEntryFor: (id, date) => manualEntries.get(`${id}__${date}`)?.entryTime,
-      eligibleEntry: reading => filterPdksReadings([reading], projectId, r => policies(projectId, trDateKey(r.accessTime))).length > 0,
+      eligibleEntry: (reading, date) => filterPdksReadings([reading], projectId, r => policies(projectId, date ?? trDateKey(r.accessTime))).length > 0,
     }, (_reading, date) => policies(projectId, date), shifts.resolveLast) : boundaryWorkDate;
     const employeesById = new Map(allEmployees.map(employee => [employee._id, employee]));
     const employeesByCard = new Map(allEmployees.map(employee => [employee.cardNumber, employee]));

@@ -27,6 +27,7 @@ describe('UserSetup', () => {
     ['INVITE_EMAIL_MISMATCH', 'Oturum açtığınız hesabın e-posta adresi davetle eşleşmiyor.'],
     ['INVITE_WRONG_TYPE', 'Bu bağlantı hesap daveti değil.'],
     ['INVITE_INVALID', 'Davet kullanılmış veya süresi dolmuş olabilir.'],
+    ['INVITE_CLAIM_EXPIRED', 'Kurulum süresi doldu, lütfen tekrar deneyin.'],
     ['INVITE_ACCOUNT_EXISTS', "Bu e-postayla doğrulanmış bir hesap var; 'Mevcut hesabım var' ile giriş yapın."],
     ['INVITE_WEAK_PASSWORD', 'Şifre en az 8 karakter, büyük harf, küçük harf ve rakam içermelidir.'],
   ])('maps %s to fixed Turkish recovery copy', (code, message) => {

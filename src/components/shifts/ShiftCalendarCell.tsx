@@ -47,7 +47,7 @@ export function ShiftCalendarCell({
   const ariaLabel = [employeeName, dayLabel(date), rest ? "Hafta tatili" : records.length ? `${records.length} atama: ${records.map(({ shift }) => shift.name).join(", ")}` : "atama yok",
     sourceLabel, rest || records.length ? "ayrıntıları aç" : canAssign ? "vardiya ata" : "günü aç"].filter(Boolean).join(", ");
   return (
-    <div title={title || undefined} data-source={source} data-kind={data.resolved?.cell.kind} style={rest ? { backgroundImage: "repeating-linear-gradient(135deg, transparent, transparent 4px, hsl(var(--border)) 4px, hsl(var(--border)) 5px)" } : undefined} className={`group relative rounded text-left text-xs break-words hover:bg-subtle ${source === "department" ? "border border-dashed" : ""} ${rest ? "bg-subtle text-muted-foreground" : ""} ${compact ? "min-h-10 p-0.5" : "min-h-[68px] p-2"}`}>
+    <div title={title || undefined} data-source={source} data-kind={data.resolved?.cell.kind} className={`group relative rounded text-left text-xs break-words hover:bg-subtle ${source === "department" ? "border border-dashed" : ""} ${rest ? "text-muted-foreground" : records.length ? "border-l-2 border-primary/50 bg-primary/5" : ""} ${compact ? "min-h-10 p-0.5" : "min-h-[56px] px-2 py-2"}`}>
       {onOpen && (
         <button
           type="button"
@@ -60,7 +60,7 @@ export function ShiftCalendarCell({
         </button>
       )}
       <div className="pointer-events-none space-y-1">
-        {rest && <span className="block font-medium">Hafta tatili</span>}
+        {rest && <span className="block pt-1 text-[11px] text-muted-foreground">Hafta tatili</span>}
         {records.slice(0, limit).map(({ key, shift, continuation }) => (
           <span key={key} className="relative block" title={`${shift.name} · ${continuation ? "Önceki günden · " : ""}${shiftTimeLabel(shift)}`}>
             {!compact && <span className="block font-medium">{shift.name}</span>}

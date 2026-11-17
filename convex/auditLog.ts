@@ -1,4 +1,5 @@
 import { requirePermission } from "./lib/permissions";
+import { safeAuditRow } from "./lib/auditPrivacy";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { requireEmployeeAccess } from "./lib/auth";
@@ -131,7 +132,7 @@ export const list = authedQuery({
     return { ...result, ...(args.actor ? { actorFilterScope: "index" as const } : {}), page: result.page
       .filter(row => row.timestamp >= start && row.timestamp <= end)
       .filter(row => !args.actor || row.userId === undefined)
-      .map(row => ({ ...row,
+      .map(row => ({ ...safeAuditRow(row),
         userName: row.userName ?? (row.userId ? names.get(row.userId) : "Sistem"),
         projectName: row.projectId ? projectNames.get(row.projectId) ?? "Bilinmeyen proje" : "Projesiz kayıt",
       }))

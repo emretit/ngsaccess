@@ -397,18 +397,24 @@ export const latestForRule = authedQuery({
     const own = (await ctx.db.query("deviceSyncRuns")
       .withIndex("by_rule_started", q => q.eq("ruleId", rule._id)).order("desc").take(1))
       .find(candidate => candidate.projectId === projectId);
-    const recent = rule.isActive === false ? [] : await ctx.db.query("deviceSyncRuns")
-      .withIndex("by_project_started", q => q.eq("projectId", projectId)).order("desc").take(20);
-    const shared = recent.find(run => run.kind === "project_resync");
+    const candidate = rule.isActive === false ? null : await ctx.db.query("deviceSyncRuns")
+      .withIndex("by_project_kind_startedAt", q => q.eq("projectId", projectId).eq("kind", "project_resync"))
+      .order("desc").first();
+    const createdAt = Date.parse(rule.createdAt ?? "") || rule._creationTime || 0;
+    const shared = candidate && candidate.startedAt >= createdAt ? candidate : null;
     const run = shared && (!own || shared.startedAt > own.startedAt) ? shared : own;
     if (!run) return null;
     let targets = await ctx.db.query("deviceSyncRunTargets")
       .withIndex("by_run", q => q.eq("runId", run._id)).take(MAX_DEVICES + 1);
-    if (run.kind !== "rule_sync") {
-      const deviceIds = new Set((await scheduleRuleDevices(ctx, rule)).map(device => device._id));
-      targets = targets.filter(target => deviceIds.has(target.deviceId));
-    }
-    return { ...run, ...summarizeRun(targets.map(t => t.status), run.dispatchFinished === true), targets };
+    const deviceIds = new Set((await scheduleRuleDevices(ctx, rule)).map(device => device._id));
+    targets = targets.filter(target => deviceIds.has(target.deviceId));
+    const covered = new Set(targets.map(target => target.deviceId));
+    const scopeInfo: { uncoveredDeviceCount?: number; ruleChangedSinceRun?: boolean } = {
+      uncoveredDeviceCount: [...deviceIds].filter(id => !covered.has(id)).length,
+      ruleChangedSinceRun: Date.parse(rule.updatedAt ?? "") > run.startedAt,
+    };
+    const uncovered = Array.from({ length: scopeInfo.uncoveredDeviceCount ?? 0 }, () => "unknown" as const);
+    return { ...run, ...summarizeRun([...targets.map(t => t.status), ...uncovered], run.dispatchFinished === true), targets, ...scopeInfo };
   },
 });
 export const get = authedQuery({

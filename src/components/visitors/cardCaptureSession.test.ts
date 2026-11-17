@@ -182,14 +182,14 @@ describe("kart okuyucu etkileşimleri", () => {
 });
 
 describe("ziyaretçi form hataları", () => {
-  const valid = { firstName: "Ada", lastName: "Soyad", cardNumber: "123", presetRuleId: "zone", accessExpiresAt: "2099-10-16T18:00", isActive: true };
+  const valid = { firstName: "Ada", lastName: "Soyad", cardNumber: "123", selected_doors: ["door"], accessExpiresAt: "2099-10-16T18:00", isActive: true };
   it("iade edilmiş pasif kaydı yeni kart vermeden düzenler, aktivasyonda kart ister", () => {
     expect(visitorFormSchema.safeParse({ ...valid, isEditing: true, isActive: false, cardNumber: "" }).success).toBe(true);
     expect(visitorFormSchema.safeParse({ ...valid, isEditing: true, isActive: true, cardNumber: "" }).success).toBe(false);
     expect(visitorFormSchema.safeParse({ ...valid, isActive: false, cardNumber: "" }).success).toBe(false);
   });
   it.each([
-    [{ presetRuleId: null }, "presetRuleId"],
+    [{ selected_doors: [] }, "doors"],
     [{ accessExpiresAt: "2020-01-01T12:00" }, "accessExpiresAt"],
     [{ firstName: " " }, "firstName"],
     [{ cardNumber: "IADE:123:visitor" }, "cardNumber"],

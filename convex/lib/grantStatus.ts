@@ -102,10 +102,14 @@ export async function departmentGrantCandidates(
 
 export type GrantResult = {
   projectId: Id<"projects">; employeeId: Id<"employees">; deviceId: Id<"devices">;
-  state: GrantState; ruleIds?: Id<"accessRules">[]; lastError?: string; lastRunId?: Id<"deviceSyncRuns">; lastOperationId?: string;
+  expectedGeneration?: number; state: GrantState; ruleIds?: Id<"accessRules">[]; lastError?: string; lastRunId?: Id<"deviceSyncRuns">; lastOperationId?: string;
 };
 /** Runs inside the caller's existing transaction; never deletes history. */
-export async function upsertGrantStatus(ctx: MutationCtx, args: GrantResult) {
+export async function upsertGrantStatus(ctx: MutationCtx, args: GrantResult,
+  options?: { gatewayReservation?: boolean },
+): Promise<{ reconcile: { employeeId: Id<"employees">; deviceId: Id<"devices">; projectId: Id<"projects"> } } | undefined> {
+  const { expectedGeneration, ...fields } = args;
+  const current = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId)).unique();
   const transferSource = args.state === "effective" || args.state === "removed" ? await ctx.db.get(args.employeeId) : null;
   const sourceRun = await sourceTransfer(ctx, transferSource);
   if (args.state === "effective") {
@@ -132,6 +136,15 @@ export async function upsertGrantStatus(ctx: MutationCtx, args: GrantResult) {
       return;
     }
   }
+  if (expectedGeneration !== undefined && expectedGeneration !== (current?.syncGeneration ?? 0)) {
+    // An in-flight or already successful newer sync owns convergence. Terminal
+    // failures/removals get at most one corrective hop per reservation or explicit write.
+    if (args.state === "effective" && current && (current.state === "removed" || current.state === "failed") && !current.reconciliationScheduled) {
+      await ctx.db.patch(current._id, { reconciliationScheduled: true });
+      return { reconcile: { employeeId: args.employeeId, deviceId: args.deviceId, projectId: args.projectId } };
+    }
+    return;
+  }
   if (args.state === "removed") {
     const transfer = sourceRun;
     if (transfer?.employeeId === args.employeeId) {
@@ -152,7 +165,9 @@ export async function upsertGrantStatus(ctx: MutationCtx, args: GrantResult) {
     ? (await employeeGrantGraph(ctx, employee)).get(args.deviceId)?.ruleIds ?? []
     : existing?.ruleIds ?? []);
   const now = Date.now();
-  const value = { ...args, ruleIds: [...new Set(ruleIds)], departmentId: employee ? employee.departmentId : existing?.departmentId,
+  const reconciliationScheduled = options?.gatewayReservation || args.state === "effective" || expectedGeneration === undefined
+    ? undefined : existing?.reconciliationScheduled;
+  const value = { ...fields, reconciliationScheduled, syncGeneration: (existing?.syncGeneration ?? 0) + 1, ruleIds: [...new Set(ruleIds)], departmentId: employee ? employee.departmentId : existing?.departmentId,
     lastError: args.state === "failed" ? (args.lastError ?? "Cihaz işlemi başarısız").slice(0, 2000) : undefined,
     appliedAt: args.state === "effective" ? now : existing?.appliedAt, updatedAt: now };
   if (existing) await ctx.db.patch(existing._id, value);

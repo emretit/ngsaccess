@@ -13,7 +13,7 @@ export function StatusCounters({
   return (
     <>
       <p className="text-sm text-muted-foreground">
-        {filters.departmentId ? "Departman özeti" : "Proje özeti"} ·{" "}
+        Proje özeti ·{" "}
         {counts ? countText(counts.all, counts.capped) : "—"} kişi–cihaz kaydı
         {/* Eski Convex sürümü personCount döndürmez; yayın arasında "undefined" yazmasın. */}
         {typeof counts?.personCount === "number" && ` · ${counts.personCount}${counts.capped ? "+" : ""} kişi`}

@@ -21,7 +21,7 @@ vi.mock("@/components/ui/tooltip", () => ({ TooltipProvider: ({ children }: { ch
 vi.mock("@/components/auth/AuthProvider", () => ({ AuthProvider: ({ children }: { children: ReactNode }) => children }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ ActiveProjectProvider: ({ children }: { children: ReactNode }) => children }));
 vi.mock("@/components/Layout", () => ({ default: () => null }));
-it.each([["/shifts", "/pdks-records?plan=1"], ["/shifts/definitions", "/pdks-records"]])("redirects %s to %s with replacement", (from, to) => {
+it.each([["/shifts", "/pdks-records/plan"], ["/shifts/definitions", "/pdks-records/plan?tab=definitions"]])("redirects %s to %s with replacement", (from, to) => {
   state.path = from;
   const html = renderToStaticMarkup(<App />);
   expect(html).toContain(`href="${to}"`);

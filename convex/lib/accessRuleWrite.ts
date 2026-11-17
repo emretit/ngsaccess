@@ -5,6 +5,8 @@ import type { MutationCtx } from "../_generated/server";
 import { validateAccessRelations } from "./accessScopeRelations";
 import { assertAccessSchedule } from "./accessRuleUx";
 import { resolveProjectScope } from "./projectScope";
+import { departmentMemberIds, writeRuleDepartments, type DepartmentSelection } from "./departmentAccess";
+import { writeAudit } from "./audit";
 
 type CreateAccessRuleWithGroupsArgs = {
   name: string;
@@ -20,6 +22,7 @@ type CreateAccessRuleWithGroupsArgs = {
   employeeIds?: Id<"employees">[];
   deviceIds?: Id<"devices">[];
   doorIds?: Id<"doors">[];
+  departmentSelections?: DepartmentSelection[];
 };
 
 /** Called only by accessRules.createWithGroups after authorization. */
@@ -30,8 +33,25 @@ export async function createAccessRuleWithGroups(
   await resolveProjectScope(ctx, args.projectId);
   if (!args.projectId) throw new Error("Önce bir proje seçin");
   await requirePermission(ctx, ctx.user, args.projectId, "accessRules.manage");
-  await validateAccessRelations(ctx, args.projectId, args);
-  const { employeeIds, deviceIds, doorIds, ...ruleData } = args;
+  const ruleId = await insertAccessRuleWithGroups(ctx, args);
+  await writeAudit(ctx, { user: ctx.user, projectId: args.projectId, action: "create", targetTable: "accessRules", targetId: ruleId,
+    newValue: { name: args.name, days: args.days, startTime: args.startTime, endTime: args.endTime, deviceCount: args.deviceIds?.length ?? 0,
+      doorCount: args.doorIds?.length ?? 0, manualMemberCount: args.employeeIds?.length ?? 0, departmentSelections: args.departmentSelections } });
+  return ruleId;
+}
+
+/** Kural + bağlantıları yazar ve cihaz senkronunu kuyruğa alır; yetkiyi çağıran doğrular. */
+export async function insertAccessRuleWithGroups(
+  ctx: MutationCtx,
+  args: CreateAccessRuleWithGroupsArgs,
+): Promise<Id<"accessRules">> {
+  if (!args.projectId) throw new Error("Önce bir proje seçin");
+  const { departmentSelections, employeeIds: manualIds, deviceIds, doorIds, ...ruleData } = args;
+  if (args.targetType === "visitor" && departmentSelections?.length) throw new Error("Ziyaretçi kuralına departman atanamaz");
+  const inherited = await departmentMemberIds(ctx, args.projectId, departmentSelections ?? []);
+  const employeeIds = [...new Set([...(manualIds ?? []), ...inherited])];
+  if (departmentSelections?.length && employeeIds.length > 500) throw new Error("Kural kişi sınırı aşıldı (500)");
+  await validateAccessRelations(ctx, args.projectId, { ...args, employeeIds });
   assertAccessSchedule(args);
   if (!args.name.trim()) throw new Error("Kural adı zorunludur");
   const now = new Date().toISOString();
@@ -41,6 +61,7 @@ export async function createAccessRuleWithGroups(
     createdAt: now,
     updatedAt: now,
   });
+  if (departmentSelections !== undefined) await writeRuleDepartments(ctx, ruleId, args.projectId, departmentSelections);
 
   if (employeeIds?.length) {
     await Promise.all(
@@ -50,6 +71,7 @@ export async function createAccessRuleWithGroups(
           employeeId: empId,
           projectId: args.projectId,
           createdAt: now,
+          ...(departmentSelections?.length ? { source: manualIds?.includes(empId) ? "manual" as const : "department" as const } : {}),
         })
       )
     );

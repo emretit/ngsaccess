@@ -612,7 +612,12 @@ export const markAck = internalMutation({
     if (mobileOperationId(op.payload) !== undefined &&
         (op.msxId === undefined || args.msxId === undefined || op.msxId !== args.msxId)) return;
     // Eski/yinelenen ack'i ele: beklenen msxId ile eşleşmeli (markSent her zaman msxId yazar).
-    if (args.msxId != null && op.msxId != null && op.msxId !== args.msxId) return;
+    if (args.msxId !== undefined && op.msxId !== args.msxId) return;
+    if (args.msxId === undefined) {
+      const candidates = await ctx.db.query("idePendingOperations")
+        .withIndex("by_device_status", q => q.eq("deviceId", op.deviceId).eq("status", "sent")).take(2);
+      if (candidates.length !== 1 || candidates[0]._id !== op._id) return;
+    }
 
     if (await currentCredentialProtected(ctx, op)) {
       await supersedeDeletion(ctx, op);

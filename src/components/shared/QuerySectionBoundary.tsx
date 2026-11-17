@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ReactElement, type ReactNode } from "react";
 import { ErrorState } from "./ErrorState";
 
 export interface QuerySectionBoundaryProps {
@@ -6,6 +6,7 @@ export interface QuerySectionBoundaryProps {
   title?: string;
   description?: string;
   onRetry?: () => void;
+  renderFallback?: (retry: () => void) => ReactElement;
   resetKey?: string | number;
   className?: string;
 }
@@ -17,12 +18,14 @@ export class QuerySectionBoundary extends Component<QuerySectionBoundaryProps, {
   componentDidUpdate(previous: QuerySectionBoundaryProps) {
     if (previous.resetKey !== this.props.resetKey && this.state.failed) this.setState({ failed: false });
   }
+  private retry = () => {
+    this.props.onRetry?.();
+    this.setState(({ attempt }) => ({ failed: false, attempt: attempt + 1 }));
+  };
   render() {
+    if (this.state.failed && this.props.renderFallback) return this.props.renderFallback(this.retry);
     if (this.state.failed) return <ErrorState title={this.props.title} description={this.props.description}
-      className={this.props.className} compact onRetry={() => {
-        this.props.onRetry?.();
-        this.setState(({ attempt }) => ({ failed: false, attempt: attempt + 1 }));
-      }} />;
+      className={this.props.className} compact onRetry={this.retry} />;
     return <section key={this.state.attempt} className={this.props.className}>{this.props.children}</section>;
   }
 }

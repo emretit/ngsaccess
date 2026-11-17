@@ -75,6 +75,12 @@ export function AccessRuleDetails({
     return <SectionSkeleton rows={3} label="Kural ayrıntısı yükleniyor" />;
   return (
     <div className="mt-4 space-y-6 min-w-0">
+      {!!rule.departmentSelections?.length && <section className="space-y-1">
+        <h3 className="font-semibold">Departmanlar</h3>
+        {rule.departmentSelections.map(selection => <p key={selection.departmentId}>
+          {selection.name}{selection.includeChildren ? " (alt departmanlar dahil)" : ""} · Üyelik otomatik güncellenir
+        </p>)}
+      </section>}
       {rule.targetType === "visitor" && (
         <p className="text-xs text-muted-foreground">
           Ziyaretçiler şablona Ziyaretçiler ekranından eklenir.

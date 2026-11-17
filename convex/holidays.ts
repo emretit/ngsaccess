@@ -6,6 +6,7 @@ import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { getTurkishHolidaysForYear, hasReligiousData } from "./lib/turkishHolidays";
+import { invalidateHolidayPlans } from "./doorPlanInvalidation";
 
 type HolidayCtx = (QueryCtx | MutationCtx) & { user: Doc<"users"> };
 
@@ -84,6 +85,7 @@ export const create = authedMutation({
       isHalfDay: args.isHalfDay ?? false,
       createdAt: new Date().toISOString(),
     });
+    await invalidateHolidayPlans(ctx, { projectId: args.projectId, years: [Number(args.date.slice(0, 4))] });
     await writeAudit(ctx, {
       user: ctx.user,
       projectId: args.projectId ?? null,
@@ -103,6 +105,7 @@ export const remove = authedMutation({
     if (!old) return;
     await requireHolidayScope(ctx, old.projectId, true);
     await ctx.db.delete(args.id);
+    await invalidateHolidayPlans(ctx, { projectId: old.projectId, years: [Number(old.date.slice(0, 4))] });
     await writeAudit(ctx, {
       user: ctx.user,
       projectId: old.projectId ?? null,
@@ -124,6 +127,7 @@ export const seedTurkishHolidays = authedMutation({
     let inserted = 0;
     let skipped = 0;
     const missingYears: number[] = [];
+    const changedYears = new Set<number>();
 
     for (const year of args.years) {
       if (!hasReligiousData(year)) missingYears.push(year);
@@ -148,9 +152,11 @@ export const seedTurkishHolidays = authedMutation({
           createdAt: new Date().toISOString(),
         });
         inserted += 1;
+        changedYears.add(year);
       }
     }
 
+    if (changedYears.size) await invalidateHolidayPlans(ctx, { projectId: args.projectId, years: [...changedYears] });
     await writeAudit(ctx, {
       user: ctx.user,
       projectId: args.projectId ?? null,

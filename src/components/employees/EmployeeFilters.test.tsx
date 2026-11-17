@@ -24,3 +24,11 @@ it("shows FIELD labels, all statuses and a visible clear action even with zero c
   expect(html).toContain("Filtreleri temizle");
   expect(html).not.toContain("button:last-of-type");
 });
+
+it("keeps search and clear outside the collapsed mobile panel and shows active count", () => {
+  const html = renderToStaticMarkup(<EmployeeFilters searchQuery="Ada" onSearchChange={() => {}} status="active" statusCounts={{ all: 7, active: 5, inactive: 2 }} onStatusChange={() => {}} sort="name:asc" onSortChange={() => {}} onClear={() => {}} hasFilters />);
+  expect(html).toContain("Filtreler (2)");
+  expect(html).toContain('aria-expanded="false"');
+  expect(html.indexOf('type="search"')).toBeLessThan(html.indexOf('aria-expanded="false"'));
+  expect(html).toContain("Filtreleri temizle");
+});

@@ -404,7 +404,7 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
   });
-  it("04-O2 listede devre dışı planları kapı kilit modu ile karıştırmaz ve sekme başlığını gösterir", () => {
+  it("04-O2 listede devre dışı planları kapı kilit modu ile karıştırmaz ve yerel başlık göstermez", () => {
     state.targets = [
       { ...door, hikDoorStatusPlan: { ...legacy, enabled: false } },
     ];
@@ -412,9 +412,7 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     const tree = DoorPlansTab();
     expect(renderToStaticMarkup(tree)).toContain("Plan etkin değil");
     expect(hasText(tree, "Kapalı")).toBe(false);
-    expect(find(tree, (element) => element.type === "h1").props.children).toBe(
-      "Kapı Planları",
-    );
+    expect(renderToStaticMarkup(tree)).not.toContain("<h1");
   });
   it("04-O3 boş tatil takvimine geçişi kaydedilmemiş değişiklik korumasına bırakır", () => {
     const overrides = {
@@ -507,7 +505,7 @@ describe("DoorPlanDialog haftalık kayıt", () => {
     expect(html).toContain("11 tatil aralığı · tam gün");
     expect(html).toContain("Tümünü göster");
     expect(html).toContain("12.01.2026");
-    expect(hasText(tree, "Tatil takvimini aç")).toBe(false);
+    expect(hasText(tree, "Tatil takvimini aç")).toBe(true);
   });
   it("tekrar gönderim sonucunda kaydedilmemiş düzenlemeyi kaydedildi olarak göstermez", async () => {
     const overrides = { plansPending: true };

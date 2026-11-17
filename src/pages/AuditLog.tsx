@@ -5,7 +5,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useActiveProjectScope } from '@/hooks/useActiveProjectScope';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { PageTemplate } from '@/components/shared/PageTemplate';
 import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
 import { Switch } from '@/components/ui/switch';
 import { AuditCoverage } from '@/components/audit/AuditCoverage';
@@ -24,21 +24,18 @@ function AuthorizedAuditLog() {
   const args = auditArgs(state.params, projectId, allProjects);
   const rangeError = auditRangeError(args.startDate, args.endDate);
   const ready = !loading && (allProjects || Boolean(projectId));
-  return <div className="min-w-0 space-y-6">
-    <PageHeader title="Denetim Kaydı" scope={<span>{allProjects ? 'Tüm projeler · Projesiz kayıtlar dahil' : activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)</span>}>
-      {profile?.role === 'super_admin' && <label className="flex min-h-10 items-center gap-2 text-sm"><Switch checked={allProjects} onCheckedChange={checked => state.update('allProjects', checked ? 'true' : '')} />Tüm projeler</label>}
-    </PageHeader>
-    <AuditCoverage />
-    <AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError}
-      actions={ready && !state.changingScope && !rangeError && <AuditExportButton key={JSON.stringify(args)} args={args} projectName={activeProject?.name ?? "proje"} />} />
+  return <PageTemplate title="Denetim Kaydı" scope={<span>{allProjects ? 'Tüm projeler · Projesiz kayıtlar dahil' : activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)</span>} secondaryActions={
+      profile?.role === 'super_admin' && <label className="flex min-h-10 items-center gap-2 text-sm"><Switch checked={allProjects} onCheckedChange={checked => state.update('allProjects', checked ? 'true' : '')} />Tüm projeler</label>
+    } summary={<AuditCoverage />} filters={<AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError}
+      actions={ready && !state.changingScope && !rangeError && <AuditExportButton key={JSON.stringify(args)} args={args} projectName={activeProject?.name ?? "proje"} />} />}>
     {!allProjects && <p className="text-xs text-muted-foreground">Seçili projenin kayıtları gösteriliyor. Projeyi üst çubuktan değiştirebilirsiniz.</p>}
     {loading || state.changingScope ? <AuditTable rows={[]} allProjects={allProjects} loading onSelect={() => {}} /> : !ready ? <EmptyState title="Bir proje seçin" description="Denetim kayıtlarını görmek için üst çubuktan bir proje seçin." /> : rangeError ? <AuditTable rows={[]} allProjects={allProjects} onSelect={() => {}} message={<p className="text-xs text-muted-foreground">Geçerli bir tarih aralığı seçilince kayıtlar listelenir.</p>} /> : <AuditResults key={JSON.stringify(args)} args={args} />}
-  </div>;
+  </PageTemplate>;
 }
 
 export default function AuditLog() {
   const { can, loading } = usePermissions();
-  if (loading) return <SectionSkeleton label="Yetkiler yükleniyor" />;
-  if (!can("admin.manage")) return <div role="status" className="space-y-3 py-8"><h1 className="text-base font-semibold">Denetim kaydını görüntüleme yetkiniz yok.</h1><p className="text-sm text-muted-foreground">Bu sayfa yöneticiler içindir.</p><Button variant="outline" asChild><Link to="/">Ana Sayfa’ya dön</Link></Button></div>;
+  if (loading) return <PageTemplate title="Denetim Kaydı"><SectionSkeleton label="Yetkiler yükleniyor" /></PageTemplate>;
+  if (!can("admin.manage")) return <PageTemplate title="Denetim Kaydı"><div role="status" className="space-y-3"><p className="text-base font-semibold">Denetim kaydını görüntüleme yetkiniz yok.</p><p className="text-sm text-muted-foreground">Bu sayfa yöneticiler içindir.</p><Button variant="outline" asChild><Link to="/">Ana Sayfa’ya dön</Link></Button></div></PageTemplate>;
   return <AuthorizedAuditLog />;
 }

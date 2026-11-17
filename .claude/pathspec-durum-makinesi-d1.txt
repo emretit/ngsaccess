@@ -1,0 +1,21 @@
+convex/accessRuleMemberships.test.ts
+convex/attendanceCorrections.test.ts
+convex/attendanceCorrections.ts
+convex/employeeTermination.test.ts
+convex/ideSync.ts
+convex/lib/accessRuleRead.ts
+convex/lib/employeeAuth.ts
+convex/lib/employment.test.ts
+convex/lib/employment.ts
+convex/lib/mobileAccess.ts
+convex/lib/pdksTable.test.ts
+convex/mobileAccess.handlers.test.ts
+convex/mobileAccess.ts
+convex/privacyRetention.ts
+convex/retention.test.ts
+src/components/access-control/unified/AccessRuleDetails.tsx
+# open-closure paketiyle ortak (o paket önce commit'lenmeli):
+convex/schema.ts
+convex/employees.ts
+convex/employeeTermination.ts
+convex/accessRules.ts

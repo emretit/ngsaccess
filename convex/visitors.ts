@@ -28,6 +28,7 @@ import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeAudit } from "./lib/audit";
 import { cardConflictMessage, cardNumericKey } from "./lib/cardIdentity";
 import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
+import { resolveVisitorDoorRule } from "./lib/visitorDoorRule";
 
 /** Freeze the old credential and targets before checkout, release or badge reuse. */
 async function scheduleVisitorCardRemoval(ctx: MutationCtx, visitor: Doc<"employees">) {
@@ -353,7 +354,9 @@ export const create = authedMutation({
     lastName: v.string(),
     email: v.optional(v.string()),
     cardNumber: v.string(),
-    presetRuleId: v.id("accessRules"),
+    // Web formu kapı seçer (doorIds); presetRuleId mevcut ziyaretçi kuralı için geriye uyumlu.
+    presetRuleId: v.optional(v.id("accessRules")),
+    doorIds: v.optional(v.array(v.id("doors"))),
     accessExpiresAt: v.string(),
     accessStartsAt: v.optional(v.string()),
     visitorPhone: v.optional(v.string()),
@@ -368,7 +371,9 @@ export const create = authedMutation({
   handler: async (ctx, args) => {
     await requirePermission(ctx, ctx.user, args.projectId, "visitors.manage");
     await resolveProjectScope(ctx, args.projectId);
-    await validateVisitorAccessRelations(ctx, args.projectId, args.presetRuleId, args.hostEmployeeId);
+    if ((args.doorIds === undefined) === (args.presetRuleId === undefined)) throw new Error("Ziyaretçinin geçeceği kapıları seçin");
+    const ruleId = args.doorIds ? await resolveVisitorDoorRule(ctx, args.projectId, args.doorIds) : args.presetRuleId;
+    await validateVisitorAccessRelations(ctx, args.projectId, ruleId, args.hostEmployeeId);
     const inAllowed = (projectId: Id<"projects"> | undefined) => projectId === args.projectId;
 
     const validationError = visitorDetailsError(args, Date.now(), false) ?? visitorExpiryValidation(args.accessExpiresAt)
@@ -376,7 +381,7 @@ export const create = authedMutation({
     if (validationError) throw new Error(validationError);
     const cardNumber = args.cardNumber.trim();
     if (!cardNumber) throw new Error("Kart numarası zorunludur");
-    await validateVisitorPresetCard(ctx, args.projectId, args.presetRuleId, cardNumber);
+    await validateVisitorPresetCard(ctx, args.projectId, ruleId, cardNumber);
     const dupCard = await findDuplicateEmployee(ctx, "cardNumber", cardNumber);
     if (dupCard) {
       // İade edilen rozet: SADECE yetkili projedeki pasif bir ziyaretçinin kartıysa serbest
@@ -417,7 +422,7 @@ export const create = authedMutation({
       lastName: args.lastName.trim(),
       email,
       cardNumber,
-      accessRuleId: args.presetRuleId,
+      accessRuleId: ruleId,
       isActive,
       isVisitor: true,
       visitorStatus: isActive ? "checkedIn" : "preRegistered",
@@ -432,7 +437,7 @@ export const create = authedMutation({
       updatedAt: now,
     });
 
-    await upsertGroupMembership(ctx, id, args.presetRuleId, args.projectId);
+    await upsertGroupMembership(ctx, id, ruleId, args.projectId);
     if (args.kvkkConsent) {
       await grantKvkkConsent(ctx, ctx.user, id, args.projectId, args.kvkkDocumentVersion);
     }
@@ -463,6 +468,7 @@ export const update = authedMutation({
     lastName: v.optional(v.string()),
     cardNumber: v.optional(v.string()),
     presetRuleId: v.optional(v.id("accessRules")),
+    doorIds: v.optional(v.array(v.id("doors"))),
     accessExpiresAt: v.optional(v.string()),
     visitorPhone: v.optional(v.union(v.null(), v.string())),
     visitorCompany: v.optional(v.union(v.null(), v.string())),
@@ -479,18 +485,20 @@ export const update = authedMutation({
     await requirePermission(ctx, ctx.user, visitor.projectId, "visitors.manage");
     assertAccessProjectUnchanged(visitor.projectId, args.projectId);
     await resolveProjectScope(ctx, visitor.projectId);
-    const assigningPreset = args.presetRuleId !== undefined;
+    if (args.presetRuleId !== undefined && args.doorIds !== undefined) throw new Error("Kural ve kapı seçimi birlikte gönderilemez");
+    const assigningPreset = args.presetRuleId !== undefined || args.doorIds !== undefined;
     // Only a ruleless mobile preregistration can receive its first operator
     // assignment. Existing visitor zone semantics remain unchanged.
     if (assigningPreset && !(visitor.mobileVisitorRequestId && visitor.isActive === false &&
         visitor.visitorStatus === "preRegistered" && visitor.cardNumber.startsWith("PRE:") && !visitor.accessRuleId)) {
-      throw new Error("Ziyaretçi bölgesi yalnız mobil ön kayıt aktivasyonunda atanabilir");
+      throw new Error("Ziyaretçi kapıları yalnız mobil ön kayıt aktivasyonunda atanabilir");
     }
+    const assignedRuleId = args.doorIds ? await resolveVisitorDoorRule(ctx, visitor.projectId, args.doorIds) : args.presetRuleId;
     // A deleted historical host is absent; explicitly assigning a host still validates it.
     const existingHost = visitor.hostEmployeeId ? await ctx.db.get(visitor.hostEmployeeId) : null;
     const effectiveHostId = args.hostEmployeeId === undefined
       ? existingHost?._id : args.hostEmployeeId ?? undefined;
-    await validateVisitorAccessRelations(ctx, visitor.projectId, args.presetRuleId ?? visitor.accessRuleId, effectiveHostId);
+    await validateVisitorAccessRelations(ctx, visitor.projectId, assignedRuleId ?? visitor.accessRuleId, effectiveHostId);
 
     const effective = { ...visitor, ...toPatch(args) };
     // İade edilmiş pasif kayıt kişisel bilgi düzenlemesine açık kalır.
@@ -514,7 +522,7 @@ export const update = authedMutation({
       if (dup) throw new Error(cardConflictMessage(card, dup, DUPLICATE_MESSAGES.cardNumber));
     }
     if (cardChanged || args.isActive === true || assigningPreset) {
-      await validateVisitorPresetCard(ctx, visitor.projectId, args.presetRuleId ?? visitor.accessRuleId,
+      await validateVisitorPresetCard(ctx, visitor.projectId, assignedRuleId ?? visitor.accessRuleId,
         newCard ?? visitor.cardNumber, visitor._id);
     }
     const activeChanged = args.isActive !== undefined && args.isActive !== visitor.isActive;
@@ -548,14 +556,14 @@ export const update = authedMutation({
       patch.accessExpiresAt = new Date(visitorTime(args.accessExpiresAt)).toISOString();
     }
     if (cardChanged) patch.cardNumber = newCard;
-    if (assigningPreset) patch.accessRuleId = args.presetRuleId;
+    if (assigningPreset) patch.accessRuleId = assignedRuleId;
     if (activeChanged) {
       patch.isActive = args.isActive;
       patch.visitorStatus = args.isActive ? "checkedIn" : "checkedOut";
     }
     await ctx.db.patch(args.visitorId, patch);
     if (assigningPreset) {
-      await upsertGroupMembership(ctx, args.visitorId, args.presetRuleId, visitor.projectId);
+      await upsertGroupMembership(ctx, args.visitorId, assignedRuleId, visitor.projectId);
     }
 
     // Kart değişiminde ESKİ kartı, deaktivasyonda paneldeki kartı IDE panellerinden FİZİKSEL

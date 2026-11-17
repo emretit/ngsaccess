@@ -1,8 +1,6 @@
 import { planShiftIds } from "../../../convex/lib/shiftPlan";
-import { AssignmentPatternEditor } from "./AssignmentPatternEditor";
-import { assignmentFields, focusAssignmentError, planFormError, planSummary } from "./lib/planForm";
+import { assignmentFields, focusAssignmentError, planFormError, planSummary, withShiftSchedule } from "./lib/planForm";
 import type { DepartmentAssignment } from "./lib/planning";
-import { WeekdaySelection } from "./WeekdaySelection";
 import { ShiftSelect } from "./ShiftSelect";
 import { shiftMessage, shortDate, shiftTimeLabel } from "./lib/planning";
 import { shiftError } from "./lib/shiftError";
@@ -18,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { AssignmentDateFields } from "./AssignmentDateFields";
 import { DateRangeFields } from "@/components/shared/DateRangeFields";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
@@ -64,6 +63,9 @@ function EditForm({
       (assignment.weekPattern?.length ? assignment.weekPattern : DEFAULT_WORKING_DAYS).includes(code),
     ).map(([code]) => code),
   });
+  const savedScheduleLabel = values.plan && values.plan.kind !== "weekly"
+    ? planSummary(values.plan)
+    : DAYS.filter(([code]) => values.weekPattern.includes(code)).map(([, label]) => label).join(", ");
   const assignmentLabel = assignment.plan && planShiftIds(assignment.plan).length > 1 ? planSummary(assignment.plan) : shiftName;
   const [baseline, setBaseline] = useState(() => JSON.stringify(values));
   const guard = useUnsavedChangesGuard(JSON.stringify(values) !== baseline);
@@ -157,24 +159,29 @@ function EditForm({
             </p>
           )}
           <fieldset disabled={pending} className="space-y-4">
-            {!assignment.plan && !("departmentId" in assignment) && errors.plan && <p ref={planErrorRef} tabIndex={-1} role="alert" className="text-sm text-danger">{errors.plan}</p>}
-            {(assignment.plan || "departmentId" in assignment) ? <AssignmentPatternEditor values={values} shifts={shifts} onChange={change} errors={errors} errorRef={planErrorRef} /> : <FormFieldWrapper
+            {errors.plan && <p ref={planErrorRef} tabIndex={-1} role="alert" className="text-sm text-danger">{errors.plan}</p>}
+            <FormFieldWrapper
               htmlFor="edit-shift"
               label="Vardiya"
               error={errors.shiftId}
             >
               <ShiftSelect id="edit-shift" label="Vardiya" value={values.shiftId}
                 invalid={!!errors.shiftId} describedBy={[errors.shiftId ? "edit-shift-error" : "", hasInactiveShift ? "edit-inactive-shift" : ""].filter(Boolean).join(" ") || undefined}
-                onChange={(shiftId) => change({ ...values, shiftId })}
+                onChange={shiftId => {
+                  const next = { ...values, shiftId };
+                  change(withShiftSchedule(next, shifts));
+                }}
                 options={shifts.filter(s => s.isActive !== false || s._id === assignment.shiftId).map(s => ({ value: s._id, label: `${s.name} · ${shiftTimeLabel(s)}` }))} />
-            </FormFieldWrapper>}
+            </FormFieldWrapper>
             {hasInactiveShift && <p id="edit-inactive-shift" role="status" className="text-xs text-muted-foreground">Bu vardiya pasif; kaydetmek için aktif bir vardiya seçin.</p>}
+            {"employeeId" in assignment ? <AssignmentDateFields idPrefix="edit" startDate={values.startDate} endDate={values.endDate}
+              errors={errors} onChange={dates => change({ ...values, ...dates })} /> : (
             <DateRangeFields idPrefix="edit" layout="row" labels={{ start: "Başlangıç", end: "Bitiş" }}
               value={{ start: values.startDate, end: values.endDate }}
               errors={{ start: errors.startDate, end: errors.endDate }}
               onChange={(next) => change({ ...values, startDate: next.start, endDate: next.end })} />
-            {!(assignment.plan || "departmentId" in assignment) && <WeekdaySelection id="assignment-days" value={values.weekPattern} error={errors.weekPattern}
-              onChange={(weekPattern) => change({ ...values, weekPattern })} />}
+            )}
+            <p className="text-xs text-muted-foreground">{savedScheduleLabel}</p>
             <p className="text-xs text-muted-foreground">
               {shortDate(values.startDate)}–{shortDate(values.endDate)} dahil tüm seri. Mevcut diğer
               atamalar korunur.

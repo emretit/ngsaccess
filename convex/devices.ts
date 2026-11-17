@@ -1,6 +1,10 @@
+import { checkHeartbeatOffline as checkHeartbeatOfflineHandler } from "./lib/deviceConnection";
+import { writeAudit } from "./lib/audit";
+import type { Doc } from "./_generated/dataModel";
 import { hikBackfillPendingValidator, type HikBackfillPending } from "./lib/gateway/backfillState";
 import { requirePermission, hasPermission } from "./lib/permissions";
 import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS, hasFreshIsupStatus } from "./lib/deviceConnection";
+
 import { internal } from "./_generated/api";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { listMobileTargets } from "./lib/mobileAccess";
@@ -34,6 +38,11 @@ import {
  * arg'larında yok (yalnız issueApiToken yazar) → write loop'ta hiç görünmez; sette durması
  * zararsız ve okuma-gate'iyle simetriyi korur.
  */
+export const checkHeartbeatOffline = internalMutation({
+  args: { deviceId: v.id("devices"), checkAt: v.number() },
+  handler: checkHeartbeatOfflineHandler,
+});
+
 const DEVICE_SECRET_FIELDS = ["devicePassword", "idePassword", "ehomeKey", "apiToken"] as const;
 const DEVICE_SECRET_FIELD_SET: ReadonlySet<string> = new Set(DEVICE_SECRET_FIELDS);
 
@@ -277,6 +286,10 @@ export const update = authedMutation({
       }
     }
     await ctx.db.patch(deviceId, toPatch(clean));
+    const changedSecrets = Object.entries(args).filter(([key, value]) =>
+      (DEVICE_SECRET_FIELDS as readonly string[]).includes(key) && value !== undefined && value !== device[key as keyof typeof device]).map(([key]) => key);
+    if (changedSecrets.length) await writeAudit(ctx, { user: ctx.user, projectId: device.projectId, action: "update", targetTable: "devices", targetId: deviceId,
+      newValue: { secretsChanged: changedSecrets }, note: "Cihaz bağlantı sırları değiştirildi; değerler kaydedilmez" });
 
     // Panel başka bölgeye taşınırsa (zoneId değişti), o panele bağlı tüm kapıların
     // door.zoneId'sini eşitle (Variant 1 değişmezi: panelin tüm kapıları tek bölgede).
@@ -424,6 +437,7 @@ export const updateLastSeen = internalMutation({
 async function issueApiToken(
   ctx: MutationCtx,
   deviceId: Id<"devices">,
+  actor: Doc<"users"> | null = null,
 ): Promise<{ token: string; createdAt: string }> {
   const token = crypto.randomUUID();
   const createdAt = new Date().toISOString();
@@ -432,6 +446,9 @@ async function issueApiToken(
     apiTokenCreatedAt: createdAt,
     updatedAt: createdAt,
   });
+  const device = await ctx.db.get(deviceId);
+  await writeAudit(ctx, { user: actor, projectId: device?.projectId, action: "update", targetTable: "devices", targetId: deviceId,
+    newValue: { tokenRotated: true }, note: "Cihaz API token yenilendi; değer kaydedilmez" });
   return { token, createdAt };
 }
 
@@ -451,7 +468,7 @@ export const regenerateApiToken = authedMutation({
         throw new Error("Bu cihaza erişim yetkiniz yok");
       }
     }
-    return await issueApiToken(ctx, args.deviceId);
+    return await issueApiToken(ctx, args.deviceId, ctx.user);
   },
 });
 

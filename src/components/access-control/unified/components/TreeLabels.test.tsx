@@ -18,4 +18,6 @@ it("kapı ağacının grup adını korur ve cihaz terimini kullanır", () => {
   expect(html).toContain('role="group" aria-label="Kapı ve cihaz seçimi"');
   expect(html).toContain("Kapı, cihaz veya bölge ara");
   expect(html).not.toMatch(/panel/i);
+  expect(html).toContain("Giriş cihazı · Giriş");
+  expect(html).not.toContain("Giriş cihazı kapılarını genişlet");
 });

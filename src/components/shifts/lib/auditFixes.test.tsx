@@ -46,9 +46,9 @@ beforeEach(() => {
   vi.stubGlobal("window", { matchMedia: () => ({ matches: false }) });
 });
 describe("09 denetim düzeltmeleri", () => {
-  it("O1/O2/D1/D2/D5: tanımsız projede eylem tanımı açar, imkânsız atama ipucu ve gün sayacı yoktur", () => {
+  it("O1/O2/D1/D2/D5: tanımsız projede tanım eylemi ve atama menüsü görünür, gün sayacı yoktur", () => {
     const html = renderToStaticMarkup(<MemoryRouter><ShiftCalendarView projectId={"project" as Id<"projects">} projectName="Proje" openDefinitions={() => undefined} /></MemoryRouter>);
-    expect(html).not.toContain(">Vardiya ata<");
+    expect(html).toContain(">Vardiya ata<");
     expect(html).toContain("Vardiya tanımla");
     expect(html).toContain("Atama yapmak için önce bir vardiya tanımlayın.");
     expect(html.match(/Henüz vardiya tanımlanmamış/g)).toHaveLength(1);
@@ -80,7 +80,7 @@ describe("09 denetim düzeltmeleri", () => {
     expect(html).toContain('aria-describedby="day-assign-help"');
     expect(html).not.toContain("2026-10-19");
   });
-  it("O3/O4: önizlemede çakışma, izin, tatil ve eski sunucu mesajları biçimlenir", () => {
+  it("O3/O4: atama sonucunda çakışma, izin, tatil ve eski sunucu mesajları biçimlenir", () => {
     const html = renderToStaticMarkup(<Decision item={decision} />);
     expect(html).toContain("19.10.2026"); expect(html).toContain("20.10.2026"); expect(html).toContain("25.10.2026");
     expect(html).toContain("22:00–06:00 (+1 gün)"); expect(html).not.toMatch(/2026-10-\d\d/);
@@ -91,8 +91,16 @@ describe("09 denetim düzeltmeleri", () => {
   it("O3/O4/D3/D5: atama ve düzenleme özetleri Türkçe tarih ve gece seçicisini kullanır", () => {
     const assign = renderToStaticMarkup(<AssignShiftDialog open projectId={"project" as Id<"projects">} employees={[employee]} shifts={[shift]} initial={assignmentInitial("2026-10-19")} onOpenChange={() => undefined} />);
     const edit = renderToStaticMarkup(<AssignmentEditDialog open assignment={assignment} shifts={[shift]} employeeName="İpek Yıldız" shiftName="Gece" onOpenChange={() => undefined} />);
-    for (const html of [assign, edit]) {
-      expect(html).toContain("19.10.2026"); expect(html).toContain('role="combobox"'); expect(html).not.toMatch(/<select(?! aria-hidden="true")/);
+    for (const [html, prefix, endDate] of [[assign, "assignment", "19 Ekim 2026"], [edit, "edit", "25 Ekim 2026"]]) {
+      for (const [field, label, date] of [["start", "Başlangıç", "19 Ekim 2026"], ["end", "Bitiş", endDate]]) {
+        const id = `${prefix}-${field}`;
+        const control = html.match(new RegExp(`<button\\b(?=[^>]*\\bid="${id}")[^>]*>[\\s\\S]*?<\\/button>`))?.[0] ?? "";
+        expect(html).toMatch(new RegExp(`<label\\b[^>]*for="${id}"[^>]*>${label}<\\/label>`));
+        expect(control).toContain('aria-haspopup="dialog"');
+        expect(control.replace(/<[^>]*>/g, "").trim()).toBe(date);
+      }
+      expect(html).toContain('role="combobox"');
+      expect(html).not.toMatch(/<select(?! aria-hidden="true")/);
       expect(html).toContain("max-sm:min-h-11");
     }
     expect(edit).toContain("Gece · 22:00–06:00 (+1 gün)");

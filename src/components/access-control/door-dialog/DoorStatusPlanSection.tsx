@@ -20,7 +20,7 @@ export function DoorStatusPlanSection({
     <div className="min-w-0 rounded-md border p-3 space-y-3">
       <div className="flex min-h-11 items-center justify-between gap-2">
         <Label htmlFor="status-enabled" className="text-sm font-medium">
-          Kapı Durum Planı
+          Kapı durum planı
         </Label>
         <div className="flex shrink-0 items-center gap-2">
           <span className="text-sm">

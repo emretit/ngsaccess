@@ -16,7 +16,7 @@ export function visitorFormPayload(formData: VisitorFormData, visitor?: VisitorD
   if (visitor) {
     return { kind: "update", args: {
       visitorId: visitor._id, projectId: formData.projectId, ...shared,
-      ...(isPreRegistration && formData.presetRuleId ? { presetRuleId: formData.presetRuleId } : {}),
+      ...(isPreRegistration && parsed.selected_doors.length ? { doorIds: parsed.selected_doors as Id<"doors">[] } : {}),
       ...(parsed.accessExpiresAt !== originalExpiry ? { accessExpiresAt: localInputToIso(parsed.accessExpiresAt) } : {}),
       cardNumber: parsed.cardNumber || undefined,
       visitorPhone: formData.visitorPhone.trim() || null,
@@ -27,7 +27,7 @@ export function visitorFormPayload(formData: VisitorFormData, visitor?: VisitorD
   }
   return { kind: "create", args: {
     ...shared, projectId: formData.projectId, accessExpiresAt: localInputToIso(parsed.accessExpiresAt),
-    presetRuleId: parsed.presetRuleId as Id<"accessRules">, cardNumber: parsed.cardNumber,
+    doorIds: parsed.selected_doors as Id<"doors">[], cardNumber: parsed.cardNumber,
     visitorPhone: formData.visitorPhone.trim() || undefined,
     visitorCompany: formData.visitorCompany.trim() || undefined,
     visitPurpose: formData.visitPurpose.trim() || undefined,

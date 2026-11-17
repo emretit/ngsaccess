@@ -22,24 +22,24 @@ export function CalendarNavigation({ day, effectivePeriod, period, compact, rang
   setPeriod: (period: Period) => void; clearSelection: () => void;
 }) {
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-    <div className="flex items-center gap-1">
-      <Button variant="outline" size="icon" aria-label="Önceki dönem" onClick={() => changeDay(nextPeriod(day, effectivePeriod, -1))}>
+    <div className="flex items-center gap-0.5">
+      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Önceki dönem" onClick={() => changeDay(nextPeriod(day, effectivePeriod, -1))}>
         <ChevronLeft className="size-4" aria-hidden="true" />
       </Button>
-      <Button variant="outline" className="px-2" onClick={() => changeDay(istanbulToday())}>Bugün</Button>
-      <Button variant="outline" size="icon" aria-label="Sonraki dönem" onClick={() => changeDay(nextPeriod(day, effectivePeriod, 1))}>
+      <Button variant="outline" className="h-8 px-3 text-xs" onClick={() => changeDay(istanbulToday())}>Bugün</Button>
+      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sonraki dönem" onClick={() => changeDay(nextPeriod(day, effectivePeriod, 1))}>
         <ChevronRight className="size-4" aria-hidden="true" />
       </Button>
     </div>
     <div className="flex flex-wrap items-center gap-x-1">
       <DateInput required value={day} onChange={changeDay}
-        trigger={<Button variant="ghost" className="px-2 text-xs" aria-label="Tarih seç">
+        trigger={<Button variant="ghost" className="h-8 px-1 text-sm font-semibold" title="İstanbul saati" aria-label="Tarih seç">
           {calendarRangeLabel(range.rangeStart, range.rangeEnd, effectivePeriod)}
           <CalendarIcon className="h-4 w-4 opacity-50" aria-hidden="true" />
         </Button>} />
-      <span className="whitespace-nowrap text-[11px] text-muted-foreground">İstanbul saati</span>
+      <span className="sr-only">İstanbul saati</span>
     </div>
-    {!compact && <SegmentedViewControl label="Dönem" className="gap-1" value={period}
+    {!compact && <SegmentedViewControl label="Dönem" className="gap-0.5 rounded-md border bg-background p-0.5 [&_button]:h-7 [&_button]:px-3 [&_button]:text-xs" value={period}
       options={[{ value: "week", label: "Hafta" }, { value: "month", label: "Ay" }]}
       onChange={(value) => { setPeriod(value); clearSelection(); }} />}
   </div>;

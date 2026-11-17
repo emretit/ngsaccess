@@ -26,8 +26,7 @@ export function DepartmentAssignments({ projectId }: { projectId: Id<'projects'>
   const [deleting, setDeleting] = useState<DepartmentAssignment | null>(null);
   const labels = departmentLabels(departments, companies, item => departmentPath(item._id, departments ?? []));
   const name = (row: DepartmentAssignment) => labels.get(row.departmentId) ?? departmentPath(row.departmentId, departments ?? []);
-  return <section className="mt-6 space-y-3 border-t pt-4" aria-label="Departman atamaları">
-    <h3 className="font-semibold">Departman atamaları</h3>
+  return <section className="space-y-3" aria-label="Departman atamaları">
     {!assignments || !departments || !shifts ? <SectionSkeleton label="Departman atamaları yükleniyor" /> : !assignments.length ? <p className="text-sm text-muted-foreground">Henüz departman ataması yok.</p> : <Table framed resizeKey="shift-department-assignments" className="w-full text-sm">
       <TableHeader><TableRow className="border-b text-left"><TableHead columnId="department" className="p-2">Departman</TableHead><TableHead columnId="pattern" className="p-2">Desen</TableHead><TableHead columnId="date-range" className="p-2">Tarih aralığı</TableHead><TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="p-2"><span className="sr-only">İşlemler</span></TableHead></TableRow></TableHeader>
       <TableBody>{assignments.map(row => <TableRow key={row._id} className={`border-b ${can('schedule.manage') ? ROW_CLICK_CLASS : ''}`} onClick={can('schedule.manage') ? onRowActivate(() => setEdit(row)) : undefined}>

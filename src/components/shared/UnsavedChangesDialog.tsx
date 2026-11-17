@@ -14,7 +14,12 @@ export function UnsavedChangesDialog({ open, onOpenChange, onConfirm }: UnsavedC
     <AlertDialogContent onOpenAutoFocus={() => {
       trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }} onCloseAutoFocus={(event) => {
-      if (trigger.current?.isConnected) { event.preventDefault(); trigger.current.focus(); }
+      if (trigger.current?.isConnected) { event.preventDefault(); trigger.current.focus(); return; }
+      // A mobile menu link can disappear while confirmation is open. Resolve
+      // main at close time so cancel returns to the form's page and discard
+      // keeps focus on the newly navigated page, without changing its scroll.
+      const main = document.getElementById("main");
+      if (main) { event.preventDefault(); main.focus({ preventScroll: true }); }
     }}>
       <AlertDialogHeader>
         <AlertDialogTitle>Değişiklikler kaydedilmedi</AlertDialogTitle>

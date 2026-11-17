@@ -1,6 +1,5 @@
-import { MasterDetailListLayout } from "@/components/shared/MasterDetailListLayout";
+import { PageTemplate } from "@/components/shared/PageTemplate";
 import type { ReactNode } from "react";
-import { PageHeader } from "@/components/shared/PageHeader";
 import { DeviceAddMenu } from "./DeviceAddMenu";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Device } from "@/types/device";
@@ -81,14 +80,12 @@ export function DevicesContent({
   ]));
 
   return (
-    <div className="min-w-0 space-y-5">
-      <PageHeader title="Cihazlar">
-        {canManage && (
-          <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} onAddVirtualReader={onAddVirtualReader} />
-        )}
-      </PageHeader>
-      <MasterDetailListLayout sidebar={sidebar}>
-        <DeviceFilters
+    <PageTemplate
+      title="Cihazlar"
+      scope={activeProject?.name}
+      primaryAction={canManage && <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} onAddVirtualReader={onAddVirtualReader} />}
+      aside={sidebar ? { label: "Bölge ve kapı kapsamı", content: sidebar } : undefined}
+      filters={<DeviceFilters
           onClearFilters={clearFilters}
           locationActive={Boolean(selectedZoneId || selectedDoorId)}
           typeCounts={typeCounts}
@@ -115,27 +112,26 @@ export function DevicesContent({
           onAddFromCloud={onAddFromCloud}
           showNewDevice={canManage}
           deviceCount={devices.length}
+        />}
+    >
+      <div className="min-w-0">
+        <DeviceList
+          canManage={canManage}
+          filterKey={`${activeProject?._id}:${search}:${statusFilter}:${typeFilter}:${selectedZoneId}:${selectedDoorId}`}
+          onClearFilters={clearFilters}
+          onAddDevice={canManage ? onAddNew : undefined}
+          devices={devices}
+          filteredDevices={filteredDevices}
+          isLoading={isLoading}
+          zones={zones}
+          onDeleteDevice={onDeleteDevice}
+          onAssignLocation={onAssignLocation}
+          onEditDevice={onEditDevice}
+          onQRClick={onQRClick}
+          onReleaseDevice={onReleaseDevice}
+          hideZoneColumn={Boolean(selectedZoneId || selectedDoorId)}
         />
-
-        <div className="min-w-0">
-          <DeviceList
-            canManage={canManage}
-            filterKey={`${activeProject?._id}:${search}:${statusFilter}:${typeFilter}:${selectedZoneId}:${selectedDoorId}`}
-            onClearFilters={clearFilters}
-            onAddDevice={canManage ? onAddNew : undefined}
-            devices={devices}
-            filteredDevices={filteredDevices}
-            isLoading={isLoading}
-            zones={zones}
-            onDeleteDevice={onDeleteDevice}
-            onAssignLocation={onAssignLocation}
-            onEditDevice={onEditDevice}
-            onQRClick={onQRClick}
-            onReleaseDevice={onReleaseDevice}
-            hideZoneColumn={Boolean(selectedZoneId || selectedDoorId)}
-          />
-        </div>
-      </MasterDetailListLayout>
-    </div>
+      </div>
+    </PageTemplate>
   );
 }

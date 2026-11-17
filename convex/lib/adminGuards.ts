@@ -55,6 +55,8 @@ export const projectDeletionMatrix = [
   { table: "employeeFaces", index: "by_project", label: "yüz kaydı", policy: "block" },
   { table: "employeeFingerprints", index: "by_project", label: "parmak izi kaydı", policy: "block" },
   { table: "groupMembers", index: "by_project_employee", label: "grup üyeliği", policy: "block" },
+  { table: "groupDepartments", index: "by_project", label: "dinamik departman yetkisi", policy: "block" },
+  { table: "employeeDepartmentHistory", index: "by_project_employee", label: "tarihli departman üyeliği", policy: "block" },
   { table: "groupDevices", index: "by_project_device", label: "grup cihaz bağlantısı", policy: "block" },
   { table: "groupDoors", index: "by_project_group", label: "grup kapı bağlantısı", policy: "block" },
   { table: "deviceEvents", index: "by_project", label: "cihaz olayı", policy: "block" },
@@ -68,6 +70,7 @@ export const projectDeletionMatrix = [
   { table: "overtimeRates", index: "by_project", label: "Fazla mesai oranları", policy: "delete" },
   { table: "holidays", index: "by_project", label: "Tatiller", policy: "delete" },
   { table: "reportScheduleSettings", index: "by_project", label: "Rapor zamanlamaları", policy: "delete" },
+  { table: "reportDeliveries", index: "by_projectId", label: "Rapor teslim kayıtları", policy: "delete" },
   { table: "leaveBalances", index: "by_project", label: "İzin bakiyeleri", policy: "delete" },
   { table: "chatConversations", index: "by_project", label: "Sohbetler", policy: "delete" },
   { table: "projectPrivacySettings", index: "by_project", label: "Gizlilik ayarları", policy: "delete" },
@@ -161,6 +164,7 @@ function projectDeletionTableQuery(
   if (entry.index === "scan") return ctx.db.query(entry.table).filter(q => q.eq(q.field("projectId"), projectId));
   // Narrow the discriminated entry before selecting its schema-checked index.
   if (entry.index === "by_project") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_project_end") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_project_employee") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_project_device") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));

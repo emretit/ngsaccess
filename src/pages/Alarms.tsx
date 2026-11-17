@@ -6,19 +6,21 @@ import { SegmentedViewControl } from "@/components/shared/SegmentedViewControl";
 import { LoadMoreFooter } from "@/components/shared/LoadMoreFooter";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { PageTemplate } from "@/components/shared/PageTemplate";
+import { BulkBar } from "@/components/shared/BulkBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { notify } from "@/lib/notify";
-import { DEFAULT_ALARM_FILTERS, alarmListArgs, AlarmAcknowledgeButton, AlarmFilters, type AlarmFiltersValue } from "@/components/alarms/AlarmFilters";
+import { DEFAULT_ALARM_FILTERS, alarmListArgs, AlarmAcknowledgeButton, AlarmDeviceOptions, AlarmFilters, type AlarmFiltersValue } from "@/components/alarms/AlarmFilters";
 import { AlarmEmailStatus } from "@/components/alarms/AlarmEmailStatus";
 
 function OfflineDuration({ offlineDurationMs }: { offlineDurationMs?: number }) {
@@ -85,36 +87,79 @@ function AlarmSettingsDialog({ projectId, open, onOpenChange }: { projectId: Id<
   </DialogContent></Dialog>;
 }
 
-export default function Alarms() {
-  const [searchParams] = useSearchParams();
-  const { projectId, activeProject, loading } = useActiveProjectScope();
+export function AlarmContent({ settingsOpen = false, onSettingsOpenChange = () => {} }: { settingsOpen?: boolean; onSettingsOpenChange?: (open: boolean) => void } = {}) {
+  const { projectId } = useActiveProjectScope();
   const { can } = usePermissions();
   const canManage = can("alarms.ack");
   const [category, setCategory] = useState<Category>("alarm");
   const [filters, setFilters] = useState<AlarmFiltersValue>(DEFAULT_ALARM_FILTERS);
   const { status } = filters;
   const [selected, setSelected] = useState<Id<"deviceEvents">[]>([]);
-  const [settingsOpen, setSettingsOpen] = useState(searchParams.get("settings") === "notifications");
-  const summary = useQuery(api.alarms.summary, projectId ? { projectId } : "skip");
-  const devices = useQuery(api.devices.list, projectId ? { projectId } : "skip");
   const acknowledge = useMutation(api.alarms.acknowledge);
-  const { results, status: pageStatus, loadMore } = usePaginatedQuery(api.alarms.list,
-    projectId ? alarmListArgs(projectId, category, filters) : "skip", { initialNumItems: 50 });
   useEffect(() => { setSelected([]); }, [projectId, category, filters]);
   const acknowledgeRows = async (ids: Id<"deviceEvents">[]) => {
     try { await acknowledge({ ids }); setSelected(current => current.filter(id => !ids.includes(id))); notify.success("Olay onaylandı"); }
     catch (error) { notify.error("Olay onaylanamadı", error); }
   };
-  if (!projectId && !loading) return <div className="space-y-6"><PageHeader title="Alarmlar" /><EmptyState title="Bir proje seçin" description="Alarm kayıtlarını görmek için üst çubuktan proje seçin." /></div>;
   return <div className="min-w-0 space-y-6">
-    <PageHeader title="Alarmlar" scope={activeProject?.name ?? "Seçili proje"} />
     <p className="text-sm text-muted-foreground">Çevrimdışı arızaları yeni sinyal geldiğinde süreleriyle kaydedilir ve bağlantının geri geldiği işaretlenir. Hik gateway sessizliği tek başına arıza sayılmaz.</p>
-    <section aria-label="Son yedi gün" className="flex gap-6 rounded-lg border border-line p-4 text-sm"><span>Kritik açık: <strong>{summary?.critical ?? "—"}{summary?.capped ? "+" : ""}</strong></span><span>Uyarı açık: <strong>{summary?.warning ?? "—"}{summary?.capped ? "+" : ""}</strong></span></section>
-    <AlarmFilters value={filters} devices={devices ?? []} onChange={setFilters}
+    <QuerySectionBoundary resetKey={projectId} title="Alarm özeti yüklenemedi"><AlarmSummary /></QuerySectionBoundary>
+    <AlarmFilters value={filters} deviceControl={<QuerySectionBoundary resetKey={projectId} title="Cihaz seçenekleri yüklenemedi"><AlarmDeviceFilter value={filters} onChange={setFilters} /></QuerySectionBoundary>} onChange={setFilters}
       start={<SegmentedViewControl label="Olay türü" value={category} options={[{ value: "alarm", label: "Alarm" }, { value: "exception", label: "Arıza / İstisna" }]} onChange={setCategory} />}
-      actions={<>{can("admin.manage") && <Button variant="outline" onClick={() => setSettingsOpen(true)}>Bildirim ayarları</Button>}{canManage && status !== "acked" && <Button disabled={!selected.length} onClick={() => void acknowledgeRows(selected)}>Seçilenleri onayla ({selected.length})</Button>}</>} />
-    <Table framed resizeKey="alarms" className="w-full text-left text-sm"><TableHeader className="bg-subtle"><TableRow>{canManage && <TableHead columnId="select" resizable={false} className="p-3">Seç</TableHead>}<TableHead columnId="time" className="p-3">Zaman</TableHead><TableHead columnId="device" className="p-3">Cihaz</TableHead><TableHead columnId="event" className="p-3">Olay</TableHead><TableHead columnId="severity" className="p-3">Önem</TableHead><TableHead columnId="status" className="p-3">Durum</TableHead>{can("admin.manage") && <TableHead columnId="email" className="p-3">E-posta</TableHead>}{canManage && <TableHead columnId="actions" resizable={false} className="p-3">İşlem</TableHead>}</TableRow></TableHeader><TableBody>{loading || pageStatus === "LoadingFirstPage" ? <TableStateRow colSpan={5 + (canManage ? 2 : 0) + (can("admin.manage") ? 1 : 0)} state="loading" label="Olaylar yükleniyor." /> : !results.length ? <TableStateRow colSpan={5 + (canManage ? 2 : 0) + (can("admin.manage") ? 1 : 0)} state="empty" title={pageStatus === "CanLoadMore" ? "Daha fazla yükle" : "Olay bulunamadı"} description={pageStatus === "CanLoadMore" ? "Tarama sınırına ulaşıldı. Daha fazla olay için aşağıdaki düğmeyi kullanın." : "Seçili filtrelerde gösterilecek olay yok."} /> : results.map(row => <TableRow key={row._id} className="border-t border-line">{canManage && <TableCell className="p-3">{!row.ackedAt && <input aria-label={`${row.label} seç`} type="checkbox" disabled={selected.length >= 50 && !selected.includes(row._id)} checked={selected.includes(row._id)} onChange={event => setSelected(current => event.target.checked ? (current.includes(row._id) || current.length >= 50 ? current : [...current, row._id]) : current.filter(id => id !== row._id))} />}</TableCell>}<TableCell className="p-3">{new Date(row.eventTime).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}</TableCell><TableCell className="p-3 truncate" title={row.deviceName}>{row.deviceName}</TableCell><TableCell className="p-3"><span className="block truncate" title={row.label}>{row.label}</span>{row.resolvedAt && <p className="text-xs text-muted-foreground">Bağlantı geri geldi · {new Date(row.resolvedAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}</p>}{row.resolvedAt && <OfflineDuration offlineDurationMs={row.offlineDurationMs} />}</TableCell><TableCell className="p-3"><StatusBadge tone={row.severity === "critical" ? "danger" : row.severity === "warning" ? "warning" : "neutral"}>{row.severity === "critical" ? "Kritik" : row.severity === "warning" ? "Uyarı" : "Bilgi"}</StatusBadge></TableCell><TableCell className="p-3">{row.ackedAt ? `Onaylandı · ${new Date(row.ackedAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}` : "İnceleme bekliyor"}</TableCell>{can("admin.manage") && <TableCell className="p-3"><AlarmEmailStatus delivery={{ status: row.alarmEmailStatus, attempts: row.alarmEmailAttempts, at: row.alarmEmailAttemptAt ?? row.alarmQueuedAt, error: row.alarmEmailError, retryAt: row.alarmEmailRetryAt }} /></TableCell>}{canManage && <TableCell className="p-3">{!row.ackedAt && <AlarmAcknowledgeButton onAcknowledge={() => void acknowledgeRows([row._id])} />}</TableCell>}</TableRow>)}</TableBody></Table>
-    <LoadMoreFooter hasMore={pageStatus === "CanLoadMore" || pageStatus === "LoadingMore"} loading={pageStatus === "LoadingMore"} onLoadMore={() => loadMore(50)} />
-    {projectId && can("admin.manage") && <AlarmSettingsDialog key={projectId} projectId={projectId} open={settingsOpen} onOpenChange={setSettingsOpen} />}
+      />
+    {canManage && status !== "acked" && <BulkBar count={selected.length} onClear={() => setSelected([])}><Button onClick={() => void acknowledgeRows(selected)}>Seçilenleri onayla ({selected.length})</Button></BulkBar>}
+    <QuerySectionBoundary resetKey={`${projectId}:${category}:${JSON.stringify(filters)}`} title="Alarm kayıtları yüklenemedi" description="Filtreleriniz korunuyor. Yeniden deneyebilirsiniz.">
+      <AlarmResults category={category} filters={filters} selected={selected} setSelected={setSelected} acknowledgeRows={acknowledgeRows} canManage={canManage} isAdmin={can("admin.manage")} />
+    </QuerySectionBoundary>
+    {projectId && can("admin.manage") && <QuerySectionBoundary key={projectId} resetKey={`${projectId}:${settingsOpen}`} title="Bildirim ayarları yüklenemedi"><AlarmSettingsDialog projectId={projectId} open={settingsOpen} onOpenChange={onSettingsOpenChange} /></QuerySectionBoundary>}
   </div>;
+}
+
+function AlarmSummary() {
+  const { projectId } = useActiveProjectScope();
+  const summary = useQuery(api.alarms.summary, projectId ? { projectId } : "skip");
+  return (
+    <section aria-label="Son yedi gün" className="flex gap-6 rounded-lg border border-line p-4 text-sm"><span>Kritik açık: <strong>{summary?.critical ?? "—"}{summary?.capped ? "+" : ""}</strong></span><span>Uyarı açık: <strong>{summary?.warning ?? "—"}{summary?.capped ? "+" : ""}</strong></span></section>
+  );
+}
+
+function AlarmDeviceFilter({ value, onChange }: { value: AlarmFiltersValue; onChange: (next: AlarmFiltersValue) => void }) {
+  const { projectId } = useActiveProjectScope();
+  const devices = useQuery(api.devices.list, projectId ? { projectId } : "skip");
+  return <AlarmDeviceOptions value={value} devices={devices ?? []} onChange={onChange} />;
+}
+
+function AlarmResults({ category, filters, selected, setSelected, acknowledgeRows, canManage, isAdmin }: {
+  category: Category;
+  filters: AlarmFiltersValue;
+  selected: Id<"deviceEvents">[];
+  setSelected: Dispatch<SetStateAction<Id<"deviceEvents">[]>>;
+  acknowledgeRows: (ids: Id<"deviceEvents">[]) => Promise<void>;
+  canManage: boolean;
+  isAdmin: boolean;
+}) {
+  const { projectId, loading } = useActiveProjectScope();
+  const { results, status: pageStatus, loadMore } = usePaginatedQuery(api.alarms.list,
+    projectId ? alarmListArgs(projectId, category, filters) : "skip", { initialNumItems: 50 });
+  return <>
+    <Table framed scrollLabel="Alarm kayıtları" resizeKey="alarms" className="w-full text-left text-sm"><TableHeader className="bg-subtle"><TableRow>{canManage && <TableHead columnId="select" resizable={false} className="p-3">Seç</TableHead>}<TableHead columnId="time" className="p-3">Zaman</TableHead><TableHead columnId="device" className="p-3">Cihaz</TableHead><TableHead columnId="event" className="p-3">Olay</TableHead><TableHead columnId="severity" className="p-3">Önem</TableHead><TableHead columnId="status" className="p-3">Durum</TableHead>{isAdmin && <TableHead columnId="email" className="p-3">E-posta</TableHead>}{canManage && <TableHead columnId="actions" resizable={false} className="p-3">İşlem</TableHead>}</TableRow></TableHeader><TableBody>{loading || pageStatus === "LoadingFirstPage" ? <TableStateRow colSpan={5 + (canManage ? 2 : 0) + (isAdmin ? 1 : 0)} state="loading" label="Olaylar yükleniyor." /> : !results.length ? <TableStateRow colSpan={5 + (canManage ? 2 : 0) + (isAdmin ? 1 : 0)} state="empty" title={pageStatus === "CanLoadMore" ? "Daha fazla yükle" : "Olay bulunamadı"} description={pageStatus === "CanLoadMore" ? "Tarama sınırına ulaşıldı. Daha fazla olay için aşağıdaki düğmeyi kullanın." : "Seçili filtrelerde gösterilecek olay yok."} /> : results.map(row => <TableRow key={row._id} className="border-t border-line">{canManage && <TableCell className="p-3">{!row.ackedAt && <input aria-label={`${row.label} seç`} type="checkbox" disabled={selected.length >= 50 && !selected.includes(row._id)} checked={selected.includes(row._id)} onChange={event => setSelected(current => event.target.checked ? (current.includes(row._id) || current.length >= 50 ? current : [...current, row._id]) : current.filter(id => id !== row._id))} />}</TableCell>}<TableCell className="p-3">{new Date(row.eventTime).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}</TableCell><TableCell className="p-3 truncate" title={row.deviceName}>{row.deviceName}</TableCell><TableCell className="p-3"><span className="block truncate" title={row.label}>{row.label}</span>{row.resolvedAt && <p className="text-xs text-muted-foreground">Bağlantı geri geldi · {new Date(row.resolvedAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}</p>}{row.resolvedAt && <OfflineDuration offlineDurationMs={row.offlineDurationMs} />}</TableCell><TableCell className="p-3"><StatusBadge tone={row.severity === "critical" ? "danger" : row.severity === "warning" ? "warning" : "neutral"}>{row.severity === "critical" ? "Kritik" : row.severity === "warning" ? "Uyarı" : "Bilgi"}</StatusBadge></TableCell><TableCell className="p-3">{row.ackedAt ? `Onaylandı · ${new Date(row.ackedAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}` : "İnceleme bekliyor"}</TableCell>{isAdmin && <TableCell className="p-3"><AlarmEmailStatus delivery={{ status: row.alarmEmailStatus, attempts: row.alarmEmailAttempts, at: row.alarmEmailAttemptAt ?? row.alarmQueuedAt, error: row.alarmEmailError, retryAt: row.alarmEmailRetryAt }} /></TableCell>}{canManage && <TableCell className="p-3">{!row.ackedAt && <AlarmAcknowledgeButton onAcknowledge={() => void acknowledgeRows([row._id])} />}</TableCell>}</TableRow>)}</TableBody></Table>
+    <LoadMoreFooter hasMore={pageStatus === "CanLoadMore" || pageStatus === "LoadingMore"} loading={pageStatus === "LoadingMore"} onLoadMore={() => loadMore(50)} />
+  </>;
+}
+
+function AlarmNotificationAction({ onOpen }: { onOpen: () => void }) {
+  const { can } = usePermissions();
+  return can("admin.manage") ? <Button variant="outline" onClick={onOpen}>Bildirim ayarları</Button> : null;
+}
+
+export default function Alarms() {
+  const { projectId, activeProject, loading } = useActiveProjectScope();
+  const [searchParams] = useSearchParams();
+  const [settingsOpen, setSettingsOpen] = useState(searchParams.get("settings") === "notifications");
+  return <PageTemplate title="Alarmlar" scope={activeProject?.name ?? "Seçili proje"}
+    secondaryActions={projectId && <QuerySectionBoundary resetKey={projectId} title="Bildirim eylemi yüklenemedi"><AlarmNotificationAction onOpen={() => setSettingsOpen(true)} /></QuerySectionBoundary>}>
+    {!projectId && !loading
+      ? <EmptyState title="Bir proje seçin" description="Alarm kayıtlarını görmek için üst çubuktan proje seçin." />
+      : <QuerySectionBoundary resetKey={projectId} title="Alarm kontrolleri yüklenemedi"><AlarmContent settingsOpen={settingsOpen} onSettingsOpenChange={setSettingsOpen} /></QuerySectionBoundary>}
+  </PageTemplate>;
 }

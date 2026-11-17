@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FormFieldWrapper } from "./FormFieldWrapper";
 import { PasswordField } from "./PasswordField";
@@ -33,4 +33,31 @@ describe("ortak form ve bölüm sözleşmeleri", () => {
     expect(renderToStaticMarkup(boundary.render())).toContain('Tekrar Dene');
     expect(renderToStaticMarkup(boundary.render())).not.toContain('Veri</p>');
   });
+});
+
+it("uses the custom fallback only for errors and preserves retry and reset semantics", () => {
+  const onRetry = vi.fn();
+  let retry = () => {};
+  const renderFallback = vi.fn((attempt: () => void) => {
+    retry = attempt;
+    return <div role="alert">Özel sayfa hatası</div>;
+  });
+  const props = { children: <p>Veri</p>, resetKey: "project-a", onRetry, renderFallback };
+  const boundary = new QuerySectionBoundary(props);
+  const update = vi.spyOn(boundary, "setState");
+  update.mockImplementation(() => undefined);
+  expect(renderToStaticMarkup(boundary.render())).toContain("Veri");
+  expect(renderFallback).not.toHaveBeenCalled();
+  boundary.state = { failed: true, attempt: 2 };
+  expect(renderToStaticMarkup(boundary.render())).toContain("Özel sayfa hatası");
+  retry();
+  expect(onRetry).toHaveBeenCalledOnce();
+  const updater = update.mock.calls[0]?.[0];
+  expect(typeof updater).toBe("function");
+  if (typeof updater === "function") expect(updater(boundary.state, props)).toEqual({ failed: false, attempt: 3 });
+  update.mockClear();
+  boundary.componentDidUpdate(props);
+  expect(update).not.toHaveBeenCalled();
+  boundary.componentDidUpdate({ ...props, resetKey: "project-b" });
+  expect(update).toHaveBeenCalledExactlyOnceWith({ failed: false });
 });

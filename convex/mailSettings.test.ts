@@ -71,30 +71,57 @@ const row = { host: "smtp.gmail.com", port: 465, secure: true, username: "rapor@
 describe("project mail settings", () => {
   it("stores the account without ever returning the password", async () => {
     const { t, ids, caller } = await setup("super_admin");
-    await t.mutation(internal.mailSettings.upsertForCaller, { ...row, callerId: ids.caller, projectId: ids.project, passwordEnc: "v1.iv.data" });
+    await caller.mutation(internal.mailSettings.upsertForCaller, { ...row, callerId: ids.caller, projectId: ids.project, passwordEnc: "v1.iv.data" });
     const saved = await caller.query(api.mailSettings.get, { projectId: ids.project });
     expect(saved).toMatchObject({ host: "smtp.gmail.com", hasPassword: true, isActive: true });
     expect(JSON.stringify(saved)).not.toContain("v1.iv.data");
     expect(await t.query(internal.mailSettings.getForDelivery, { projectId: ids.project })).toMatchObject({ passwordEnc: "v1.iv.data" });
   });
   it("keeps the stored password only while host and username stay the same", async () => {
-    const { t, ids } = await setup("super_admin");
+    const { ids, caller } = await setup("super_admin");
     const args = { ...row, callerId: ids.caller, projectId: ids.project };
-    await expect(t.mutation(internal.mailSettings.upsertForCaller, args)).rejects.toThrow(/şifresini girin/);
-    await t.mutation(internal.mailSettings.upsertForCaller, { ...args, passwordEnc: "v1.iv.data" });
-    await t.mutation(internal.mailSettings.upsertForCaller, { ...args, fromName: "Yeni ad" });
-    await expect(t.mutation(internal.mailSettings.upsertForCaller, { ...args, host: "evil.example.com" })).rejects.toThrow(/yeniden girin/);
+    await expect(caller.mutation(internal.mailSettings.upsertForCaller, args)).rejects.toThrow(/şifresini girin/);
+    await caller.mutation(internal.mailSettings.upsertForCaller, { ...args, passwordEnc: "v1.iv.data" });
+    await caller.mutation(internal.mailSettings.upsertForCaller, { ...args, fromName: "Yeni ad" });
+    await expect(caller.mutation(internal.mailSettings.upsertForCaller, { ...args, host: "evil.example.com" })).rejects.toThrow(/yeniden girin/);
   });
   it("falls back to the default provider when the account is inactive", async () => {
-    const { t, ids } = await setup("super_admin");
-    await t.mutation(internal.mailSettings.upsertForCaller, { ...row, isActive: false, callerId: ids.caller, projectId: ids.project, passwordEnc: "v1.iv.data" });
+    const { t, ids, caller } = await setup("super_admin");
+    await caller.mutation(internal.mailSettings.upsertForCaller, { ...row, isActive: false, callerId: ids.caller, projectId: ids.project, passwordEnc: "v1.iv.data" });
     expect(await t.query(internal.mailSettings.getForDelivery, { projectId: ids.project })).toBeNull();
-    expect(await t.query(internal.mailSettings.getForCaller, { callerId: ids.caller, projectId: ids.project })).toMatchObject({ isActive: false });
+    expect(await caller.query(internal.mailSettings.getForCaller, { callerId: ids.caller, projectId: ids.project })).toMatchObject({ isActive: false });
   });
   it("rejects users without admin.manage", async () => {
-    const { t, ids, caller } = await setup("project_user");
-    await expect(t.mutation(internal.mailSettings.upsertForCaller, { ...row, callerId: ids.caller, projectId: ids.project, passwordEnc: "v1.iv.data" })).rejects.toThrow();
+    const { ids, caller } = await setup("project_user");
+    await expect(caller.mutation(internal.mailSettings.upsertForCaller, { ...row, callerId: ids.caller, projectId: ids.project, passwordEnc: "v1.iv.data" })).rejects.toThrow();
     await expect(caller.query(api.mailSettings.get, { projectId: ids.project })).rejects.toThrow();
-    await expect(t.query(internal.mailSettings.getForCaller, { callerId: ids.caller, projectId: ids.project })).rejects.toThrow();
+    await expect(caller.query(internal.mailSettings.getForCaller, { callerId: ids.caller, projectId: ids.project })).rejects.toThrow();
+  });
+});
+
+describe("C-04 SMTP commit authorization", () => {
+  it.each(["frozen", "expired", "unverified", "demoted", "revoked", "sessionDeleted", "projectInactive"] as const)("rejects %s after action authorization without changing settings", async reason => {
+    const { t, ids, caller } = await setup("project_admin");
+    const args = { ...row, callerId: ids.caller, projectId: ids.project, passwordEnc: "v1.old.secret" };
+    await caller.mutation(internal.mailSettings.upsertForCaller, args);
+    // Same initial guard as authedAction, before the encryption/commit boundary.
+    await caller.query(internal.users.requireCurrentUser, {});
+    await t.run(async ctx => {
+      if (reason === "frozen") await ctx.db.patch(ids.caller, { disabledAt: Date.now() });
+      if (reason === "expired") await ctx.db.patch(ids.caller, { accessExpiresAt: Date.now() - 1 });
+      if (reason === "unverified") await ctx.db.patch(ids.caller, { verified: false });
+      if (reason === "demoted") await ctx.db.patch(ids.caller, { role: "project_user" });
+      if (reason === "revoked") await ctx.db.patch(ids.caller, { sessionsRevokedThrough: Date.now() + 1 });
+      if (reason === "sessionDeleted") await ctx.db.delete(ids.session);
+      if (reason === "projectInactive") await ctx.db.patch(ids.project, { isActive: false });
+    });
+    await expect(caller.mutation(internal.mailSettings.upsertForCaller, { ...args, passwordEnc: "v1.new.secret", fromName: "Changed" })).rejects.toThrow();
+    expect(await t.run(ctx => ctx.db.query("mailSettings").withIndex("by_project", q => q.eq("projectId", ids.project)).unique()))
+      .toMatchObject({ smtpPassword: "v1.old.secret", fromName: "Firma" });
+  });
+  it("rejects an anonymous internal call even with a valid caller ID", async () => {
+    const { t, ids } = await setup("super_admin");
+    await expect(t.mutation(internal.mailSettings.upsertForCaller, { ...row, callerId: ids.caller, projectId: ids.project, passwordEnc: "v1.iv.data" })).rejects.toThrow();
+    expect(await t.run(ctx => ctx.db.query("mailSettings").first())).toBeNull();
   });
 });

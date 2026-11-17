@@ -1,3 +1,4 @@
+import { OPEN_SHIFT_END, shiftEndLabel } from "./shiftRange";
 import { ConvexError } from "convex/values";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import { planShiftIds, validateShiftPlan, validatePlanStructure, type PlanRow, type ShiftPlan } from "./shiftPlan";
@@ -10,7 +11,7 @@ export const BULK_ASSIGN_LIMIT = 100;
 export const ASSIGNMENT_SCAN_LIMIT = 5000;
 
 export function shiftDateOffset(day: string, offset: number): string {
-  return new Date(Date.parse(day) + offset * DAY).toISOString().slice(0, 10);
+  return new Date(Math.min(Date.parse(OPEN_SHIFT_END), Date.parse(day) + offset * DAY)).toISOString().slice(0, 10);
 }
 
 export function validateAssignRange(range: ScheduleRange): void {
@@ -60,27 +61,24 @@ export function evaluateShiftAssignment(input: {
   shifts?: ReadonlyMap<string, ShiftClock>;
 }): AssignmentDecision {
   validateAssignRange(input.range);
-  const intervals = scheduleIntervals(input.range, input.shift, input.shifts);
+  const occurrenceCount = countScheduledOccurrences(input.range, input.shift, input.shifts);
   const base: AssignmentDecision = {
-    status: "will_assign", reason: "Atanacak", occurrenceCount: intervals.length,
+    status: "will_assign", reason: "Atanacak", occurrenceCount,
     conflict: null, leave: null, holiday: null,
   };
   if (input.shift.isActive === false) return { ...base, status: "skipped", reason: "Pasif vardiya atanamaz" };
 
   // Weekly patterns need a selected work date; cycle rest-only assignments remain valid.
-  if (!intervals.length && (!input.range.plan || input.range.plan.kind === "weekly")) return { ...base, status: "skipped", reason: "Seçilen günlere denk gelen tarih yok" };
+  if (!occurrenceCount && (!input.range.plan || input.range.plan.kind === "weekly")) return { ...base, status: "skipped", reason: "Seçilen günlere denk gelen tarih yok" };
 
-  const touched = new Set<string>();
-  for (const [start, end] of intervals) {
-    for (let day = Math.floor(start / 1440); day * 1440 < end; day++) {
-      touched.add(new Date(day * DAY).toISOString().slice(0, 10));
-    }
+  for (const leave of input.leaves) {
+    if (leave.status !== "approved") continue;
+    const date = firstScheduledTouch(input.range, input.shift, leave.startDate, leave.endDate, input.shifts);
+    if (date && (!base.leave || date < base.leave.date)) base.leave = { leaveId: leave._id, date, leaveType: leave.leaveType };
   }
-  for (const date of touched) {
-    const leave = input.leaves.find(item => item.status === "approved" && item.startDate <= date && item.endDate >= date);
-    if (leave && !base.leave) base.leave = { leaveId: leave._id, date, leaveType: leave.leaveType };
-    const holiday = input.holidays.find(item => item.date === date);
-    if (holiday && !base.holiday) base.holiday = { holidayId: holiday._id, date, name: holiday.name, isHalfDay: holiday.isHalfDay ?? false };
+  for (const holiday of input.holidays) {
+    const date = firstScheduledTouch(input.range, input.shift, holiday.date, holiday.date, input.shifts);
+    if (date && (!base.holiday || date < base.holiday.date)) base.holiday = { holidayId: holiday._id, date, name: holiday.name, isHalfDay: holiday.isHalfDay ?? false };
   }
   for (const existing of input.existing) {
     // Clip legacy long series before expanding, while preserving the previous night.
@@ -89,9 +87,14 @@ export function evaluateShiftAssignment(input: {
       startDate: existing.startDate > shiftDateOffset(input.range.startDate, -1) ? existing.startDate : shiftDateOffset(input.range.startDate, -1),
       endDate: existing.endDate < shiftDateOffset(input.range.endDate, 1) ? existing.endDate : shiftDateOffset(input.range.endDate, 1),
     };
-    const other = scheduleIntervals(range, existing.shift, input.shifts);
     const ownsSameDate = existing.startDate <= input.range.endDate && existing.endDate >= input.range.startDate;
-    if (ownsSameDate || intervalsOverlap(intervals, other)) {
+    // Ayrı dönemlerde yalnız gece vardiyasının sınırdaki devamı kesişebilir.
+    const currentBoundary = {
+      ...input.range,
+      startDate: input.range.startDate > shiftDateOffset(existing.startDate, -1) ? input.range.startDate : shiftDateOffset(existing.startDate, -1),
+      endDate: input.range.endDate < shiftDateOffset(existing.endDate, 1) ? input.range.endDate : shiftDateOffset(existing.endDate, 1),
+    };
+    if (ownsSameDate || intervalsOverlap(scheduleIntervals(currentBoundary, input.shift, input.shifts), scheduleIntervals(range, existing.shift, input.shifts))) {
       const { shift, ...assignment } = existing;
       base.conflict = { ...assignment, ...shift };
       break;
@@ -99,8 +102,35 @@ export function evaluateShiftAssignment(input: {
   }
   if (!input.calendarConfirmed && base.leave) return { ...base, status: "on_leave", reason: `İzin: ${base.leave.date}` };
   if (!input.calendarConfirmed && base.holiday) return { ...base, status: "holiday", reason: `${base.holiday.date}: ${base.holiday.name}` };
-  if (!input.forceConfirm && base.conflict) return { ...base, status: "conflict", reason: `OVERLAP:1 Mevcut planın üstünü örter: ${base.conflict.shiftName} ${shiftTimeLabel(base.conflict)} (${base.conflict.startDate}–${base.conflict.endDate})` };
+  if (!input.forceConfirm && base.conflict) return { ...base, status: "conflict", reason: `OVERLAP:1 Mevcut planın üstünü örter: ${base.conflict.shiftName} ${shiftTimeLabel(base.conflict)} (${base.conflict.startDate}–${shiftEndLabel(base.conflict.endDate)})` };
   return base;
+}
+
+/** Sınırsız seri için de yalnız bir desen döngüsü açılır; toplam tam döngülerden hesaplanır. */
+export function countScheduledOccurrences(range: ScheduleRange, shift: ShiftClock, shifts?: ReadonlyMap<string, ShiftClock>): number {
+  const days = Math.floor((Date.parse(range.endDate) - Date.parse(range.startDate)) / DAY) + 1;
+  if (days <= 0) return 0;
+  const period = range.plan && range.plan.kind !== "weekly" ? range.plan.slots.length : 7;
+  if (period < 1) return 0;
+  const sample = { ...range, endDate: shiftDateOffset(range.startDate, Math.min(days, period) - 1) };
+  const intervals = scheduleIntervals(sample, shift, shifts);
+  if (days <= period) return intervals.length;
+  const full = Math.floor(days / period);
+  const remainderEnd = Date.parse(range.startDate) / 60000 + (days % period) * 1440;
+  return full * intervals.length + intervals.filter(([start]) => start < remainderEnd).length;
+}
+
+/** Bir izin/tatil aralığındaki ilk çalışma günü, en fazla bir döngü ve gece devamından bulunur. */
+function firstScheduledTouch(range: ScheduleRange, shift: ShiftClock, from: string, until: string, shifts?: ReadonlyMap<string, ShiftClock>): string | null {
+  const startDate = range.startDate > shiftDateOffset(from, -1) ? range.startDate : shiftDateOffset(from, -1);
+  const period = range.plan && range.plan.kind !== "weekly" ? range.plan.slots.length : 7;
+  const sampleEnd = shiftDateOffset(startDate, period);
+  const endDate = [range.endDate, until, sampleEnd].sort()[0];
+  if (!endDate || startDate > endDate) return null;
+  const windowStart = Date.parse(from) / 60000;
+  const windowEnd = Date.parse(until) / 60000 + 1440;
+  const interval = scheduleIntervals({ ...range, startDate, endDate }, shift, shifts).find(([start, end]) => start < windowEnd && end > windowStart);
+  return interval ? new Date(Math.max(Math.floor(interval[0] / 1440) * DAY, Date.parse(from))).toISOString().slice(0, 10) : null;
 }
 
 /** Exact visible-day intersection, including the previous day's night tail. */
@@ -108,7 +138,7 @@ export function assignmentIntersectsRange(range: ScheduleRange, shift: ShiftCloc
   const first = range.startDate > shiftDateOffset(start, -1) ? range.startDate : shiftDateOffset(start, -1);
   const last = range.endDate < end ? range.endDate : end;
   const visibleStart = Date.parse(start) / 60000;
-  const visibleEnd = Date.parse(shiftDateOffset(end, 1)) / 60000;
+  const visibleEnd = Date.parse(end) / 60000 + 1440;
   return scheduleIntervals({ ...range, startDate: first, endDate: last }, shift, shifts)
     .some(([startMinute, endMinute]) => startMinute < visibleEnd && endMinute > visibleStart);
 }

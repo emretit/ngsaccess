@@ -1,3 +1,4 @@
+import { scheduleModeValidator } from "./lib/shiftSchedule";
 import { hikBackfillPendingValidator } from "./lib/gateway/backfillState";
 import { shiftPlanValidator, shiftPlanFields } from "./lib/shiftPlan";
 import { doorStatusPlanValidator, verifyPlanValidator, holidayPlanValidator } from "./lib/doorStatusPlan";
@@ -90,6 +91,7 @@ export default defineSchema({
 
   // ═══════ 2 · ÇALIŞANLAR · KİMLİK DOĞRULAMA · ORGANİZASYON ══════════════
   employees: defineTable({
+    hasDepartmentHistory: v.optional(v.boolean()),
     projectId: v.optional(v.id("projects")),
     firstName: v.string(),
     lastName: v.string(),
@@ -337,6 +339,7 @@ export default defineSchema({
     hikDoorHolidaySlots: v.optional(v.array(v.number())),
     hikPlanSavedAt: v.optional(v.string()),
     hikPlanRevision: v.optional(v.number()),
+    hikPlanPendingReason: v.optional(v.string()),
     hikPlanAppliedAt: v.optional(v.string()),
     hikPlanApplyError: v.optional(v.string()),
     hikPlanResults: v.optional(v.object({
@@ -430,6 +433,8 @@ export default defineSchema({
     hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
     hikLastSeenAt: v.optional(v.number()),
     hikOfflineHint: v.optional(v.string()),
+    heartbeatCheckAt: v.optional(v.number()),
+    heartbeatOfflineEventId: v.optional(v.id("deviceEvents")),
     // Eski kayıt-sonrası temizlik bayrağı; temizlik kaldırıldı (2026-10-28), artık okunmuyor.
     hikRosterReconcilePending: v.optional(v.boolean()),
     hikIsupOnline: v.optional(v.boolean()),
@@ -531,6 +536,8 @@ export default defineSchema({
     .index("by_employee_device", ["employeeId", "deviceId"]),
 
   accessGrantStatus: defineTable({
+    syncGeneration: v.optional(v.number()),
+    reconciliationScheduled: v.optional(v.boolean()),
     projectId: v.id("projects"), employeeId: v.id("employees"), deviceId: v.id("devices"),
     departmentId: v.optional(v.id("departments")),
     state: v.union(v.literal("pending"), v.literal("effective"), v.literal("failed"), v.literal("removed")),
@@ -577,11 +584,35 @@ export default defineSchema({
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
     createdAt: v.string(),
+    // Missing source is a legacy, explicitly assigned membership.
+    source: v.optional(v.union(v.literal("manual"), v.literal("department"))),
   })
     .index("by_group", ["groupId"])
     .index("by_employee", ["employeeId"])
     .index("by_project_employee", ["projectId", "employeeId"])
     .index("by_project_group", ["projectId", "groupId"]),
+
+  employeeDepartmentHistory: defineTable({
+    employeeId: v.id("employees"),
+    projectId: v.id("projects"),
+    departmentId: v.optional(v.id("departments")),
+    companyId: v.optional(v.id("companies")),
+    validFrom: v.string(),
+    source: v.union(v.literal("baseline"), v.literal("change")),
+    createdAt: v.string(),
+  })
+    .index("by_employee_validFrom", ["employeeId", "validFrom"])
+    .index("by_project_employee", ["projectId", "employeeId"]),
+
+  groupDepartments: defineTable({
+    projectId: v.id("projects"),
+    groupId: v.id("accessRules"),
+    departmentId: v.id("departments"),
+    includeChildren: v.boolean(),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_project", ["projectId"])
+    .index("by_department", ["departmentId"]),
 
   groupDevices: defineTable({
     groupId: v.id("accessRules"),
@@ -717,6 +748,7 @@ export default defineSchema({
     alarmEmailError: v.optional(v.string()),
     alarmEmailRetryAt: v.optional(v.string()),
     alarmEmailRecipients: v.optional(v.array(v.string())),
+    alarmEmailContent: v.optional(v.object({ from: v.string(), subject: v.string(), html: v.string() })),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
@@ -726,6 +758,8 @@ export default defineSchema({
     .index("by_project_and_event_time", ["projectId", "eventTime"])
     .index("by_project_category_event_time", ["projectId", "category", "eventTime"])
     .index("by_device_and_event_time", ["deviceId", "eventTime"])
+    .index("by_device_category_label_alarmQueuedAt", ["deviceId", "category", "label", "alarmQueuedAt"])
+    .index("by_device_category_label_alarmNotifiedAt", ["deviceId", "category", "label", "alarmNotifiedAt"])
     .index("by_device_category_label_event_time", ["deviceId", "category", "label", "eventTime"])
     .index("by_device_and_hik_serial", ["deviceId", "hikSerialNo"]),
 
@@ -745,6 +779,9 @@ export default defineSchema({
   // Gateway cihazlarda worker failed kayıtları retry eder; localBridge cihazlarda
   // Windows bridge pending kayıtları claim edip SDK ile panele uygular.
   hikPendingOperations: defineTable({
+    attempt: v.optional(v.number()),
+    legacyAckUnsafe: v.optional(v.boolean()),
+    hasBeenClaimed: v.optional(v.boolean()),
     projectId: v.optional(v.id("projects")),
     deviceId: v.id("devices"),
     operation: v.union(
@@ -909,6 +946,7 @@ export default defineSchema({
   })
     .index("by_status_and_finishedAt", ["status", "finishedAt"])
     .index("by_project_started", ["projectId", "startedAt"])
+    .index("by_project_kind_startedAt", ["projectId", "kind", "startedAt"])
     .index("by_rule_started", ["ruleId", "startedAt"]),
 
   /** Çalıştırma başına hedef cihaz durumu (Hik done = sent; IDE acked = verified). */
@@ -1029,6 +1067,8 @@ export default defineSchema({
   }).index("by_project", ["projectId"]),
 
   shifts: defineTable({
+    scheduleMode: v.optional(scheduleModeValidator),
+    dayPlan: v.optional(v.array(v.boolean())),
     name: v.string(),
     color: v.optional(shiftColorValidator),
     projectId: v.optional(v.id("projects")),
@@ -1434,6 +1474,32 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_user_project", ["userId", "projectId"]),
 
+  // Zamanlanmış rapor teslim kaydı: dönem başına tek satır (idempotency) + sınırlı retry.
+  reportDeliveries: defineTable({
+    scheduleId: v.id("reportScheduleSettings"),
+    year: v.number(),
+    month: v.number(),
+    scheduleUpdatedAt: v.string(),
+    email: v.string(),
+    reportType: v.string(),
+    projectId: v.optional(v.id("projects")),
+    status: v.union(
+      v.literal("sending"),
+      v.literal("retryScheduled"),
+      v.literal("sent"),
+      v.literal("failed"),
+      v.literal("skipped"),
+    ),
+    attempts: v.number(),
+    lastAttemptAt: v.number(),
+    nextRetryAt: v.optional(v.number()),
+    sentAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+  })
+    .index("by_scheduleId_and_year_and_month", ["scheduleId", "year", "month"])
+    .index("by_projectId", ["projectId"])
+    .index("by_lastAttemptAt", ["lastAttemptAt"]),
+
   // KVKK Faz 1: proje bazlı gizlilik ayarları (biyometri modülü, okuma saklama
   // süresi, asistan isim maskeleme). Satır YOKSA eski davranış (bkz.
   // convex/lib/privacySettings.ts DEFAULT_PRIVACY): biyometri açık, saklama süresiz,
@@ -1450,8 +1516,15 @@ export default defineSchema({
     // Ziyaretçi KVKK aydınlatma metni bağlantısı ve sürümü (06-O5; Ayarlar > Gizlilik'ten yönetilir).
     visitorKvkkUrl: v.optional(v.string()),
     visitorKvkkVersion: v.optional(v.string()),
+    // Ziyaretçi saklama zinciri: projeler arası adil sıra + proje içi kaldığı yer.
+    visitorRetentionLastProcessedAt: v.optional(v.number()),
+    visitorRetentionCursor: v.optional(v.string()),
+    visitorRetentionRunAt: v.optional(v.number()),
+    visitorRetentionCursorDays: v.optional(v.number()),
     updatedAt: v.string(),
-  }).index("by_project", ["projectId"]),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_visitorRetentionLastProcessedAt", ["visitorRetentionLastProcessedAt"]),
 
   // Kullanıcı davet sistemi - yetkili kullanıcılar projeye davet eder veya
   // mevcut kullanıcıya şifre sıfırlama maili gönderir (type === "reset")
@@ -1465,6 +1538,10 @@ export default defineSchema({
     createdBy: v.id("users"),
     expiresAt: v.string(),
     used: v.optional(v.boolean()),
+    // Davet kabul rezervasyonu (C-01): claim atomik yazar, consume doğrulayıp temizler.
+    claimToken: v.optional(v.string()),
+    claimUserId: v.optional(v.id("users")),
+    claimExpiresAt: v.optional(v.number()),
     createdAt: v.string(),
   })
     .index("by_token", ["token"])

@@ -199,6 +199,10 @@ export function EmployeeStatus({ detail }: { detail: EmployeeDetail }) {
             </details>
           )}
           {row.removalRequired && <p className="text-sm font-medium text-warning">Kaldırılacak</p>}
+          {row.deviceConnection && <p className="text-xs">Cihaz: {row.deviceConnection === "online" ? "Çevrimiçi" : row.deviceConnection === "offline" ? "Çevrimdışı" : "Henüz bağlantı sinyali yok"}</p>}
+          {typeof row.scheduleAllowedNow === "boolean" && <p className="text-xs">Saat aralığı: {row.scheduleAllowedNow ? "Kontrol anında uygun" : "Kontrol anında uygun değil"}</p>}
+          {row.validityAllowedNow === false && <p className="text-xs text-warning">Kişinin erişim geçerliliği şu an uygun değil.</p>}
+          {row.checkedAt && <p className="text-xs text-muted-foreground">Kontrol: {formatTrDateTime(row.checkedAt)} · Cihazdaki geçiş sonucu ayrıca doğrulanır.</p>}
           <p>{row.doorNames.join(", ") || "Kapı bilgisi yok"}</p>
           <p className="text-xs">
             {row.ruleNames.join(", ") || "Kural yok"} ·{" "}

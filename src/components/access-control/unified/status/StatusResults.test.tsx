@@ -14,27 +14,50 @@ vi.mock("./StatusViews", async importOriginal => {
   };
 });
 
-function render(cursor: string | null, busy = false, rows: GrantRow[] = []) {
-  return renderToStaticMarkup(
+function results(cursor: string | null, busy = false, rows: GrantRow[] = [], error = "", onRetry = () => {}) {
+  return (
     <StatusResults
-      view="person"
-      rows={rows}
-      selected={[]}
-      toggle={() => {}}
-      setEmployee={() => {}}
-      cursor={cursor}
-      busy={busy}
-      more={async () => {}}
-      options={{ departments: [], devices: [], rules: [] }}
-      filters={{}}
-      expanded={undefined}
-      setExpanded={() => {}}
-      deviceCounts={{}}
-    />,
+      view="person" rows={rows} selected={[]} toggle={() => {}} setEmployee={() => {}}
+      cursor={cursor} busy={busy} more={async () => {}} options={{ departments: [], devices: [], rules: [] }}
+      filters={{}} expanded={undefined} setExpanded={() => {}} deviceCounts={{}} error={error} onRetry={onRetry}
+    />
   );
 }
 
+function render(cursor: string | null, busy = false, rows: GrantRow[] = []) {
+  return renderToStaticMarkup(results(cursor, busy, rows));
+}
+
 describe("StatusResults boş sonuç", () => {
+  it("liste hatasını boş sonuçtan ayırır ve yeniden denemeyi başlatır", () => {
+    const retry = vi.fn();
+    const props = results(null, false, [], "Bağlantı kesildi", retry).props;
+    const html = renderToStaticMarkup(<StatusResults {...props} />);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Yetki listesi yüklenemedi: Bağlantı kesildi");
+    expect(html).not.toContain("kayıt bulunamadı");
+    expect(html).not.toContain("Filtre sonucu: 0");
+    const tree = StatusResults(props);
+    function findRetry(node: ReactNode): (() => void) | undefined {
+      for (const child of Children.toArray(node)) {
+        if (!isValidElement<{ children?: ReactNode; onClick?: () => void }>(child)) continue;
+        if (child.props.children === "Tekrar dene") return child.props.onClick;
+        const found = findRetry(child.props.children);
+        if (found) return found;
+      }
+    }
+    const onClick = findRetry(tree);
+    expect(onClick).toBeDefined();
+    onClick?.();
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it("devam sayfası hatasında yüklenmiş kayıtları korur ve tek yeniden deneme sunar", () => {
+    const html = renderToStaticMarkup(results("next", false, [{} as GrantRow], "Bağlantı kesildi"));
+    expect(html).toContain("Filtre sonucu: 1 kayıt");
+    expect(html).toContain("Tekrar dene");
+    expect(html).not.toContain("Daha fazla yükle");
+  });
   it("filtre sonucu sayısını güncel kayıtlarla gösterir ve devam sayfasını açıklar", () => {
     // GrantRows is mocked: these rows only supply result cardinality here.
     const rows = [{}, {}] as GrantRow[];

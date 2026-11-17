@@ -1,0 +1,6 @@
+## Görev: Geçiş Kontrol modülü audit'i
+- Rapor dosyası: `docs/genel-audit-2026-11-03/02-gecis-kontrol.md` · Bulgu ID öneki: `GK-`
+- Kapsam (backend): `convex/accessRules.ts`, `accessGrantStatus.ts`, `doors.ts`, `zones.ts`, `readers.ts`, `mobileAccess.ts`, `mobileAccessGateway.ts`, `virtualReaders.ts`, `cardReadings.ts` (erişim kararı + canlı izleme kısmı; PDKS hesap kısmı 03 numaralı worker'da), kapı planları ile ilgili `convex/lib/*`.
+- Kapsam (web): `src/pages/AccessControl.tsx`, `LiveMonitoring.tsx`, `VirtualReaderKiosk.tsx`, `src/components/access-control/**`, `src/components/live-monitoring/**`, `src/components/virtual-reader/**`.
+- Hik kıyası: `KIYAS.md` §2 Access Control + `HIKCONNECT_SAYFALAR.md` §2 (canlı kapı + Batch Control, Overview yetki dağıtım durumu, Access Level, Grant by Department/Person, Access Schedule Template, Holiday, Remain Unlocked/Locked, Super/Extended Access, Event Notification, Access Record Retrieval).
+- Özel dikkat: genel-akış audit Faz 1.1-1.3 (erişim kuralı/kapı/bölge/okuyucu yazma yetkisi, tatil proje kontrolü) ve Faz 2.2 (kural silinince cihazdan yetki kaldırma) kapandı mı; kapı açma komutunun rol kontrolü (project_user yalnız kapı açar); sanal okuyucu/mobil QR token güvenliği (tekrar oynatma, süre); erişim kuralının tatil takvimine bağlı olup olmadığı ([teyit] satırı).

@@ -1,0 +1,4 @@
+docs/hikconnect-audit/KIYAS.md
+docs/hikconnect-audit/PDKS_KIYAS.md
+docs/hikconnect-reports/README.md
+docs/genel-audit-2026-11-03

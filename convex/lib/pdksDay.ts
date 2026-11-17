@@ -78,7 +78,7 @@ export function computePdksDay(params: {
     .sort((a, b) => a.accessTime.localeCompare(b.accessTime));
   const provisionalManual = manualPdksTimes(date, manual, shift);
   const validManualEntry = provisionalManual.entryISO && (!flex || validFlexibleEntry(flex, relativeMinute(date, provisionalManual.entryISO))) ? provisionalManual.entryISO : undefined;
-  let readings = flex ? flexibleReadings(flex, date, candidateReadings, validManualEntry) : candidateReadings;
+  let readings = flex ? flexibleReadings(flex, date, candidateReadings, validManualEntry, eachPunch) : candidateReadings;
   const rawEntry = readings[0]?.accessTime;
   const fallbackEntry = rawEntry
     ? `${String(Math.floor(isoTimeToTRMinutes(rawEntry) / 60)).padStart(2, "0")}:${String(isoTimeToTRMinutes(rawEntry) % 60).padStart(2, "0")}`
@@ -161,28 +161,37 @@ export function computePdksDay(params: {
     firstISO && lastISO ? Math.max(0, minutesBetweenISO(firstISO, lastISO)) : 0;
   const interval = eachPunch ? { start: Math.min(entry ?? Infinity, pairIntervals[0]?.start ?? Infinity), end: Math.max(exit ?? 0, pairIntervals[pairIntervals.length - 1]?.end ?? 0) } : { start: entry ?? 0, end: exit ?? entry ?? 0 };
   if (!Number.isFinite(interval.start)) interval.start = 0;
+  // A complete, uninterrupted visit has no recorded lunch gap. Apply the
+  // configured fixed break to that visit, including historical report dates.
+  // Multiple visits already exclude outside time; incomplete days add no break.
+  const singleVisitBreak = eachPunch && pairIntervals.length === 1 &&
+    !pairResult?.missingEntry && !pairResult?.missingExit;
+  const breakInterval = singleVisitBreak ? pairIntervals[0] : interval;
   const scheduledBreaks =
-    !eachPunch && !flex && shift?.breakStart && shift.breakEnd
+    (!eachPunch || singleVisitBreak) && !flex && shift?.breakStart && shift.breakEnd
       ? recurringWindows(
           shift.breakStart,
           shift.breakEnd,
-          interval.start,
-          interval.end,
+          breakInterval.start,
+          breakInterval.end,
         )
       : [];
   const scheduledBreakMinutes = scheduledBreaks.reduce(
-    (sum, window) => sum + overlap(interval, window),
+    (sum, window) => sum + overlap(breakInterval, window),
     0,
   );
-  // Outside time is already excluded by pairing; never deduct a second break.
-  const breakMinutes = eachPunch ? 0 : Math.min(
+  const actualVisitMinutes = singleVisitBreak ? breakInterval.end - breakInterval.start : 0;
+  const breakMinutes = eachPunch ? singleVisitBreak
+    ? flex?.breakMode === "duration" ? flexibleBreak(flex, rawTotalMinutes)
+      : rawTotalMinutes - Math.max(0, Math.floor(actualVisitMinutes - scheduledBreakMinutes))
+    : 0 : Math.min(
     rawTotalMinutes,
-    flex ? flexibleBreak(flex, rawTotalMinutes) : scheduledBreakMinutes || legalBreakMinutes(rawTotalMinutes),
+    flex ? flexibleBreak(flex, rawTotalMinutes) : (shift?.breakStart && shift.breakEnd ? scheduledBreakMinutes : legalBreakMinutes(rawTotalMinutes)),
   );
   const totalMinutes = rawTotalMinutes - breakMinutes;
   const netOverlap = (window: Interval) => {
-    if (eachPunch) return pairIntervals.reduce((sum, pair) => sum + overlap(pair, window), 0);
-    const raw = overlap(interval, window);
+    const raw = eachPunch ? pairIntervals.reduce((sum, pair) => sum + overlap(pair, window), 0) : overlap(interval, window);
+    if (eachPunch && !singleVisitBreak) return raw;
     if (scheduledBreakMinutes > 0) {
       return (
         raw -
@@ -191,8 +200,8 @@ export function computePdksDay(params: {
             sum +
             overlap(
               {
-                start: Math.max(interval.start, window.start),
-                end: Math.min(interval.end, window.end),
+                start: Math.max(breakInterval.start, window.start),
+                end: Math.min(breakInterval.end, window.end),
               },
               pause,
             ),
@@ -200,7 +209,8 @@ export function computePdksDay(params: {
         )
       );
     }
-    return rawTotalMinutes > 0 ? (raw * totalMinutes) / rawTotalMinutes : 0;
+    const gross = eachPunch ? actualVisitMinutes : rawTotalMinutes;
+    return gross > 0 ? (raw * totalMinutes) / gross : 0;
   };
   const wholeMinutes = eachPunch ? Math.floor : Math.round;
   const holidayFor = (holiday: Doc<"holidays"> | null | undefined) => shift?.holidayWorkRequired ? undefined : holiday;
@@ -228,7 +238,7 @@ export function computePdksDay(params: {
     rates.nightShiftStart, rates.nightShiftEnd, interval.start, interval.end,
   );
   const rawNightMinutes = nightWindows.reduce(
-    (sum, window) => sum + (eachPunch ? netOverlap(window) : overlap(interval, window)), 0,
+    (sum, window) => sum + (eachPunch ? pairIntervals.reduce((minutes, pair) => minutes + overlap(pair, window), 0) : overlap(interval, window)), 0,
   );
   let nightMinutes = Math.min(totalMinutes, Math.round(
     nightWindows.reduce((sum, window) => sum + netOverlap(window), 0),

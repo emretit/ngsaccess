@@ -1,3 +1,5 @@
+import { reconcileEmployeeDepartmentRules } from "./lib/departmentAccess";
+import { recordDepartmentChange } from "./lib/employeeDepartmentHistory";
 import { internal } from "./_generated/api";
 import { requirePermission } from "./lib/permissions";
 import { ConvexError, v } from "convex/values";
@@ -100,6 +102,8 @@ export const importChunk = authedMutation({
         companyId: company?._id ?? department?.companyId,
         isActive: row.isActive ?? true, createdAt: now, updatedAt: now,
       });
+      await recordDepartmentChange(ctx, employeeId);
+      await reconcileEmployeeDepartmentRules(ctx, employeeId);
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
       await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
       results.push({ rowNumber: row.rowNumber, status: "created", message: "Kişi oluşturuldu" });

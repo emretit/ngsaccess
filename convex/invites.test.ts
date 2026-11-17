@@ -38,7 +38,7 @@ const setupStateHandler = (setupAccountState as unknown as {
   _handler: (ctx: QueryCtx, args: { token: string }) => Promise<unknown>;
 })._handler;
 const resetClaimedHandler = (resetClaimedAccount as unknown as {
-  _handler: (ctx: MutationCtx, args: { userId: Id<'users'>; token: string }) => Promise<null>;
+  _handler: (ctx: MutationCtx, args: { userId: Id<'users'>; token: string; password: string }) => Promise<null>;
 })._handler;
 const claimHandler = (claimSetupAccount as unknown as {
   _handler: (ctx: ActionCtx, args: { token: string; password: string }) => Promise<{ flow: 'signUp' | 'signIn' }>;
@@ -162,7 +162,7 @@ function setupFixture(options: {
   };
   return {
     queryCtx: { db } as unknown as QueryCtx,
-    mutationCtx: { db, auth: { getUserIdentity: async () => identity } } as unknown as MutationCtx,
+    mutationCtx: { db, runMutation: vi.fn(async () => null), auth: { getUserIdentity: async () => identity } } as unknown as MutationCtx,
     get, patch, insert, memberships, user: () => user, invite: () => invite,
   };
 }
@@ -203,14 +203,14 @@ describe('invites.setupAccountState', () => {
 describe('invites.resetClaimedAccount', () => {
   it('rechecks claimability and does not patch protected accounts', async () => {
     const f = setupFixture({ user: { verified: true } });
-    await expect(resetClaimedHandler(f.mutationCtx, { userId, token: args.token })).rejects.toMatchObject({
+    await expect(resetClaimedHandler(f.mutationCtx, { userId, token: args.token, password: 'Strongpass1' })).rejects.toMatchObject({
       data: { code: 'INVITE_ACCOUNT_EXISTS' },
     });
     expect(f.patch).not.toHaveBeenCalled();
   });
   it('clears stale signup fields while preserving role and verification', async () => {
     const f = setupFixture();
-    await resetClaimedHandler(f.mutationCtx, { userId, token: args.token });
+    await resetClaimedHandler(f.mutationCtx, { userId, token: args.token, password: 'Strongpass1' });
     expect(f.patch).toHaveBeenCalledWith(userId, expect.objectContaining({
       firstCompanyName: undefined, name: undefined, setupToken: undefined,
       tokenExpiresAt: undefined, updatedAt: expect.any(String),
@@ -223,25 +223,23 @@ describe('invites.resetClaimedAccount', () => {
 });
 
 describe('invites.claimSetupAccount', () => {
-  it('claims a squat account, invalidates sessions and then allows invite consumption', async () => {
+  it('claims a squat account through one atomic mutation and then allows invite consumption', async () => {
     vi.mocked(modifyAccountCredentials).mockClear();
     vi.mocked(invalidateSessions).mockClear();
     const order: string[] = [];
     const f = setupFixture();
     const ctx = {
       runQuery: vi.fn(async () => setupStateHandler(f.queryCtx, { token: args.token })),
-      runMutation: vi.fn(async () => { order.push('reset'); return resetClaimedHandler(f.mutationCtx, { userId, token: args.token }); }),
+      runMutation: vi.fn(async () => { order.push('reset'); return resetClaimedHandler(f.mutationCtx, { userId, token: args.token, password: 'Strongpass1' }); }),
     } as unknown as ActionCtx;
-    vi.mocked(modifyAccountCredentials).mockImplementationOnce(async () => { order.push('modify'); });
-    vi.mocked(invalidateSessions).mockImplementationOnce(async () => { order.push('invalidate'); });
     await expect(claimHandler(ctx, { token: args.token, password: 'Strongpass1' }))
       .resolves.toEqual({ flow: 'signIn' });
-    expect(modifyAccountCredentials).toHaveBeenCalledWith(ctx, {
-      provider: 'password', account: { id: args.email, secret: 'Strongpass1' },
-    });
-    expect(invalidateSessions).toHaveBeenCalledWith(ctx, { userId });
     expect(ctx.runMutation).toHaveBeenCalledOnce();
-    expect(order).toEqual(['reset', 'modify', 'invalidate']);
+    expect(f.mutationCtx.runMutation).toHaveBeenNthCalledWith(1, expect.anything(), { args: {
+      type: 'modifyAccount', provider: 'password', account: { id: args.email, secret: 'Strongpass1' },
+    } });
+    expect(f.mutationCtx.runMutation).toHaveBeenNthCalledWith(2, expect.anything(), { args: { type: 'invalidateSessions', userId } });
+    expect(order).toEqual(['reset']);
     expect(f.user()).toMatchObject({ verified: false, name: undefined, firstCompanyName: undefined });
     expect(f.user().role).toBeUndefined();
     expect(f.user().setupToken).toBeUndefined();
@@ -256,7 +254,7 @@ describe('invites.claimSetupAccount', () => {
     const f = setupFixture();
     const runMutation = vi.fn(async () => {
       f.user().verified = true;
-      return resetClaimedHandler(f.mutationCtx, { userId, token: args.token });
+      return resetClaimedHandler(f.mutationCtx, { userId, token: args.token, password: 'Strongpass1' });
     });
     const ctx = {
       runQuery: vi.fn(async () => setupStateHandler(f.queryCtx, { token: args.token })),
@@ -543,7 +541,7 @@ it('Y-10 rechecks creator authority after setup state before credential modifica
     runMutation: vi.fn(async () => {
       const original = f.get.getMockImplementation();
       f.get.mockImplementation(async id => id === attackerId ? null : original ? original(id) : null);
-      return resetClaimedHandler(f.mutationCtx, { userId, token: args.token });
+      return resetClaimedHandler(f.mutationCtx, { userId, token: args.token, password: 'Strongpass1' });
     }),
   } as unknown as ActionCtx;
   await expect(claimHandler(ctx, { token: args.token, password: 'Strongpass1' })).rejects.toMatchObject({ data: { code: 'INVITE_INVALID' } });

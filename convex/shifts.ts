@@ -1,3 +1,4 @@
+import { scheduleModeValidator, validateShiftSchedule } from "./lib/shiftSchedule";
 import { departmentChain } from "./lib/shiftResolver";
 import { shiftPlanValidator, planShiftIds, validPlanDate, validateShiftPlan } from "./lib/shiftPlan";
 import { requirePermission } from "./lib/permissions";
@@ -478,6 +479,8 @@ export const list = authedQuery({
 });
 
 const scheduleArgs = {
+  scheduleMode: v.optional(scheduleModeValidator),
+  dayPlan: v.optional(v.array(v.boolean())),
   validWindow: v.optional(v.union(v.null(), v.object({
     checkInStart: v.string(), checkInEnd: v.string(),
     checkOutStart: v.string(), checkOutEnd: v.string(),
@@ -521,6 +524,7 @@ export const create = authedMutation({
     const now = new Date().toISOString();
     // Renk kaldırıldı; eski web istemcisi gönderirse yok sayılır (şemadan daraltma ayrı yayında).
     const fields = { ...toPatch({ ...args, color: undefined }), name: args.name, startTime: args.startTime, endTime: args.endTime };
+    validateShiftSchedule(fields);
     validateShift(fields);
     if (fields.scheduleType === "flexible" && fields.flexible) {
       fields.startTime = fields.flexible.checkInStart;
@@ -565,6 +569,7 @@ export const update = authedMutation({
     // Renk kaldırıldı; eski web istemcisi gönderirse yok sayılır.
     const { shiftId, color: _legacyColor, effectiveFrom, ...updates } = args;
     const patch = toPatch(updates);
+    validateShiftSchedule({ ...shift, ...patch });
     const now = new Date().toISOString();
     // Esnekte başlangıç/bitiş her zaman giriş penceresinden türetilir (create ile aynı).
     const flexibleWindow = shift.scheduleType === "flexible" ? patch.flexible ?? shift.flexible : undefined;
@@ -574,7 +579,7 @@ export const update = authedMutation({
     const ruleValue = (source: Partial<Doc<"shifts">>, key: keyof Doc<"shifts">) => key === "scheduleType" ? source.scheduleType ?? "fixed" : source[key];
     const changedRules = SHIFT_RULE_KEYS.filter(key => key in patch && stableJson(ruleValue(patch, key)) !== stableJson(ruleValue(shift, key)));
     if (!changedRules.length) {
-      const cosmetic = { ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}) };
+      const cosmetic = { ...(patch.scheduleMode !== undefined ? { scheduleMode: patch.scheduleMode } : {}), ...(patch.dayPlan !== undefined ? { dayPlan: patch.dayPlan } : {}), ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}) };
       await ctx.db.patch(shiftId, { ...cosmetic, updatedAt: now });
       return;
     }
@@ -679,6 +684,45 @@ export const remove = authedMutation({
     await Promise.all(versions.map(version => ctx.db.delete(version._id)));
     await ctx.db.delete(args.shiftId);
     return { removedAssignments: eligible.length, skippedAssignments: linkedAssignments.length - eligible.length };
+  },
+});
+
+export const clearAllAssignments = authedMutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    await requirePermission(ctx, ctx.user, projectId, "schedule.manage");
+    await resolveProjectScope(ctx, projectId);
+    const [personal, departments] = await Promise.all([
+      ctx.db.query("shiftAssignments").withIndex("by_project", q => q.eq("projectId", projectId)).take(100),
+      ctx.db.query("departmentShiftAssignments").withIndex("by_project_end", q => q.eq("projectId", projectId)).take(100),
+    ]);
+    const owners = [
+      ...personal.map(row => ({ id: row._id, assignmentId: row._id })),
+      ...departments.map(row => ({ id: row._id, departmentAssignmentId: row._id })),
+    ].slice(0, 100);
+    let deleted = 0;
+    let remainingWrites = 4000;
+    // Each batch removes assignments and their secondary references together.
+    for (const owner of owners) {
+      const references = "assignmentId" in owner
+        ? await ctx.db.query("shiftPlanRefs").withIndex("by_assignment", q => q.eq("assignmentId", owner.assignmentId)).take(remainingWrites)
+        : await ctx.db.query("shiftPlanRefs").withIndex("by_department_assignment", q => q.eq("departmentAssignmentId", owner.departmentAssignmentId)).take(remainingWrites);
+      if (references.length >= remainingWrites) break;
+      for (const reference of references) await ctx.db.delete(reference._id);
+      await ctx.db.delete(owner.id);
+      remainingWrites -= references.length + 1;
+      deleted++;
+    }
+    if (owners.length > 0 && deleted === 0) throw new ConvexError("Atamanın plan referansları temizlenemedi.");
+    const [remainingPersonal, remainingDepartments] = await Promise.all([
+      ctx.db.query("shiftAssignments").withIndex("by_project", q => q.eq("projectId", projectId)).take(1),
+      ctx.db.query("departmentShiftAssignments").withIndex("by_project_end", q => q.eq("projectId", projectId)).take(1),
+    ]);
+    if (deleted > 0) await writeAudit(ctx, {
+      user: ctx.user, projectId, action: "delete", targetTable: "shiftAssignments", targetId: projectId,
+      newValue: { deleted }, note: "Projedeki tüm vardiya atamalarını temizle",
+    });
+    return { deleted, isDone: remainingPersonal.length === 0 && remainingDepartments.length === 0 };
   },
 });
 

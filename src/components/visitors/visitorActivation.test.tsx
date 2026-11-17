@@ -1,4 +1,4 @@
-import { Children, isValidElement, type FormEvent, type ReactNode } from "react";
+import { isValidElement, type FormEvent, type ReactNode } from "react";
 import { renderToStaticMarkup as renderMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,9 +20,10 @@ vi.mock("convex/react", () => ({
 }));
 vi.mock("@/lib/notify", () => ({ notify: { success: mocks.success, error: mocks.error } }));
 vi.mock("./hooks/useVisitorFormData", () => ({
-  useVisitorFormData: () => ({ formData: mocks.formData, setFormData: vi.fn(), presetRules: [], hostEmployees: [], optionsLoading: false, isDirty: true }),
+  useVisitorFormData: () => ({ formData: mocks.formData, setFormData: vi.fn(), hostEmployees: [], isDirty: true }),
 }));
 vi.mock("./VisitorCardCapture", () => ({ default: () => null }));
+vi.mock("@/components/access-control/unified/components/ZoneDeviceTree", () => ({ ZoneDeviceTree: () => <div id="door-tree" /> }));
 
 const visitor: VisitorDetail = {
   _id: "prereg" as Id<"employees">, projectId: "project" as Id<"projects">,
@@ -33,10 +34,11 @@ const visitor: VisitorDetail = {
   hostEmployeeId: "host" as Id<"employees">, presetRuleId: null, email: null,
   visitorPhone: null, visitorCompany: null, visitPurpose: "Meeting", notes: null, kvkkConsent: null, recentReadings: [],
 };
-const selectedRule = "visitor-rule" as Id<"accessRules">;
+const selectedDoor = "door-1" as Id<"doors">;
+const existingRule = "visitor-rule" as Id<"accessRules">;
 const initialForm: VisitorFormData = {
   firstName: visitor.firstName, lastName: visitor.lastName, visitorPhone: "", visitorCompany: "", visitPurpose: "Meeting",
-  hostEmployeeId: visitor.hostEmployeeId, cardNumber: "12345678", presetRuleId: selectedRule,
+  hostEmployeeId: visitor.hostEmployeeId, cardNumber: "12345678", selected_doors: [selectedDoor], selected_devices: ["device-1"],
   accessExpiresAt: "2099-01-01T18:00", isActive: true, notes: "", kvkkConsent: false, projectId: visitor.projectId,
 };
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true }) }));
@@ -48,8 +50,7 @@ const noop = () => undefined;
 function renderForm(detail: VisitorDetail | null = visitor) {
   let submit: ((event: FormEvent) => Promise<void>) | undefined;
   function Harness() {
-    const tree = VisitorForm({ visitor: detail, onClose: noop, onSave: mocks.saved, onStateChange: noop });
-    const form = Children.toArray(tree.props.children as ReactNode).find(child => isValidElement(child) && child.type === "form");
+    const form = VisitorForm({ visitor: detail, onClose: noop, onSave: mocks.saved, onStateChange: noop });
     if (isValidElement<{ onSubmit: (event: FormEvent) => Promise<void> }>(form)) submit = form.props.onSubmit;
     return null;
   }
@@ -72,11 +73,11 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("operator activation of mobile visitor preregistration", () => {
-  it("submits selected region and actual card together through the existing update, then reports success", async () => {
+  it("submits selected doors and actual card together through the existing update, then reports success", async () => {
     await renderForm()(formEvent());
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.update).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-      visitorId: visitor._id, projectId: visitor.projectId, presetRuleId: selectedRule, cardNumber: "12345678", isActive: true,
+      visitorId: visitor._id, projectId: visitor.projectId, doorIds: [selectedDoor], cardNumber: "12345678", isActive: true,
     }));
     expect(mocks.update.mock.calls[0]?.[0]).not.toHaveProperty("accessExpiresAt");
     expect(mocks.saved).toHaveBeenCalledExactlyOnceWith({ _id: visitor._id });
@@ -84,9 +85,9 @@ describe("operator activation of mobile visitor preregistration", () => {
   });
 
   it.each([
-    { presetRuleId: null }, { cardNumber: "" }, { cardNumber: "  " }, { accessExpiresAt: "2020-01-01T18:00" },
+    { selected_doors: [] }, { cardNumber: "" }, { cardNumber: "  " }, { accessExpiresAt: "2020-01-01T18:00" },
     { cardNumber: "PRE:synthetic-reference" }, { cardNumber: " IADE:old" }, { cardNumber: "•••• 5678" },
-  ])("rejects missing region or unusable card before issuing any mutation: %j", async patch => {
+  ])("rejects missing doors or unusable card before issuing any mutation: %j", async patch => {
     mocks.formData = { ...initialForm, ...patch };
     await renderForm()(formEvent());
     expect(mocks.update).not.toHaveBeenCalled();
@@ -96,23 +97,24 @@ describe("operator activation of mobile visitor preregistration", () => {
     expect(requestAnimationFrame).toHaveBeenCalledOnce();
   });
 
-  it("requires card and region even when saving the preregistration without granting access", async () => {
-    mocks.formData = { ...initialForm, isActive: false, cardNumber: "", presetRuleId: null };
+  it("requires card and doors even when saving the preregistration without granting access", async () => {
+    mocks.formData = { ...initialForm, isActive: false, cardNumber: "", selected_doors: [] };
     await renderForm()(formEvent());
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
-  it("recovers an expired preregistration with a future expiry and atomic card/region assignment", async () => {
+  it("recovers an expired preregistration with a future expiry and atomic card/door assignment", async () => {
     await renderForm({ ...visitor, status: "expired", visitEnd: "2020-01-01T15:00:00.000Z" })(formEvent());
     expect(mocks.update).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-      presetRuleId: selectedRule, cardNumber: "12345678", isActive: true, accessExpiresAt: "2099-01-01T15:00:00.000Z",
+      doorIds: [selectedDoor], cardNumber: "12345678", isActive: true, accessExpiresAt: "2099-01-01T15:00:00.000Z",
     }));
     expect(mocks.saved).toHaveBeenCalledOnce();
   });
 
-  it("keeps first-region assignment locked on a cancelled preregistration", () => {
+  it("keeps first door assignment locked on a cancelled preregistration", () => {
     const html = renderToStaticMarkup(<VisitorForm visitor={{ ...visitor, status: "checkedOut" }} onClose={noop} onSave={noop} onStateChange={noop} />);
-    expect(html.match(/<button[^>]*id="v_zone"[^>]*>/)?.[0]).toMatch(/\sdisabled[\s=>]/);
+    expect(html).not.toContain('id="door-tree"');
+    expect(html).toContain("kapılar değiştirilemez");
     expect(html).not.toContain("Erişim bölgesi oluştur");
     expect(html).not.toContain("Erişimi etkinleştir");
   });
@@ -140,24 +142,28 @@ describe("operator activation of mobile visitor preregistration", () => {
     expect(mocks.saved).toHaveBeenCalledOnce();
   });
 
-  it("preserves fixed-region updates and the ordinary create contract", async () => {
-    await renderForm({ ...visitor, isActive: true, status: "active", presetRuleId: selectedRule, cardNumber: "12345678" })(formEvent());
+  it("preserves fixed-door updates and the ordinary create contract", async () => {
+    await renderForm({ ...visitor, isActive: true, status: "active", presetRuleId: existingRule, cardNumber: "12345678" })(formEvent());
+    expect(mocks.update.mock.calls[0]?.[0]).not.toHaveProperty("doorIds");
     expect(mocks.update.mock.calls[0]?.[0]).not.toHaveProperty("presetRuleId");
     await renderForm(null)(formEvent());
-    expect(mocks.create).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ presetRuleId: selectedRule, cardNumber: "12345678" }));
+    expect(mocks.create).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ doorIds: [selectedDoor], cardNumber: "12345678" }));
+    expect(mocks.create.mock.calls[0]?.[0]).not.toHaveProperty("presetRuleId");
   });
 
-  it("unlocks region assignment for preregistration while ordinary edits retain their region", () => {
+  it("unlocks door selection for preregistration while ordinary edits retain their doors", () => {
     const render = (isPreRegistration: boolean) => renderToStaticMarkup(<VisitorFormFields
-      formData={initialForm} setFormData={noop} presetRules={[{ id: selectedRule, name: "Lobby" }]}
-      hostEmployees={[]} isEditing isPreRegistration={isPreRegistration} onNewZone={noop} />);
+      formData={initialForm} setFormData={noop} assignedDoors="Ziyaretçi · Lobby"
+      hostEmployees={[]} isEditing isPreRegistration={isPreRegistration} />);
     const prereg = render(true);
     const existing = render(false);
-    expect(prereg.match(/<button[^>]*id="v_zone"[^>]*>/)?.[0]).not.toMatch(/\sdisabled[\s=>]/);
-    expect(prereg).toContain("Erişim bölgesi oluştur");
+    expect(prereg).toContain('id="door-tree"');
     expect(prereg).toContain("teslim edeceğiniz kartı");
-    expect(existing.match(/<button[^>]*id="v_zone"[^>]*>/)?.[0]).toMatch(/\sdisabled[\s=>]/);
-    expect(existing).toContain("erişim bölgesi değiştirilemez");
+    expect(existing).not.toContain('id="door-tree"');
+    expect(existing).toContain("Lobby");
+    expect(existing).not.toContain("Ziyaretçi · Lobby");
+    expect(existing).toContain("kapılar değiştirilemez");
+    for (const html of [prereg, existing]) expect(html).not.toContain("Erişim bölgesi oluştur");
   });
 
   it("does not display the preregistration reference as a physical card", () => {
@@ -171,11 +177,11 @@ describe("operator activation of mobile visitor preregistration", () => {
 
 it("preserves active access in update payload even if stale form state requests deactivation", async () => {
   mocks.formData = { ...initialForm, isActive: false };
-  await renderForm({ ...visitor, isActive: true, status: "active", presetRuleId: selectedRule, cardNumber: "12345678" })(formEvent());
+  await renderForm({ ...visitor, isActive: true, status: "active", presetRuleId: existingRule, cardNumber: "12345678" })(formEvent());
   expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ isActive: true }));
 });
 it.each([
-  { patch: { firstName: "", lastName: "", presetRuleId: null, cardNumber: "", accessExpiresAt: "" }, id: "v_zone" },
+  { patch: { firstName: "", lastName: "", selected_doors: [], cardNumber: "", accessExpiresAt: "" }, id: "v_doors" },
   { patch: { firstName: "", cardNumber: "", accessExpiresAt: "" }, id: "v_expires" },
   { patch: { firstName: "", cardNumber: "" }, id: "v_card" },
   { patch: { firstName: "", lastName: "" }, id: "v_first_name" },

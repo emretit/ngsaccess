@@ -278,7 +278,8 @@ export function classifyHikEvent(
           ? majorLabel
           : HIK_ALARM_LABELS[subEventType] ?? `Alarm olayı (${subEventType})`,
       category: "alarm",
-      severity: "warning",
+      severity: subEventType === 1026 || subEventType === 1030 ? "critical"
+        : subEventType === 1031 || subEventType === 1033 ? "info" : "warning",
       shouldCreateCardReading: false,
     };
   }

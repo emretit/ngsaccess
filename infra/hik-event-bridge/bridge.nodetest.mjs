@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   createBridge, MultipartStreamParser, digestAuthorization, parseDigestChallenge, resolveToken, shouldForward, toCardReaderBody, withTimeOffset,
 } from './bridge.mjs';
@@ -114,6 +117,42 @@ const config = {
   convexSiteUrl: 'https://example.convex.site', tokens: { 'dev-1': 'token-1' },
 };
 const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
+
+test('429 respects Retry-After and only acknowledges a successful forward', async t => {
+  const waits = [];
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => ++calls === 1
+    ? new Response(null, { status: 429, headers: { 'Retry-After': '2' } }) : new Response(null, { status: 200 }));
+  const bridge = createBridge(config, { log: () => {}, wait: async ms => { waits.push(ms); } });
+  t.after(() => bridge.stop());
+  bridge.enqueue({ eventType: 'devStatusChanged', devIndex: 'dev-1', status: 'online' });
+  await bridge.drain();
+  assert.equal(calls, 2);
+  assert.deepEqual(waits, [2000]);
+});
+
+test('failed sends survive restart without storing tokens, then replay with current credentials', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'ngs-event-spool-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
+  const first = createBridge({ ...config, queueDir: directory }, { log: () => {}, wait: async () => {} });
+  t.after(() => first.stop());
+  first.enqueue({ eventType: 'devStatusChanged', devIndex: 'dev-1', status: 'offline' });
+  await first.drain();
+  first.stop();
+  const files = readdirSync(directory).filter(name => name.endsWith('.json'));
+  assert.equal(files.length, 1);
+  assert.equal(readFileSync(join(directory, files[0]), 'utf8').includes('token-1'), false);
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (_url, options) => { calls.push(options); return new Response(null, { status: 200 }); });
+  const replay = createBridge({ ...config, tokens: { 'dev-1': 'rotated-token' }, queueDir: directory }, { log: () => {} });
+  t.after(() => replay.stop());
+  await replay.drain();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].headers.Authorization, 'Bearer rotated-token');
+  assert.equal(JSON.parse(calls[0].body).status, 'offline');
+  assert.deepEqual(readdirSync(directory), []);
+});
 
 test('devStatusChanged doğru URL, Bearer, zaman ve gövdeyle mevcut kuyruktan gönderilir', async (t) => {
   const calls = [];

@@ -43,6 +43,8 @@ export function StatusResults({
   expanded,
   setExpanded,
   deviceCounts,
+  error = "",
+  onRetry,
 }: {
   view: "person" | "device";
   rows: GrantRow[];
@@ -57,28 +59,40 @@ export function StatusResults({
   expanded: Id<"devices"> | undefined;
   setExpanded: (deviceId: Id<"devices"> | undefined) => void;
   deviceCounts: Record<string, Counts>;
+  error?: string;
+  onRetry?: () => void;
 }) {
   const rowView = (
     <>
-      <p className="text-sm text-muted-foreground">
-        Filtre sonucu: {rows.length} kayıt{cursor ? " (yüklenenler; daha fazla kayıt olabilir)" : ""}
-      </p>
-      <GrantRows
-        rows={rows}
-        selected={selected}
-        onToggle={toggle}
-        onEmployee={setEmployee}
-        canManage
-        loading={busy}
-        emptyTitle={cursor ? "Yüklenen kayıtlarda bu filtrelerde eşleşme bulunamadı." : "Bu filtrelerde kayıt bulunamadı."}
-        hideDevice={view === "device"}
-      />
-      <LoadMoreFooter
-        hasMore={Boolean(cursor)}
-        loading={busy}
-        loadingLabel="Daha fazla yükle"
-        onLoadMore={() => void more()}
-      />
+      {error && (
+        <div role="alert" className="space-y-2">
+          <p>Yetki listesi yüklenemedi: {error}</p>
+          <Button variant="outline" disabled={busy} onClick={onRetry}>Tekrar dene</Button>
+        </div>
+      )}
+      {(!error || rows.length > 0) && (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Filtre sonucu: {rows.length} kayıt{cursor ? " (yüklenenler; daha fazla kayıt olabilir)" : ""}
+          </p>
+          <GrantRows
+            rows={rows}
+            selected={selected}
+            onToggle={toggle}
+            onEmployee={setEmployee}
+            canManage
+            loading={busy}
+            emptyTitle={cursor ? "Yüklenen kayıtlarda bu filtrelerde eşleşme bulunamadı." : "Bu filtrelerde kayıt bulunamadı."}
+            hideDevice={view === "device"}
+          />
+          <LoadMoreFooter
+            hasMore={Boolean(cursor) && !error}
+            loading={busy}
+            loadingLabel="Daha fazla yükle"
+            onLoadMore={() => void more()}
+          />
+        </>
+      )}
     </>
   );
   return (

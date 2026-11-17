@@ -105,7 +105,7 @@ describe("PDK-006 half-day holiday time portions", () => {
     const policy = { ...LEGACY_PDKS_POLICY, calculationMode: "eachPunch" as const };
     const morning = run({ holiday: holiday(), policy, readings: [reading("09:00", "entry"), reading("13:00", "exit")] });
     const afternoon = run({ holiday: holiday(), policy, readings: [reading("13:00", "entry"), reading("18:00", "exit")] });
-    expect(minutesByClass(morning)).toEqual({ workday: 240 });
+    expect(minutesByClass(morning)).toEqual({ workday: 180 });
     expect(morning.overtimeMinutes).toBe(0);
     expect(minutesByClass(afternoon)).toEqual({ halfDayHoliday: 300 });
     expect(afternoon.overtimeMinutes).toBe(300);

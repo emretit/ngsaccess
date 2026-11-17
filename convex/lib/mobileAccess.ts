@@ -221,6 +221,18 @@ export async function settleMobileIdeOperation(ctx: MutationCtx, command: Doc<"i
   await ctx.db.patch(row._id, outcome);
 }
 
+/** Persist local-bridge ACKs in the mobile history in the same transaction. */
+export async function settleMobileHikOperation(ctx: MutationCtx, command: Doc<"hikPendingOperations">, status: "acked" | "failed") {
+  const marker = mobileOperationId(command.payload);
+  const id = marker === undefined ? null : ctx.db.normalizeId("mobileAccessOperations", marker);
+  const row = id ? await ctx.db.get(id) : null;
+  if (!row || (mobileOperationTerminal(row) && !(row.status === "unknown" && status === "acked")) || row.hikOperationId !== command._id ||
+      row.deviceId !== command.deviceId || row.projectId !== command.projectId) return;
+  await ctx.db.patch(row._id, status === "acked" ? { status: "confirmed", errorCode: undefined }
+    : command.attemptCount > 0 ? { status: "unknown", errorCode: row.errorCode ?? "COMMAND_OUTCOME_UNKNOWN" }
+    : { status: "failed", errorCode: row.errorCode ?? "COMMAND_FAILED" });
+}
+
 export function mobileOperationId(payload: unknown): string | undefined {
   if (typeof payload !== "object" || payload === null || !("mobileOperationId" in payload)) return undefined;
   return typeof payload.mobileOperationId === "string" ? payload.mobileOperationId : "invalid";

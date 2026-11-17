@@ -114,3 +114,9 @@ describe("dashboard audit fixes", () => {
     expect(html).toMatch(/<a[^>]*class="[^"]*min-h-11/);
   });
 });
+
+it("composes dashboard content below a single page heading", () => {
+  const html = render(<DashboardHeader><p>Proje panelleri</p></DashboardHeader>);
+  expect(html.match(/<h1\b/g)).toHaveLength(1);
+  expect(html.indexOf("Ana Sayfa</h1>")).toBeLessThan(html.indexOf("Proje panelleri"));
+});

@@ -131,3 +131,32 @@ it("08-H2: assigned overnight manual form labels the following day", () => {
   state.values = [];
   expect(render(<ManualPdksEditDialog {...props} />)).not.toContain("Çıkış ertesi gün kaydedilecek.");
 });
+
+it("dates an exit-only fixed-night correction using the assigned shift, without inventing an entry", () => {
+  state.values = [];
+  const html = render(<ManualPdksEditDialog open employeeId={"e" as import("../../../../convex/_generated/dataModel").Id<"employees">}
+    employeeName="Ada" date="2026-12-31" initialEntry="" initialExit="06:00" isOvernightShift
+    plannedExitReferenceTime="22:00" punchQuality="missingEntry" onClose={vi.fn()} />);
+  expect(html).toContain("Eksik kaydı tamamla");
+  expect(html).toContain("Çıkış ertesi gün kaydedilecek.");
+  expect(html).toContain("1 Ocak 2027 Cuma");
+  expect(html).toMatch(/id="manual-entry"[^>]*value=""/);
+});
+
+it("keeps an entryless flexible correction on its work date", () => {
+  state.values = [];
+  const html = render(<ManualPdksEditDialog open employeeId={"e" as import("../../../../convex/_generated/dataModel").Id<"employees">}
+    employeeName="Ada" date="2026-12-31" initialEntry="" initialExit="06:00" isOvernightShift
+    plannedExitReferenceTime={null} onClose={vi.fn()} />);
+  expect(html).toContain("31 Aralık 2026 Perşembe");
+  expect(html).not.toContain("Çıkış ertesi gün kaydedilecek.");
+});
+
+it("does not offer endpoint correction as a way to add a missing intermediate entry", () => {
+  const html = render(<ManualPdksEditDialog open employeeId={"e" as import("../../../../convex/_generated/dataModel").Id<"employees">}
+    employeeName="Ada" date="2026-12-31" initialEntry="22:00" initialExit="06:00" isOvernightShift
+    plannedExitReferenceTime="22:00" punchQuality="missingEntry" onClose={vi.fn()} />);
+  expect(html).toContain("Manuel düzelt");
+  expect(html).not.toContain("Eksik kaydı tamamla");
+  expect(html).toContain("Bu form ara okutma eklemez");
+});

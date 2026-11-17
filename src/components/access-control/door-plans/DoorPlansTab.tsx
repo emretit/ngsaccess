@@ -2,11 +2,14 @@ import { TableStateRow } from "@/components/shared/TableStateRow";
 import { pastAttemptText } from "@/lib/pastAttempt";
 import { CopyDoorPlansDialog } from "./CopyDoorPlansDialog";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,11 +36,11 @@ const modes: Record<string, string> = {
   normal: "normal",
   card: "Kart",
   face: "Yüz",
-  fp: "Parmak İzi",
-  cardOrFace: "Kart veya Yüz",
-  cardAndPw: "Kart + Şifre",
-  cardAndFace: "Kart + Yüz",
-  faceAndCard: "Kart + Yüz",
+  fp: "Parmak izi",
+  cardOrFace: "Kart veya yüz",
+  cardAndPw: "Kart + şifre",
+  cardAndFace: "Kart + yüz",
+  faceAndCard: "Kart + yüz",
 };
 const days = WEEKDAYS.map((day) => day.short);
 function statusSummary(plan: DoorPlanTarget["hikDoorStatusPlan"]) {
@@ -67,6 +70,9 @@ function statusSummary(plan: DoorPlanTarget["hikDoorStatusPlan"]) {
   );
 }
 export function DoorPlansTab() {
+  const navigate = useNavigate();
+  const devicesAction = { label: "Cihazlara git", onClick: () => navigate("/devices") };
+  const scopeDescription = "Kapı planları Hikvision gateway kapılarında desteklenir.";
   const { projectId, loading } = useActiveProjectScope();
   const targets = useQuery(
     api.doors.listPlanTargets,
@@ -81,39 +87,46 @@ export function DoorPlansTab() {
     ids: Id<"doors">[];
   }>({ projectId, ids: [] });
   const [copyProject, setCopyProject] = useState<typeof projectId>(undefined);
+  const [searchState, setSearch] = useState({ projectId, value: "" });
+  const search = searchState.projectId === projectId ? searchState.value : "";
+  const term = search.trim().toLocaleLowerCase("tr");
+  const doors = targets ?? [];
+  const filtered = doors.filter(door => !term || [door.doorName, door.deviceName, door.zoneName ?? ""].join(" ").toLocaleLowerCase("tr").includes(term));
+  const pageScope = `${projectId ?? ""}:${search}`;
+  const [pageState, setPage] = useState({ scope: pageScope, value: 1 });
+  const changeSearch = (value: string) => {
+    setSearch({ projectId, value });
+    setPage({ scope: `${projectId ?? ""}:${value}`, value: 1 });
+  };
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 20));
+  const page = Math.min(pageCount, pageState.scope === pageScope ? pageState.value : 1);
+  const visible = filtered.slice((page - 1) * 20, page * 20);
+  const selectedDoor = selected && selected.projectId === projectId
+    ? targets?.find(door => door.doorId === selected.door.doorId)
+    : undefined;
   const checked =
     selection.projectId === projectId
       ? selection.ids.filter((id) =>
-          targets?.some((door) => door.doorId === id),
+          visible.some((door) => door.doorId === id),
         )
       : [];
-  const heading = (
-    <div className="space-y-1">
-      <h1 className="text-xl font-semibold">Kapı Planları</h1>
-      <p className="text-sm text-muted-foreground">
-        Kapının herkes için ne zaman sürekli açık ya da kilitli kalacağını
-        belirleyin.
-      </p>
-    </div>
-  );
   if (loading)
     return (
       <div className="space-y-4 min-w-0">
-        {heading}
         <p role="status">Kapı planları yükleniyor…</p>
       </div>
     );
   if (!projectId)
     return (
       <div className="space-y-4 min-w-0">
-        {heading}
-        <EmptyState title="Plan kurulabilecek Hikvision kapısı yok" />
+        <EmptyState title="Bir proje seçin" description="Kapı planlarını görmek için üst çubuktan proje seçin." />
       </div>
     );
-  const doors = targets ?? [];
   return (
     <div className="space-y-4 min-w-0">
-      {heading}
+      <FilterBar search={search} onSearchChange={changeSearch}
+        searchLabel="Kapı, cihaz veya bölge ara" placeholder="Kapı, cihaz veya bölge…"
+        onClear={() => changeSearch("")} />
       {checked.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <span className="text-sm">
@@ -128,6 +141,7 @@ export function DoorPlansTab() {
           </Button>
         </div>
       )}
+      <p className="text-sm text-muted-foreground">{scopeDescription}</p>
       <Table resizeKey="door-plans" className="block w-full md:table">
         <TableHeader className="block md:table-header-group">
           <TableRow className="block md:table-row">
@@ -136,24 +150,24 @@ export function DoorPlansTab() {
                 <input
                   className="size-5"
                   type="checkbox"
-                  aria-label="Tüm kapıları seç"
-                  disabled={targets === undefined || doors.length === 0}
+                  aria-label={pageCount > 1 ? "Bu sayfadaki kapıları seç" : "Tüm kapıları seç"}
+                  disabled={targets === undefined || visible.length === 0}
                   checked={
                     checked.length > 0 &&
-                    checked.length === Math.min(doors.length, MAX_BULK_DOORS)
+                    checked.length === Math.min(visible.length, MAX_BULK_DOORS)
                   }
                   onChange={(event) =>
                     setSelection({
                       projectId,
                       ids: event.target.checked
-                        ? doors
+                        ? visible
                             .slice(0, MAX_BULK_DOORS)
                             .map((door) => door.doorId)
                         : [],
                     })
                   }
                 />
-                <span className="md:hidden">Tüm kapıları seç</span>
+                <span className="md:hidden">{pageCount > 1 ? "Bu sayfadaki kapıları seç" : "Tüm kapıları seç"}</span>
               </label>
             </TableHead>
             {[["door", "Kapı"], ["plan", "Plan"], ["delivery", "Gönderim"]].map(([id, label]) => (
@@ -164,11 +178,11 @@ export function DoorPlansTab() {
           </TableRow>
         </TableHeader>
         <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
-          {targets === undefined ? <TableStateRow colSpan={4} state="loading" label="Kapı planları yükleniyor…" /> : doors.length === 0 ? <TableStateRow colSpan={4} state="empty" title="Plan kurulabilecek Hikvision kapısı yok" /> : null}
-          {doors.map((door) => (
+          {targets === undefined ? <TableStateRow colSpan={4} state="loading" label="Kapı planları yükleniyor…" /> : filtered.length === 0 ? <TableStateRow colSpan={4} state="empty" title={term ? "Aramaya uygun kapı bulunamadı" : "Plan kurulabilecek Hikvision kapısı yok"} description={term ? "Kapı, cihaz veya bölge adını değiştirin." : scopeDescription} action={term ? undefined : devicesAction} /> : null}
+          {visible.map((door) => (
             <TableRow
               key={door.doorId}
-              className={`${ROW_CLICK_CLASS} flex flex-col rounded-lg border p-3 min-w-0 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:p-0 [&>td]:block [&>td]:p-1 [&>td]:h-auto [&>td]:min-w-0 [&>td]:break-words md:[&>td]:table-cell md:[&>td]:px-4 md:[&>td]:py-2 md:[&>td]:h-[42px]`}
+              className={`${ROW_CLICK_CLASS} flex flex-col rounded-lg border max-md:last:border! p-3 min-w-0 md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:p-0 [&>td]:block [&>td]:p-1 [&>td]:h-auto [&>td]:min-w-0 [&>td]:break-words md:[&>td]:table-cell md:[&>td]:px-4 md:[&>td]:py-2 md:[&>td]:h-[42px]`}
               onClick={onRowActivate(() => setSelected({ projectId, door }))}
             >
               <TableCell
@@ -216,7 +230,6 @@ export function DoorPlansTab() {
               </TableCell>
               <TableCell
                 className="order-3 text-sm"
-                onClick={(event) => event.stopPropagation()}
               >
                 <p className="line-clamp-1 md:line-clamp-none md:truncate" title={door.hikDoorStatusPlan?.enabled ? statusSummary(door.hikDoorStatusPlan) : door.hikVerifyPlan?.enabled ? "Doğrulama planı etkin" : door.hikDoorHolidayPlan?.enabled ? `${door.hikDoorHolidayPlan.year} tatil planı etkin` : "Plan etkin değil"}>
                   {door.hikDoorStatusPlan?.enabled
@@ -229,7 +242,7 @@ export function DoorPlansTab() {
                         ? `${door.hikDoorHolidayPlan.year} tatil planı etkin`
                         : "Plan etkin değil"}
                 </p>
-                <details>
+                <details onClick={(event) => event.stopPropagation()}>
                   <summary className="min-h-11 cursor-pointer py-3">
                     Plan ayrıntıları
                   </summary>
@@ -281,7 +294,7 @@ export function DoorPlansTab() {
                     </details>
                   </>
                 ) : door.plansPending ? (
-                  "Kaydedildi, gönderilmedi"
+                  door.pendingReason ?? "Kaydedildi, gönderilmedi"
                 ) : door.hikPlanAppliedAt ? (
                   `Gönderildi ${formatTrDateTime(new Date(door.hikPlanAppliedAt))}`
                 ) : (
@@ -292,6 +305,10 @@ export function DoorPlansTab() {
           ))}
         </TableBody>
       </Table>
+      {pageCount > 1 && <PaginationBar page={page} pageCount={pageCount}
+        summary={`${pageRange(filtered.length, page, 20)} / ${filtered.length} kapı`}
+        onPrevious={() => setPage({ scope: pageScope, value: page - 1 })}
+        onNext={() => setPage({ scope: pageScope, value: page + 1 })} />}
       {copyProject === projectId && checked.length > 0 && (
         <CopyDoorPlansDialog
           key={projectId}
@@ -300,15 +317,15 @@ export function DoorPlansTab() {
           onClose={() => setCopyProject(undefined)}
         />
       )}
-      {selected?.projectId === projectId && (
+      {selectedDoor && (
         <DoorPlanDialog
-          key={`${projectId}:${selected.door.doorId}`}
+          key={`${projectId}:${selectedDoor.doorId}`}
           open
           onOpenChange={(open) => {
             if (!open) setSelected(null);
           }}
           onSuccess={() => setSelected(null)}
-          door={selected.door}
+          door={selectedDoor}
         />
       )}
     </div>

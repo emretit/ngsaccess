@@ -25,13 +25,13 @@ export async function validateManualPdksForEmployee(ctx: MutationCtx, employee: 
  */
 export async function writeManualPdksRecord(
   ctx: MutationCtx,
-  args: { user: Doc<"users">; employee: Doc<"employees">; date: string; existing: Doc<"pdksRecords"> | null; input: ValidManualPdks; audit: boolean },
+  args: { user: Doc<"users">; employee: Doc<"employees">; date: string; existing: Doc<"pdksRecords"> | null; input: ValidManualPdks; audit: boolean; batchId?: string },
 ): Promise<{ id: Id<"pdksRecords">; created: boolean }> {
   const { user, employee, date, existing, input, audit } = args;
   const now = new Date().toISOString();
   const status = "present" as const;
   const values = { entryTime: input.entryTime, exitTime: input.exitTime, status, manualEntry: true, manualNote: input.note, editedBy: user._id, editedAt: Date.now(), updatedAt: now };
-  const newValue = { date, entryTime: input.entryTime, exitTime: input.exitTime, status, manualNote: input.note };
+  const newValue = { date, entryTime: input.entryTime, exitTime: input.exitTime, status, manualNote: input.note, ...(args.batchId ? { batchId: args.batchId } : {}) };
   if (existing) {
     await ctx.db.patch(existing._id, values);
     if (audit) {

@@ -9,6 +9,8 @@ import {
   displayDuration,
   periodTotals,
   validateManual,
+  reviewHint,
+  reviewExplanation,
   type PdksRow,
   type PdksCell,
 } from "./presentation";
@@ -176,6 +178,26 @@ it("shows unmeasured requirements days without replacing actual clocks, and keep
   expect(cellLabel("Ayşe", review.date, review)).toContain("İnceleme, Süre hesaplanamadı, Çıkış okutması yok");
   const employee: PdksRow = { ...row("Ayşe", 0), status: "incomplete", days: [review] };
   expect(filterPdksRows([employee], "incomplete")).toEqual([employee]);
+});
+
+it("keeps ongoing shifts free of premature missing-punch warnings", () => {
+  for (const durationMeasured of [true, false]) {
+    const ongoing = { status: "future", punchQuality: "missingExit", durationMeasured };
+    expect(reviewHint(ongoing)).toBe("");
+    expect(reviewExplanation(ongoing)).toBe("");
+  }
+});
+
+it("explains missing endpoints and the difference between unmeasured and partial work", () => {
+  expect(reviewExplanation({ status: "incomplete", punchQuality: "missingExit", durationMeasured: false }))
+    .toContain("çalışma süresi hesaplanamaz");
+  expect(reviewExplanation({ status: "incomplete", punchQuality: "missingEntry", durationMeasured: true }))
+    .toContain("yalnızca tamamlanmış giriş–çıkış kayıtlarından");
+  expect(reviewExplanation({ status: "incomplete", punchQuality: "noPunch", durationMeasured: false }))
+    .toContain("cihaz kayıtlarının aktarılıp aktarılmadığını");
+  expect(reviewExplanation({ status: "incomplete", punchQuality: "undirected", durationMeasured: false }))
+    .toContain("PDKS kaynak ayarlarını");
+  expect(reviewExplanation({ status: "present", punchQuality: "ok", durationMeasured: true })).toBe("");
 });
 
 describe("flexibleTargetLabel", () => {

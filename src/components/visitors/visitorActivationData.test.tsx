@@ -19,11 +19,7 @@ vi.mock("convex/react", () => ({
   useQuery: (reference: Parameters<typeof getFunctionName>[0], args: unknown) => {
     const name = getFunctionName(reference);
     queries.push({ name, args });
-    return name === "visitors:presetRules" ? [
-    { _id: "active-rule", name: "Lobby", isActive: true, hasDoors: true },
-    { _id: "no-doors", name: "Empty zone", isActive: true, hasDoors: false },
-    { _id: "inactive-rule", name: "Inactive zone", isActive: false, hasDoors: true },
-  ] : [];
+    return [];
   },
 }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project", loading: false }) }));
@@ -39,16 +35,14 @@ const visitor: VisitorDetail = {
 };
 function initialize(detail: VisitorDetail) {
   let hosts: { id: string; name: string }[] = [];
-  let options: { id: string; disabled: boolean }[] = [];
   function Harness() {
     const data = useVisitorFormData(detail);
-    options = data.presetRules;
     hosts = data.hostEmployees;
     return null;
   }
   renderToStaticMarkup(<Harness />);
   for (const effect of state.effects) effect();
-  return { form: state.updates[0] as VisitorFormData, options, hosts };
+  return { form: state.updates[0] as VisitorFormData, hosts };
 }
 afterEach(() => vi.useRealTimers());
 beforeEach(() => { vi.useFakeTimers(); state.search = ""; queries.length = 0; state.updates = []; state.effects = []; state.cursor = 0; });
@@ -57,24 +51,14 @@ it.each(["PRE:synthetic-reference", "IADE:returned-card", "•••• 1234"])(
   const { form } = initialize({ ...visitor, cardNumber });
   expect(form.cardNumber).toBe("");
   expect(form.isActive).toBe(false);
-  expect(form.presetRuleId).toBeNull();
+  expect(form.selected_doors).toEqual([]);
   expect(form.firstName).toBe(visitor.firstName);
 });
-it("keeps an ordinary actual card and its existing region while editing", () => {
+it("keeps an ordinary actual card while editing without loading visitor zone rules", () => {
   const { form } = initialize({ ...visitor, isActive: true, cardNumber: "00123456", presetRuleId: "active-rule" as Id<"accessRules"> });
   expect(form.cardNumber).toBe("00123456");
-  expect(form.presetRuleId).toBe("active-rule");
-});
-it("offers only active zones for assignment and marks a zone without doors unavailable", () => {
-  const { options } = initialize(visitor);
-  expect(options).toEqual([
-    { id: "active-rule", name: "Lobby", disabled: false },
-    { id: "no-doors", name: "Empty zone (Kapı yok)", disabled: true },
-  ]);
-});
-it("retains an existing inactive zone as disabled instead of making it selectable", () => {
-  const { options } = initialize({ ...visitor, presetRuleId: "inactive-rule" as Id<"accessRules"> });
-  expect(options.find(option => option.id === "inactive-rule")).toMatchObject({ disabled: true });
+  expect(form.selected_doors).toEqual([]);
+  expect(queries.some(query => query.name === "visitors:presetRules")).toBe(false);
 });
 
 it("uses bounded server host search and retains the current host name outside results", () => {

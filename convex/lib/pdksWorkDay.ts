@@ -3,6 +3,7 @@ import { flexibleSchedule, relativeMinute, validFlexibleEntry, validFlexibleExit
 import type { Doc, Id } from "../_generated/dataModel";
 import { isoTimeToTRMinutes, parseHHMM } from "./pdksHelpers";
 import { effectiveDirection, matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
+import { isPdksIncludedReading } from "./pdksSource";
 import { trDateKey, trDayRangeISO } from "./trDate";
 
 export type PdksShift = ShiftSchedule & FixedShiftRules;
@@ -69,8 +70,9 @@ export function groupPdksWorkDays<
   employeeId: Id<"employees">,
   resolve: PdksShiftResolver,
   manualEntryFor?: (employeeId: Id<"employees">, date: string) => string | undefined,
-  eligibleEntry?: (reading: T) => boolean,
+  eligibleEntry?: (reading: T, date: string) => boolean,
   resolveLast: PdksShiftResolver = resolve,
+  policyFor?: (date: string) => PdksDayPolicy,
 ): Map<string, T[]> {
   const result = new Map<string, T[]>();
   // Entries open their calendar day. A previous open session can start a night
@@ -83,7 +85,8 @@ export function groupPdksWorkDays<
   for (const reading of [...readings].sort((a, b) => a.accessTime.localeCompare(b.accessTime))) {
     const date = trDateKey(reading.accessTime);
     const previousDate = addWorkDate(date, -1);
-    const currentFlex = flexibleSchedule(resolve(employeeId, date));
+    const currentShift = resolve(employeeId, date);
+    const currentFlex = flexibleSchedule(currentShift);
     const previousFlex = flexibleSchedule(resolveLast(employeeId, previousDate));
     let key = pdksWorkDay(
       reading.accessTime,
@@ -108,10 +111,26 @@ export function groupPdksWorkDays<
       const previousExit = previousFlex && previous && !current
         && validFlexibleExit(previousFlex, relativeMinute(previousDate, reading.accessTime), relativeMinute(previousDate, previous.first));
       const currentEntry = currentFlex && validFlexibleEntry(currentFlex, relativeMinute(date, reading.accessTime))
-        && (!eligibleEntry || eligibleEntry(reading));
+        && (!eligibleEntry || eligibleEntry(reading, date));
       const undirected = reading.direction !== "entry" && reading.direction !== "exit";
+      const previousPolicy = policyFor?.(previousDate);
+      const returning = previousPolicy?.calculationMode === "eachPunch" && previous && (previous.nightTail || !previous.open)
+        && previousExit && effectiveDirection(reading, previousPolicy) === "entry"
+        && matchesPdksCheckpoint(reading, previousPolicy) && (!eligibleEntry || eligibleEntry(reading, previousDate));
+      const canOpenCurrent = currentEntry || currentShift && !currentFlex && (currentShift.validWindow
+        ? validFixedPunch(currentShift.validWindow, date, reading.accessTime, "entry")
+        : isoTimeToTRMinutes(reading.accessTime) >= parseHHMM(currentShift.startTime));
+      // An explicit return can reopen yesterday's bounded session, unless today's assignment also owns it.
+      if (returning && !canOpenCurrent) {
+        key = previousDate;
+        previous.open = true;
+        previous.nightTail = true;
+      } else if (returning && canOpenCurrent) {
+        conflict = true;
+        markConflict(previousDate);
+        active.set(date, { first: reading.accessTime, open: true });
       // An undirected repeat on a closed night tail stays on D unless it can open D+1.
-      if (undirected && previousExit && (previous.open || previous.nightTail && !currentEntry)) {
+      } else if (undirected && previousExit && (previous.open || previous.nightTail && !currentEntry)) {
         if (currentEntry) {
           conflict = true;
           previous.open = false;
@@ -184,7 +203,7 @@ export function manualPdksTimes(
   shift: PdksShift | null,
 ) {
   const flex = flexibleSchedule(shift);
-  const entryTime = manual?.entryTime ?? (shift?.scheduleType !== "flexible" && (shift?.validWindow || shift?.missingCheckInLateMinutes !== undefined) ? shift?.startTime : undefined);
+  const entryTime = manual?.entryTime ?? (shift?.scheduleType !== "flexible" ? shift?.startTime : undefined);
   const nextDay = flex
     ? flex.checkOutEndDayOffset === 1 && !!manual?.entryTime && !!manual.exitTime && manual.exitTime <= manual.entryTime
     : exitMayCrossMidnight(shift) &&
@@ -213,7 +232,7 @@ export function buildPdksWorkDateResolver(
   options?: {
     readings: readonly Doc<"cardReadings">[];
     manualEntryFor?: (employeeId: Id<"employees">, date: string) => string | undefined;
-    eligibleEntry?: (reading: Doc<"cardReadings">) => boolean;
+    eligibleEntry?: (reading: Doc<"cardReadings">, date?: string) => boolean;
   },
   policyFor?: (reading: WorkDateReading, date: string) => PdksDayPolicy,
   resolveLast: PdksShiftResolver = resolve,
@@ -249,13 +268,27 @@ export function buildPdksWorkDateResolver(
     for (const rawReading of options?.readings ?? []) {
       const reading = withDirection(rawReading);
       const employee = employeeFor(reading);
-      if (!employee || reading.direction === "entry" && options?.eligibleEntry && !options.eligibleEntry(reading)) continue;
+      if (!employee) continue;
+      const previousPolicy = policyFor?.(reading, addWorkDate(trDateKey(reading.accessTime), -1));
+      const previousEligible = previousPolicy?.calculationMode === "eachPunch"
+        && isPdksIncludedReading(reading, employee.projectId, previousPolicy)
+        && (options?.eligibleEntry?.(reading, addWorkDate(trDateKey(reading.accessTime), -1)) ?? true);
+      if (reading.direction === "entry" && options?.eligibleEntry && !options.eligibleEntry(reading, trDateKey(reading.accessTime)) && !previousEligible) continue;
       const bucket = byEmployee.get(String(employee._id)) ?? { employee, readings: [] };
       bucket.readings.push(reading);
       byEmployee.set(String(employee._id), bucket);
     }
     for (const { employee, readings } of byEmployee.values()) {
-      for (const [date, grouped] of groupPdksWorkDays(readings, employee._id, resolve, options?.manualEntryFor, options?.eligibleEntry, resolveLast)) {
+      const firstReading = readings[0];
+      if (!firstReading) continue;
+      const eligible = (reading: Doc<"cardReadings">, date: string) => {
+        const policy = policyFor?.(reading, date);
+        return policy?.calculationMode === "eachPunch"
+          ? isPdksIncludedReading(reading, employee.projectId, policy) && (options?.eligibleEntry?.(reading, date) ?? true)
+          : options?.eligibleEntry?.(reading) ?? true;
+      };
+      for (const [date, grouped] of groupPdksWorkDays(readings, employee._id, resolve,
+        options?.manualEntryFor, eligible, resolveLast, policyFor ? date => policyFor(firstReading, date) : undefined)) {
         for (const reading of grouped) workDates.set(String(reading._id), date);
       }
     }

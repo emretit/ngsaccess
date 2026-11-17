@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -19,6 +19,7 @@ const AccessControl = lazy(() => import('@/pages/AccessControl'));
 const Visitors = lazy(() => import('@/pages/Visitors'));
 const LiveMonitoring = lazy(() => import('@/pages/LiveMonitoring'));
 const PDKSRecords = lazy(() => import('@/pages/PDKSRecords'));
+const ShiftPlan = lazy(() => import('@/pages/ShiftPlan'));
 const PdksSettings = lazy(() => import('@/pages/PdksSettings'));
 const Leaves = lazy(() => import('@/pages/Leaves'));
 const CheckIn = lazy(() => import('@/pages/CheckIn'));
@@ -46,9 +47,13 @@ function PageFallback() {
 function AppContent() {
   const { pathname, hash } = useLocation();
   const navigationType = useNavigationType();
+  const previousRoute = useRef<string | undefined>(undefined);
   // Rota değişince sayfa başından açılır (bölüm bağlantıları ve geri/ileri hariç); uygulama kabuğu kendi kaydırmasını yönetir.
   useEffect(() => {
-    if (!hash && navigationType !== 'POP') window.scrollTo(0, 0);
+    const route = pathname + hash;
+    const changed = previousRoute.current !== route;
+    previousRoute.current = route;
+    return scrollPublicRoute(changed, hash, navigationType);
   }, [pathname, hash, navigationType]);
 
   return (
@@ -77,8 +82,9 @@ function AppContent() {
           <Route path="/live-monitoring" element={<LiveMonitoring />} />
           <Route path="/pdks-records" element={<PDKSRecords />} />
           <Route path="/pdks-records/settings" element={<PdksSettings />} />
-          <Route path="/shifts" element={<Navigate to="/pdks-records?plan=1" replace />} />
-          <Route path="/shifts/definitions" element={<Navigate to="/pdks-records" replace />} />
+          <Route path="/pdks-records/plan" element={<ShiftPlan />} />
+          <Route path="/shifts" element={<Navigate to="/pdks-records/plan" replace />} />
+          <Route path="/shifts/definitions" element={<Navigate to="/pdks-records/plan?tab=definitions" replace />} />
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit-log" element={<AuditLog />} />
@@ -113,3 +119,28 @@ function App() {
 }
 
 export default App;
+
+/** Window scrolling belongs only to routes outside the authenticated shell. */
+export function scrollPublicRoute(changed: boolean, hash: string, navigation: string): () => void {
+  if (!changed || document.getElementById("main") || navigation === "POP") return () => {};
+  if (!hash) { window.scrollTo(0, 0); return () => {}; }
+  let id: string;
+  try { id = decodeURIComponent(hash.slice(1)); } catch { return () => {}; }
+  let observer: MutationObserver | undefined;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const stop = () => { observer?.disconnect(); if (timeout !== undefined) clearTimeout(timeout); };
+  const apply = () => {
+    if (document.getElementById("main")) { stop(); return true; }
+    const element = document.getElementById(id);
+    if (!element) return false;
+    element.scrollIntoView();
+    stop();
+    return true;
+  };
+  if (!apply()) {
+    observer = new MutationObserver(apply);
+    observer.observe(document.body, { childList: true, subtree: true });
+    timeout = setTimeout(stop, 30_000);
+  }
+  return stop;
+}

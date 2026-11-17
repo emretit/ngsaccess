@@ -36,6 +36,7 @@ const state = vi.hoisted(() => ({
 vi.mock("convex/react", () => ({
   useConvex: () => ({ query: state.query }),
   useMutation: () => vi.fn(),
+  useAction: () => vi.fn(),
   useQuery: state.subscribe,
 }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({
@@ -181,7 +182,7 @@ describe("yetki durumu SSR", () => {
     expect(searched).toMatch(/aria-pressed="true"[^>]*>Hata/);
     expect(searched).toMatch(/aria-pressed="false"[^>]*>Tümü/);
     expect(searched.match(/aria-pressed=/g)).toHaveLength(4);
-    expect(render({ departmentId: "dep" as Id<"departments"> })).toContain("Departman özeti · 4 kişi–cihaz kaydı · 2 kişi");
+    expect(render({ departmentId: "dep" as Id<"departments"> })).toContain("Proje özeti · 4 kişi–cihaz kaydı · 2 kişi");
     expect(renderToStaticMarkup(<StatusCounters counts={{ ...counts, capped: true }} filters={{}} change={() => undefined} />)).toContain("2+ kişi");
   });
   it("eski Convex sürümü kişi sayısı döndürmezse özet 'undefined' yazmaz", () => {
@@ -355,9 +356,9 @@ describe("yetki durumu SSR", () => {
   });
   it("ilk SSR abonelik açmaz; grants yalnız tek seferlik query kullanır", () => {
     const html = renderToStaticMarkup(<StatusPage />);
-    expect(html).toContain("Kişi yetkilerinin cihazlara ulaşıp ulaşmadığını kontrol edin.");
+    expect(html).not.toContain("<h1");
     expect(html).toContain("Liste okundu");
-    expect(html).toContain("Yenile");
+    expect(html).not.toContain(">Yenile<");
     expect(state.subscribe).not.toHaveBeenCalled();
     const source = readFileSync(
       new URL("./StatusPage.tsx", import.meta.url),
@@ -368,6 +369,7 @@ describe("yetki durumu SSR", () => {
       expect(source.replace(/\s/g, "")).toContain(
         `convex.query(api.accessGrantStatus.${name}`,
       );
+    expect(source).toContain('useAccessControlHeader("Yenile", refresh, busy)');
     expect(source).toMatch(/\[search\]/);
     expect(source).toContain("300");
     const run = readFileSync(

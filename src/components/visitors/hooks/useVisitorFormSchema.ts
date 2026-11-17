@@ -11,10 +11,10 @@ export const visitorFormSchema = z.object({
   isPreRegistration: z.boolean().optional(),
   originalExpiry: z.string().optional(),
   wasActive: z.boolean().optional(),
-  presetRuleId: z.string().nullable(),
+  selected_doors: z.array(z.string()),
   accessExpiresAt: z.string(),
 }).superRefine((data, ctx) => {
-  if ((!data.isEditing || data.isPreRegistration) && !data.presetRuleId) ctx.addIssue({ code: "custom", path: ["presetRuleId"], message: "Ziyaretçi erişim bölgesi seçin" });
+  if ((!data.isEditing || data.isPreRegistration) && !data.selected_doors.length) ctx.addIssue({ code: "custom", path: ["doors"], message: "Ziyaretçinin geçeceği en az bir kapı seçin" });
   if (!data.isEditing || data.accessExpiresAt !== data.originalExpiry || (data.isActive && !data.wasActive)) {
     const error = visitorExpiryValidation(data.accessExpiresAt);
     if (error) ctx.addIssue({ code: "custom", path: ["accessExpiresAt"], message: error });

@@ -21,7 +21,7 @@ export const RuleBasicInfo = <T extends RuleBasicInfoFormData>({
 }: RuleBasicInfoProps<T>) => {
   return (
     <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
-      <FormFieldWrapper htmlFor="name" label="Kural Adı" error={errors.name}>
+      <FormFieldWrapper htmlFor="name" label="Kural adı" error={errors.name}>
         <Input
           id="name"
           value={formData.name}

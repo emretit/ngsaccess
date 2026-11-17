@@ -53,7 +53,7 @@ function writeWidths(resizeKey: string, widths: ColumnWidths) {
 
 const isVisible = (el: Element) => el.getClientRects().length > 0
 
-type HeaderCell = { id: string | undefined; fixed: boolean; measured: number }
+type HeaderCell = { id: string | undefined; fixed: boolean; measured: number; minWidth?: number }
 export type HeaderLayout = { container: number; cells: HeaderCell[] }
 
 function readHeader(table: HTMLTableElement): HeaderLayout | null {
@@ -66,10 +66,16 @@ function readHeader(table: HTMLTableElement): HeaderLayout | null {
     cells.push({
       id,
       fixed: id === undefined || cell.dataset.columnFixed !== undefined,
+      minWidth: Number(cell.dataset.columnMinWidth) || undefined,
       measured: id === undefined ? cell.getBoundingClientRect().width : 0,
     })
   }
   return { container: table.parentElement?.clientWidth ?? 0, cells }
+}
+
+/** Apply registered floors in memory; valid saved preferences remain untouched. */
+export function columnWidth(width: number | undefined, minWidth = 0) {
+  return Math.max(minWidth, width ?? FALLBACK_COLUMN_WIDTH)
 }
 
 /** Sabit sütun toplamı, sürüklenebilir taban toplamı ve kabı dolduracak çarpan. */
@@ -77,7 +83,7 @@ export function fitColumns(header: HeaderLayout, widths: ColumnWidths) {
   let fixedSum = 0
   let scalableSum = 0
   for (const cell of header.cells) {
-    const width = cell.id === undefined ? cell.measured : (widths[cell.id] ?? FALLBACK_COLUMN_WIDTH)
+    const width = cell.id === undefined ? cell.measured : columnWidth(widths[cell.id], cell.minWidth)
     if (cell.fixed) fixedSum += width
     else scalableSum += width
   }
@@ -89,9 +95,8 @@ export function fitColumns(header: HeaderLayout, widths: ColumnWidths) {
 /** Ekranda `rendered` px görünmesi için saklanacak taban: dolduran tabloda diğer sütunlar da ölçeklenir. */
 export function baseWidthFor(id: string, rendered: number, header: HeaderLayout, widths: ColumnWidths) {
   const { fixedSum, scalableSum } = fitColumns(header, widths)
-  const own = header.cells.some((cell) => cell.id === id && !cell.fixed)
-    ? (widths[id] ?? FALLBACK_COLUMN_WIDTH)
-    : 0
+  const cell = header.cells.find((cell) => cell.id === id && !cell.fixed)
+  const own = cell ? columnWidth(widths[id], cell.minWidth) : 0
   const others = scalableSum - own
   const free = header.container - fixedSum
   if (others <= 0 || others + rendered >= free) return rendered
@@ -190,14 +195,17 @@ export function useColumnResizeState(resizeKey: string | undefined) {
     }
     apply()
     const container = table.parentElement
-    if (container && typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(() => apply())
-      observer.observe(container)
-      return () => observer.disconnect()
-    }
+    const observer = container && typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(apply)
+      : null
+    if (container) observer?.observe(container)
+    // Media queries can hide/show columns even when a capped container stays the same size.
     window.addEventListener("resize", apply)
-    return () => window.removeEventListener("resize", apply)
-  }, [frozen, widths])
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener("resize", apply)
+    }
+  }) // Re-read visible registrations after conditional columns or minimums change.
 
   // Eylemler sabit kalır: sürükleme sırasında yalnızca widths/frozen değişir, hücre ref'leri yeniden bağlanmaz.
   const actions = React.useMemo<Omit<ColumnResizeContextValue, "widths" | "frozen">>(() => ({
@@ -211,7 +219,7 @@ export function useColumnResizeState(resizeKey: string | undefined) {
       cells.current.forEach((el, cellId) => {
         if (next[cellId] === undefined && isVisible(el)) {
           const scale = el.dataset.columnFixed === undefined ? scaleRef.current : 1
-          next[cellId] = Math.round(el.getBoundingClientRect().width / scale)
+          next[cellId] = columnWidth(Math.round(el.getBoundingClientRect().width / scale), Number(el.dataset.columnMinWidth) || 0)
         }
       })
       if (Object.keys(next).length !== Object.keys(current).length) setWidths(() => next)
@@ -223,10 +231,12 @@ export function useColumnResizeState(resizeKey: string | undefined) {
     setWidth: (id, rendered, minWidth = MIN_COLUMN_WIDTH) => {
       const table = tableRef.current
       const header = table && getComputedStyle(table).display === "table" ? readHeader(table) : null
-      const target = Math.max(minWidth, rendered)
+      const registeredMinimum = Number(cells.current.get(id)?.dataset.columnMinWidth) || 0
+      const minimum = Math.max(minWidth, registeredMinimum)
+      const target = Math.max(minimum, rendered)
       setWidths((prev) => {
         const base = header ? baseWidthFor(id, target, header, prev) : target
-        const rounded = Math.max(minWidth, Math.round(base))
+        const rounded = Math.max(minimum, Math.round(base))
         return prev[id] === rounded ? prev : { ...prev, [id]: rounded }
       })
     },
@@ -268,7 +278,7 @@ export function ColumnResizeHandle({
   const drag = React.useRef<{ startX: number; startWidth: number } | null>(null)
   const [dragging, setDragging] = React.useState(false)
   if (!resize) return null
-  const width = resize.widths[columnId]
+  const width = columnWidth(resize.widths[columnId], minWidth)
 
   const stopDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
     if (!drag.current) return

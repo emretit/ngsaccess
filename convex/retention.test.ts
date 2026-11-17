@@ -231,7 +231,7 @@ it.each([
 async function visitorFixture(days: number | null = 90) {
   const { t, ids } = await fixture();
   const privacyId = await t.run(ctx => ctx.db.insert("projectPrivacySettings", { projectId: ids.projectId,
-    ...(days === null ? {} : { visitorRetentionDays: days }), updatedAt: iso(runAt) }));
+    ...(days === null ? {} : { visitorRetentionDays: days, visitorRetentionLastProcessedAt: 0 }), updatedAt: iso(runAt) }));
   return { t, ids, privacyId };
 }
 async function addVisitor(ctx: MutationCtx, projectId: Id<"projects">, patch: Partial<import("./_generated/dataModel").Doc<"employees">> = {}) {
@@ -340,8 +340,10 @@ it.each([30, 180])("restarts a visitor page when retention changes from 90 to %i
   await t.mutation(internal.privacyRetention.purgeVisitors, { stage: 14, batch: 0, runAt });
   const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
   const continuation = jobs.find(job => job.name === "privacyRetention:purgeVisitors");
-  expect(continuation?.args[0]).toMatchObject({ days: 90, visitorProjectId: ids.projectId });
-  expect(continuation?.args[0].cursor).toEqual(expect.any(String));
+  expect(continuation?.args[0]).toMatchObject({ stage: 14, batch: 1 });
+  const progress = await t.run(ctx => ctx.db.get(privacyId));
+  expect(progress).toMatchObject({ visitorRetentionCursorDays: 90, visitorRetentionRunAt: runAt });
+  expect(progress?.visitorRetentionCursor).toEqual(expect.any(String));
   await t.run(ctx => ctx.db.patch(privacyId, { visitorRetentionDays: days }));
   // A cursor from a different index range must never reach paginate, even if invalid.
   await t.mutation(internal.privacyRetention.purgeVisitors, { stage: 14, batch: 1, runAt,

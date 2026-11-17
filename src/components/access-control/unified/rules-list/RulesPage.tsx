@@ -75,7 +75,7 @@ export function RulesPage({
                 <TableHead columnId="schedule" className="hidden xl:table-cell w-40">
                   Ne zaman
                 </TableHead>
-                <TableHead columnId="status" className="w-24">Kural durumu</TableHead>
+                <TableHead columnId="status" className="w-28 whitespace-nowrap">Kural durumu</TableHead>
                 <TableHead columnId="actions" resizable={false} resizeLabel="İşlemler" className="w-14">
                   <span className="sr-only">İşlemler</span>
                 </TableHead>
@@ -94,7 +94,7 @@ export function RulesPage({
             </TableBody>
           </Table>
         </div>
-      {result && <PaginationBar
+      {result && (!result.isDone || cursors.length > 1) && <PaginationBar
         className="max-md:[&_button]:min-h-11"
         summary={`Sayfa ${cursors.length} · ${rows.length} kural gösteriliyor`}
         page={cursors.length}

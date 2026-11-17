@@ -9,6 +9,8 @@ import { requirePermission } from "./lib/permissions";
 import { resolveProjectScope } from "./lib/projectScope";
 import { bounded, departmentGrantCandidates, grantEmployees, employeeGrantGraph, grantRuleScope, grantStale, grantState, upsertGrantStatus } from "./lib/grantStatus";
 import { createGrantRun, createRunInTransaction } from "./deviceSyncRuns";
+import { deviceConnection } from "./lib/deviceConnection";
+import { employeeWithinAccessEpoch, mobileRuleAllows } from "./lib/mobileAccess";
 
 async function authorize(ctx: QueryCtx, projectId: Id<"projects">) {
   const user = await getCurrentUser(ctx);
@@ -18,7 +20,34 @@ async function authorize(ctx: QueryCtx, projectId: Id<"projects">) {
 
 type GrantRow = Omit<Doc<"accessGrantStatus">, "_id" | "_creationTime"> & { _id: Id<"accessGrantStatus"> | null; _creationTime: number };
 type ScopeCache = Map<Id<"accessRules">, Promise<Awaited<ReturnType<typeof grantRuleScope>>>>;
-async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map(), employees?: Awaited<ReturnType<typeof grantEmployees>>) {
+type MembershipCache = Map<Id<"employees">, Promise<{ rule: Doc<"accessRules">; createdAt: string }[]>>;
+async function membershipStale(ctx: QueryCtx, row: GrantRow, employee: Doc<"employees"> | null,
+  scopes: ScopeCache, memberships: MembershipCache) {
+  if (row.appliedAt === undefined || row.state === "removed") return false;
+  let current = memberships.get(row.employeeId);
+  if (!current) {
+    current = (async () => {
+      if (!employee || employee.isActive === false) return [];
+      const links = bounded(await ctx.db.query("groupMembers").withIndex("by_project_employee", q =>
+        q.eq("projectId", row.projectId).eq("employeeId", row.employeeId)).take(101), 100);
+      const rules = await Promise.all(links.map(async link => ({ rule: await ctx.db.get(link.groupId), createdAt: link.createdAt })));
+      return rules.filter((entry): entry is { rule: Doc<"accessRules">; createdAt: string } =>
+        entry.rule !== null && entry.rule.projectId === row.projectId && entry.rule.isActive === true);
+    })();
+    memberships.set(row.employeeId, current);
+  }
+  const deviceRules: { rule: Doc<"accessRules">; createdAt: string }[] = [];
+  for (const entry of await current) {
+    let scope = scopes.get(entry.rule._id);
+    if (!scope) { scope = grantRuleScope(ctx, entry.rule); scopes.set(entry.rule._id, scope); }
+    if ((await scope).some(target => target.device._id === row.deviceId)) deviceRules.push(entry);
+  }
+  const ids = new Set(deviceRules.map(entry => entry.rule._id));
+  return ids.size !== row.ruleIds.length || row.ruleIds.some(id => !ids.has(id)) ||
+    grantStale(row.appliedAt, deviceRules.map(entry => entry.createdAt));
+}
+
+async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map(), employees?: Awaited<ReturnType<typeof grantEmployees>>, memberships: MembershipCache = new Map()) {
   const [rawEmployee, rawDevice] = await Promise.all([
     employees ? employees.get(row.employeeId) : ctx.db.get(row.employeeId), ctx.db.get(row.deviceId),
   ]);
@@ -40,10 +69,11 @@ async function enrich(ctx: QueryCtx, row: GrantRow, scopes: ScopeCache = new Map
   }
   const currentDepartment: { departmentId?: Id<"departments"> } = { departmentId: employee?.departmentId };
   return { ...row, ...currentDepartment, employeeName: employee ? `${employee.firstName} ${employee.lastName}` : "Silinmiş kişi",
+    ...(device ? { deviceConnection: deviceConnection(device, Date.now()) } : {}),
     departmentName: department?.name ?? null, deviceName: device?.name ?? "Silinmiş cihaz", brand: device?.brand ?? "other",
     doorIds: [...doors.keys()], doorNames: [...doors.values()].map(door => door.name),
     ruleNames: rules.map(rule => rule.name),
-    stale: grantStale(row.appliedAt, rules.map(rule => rule.updatedAt)),
+    stale: grantStale(row.appliedAt, rules.map(rule => rule.updatedAt)) || await membershipStale(ctx, row, employee, scopes, memberships),
     doorUnresolved: unresolvedDoor,
   };
 }
@@ -127,6 +157,7 @@ export const listByProject = authedQuery({
     if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 50) throw new ConvexError("Sayfa en fazla 50 satır olabilir");
     const deviceId = args.deviceId;
     const scopes: ScopeCache = new Map();
+    const memberships: MembershipCache = new Map();
     const search = args.search?.trim().toLocaleLowerCase("tr");
     // A department filter always takes a scan path (never the indexed fast path below).
     const department = args.departmentId
@@ -155,7 +186,7 @@ export const listByProject = authedQuery({
     if (!scanRequired) {
       const result = await base().paginate(args.paginationOpts);
       const employees = await grantEmployees(ctx, result.page);
-      return { ...result, page: await Promise.all(result.page.map(row => enrich(ctx, row, scopes, employees))), boundedScan: false };
+      return { ...result, page: await Promise.all(result.page.map(row => enrich(ctx, row, scopes, employees, memberships))), boundedScan: false };
     }
     // Non-indexed intersections/search scan the COMPLETE candidate set (max 1000),
     // THEN paginate matches. Never filter only a fetched page or silently truncate.
@@ -173,7 +204,7 @@ export const listByProject = authedQuery({
       matched.push(row);
     }
     const { rows, ...paging } = scanWindow(matched, args.paginationOpts);
-    return { page: await Promise.all(rows.map(row => enrich(ctx, row, scopes, employees))), ...paging, boundedScan: true };
+    return { page: await Promise.all(rows.map(row => enrich(ctx, row, scopes, employees, memberships))), ...paging, boundedScan: true };
   },
 });
 
@@ -225,16 +256,23 @@ export const byEmployee = authedQuery({
     await requirePermission(ctx, ctx.user, projectId, "accessRules.manage");
     await resolveProjectScope(ctx, projectId);
     const graph = await employeeGrantGraph(ctx, employee);
+    const checkedAt = Date.now();
+    const currentRules = new Map(await Promise.all([...new Set([...graph.values()].flatMap(scope => scope.ruleIds))].map(async id => [id, await ctx.db.get(id)] as const)));
+    const diagnose = (deviceId: Id<"devices">): { scheduleAllowedNow?: boolean; validityAllowedNow?: boolean; checkedAt?: number } => ({
+      scheduleAllowedNow: graph.get(deviceId)?.ruleIds.some(id => { const rule = currentRules.get(id); return rule ? mobileRuleAllows(rule, checkedAt) : false; }) ?? false,
+      validityAllowedNow: employeeWithinAccessEpoch(employee, checkedAt), checkedAt,
+    });
     const stored = bounded(await ctx.db.query("accessGrantStatus").withIndex("by_project_employee", q => q.eq("projectId", projectId).eq("employeeId", args.employeeId)).take(201), 200);
     const rows = [];
     const scopes: ScopeCache = new Map();
+    const memberships: MembershipCache = new Map();
     const employees = new Map([[employee._id, employee]]);
-    for (const row of stored) rows.push({ ...await enrich(ctx, row, scopes, employees), authorized: graph.has(row.deviceId), removalRequired: !graph.has(row.deviceId) && row.state !== "removed" });
+    for (const row of stored) rows.push({ ...await enrich(ctx, row, scopes, employees, memberships), ...diagnose(row.deviceId), authorized: graph.has(row.deviceId), removalRequired: !graph.has(row.deviceId) && row.state !== "removed" });
     for (const [deviceId, scope] of graph) {
       if (stored.some(row => row.deviceId === deviceId)) continue;
       const synthetic = await enrich(ctx, { _id: null, _creationTime: 0, projectId, employeeId: employee._id, deviceId,
         departmentId: employee.departmentId, state: "pending", ruleIds: scope.ruleIds, updatedAt: 0 }, scopes, employees);
-      rows.push({ ...synthetic, _id: null, state: "unknown" as const, authorized: true, removalRequired: false });
+      rows.push({ ...synthetic, ...diagnose(deviceId), _id: null, state: "unknown" as const, authorized: true, removalRequired: false });
     }
     const allowedDoors = new Set([...graph.values()].flatMap(scope => scope.doors.map(door => door._id)));
     const doors = bounded(await ctx.db.query("doors").withIndex("by_project", q => q.eq("projectId", projectId)).take(1001));

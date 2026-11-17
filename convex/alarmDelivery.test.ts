@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
+import { classifyHikEvent, HIK_MAJOR_EVENT_TYPES } from "./lib/hikEventCatalog";
 
 const modules = import.meta.glob("./**/*.ts");
 const now = Date.parse("2026-10-22T12:00:00Z");
@@ -34,6 +35,16 @@ async function fixture() {
 }
 
 describe("alarm delivery pipeline", () => {
+  it("a real forced-door classification passes the critical-only notification threshold", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      await ctx.db.patch(f.settingsId, { minSeverity: "critical" });
+      const classified = classifyHikEvent(HIK_MAJOR_EVENT_TYPES.DEVICE_ALARM, 1026);
+      await ctx.db.patch(f.eventId, { category: classified.category, severity: classified.severity, label: classified.label });
+      await notifyAlarmIfNeeded(ctx, f.eventId);
+    });
+    expect((await f.t.run(ctx => ctx.db.get(f.eventId)))?.alarmEmailStatus).toBe("queued");
+  });
   it("records failure, waits five minutes and retries only failed recipients exactly once", async () => {
     const f = await fixture();
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response(null, { status: 200 })).mockResolvedValue(new Response(null, { status: 503 }));
@@ -45,11 +56,20 @@ describe("alarm delivery pipeline", () => {
     expect(await f.admin.query(api.alarms.getSettings, { projectId: f.projectId })).toMatchObject({ lastEmail: { status: "retryScheduled", attempts: 1, error: "E-posta servisi HTTP 503 hatası verdi" } });
     await vi.advanceTimersByTimeAsync(299999); await f.t.finishInProgressScheduledFunctions();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    await f.t.run(async ctx => {
+      const event = await ctx.db.get(f.eventId);
+      if (event?.deviceId) await ctx.db.patch(event.deviceId, { name: "Yeni panel adı" });
+      await ctx.db.patch(f.eventId, { resolvedAt: new Date(Date.now()).toISOString() });
+    });
     await vi.advanceTimersByTimeAsync(1); await f.t.finishInProgressScheduledFunctions();
     const event = await f.t.run(ctx => ctx.db.get(f.eventId));
     expect(event).toMatchObject({ alarmEmailStatus: "failed", alarmEmailAttempts: 2 });
     expect(event?.alarmNotifiedAt).toBeUndefined(); expect(event?.alarmEmailRetryAt).toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    const firstOptions = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    const retryOptions = fetchMock.mock.calls[2]?.[1] as RequestInit;
+    expect(new Headers(retryOptions.headers).get("Idempotency-Key")).toBe(new Headers(firstOptions.headers).get("Idempotency-Key"));
+    expect(retryOptions.body).toBe(firstOptions.body);
     const retryBody = JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body)) as { to: string[] };
     expect(retryBody.to).toEqual(["second@example.com"]);
     await f.t.action(internal.actions.sendAlarmEmail.send, { eventId: f.eventId, attempt: 2 });

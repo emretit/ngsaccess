@@ -85,10 +85,19 @@ describe("Vardiya takvimi erişilebilir sunum sözleşmesi", () => {
 });
 
 
-it("09-D3/D10: başlıkta kısa Türkçe gün, erişilebilir adda tam tarih ve 24px seçim alanı vardır", () => {
+it("09-D3/D10: kısa gün başlığını, erişilebilir tam tarihi ve 44px seçim etiketini korur", () => {
   const html = renderToStaticMarkup(<ShiftCalendarGrid {...props} />);
-  expect(html).toContain('<span aria-hidden="true">Sal 20</span>');
-  expect(html).toContain('<span class="sr-only">20 Ekim 2026 Sal</span>');
-  expect(html).toContain("size-6 shrink-0 accent-primary");
+  const dayHeader = html.match(/<th\b[^>]*scope="col"[^>]*>[\s\S]*?<\/th>/g)
+    ?.find(header => header.includes("20 Ekim 2026 Sal")) ?? "";
+  const visualLabel = dayHeader.match(/<span\b[^>]*aria-hidden="true"[^>]*>([\s\S]*)<\/span>\s*<span\b[^>]*class="[^"]*sr-only/)?.[1] ?? "";
+  expect(visualLabel.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()).toBe("Sal 20");
+  expect(dayHeader).toMatch(/<span\b[^>]*class="[^"]*sr-only[^"]*"[^>]*>20 Ekim 2026 Sal<\/span>/);
+
+  const selectionLabel = html.match(/<label\b[^>]*>[\s\S]*?<\/label>/g)
+    ?.find(label => label.includes('aria-label="İpek Yıldız seç"')) ?? "";
+  expect(selectionLabel).toMatch(/<input\b[^>]*type="checkbox"/);
+  expect(selectionLabel).toContain("İpek Yıldız");
+  // The associated label supplies the touch target, independent of glyph size.
+  expect(selectionLabel).toMatch(/<label\b[^>]*class="[^"]*\bmin-h-11\b[^"]*"/);
   expect(html).not.toContain("2026-10-20");
 });

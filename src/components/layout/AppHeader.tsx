@@ -12,8 +12,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/AuthProvider";
 
-interface AppHeaderProps { title?: string; className?: string; children?: React.ReactNode }
-export function AppHeader({ title, className, children }: AppHeaderProps) {
+import type { RouteBreadcrumb } from "@/lib/routeMeta";
+
+interface AppHeaderProps { breadcrumbs?: readonly RouteBreadcrumb[]; title?: string; className?: string; children?: React.ReactNode }
+export function AppHeader({ title, breadcrumbs, className, children }: AppHeaderProps) {
   const { user, profile, signOut } = useAuth();
   const { role, can } = usePermissions();
   const [pending, setPending] = useState(false);
@@ -30,8 +32,10 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
     <SidebarTrigger className="h-11 w-11 shrink-0 min-[761px]:hidden" />
     <div className="min-w-0 flex-1 min-[761px]:max-w-[240px]"><ProjectSwitcher /></div>
     {title && title !== "Ana Sayfa" && <nav aria-label="İçerik yolu" className="hidden min-w-0 items-center gap-2 border-l pl-4 text-sm min-[761px]:flex">
-      {title !== "Ana Sayfa" && <><Link to="/home" className="shrink-0 text-muted-foreground hover:underline">Ana Sayfa</Link><span aria-hidden="true" className="text-muted-foreground">/</span></>}
-      <span aria-current="page" className="truncate">{title}</span>
+      {(breadcrumbs ?? [{ name: "Ana Sayfa", href: "/home" }, { name: title }]).map((item, index, items) => <span key={`${item.href ?? item.name}:${index}`} className="flex min-w-0 items-center gap-2">
+        {index > 0 && <span aria-hidden="true" className="text-muted-foreground">/</span>}
+        {item.href && index < items.length - 1 ? <Link to={item.href} className="truncate text-muted-foreground hover:underline">{item.name}</Link> : <span aria-current="page" className="truncate">{item.name}</span>}
+      </span>)}
     </nav>}
     {children}
     <div className="ml-auto flex shrink-0 items-center gap-2"><CommandPalette />

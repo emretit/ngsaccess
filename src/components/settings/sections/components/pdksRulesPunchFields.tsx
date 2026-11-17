@@ -70,7 +70,7 @@ export function PdksRulesPunchFields({
           <p className="text-xs text-muted-foreground">0–60 dakika. Her giriş-çıkışı topla modunda aynı yönlü tekrarları eler.</p>
         </div>
       </div>
-      {values.calculationMode === "eachPunch" && <p className="text-xs text-muted-foreground">Ara çıkışlar çalışma süresinden düşülür; ayrıca otomatik mola düşülmez. Yönsüz okutmalar dönüşümlü giriş ve çıkış sayılır.</p>}
+      {values.calculationMode === "eachPunch" && <p className="text-xs text-muted-foreground">Ara çıkışlar çalışma süresinden düşülür. Ara çıkış–giriş kaydı olmayan tamamlanmış günlerde vardiyada tanımlı sabit mola düşülür; kaydedilmiş ara çıkış varsa ikinci mola düşülmez. Bu hesap geçmiş dönemlere de uygulanır. Yönsüz okutmalar dönüşümlü giriş ve çıkış sayılır.</p>}
       {values.punchMode === "requirements" && (
         <div className="space-y-4 border-l-2 pl-4">
           <div className="flex flex-wrap gap-5">

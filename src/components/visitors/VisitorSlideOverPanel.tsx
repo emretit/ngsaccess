@@ -20,6 +20,7 @@ import { VisitorCollapsible } from "./VisitorCollapsible";
 import VisitorForm from "./VisitorForm";
 import { useStableQuery } from "./hooks/useStableQuery";
 import { canAssignVisitorPreset } from "./lib/preRegistration";
+import { visitorDoorsLabel } from "./lib/doorsLabel";
 
 export default function VisitorSlideOverPanel({ isOpen, onClose, visitor, onSave, now, canManage }: {
   isOpen: boolean; onClose: () => void; visitor: Visitor | null; onSave: (payload?: unknown) => void; now: number; canManage: boolean;
@@ -66,7 +67,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
   const name = `${detail.firstName} ${detail.lastName}`;
   const fields: DetailField[] = [
     { key: "expiry", label: "Geçerlilik bitişi (TR)", value: formatVisitorTime(detail.visitEnd), numeric: true },
-    { key: "zone", label: "Erişim bölgesi", value: detail.presetRuleName },
+    { key: "zone", label: "Kapılar", value: visitorDoorsLabel(detail.presetRuleName) },
     { key: "host", label: "Ziyaret edilen", value: detail.hostName },
   ];
   if (detail.presence) fields.push(
@@ -102,7 +103,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
     <ConfirmDestructive open={confirmation !== null} onOpenChange={open => { if (!open) setConfirmation(null); }} objectName={name}
       title={confirmation === "delete" ? "Ziyaretçi kaydı silinsin mi?" : confirmation === "release" ? "Kart serbest bırakılsın mı?" : "Ziyaret sonlandırılsın mı?"}
       confirmLabel={confirmation === "delete" ? "Kaydı sil" : confirmation === "release" ? "Kartı serbest bırak" : "Ziyareti sonlandır"}
-      effects={confirmation === "delete" ? ["Ziyaretçi kaydı ve bölge üyelikleri kalıcı olarak silinir.", "Cihazlardan kaldırma işlemi başlatılır; bağlı kişisel veriler temizlenir."] : confirmation === "release" ? ["Fiziksel kartı teslim aldığınızı doğrulayın. Kart numarası başka ziyaretçiye verilebilir."] : ["Erişim pasife alınır; cihazlardan kaldırma işlemi başlatılır.", "Fiziksel çıkış okuması oluşmaz; kart iadesi ayrıdır."]}
+      effects={confirmation === "delete" ? ["Ziyaretçi kaydı ve kapı yetkileri kalıcı olarak silinir.", "Cihazlardan kaldırma işlemi başlatılır; bağlı kişisel veriler temizlenir."] : confirmation === "release" ? ["Fiziksel kartı teslim aldığınızı doğrulayın. Kart numarası başka ziyaretçiye verilebilir."] : ["Erişim pasife alınır; cihazlardan kaldırma işlemi başlatılır.", "Fiziksel çıkış okuması oluşmaz; kart iadesi ayrıdır."]}
       onConfirm={async () => {
         if (confirmation === "delete") { await remove({ visitorId: detail._id }); notify.success("Ziyaretçi kaydı silindi"); onDeleted(); }
         else if (confirmation === "release") { await releaseCard({ visitorId: detail._id }); notify.success("Kart serbest bırakıldı"); }

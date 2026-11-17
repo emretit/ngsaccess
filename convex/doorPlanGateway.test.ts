@@ -155,6 +155,14 @@ describe("door plan gateway contract (mock only; not device verified)", () => {
     expect(mocks.write).not.toHaveBeenCalled();
     expect((await f.t.run(ctx => ctx.db.get(f.doorId)))?.hikDoorHolidaySlots).toBeUndefined();
   });
+  it("detaches the old holiday group when a calendar edit removed its last date", async () => {
+    const f = await setup();
+    await f.t.run(ctx => ctx.db.patch(f.doorId, { hikPlanPendingReason: "Tatil takvimi değişti; cihaza tekrar gönderin", hikDoorHolidayPlan: { enabled: true, year: 2099, mode: "remainClosed" } }));
+    expect(await f.caller.action(api.actions.hikGatewayDevice.applyDoorStatusPlan, { doorId: f.doorId })).toEqual({ ok: true });
+    expect(mocks.write.mock.calls.map(call => call[0])).not.toContain("/ISAPI/AccessControl/DoorStatusHolidayGroupCfg/2");
+    const template = mocks.write.mock.calls.find(call => call[0].includes("DoorStatusPlanTemplate"));
+    expect(template?.[2]).toMatchObject({ DoorStatusPlanTemplate: { holidayGroupNo: "" } });
+  });
   it.each([{}, { isSupportDoorStatusPlan: true }])("O1 HEAD status accepts absent legacy child flags %j", async capabilities => {
     const f = await setup();
     await f.t.run(ctx => ctx.db.patch(f.doorId, { hikDoorHolidayPlan: undefined }));

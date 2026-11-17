@@ -6,6 +6,7 @@ import { notify } from "@/lib/notify";
 import { Id } from "../../../convex/_generated/dataModel";
 
 interface CreateRuleWithMembersParams {
+  departmentSelections?: FunctionArgs<typeof api.accessRules.createWithGroups>["departmentSelections"];
   rule: {
     name: string;
     description?: string;
@@ -23,6 +24,7 @@ interface CreateRuleWithMembersParams {
 }
 
 interface UpdateRuleWithMembersParams {
+  departmentSelections?: FunctionArgs<typeof api.accessRules.updateWithGroups>["departmentSelections"];
   id: Id<"accessRules">;
   updates: {
     name?: string;
@@ -87,6 +89,7 @@ export const useComplexAccessRuleMutations = (onDiffSaved?: (result: RuleSaveRes
           employeeIds: params.employeeIds,
           deviceIds: params.deviceIds,
           doorIds: params.doorIds,
+          departmentSelections: params.departmentSelections,
         });
         notify.success("Kural kaydedildi", "Cihaz işlemleri ayrıca izlenir.");
         startBackgroundSync(result);
@@ -105,6 +108,7 @@ export const useComplexAccessRuleMutations = (onDiffSaved?: (result: RuleSaveRes
           employeeIds: params.employeeIds,
           deviceIds: params.deviceIds,
           doorIds: params.doorIds,
+          departmentSelections: params.departmentSelections,
         };
         if (params.relationDiff) {
           const result = await updateWithGroupsTracked(payload);

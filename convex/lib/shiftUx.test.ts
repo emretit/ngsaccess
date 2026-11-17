@@ -3,12 +3,12 @@ import { validDay, validateRange, validateShift, schedulesOverlap, assignmentTou
 import { toPatch } from "./nullablePatch";
 const daytime = { startTime: "09:00", endTime: "18:00" };
 describe("vardiya kuralları", () => {
-  it("gerçek takvim günü ve en çok 365 gün aralık ister", () => {
+  it("gerçek takvim günü ister; uzun aralıkları kabul eder", () => {
     expect(validDay("2024-02-29")).toBe(true);
     for (const value of ["", "2026-02-29", "2026-04-31", "bad"]) expect(validDay(value)).toBe(false);
     expect(() => validateRange("", "")).toThrow();
     expect(() => validateRange("2026-01-02", "2026-01-01")).toThrow();
-    expect(() => validateRange("2026-01-01", "2027-01-02")).toThrow();
+    expect(() => validateRange("2026-01-01", "2027-01-02")).not.toThrow();
   });
   it("gündüz ve gece molasının vardiya içinde olmasını ister", () => {
     expect(() => validateShift({ ...daytime, breakStart: "12:00", breakEnd: "13:00" })).not.toThrow();

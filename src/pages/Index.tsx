@@ -16,8 +16,7 @@ export default function Index() {
   const { projectId, projects, loading, isSuperAdmin } = useActiveProject();
   const navigate = useNavigate();
   const noProject = !loading && !projectId;
-  return <div className="mx-auto max-w-[1536px] space-y-6">
-    <DashboardHeader />
+  return <DashboardHeader><div className="max-w-[1536px]">
     {noProject ? <EmptyState title={projects.length ? "Bir proje seçin" : isSuperAdmin ? "Henüz aktif proje yok" : "Proje ataması bekleniyor"}
       description={projects.length ? "Proje özetini görmek için erişebildiğiniz projelerden birini seçin." : isSuperAdmin ? "Projeleri Admin sayfasından kontrol edebilirsiniz." : "Henüz erişebileceğiniz bir proje yok. Projeye atanmak için yöneticinizle iletişime geçin."}
       action={{ label: projects.length ? "Proje seç" : isSuperAdmin ? "Admin sayfasını aç" : "Profilimi aç", onClick: () => projects.length ? document.getElementById("project-switcher")?.click() : navigate(isSuperAdmin ? "/system-admin" : "/profile") }} /> : <div key={projectId ?? "loading"} className="space-y-6">
@@ -33,5 +32,5 @@ export default function Index() {
         <QuerySectionBoundary title="Hızlı erişim alınamadı" resetKey={projectId}><QuickLinksGrid /></QuerySectionBoundary>
       </div>
     </div>}
-  </div>;
+  </div></DashboardHeader>;
 }

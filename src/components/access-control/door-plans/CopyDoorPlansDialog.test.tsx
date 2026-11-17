@@ -35,6 +35,7 @@ vi.mock("react", async (original) => ({
     ];
   },
 }));
+vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
 vi.mock("convex/react", () => ({
   useQuery: () => state.targets,
   useMutation: () => state.save,

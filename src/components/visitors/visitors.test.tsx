@@ -3,7 +3,6 @@ import { MemoryRouter } from "react-router-dom";
 import { canAccessRoute, routeMeta } from "@/lib/routeMeta";
 import VisitorManagement, { VisitorList } from "./VisitorManagement";
 import { VisitorDetailView } from "./VisitorSlideOverPanel";
-import { VisitorFilters } from "./VisitorFilters";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { Visitor, VisitorDetail } from "@/types/visitor";
@@ -32,7 +31,7 @@ const detail: VisitorDetail = {
 };
 const form: VisitorFormData = {
   firstName: "İpek", lastName: "Yıldız", visitorPhone: "", visitorCompany: "", visitPurpose: "", hostEmployeeId: null,
-  cardNumber: "", presetRuleId: detail.presetRuleId, accessExpiresAt: "2020-01-01T18:00", isActive: false, notes: "", kvkkConsent: false,
+  cardNumber: "", selected_doors: [], selected_devices: [], accessExpiresAt: "2020-01-01T18:00", isActive: false, notes: "", kvkkConsent: false,
 };
 afterEach(() => { vi.useRealTimers(); query.mockReset(); permissions.values = ["visitors.manage", "devices.manage"]; permissions.loading = false; });
 
@@ -42,6 +41,7 @@ describe("visitor form boundary contracts", () => {
     expect(payload.kind).toBe("update");
     expect(payload.args).not.toHaveProperty("accessExpiresAt");
     expect(payload.args).not.toHaveProperty("presetRuleId");
+    expect(payload.args).not.toHaveProperty("doorIds");
     expect(payload.args).toMatchObject({ notes: "düzeltme", visitorPhone: null, visitorCompany: null, hostEmployeeId: null });
     expect(payload.args).not.toHaveProperty("cardNumber", "IADE:old");
   });
@@ -55,14 +55,14 @@ describe("visitor form boundary contracts", () => {
   });
   it("uses Turkish wall time for validation and submission independent of browser timezone", () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date("2030-01-01T12:00:00Z"));
-    const input = { ...form, isActive: true, cardNumber: "1234", accessExpiresAt: "2030-01-01T15:30" };
+    const input = { ...form, isActive: true, cardNumber: "1234", selected_doors: ["door"], accessExpiresAt: "2030-01-01T15:30" };
     const payload = visitorFormPayload(input);
     expect(payload.args.accessExpiresAt).toBe("2030-01-01T12:30:00.000Z");
     expect(() => visitorFormPayload({ ...input, accessExpiresAt: "2030-01-01T14:59" })).toThrow();
     expect(() => visitorFormPayload({ ...input, accessExpiresAt: "2030-02-30T15:30" })).toThrow();
   });
-  it("permits a personal edit to a legacy record without an expiry or region", () => {
-    expect(visitorFormSchema.safeParse({ ...form, isEditing: true, originalExpiry: "", wasActive: false, accessExpiresAt: "", presetRuleId: null }).success).toBe(true);
+  it("permits a personal edit to a legacy record without an expiry or doors", () => {
+    expect(visitorFormSchema.safeParse({ ...form, isEditing: true, originalExpiry: "", wasActive: false, accessExpiresAt: "" }).success).toBe(true);
   });
 });
 
@@ -131,13 +131,9 @@ describe("visitor audit access and actions", () => {
     renderToStaticMarkup(<MemoryRouter><VisitorManagement /></MemoryRouter>);
     expect(query).not.toHaveBeenCalled();
   });
-  it("moves region creation into the header and retains its device permission", () => {
-    const filters = renderToStaticMarkup(<VisitorFilters searchQuery="" onSearchChange={noop} statusFilter="all" onStatusFilterChange={noop} onClear={noop} />);
-    expect(filters).not.toContain("Erişim bölgesi oluştur");
+  it("offers no separate visitor region creation; doors are chosen in the visitor form", () => {
     const html = renderToStaticMarkup(<MemoryRouter><VisitorManagement /></MemoryRouter>);
-    expect(html).toContain("Erişim bölgesi oluştur");
-    expect(html.indexOf("Erişim bölgesi oluştur")).toBeLessThan(html.indexOf("Ziyaretçi kaydet"));
-    permissions.values = ["reports.view"];
-    expect(renderToStaticMarkup(<MemoryRouter><VisitorManagement /></MemoryRouter>)).not.toContain("Erişim bölgesi oluştur");
+    expect(html).toContain("Ziyaretçi kaydet");
+    expect(html).not.toContain("Erişim bölgesi oluştur");
   });
 });

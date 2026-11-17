@@ -51,7 +51,7 @@ export function EmployeeTableRow({
       className={`h-[42px] ${ROW_CLICK_CLASS}`}
       onClick={onRowActivate(() => onViewDetails(employee))}
     >
-      <TableCell className="px-2 py-0" onClick={(e) => e.stopPropagation()}>
+      <TableCell className="px-2 py-0 max-[759px]:[&_[role=checkbox]]:after:-inset-3.5" onClick={(e) => e.stopPropagation()}>
         <Checkbox
           aria-label={`${employee.firstName} ${employee.lastName} seç`}
           disabled={
@@ -72,16 +72,16 @@ export function EmployeeTableRow({
               {employee.lastName[0]}
             </AvatarFallback>
           </Avatar>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <button
               type="button"
-              className="max-w-full truncate text-left font-medium"
+              className="line-clamp-2 min-h-11 max-w-full break-words whitespace-normal text-left text-sm font-medium leading-5 min-[760px]:block min-[760px]:min-h-0 min-[760px]:truncate"
               title={`${employee.firstName} ${employee.lastName}`}
               onClick={() => onViewDetails(employee)}
             >
               {employee.firstName} {employee.lastName}
             </button>
-            <p className="truncate text-[11px] text-muted-foreground min-[760px]:hidden">
+            <p className="truncate text-xs text-muted-foreground min-[760px]:hidden">
               {[
                 showDepartment && (employee.departments?.name ?? "Atanmamış"),
                 employee.payrollCode,
@@ -116,7 +116,7 @@ export function EmployeeTableRow({
           <EmployeeBiometricsCell biometrics={biometrics ?? undefined} />
         </TableCell>
       )}
-      <TableCell className="px-1 py-0">
+      <TableCell className="px-1 py-0 [&>div]:text-xs">
         <EmployeeEmploymentBadge employee={employee} />
       </TableCell>
       <TableCell className="px-0 py-0">

@@ -24,6 +24,7 @@ export const accessRuleSchema = z
       "visitor",
     ]),
     selectedEmployees: z.array(z.string()),
+    selectedDepartments: z.array(z.object({ departmentId: z.string(), includeChildren: z.boolean() })).optional(),
     selectedDevices: z.array(z.string()),
     selectedZones: z.array(z.string()),
     selectedDoors: z.array(z.string()),
@@ -36,7 +37,7 @@ export const accessRuleSchema = z
   .superRefine((data, ctx) => {
     if (
       data.targetType === "individual" &&
-      data.selectedEmployees.length === 0
+      data.selectedEmployees.length === 0 && !data.selectedDepartments?.length
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

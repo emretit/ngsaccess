@@ -6,6 +6,7 @@ import { internalMutation } from "./_generated/server";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
 import { toUtcISO } from "./lib/trDate";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
+import { writeAudit } from "./lib/audit";
 
 const SOURCE_VALIDATOR = v.union(
   v.literal("hikvision"),
@@ -29,12 +30,19 @@ export const recordOperationInternal = internalMutation({
     label: v.string(),
     ok: v.boolean(),
     summary: v.optional(v.string()),
+    actorId: v.optional(v.id("users")),
+    doorId: v.optional(v.id("doors")),
+    channel: v.optional(v.number()),
+    queued: v.optional(v.boolean()),
+    operationId: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ inserted: boolean }> => {
     const device = await ctx.db.get(args.deviceId);
     if (!device) {
       throw new Error("Cihaz bulunamadı");
     }
+    const door = args.doorId ? await ctx.db.get(args.doorId) : null;
+    if (args.doorId && (!door || door.deviceId !== device._id || door.projectId !== device.projectId)) throw new Error("Komut kapısı cihaza ait değil");
 
     const now = new Date().toISOString();
     const eventId = await ctx.db.insert("deviceEvents", {
@@ -55,6 +63,13 @@ export const recordOperationInternal = internalMutation({
       updatedAt: now,
     });
     await notifyAlarmIfNeeded(ctx, eventId);
+    if (args.actorId) {
+      const actor = await ctx.db.get(args.actorId);
+      if (!actor) throw new Error("Komut aktörü bulunamadı");
+      await writeAudit(ctx, { user: actor, projectId: device.projectId, action: "update", targetTable: args.doorId ? "doors" : "devices", targetId: args.doorId ?? device._id,
+        newValue: { command: args.label, deviceId: device._id, doorId: args.doorId, channel: args.channel,
+          stage: !args.ok ? "failed" : args.queued ? "queued" : "sent", operationId: args.operationId, eventId } });
+    }
 
     return { inserted: true };
   },

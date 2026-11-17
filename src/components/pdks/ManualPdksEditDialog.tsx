@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { FormActions } from "@/components/shared/FormActions";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { errorMessage, notify } from "@/lib/notify";
-import { displayTime, readableDate, validateManual } from "./lib/presentation";
+import { displayTime, readableDate, timeMinutes, validateManual, type PdksCell } from "./lib/presentation";
+import { addWorkDate } from "../../../convex/lib/pdksWorkDay";
 interface Props {
   open: boolean;
   returnFocusTo?: HTMLElement | null;
@@ -17,6 +18,8 @@ interface Props {
   employeeName: string;
   date: string;
   isOvernightShift?: boolean;
+  plannedExitReferenceTime?: string | null;
+  punchQuality?: PdksCell["punchQuality"];
   initialEntry: string;
   initialExit: string;
   onClose: () => void;
@@ -32,6 +35,8 @@ function ManualForm({
   employeeName,
   date,
   isOvernightShift = false,
+  plannedExitReferenceTime,
+  punchQuality,
   initialEntry,
   initialExit,
   onClose,
@@ -49,6 +54,10 @@ function ManualForm({
   const [saving, setSaving] = useState(false);
   const lock = useRef(false);
   const upsert = useMutation(api.pdksRecords.upsertManual);
+  const exitReference = entry || plannedExitReferenceTime || "";
+  const exitNextDay = isOvernightShift && timeMinutes(exit) !== null && timeMinutes(exitReference) !== null && exit < exitReference;
+  const exitDateKnown = timeMinutes(exit) !== null && (!isOvernightShift || timeMinutes(exitReference) !== null || plannedExitReferenceTime === null);
+  const completingMissingPunch = punchQuality === "missingExit" || (punchQuality === "missingEntry" && !originalEntry);
   const guard = useUnsavedChangesGuard(
     entry !== originalEntry || exit !== originalExit || note.length > 0,
   );
@@ -85,7 +94,7 @@ function ManualForm({
         open={true}
         onRequestClose={close}
         pending={saving}
-        title="Manuel düzelt"
+        title={completingMissingPunch ? "Eksik kaydı tamamla" : "Manuel düzelt"}
         size="sm"
         description={
           <>
@@ -107,8 +116,11 @@ function ManualForm({
         }
       >
         <p className="text-sm text-muted-foreground">
-          Kart okumaları korunur; değişiklik denetim kaydına işlenir.
+          Günün ilk giriş ve son çıkış saatini düzeltebilirsiniz. Gerekçenizi girin; kart okumaları korunur, değişiklik denetim kaydına işlenir.
         </p>
+        {punchQuality === "missingEntry" && originalEntry && <p className="text-sm text-muted-foreground">
+          Ara okutmalardan birinin giriş kaydı eksik. Bu form ara okutma eklemez; cihaz kayıtlarını kontrol edin.
+        </p>}
         <fieldset disabled={saving} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             {(
@@ -159,11 +171,14 @@ function ManualForm({
               </div>
             ))}
           </div>
-          {isOvernightShift && entry && exit && exit <= entry && (
+          {exitNextDay && (
             <p className="text-sm text-muted-foreground">
               Çıkış ertesi gün kaydedilecek.
             </p>
           )}
+          {exitDateKnown && <p className="text-sm text-muted-foreground">
+            Çıkışın ait olduğu gün {readableDate(exitNextDay ? addWorkDate(date, 1) : date)}.
+          </p>}
           <div>
             <label htmlFor="manual-note" className="text-sm">
               Gerekçe (zorunlu)

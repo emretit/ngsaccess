@@ -34,10 +34,12 @@ export async function notifyAlarmIfNeeded(ctx: MutationCtx, eventId: Id<"deviceE
   if (!settings?.emailEnabled || settings.recipients.length === 0 || (settings.minSeverity === "critical" && event.severity !== "critical")) return;
 
   const cutoff = new Date(Date.now() - ALARM_WINDOW_MS).toISOString();
-  const recent = await ctx.db.query("deviceEvents")
-    .withIndex("by_device_and_event_time", q => q.eq("deviceId", event.deviceId).gte("eventTime", cutoff))
-    .order("desc")
-    .take(200);
+  const recent = (await Promise.all([
+    ctx.db.query("deviceEvents").withIndex("by_device_category_label_alarmQueuedAt", q => q
+      .eq("deviceId", event.deviceId).eq("category", event.category).eq("label", event.label).gte("alarmQueuedAt", cutoff)).order("desc").take(2),
+    ctx.db.query("deviceEvents").withIndex("by_device_category_label_alarmNotifiedAt", q => q
+      .eq("deviceId", event.deviceId).eq("category", event.category).eq("label", event.label).gte("alarmNotifiedAt", cutoff)).order("desc").take(2),
+  ])).flat();
   // Cihaz kimliği debounce anahtarının parçasıdır; başka cihazın arızası bastırılmaz.
   // Bastırma bildirimin kendi zamanına bakar; olay saati (cihaz saati) tek başına bildirim yaşını göstermez.
   const sentRecently = recent.some(item => item._id !== event._id && item.deviceId === event.deviceId && (item.alarmQueuedAt ?? item.alarmNotifiedAt ?? "") >= cutoff && item.label === event.label && item.category === event.category);

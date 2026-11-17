@@ -1,6 +1,8 @@
 import { hasPermission, requirePermission } from "./lib/permissions";
+import { writeAudit } from "./lib/audit";
 import { listAccessRules, listAccessRuleMemberships, ruleMemberEmployee } from "./lib/accessRuleRead";
 import { createAccessRuleWithGroups } from "./lib/accessRuleWrite";
+import { departmentSelectionValidator, departmentMemberIds, writeRuleDepartments } from "./lib/departmentAccess";
 import { planRemovedEmployeeHik, reconcileRemovedEmployeeHik, snapshotRuleHikEmployees, resolveRuleDeviceTargets, hikSnapshotValidator, type HikSnapshot } from "./lib/peopleHikSnapshot";
 import { resolveProjectScope } from "./lib/projectScope";
 import { assertAccessProjectUnchanged } from "./lib/accessScope";
@@ -711,7 +713,14 @@ export const getDetails = authedQuery({
         };
       }),
     );
-    return { ...rule, ...scope, groupMembers, membersTruncated: members.length > RULE_DETAILS_MEMBER_LIMIT };
+    const departmentLinks = await ctx.db.query("groupDepartments").withIndex("by_group", q => q.eq("groupId", rule._id)).take(101);
+    if (departmentLinks.length > 100) throw new Error("Departman seçimi sınırı aşıldı");
+    const departmentSelections = await Promise.all(departmentLinks.map(async link => {
+      const department = await ctx.db.get(link.departmentId);
+      return { departmentId: link.departmentId, includeChildren: link.includeChildren,
+        name: department && department.projectId === rule.projectId ? department.name : "Silinmiş departman" };
+    }));
+    return { ...rule, ...scope, groupMembers, departmentSelections, membersTruncated: members.length > RULE_DETAILS_MEMBER_LIMIT };
   },
 });
 
@@ -828,6 +837,8 @@ export const update = authedMutation({
     if (hikMembers.length > 4096) throw new Error("Kural üye sınırı aşıldı");
     const hikSnapshots = await snapshotRuleHikEmployees(ctx, hikMembers.map(member => member.employeeId), rule.projectId, hikMembers.length ? await ruleHikDevices(ctx, rule) : []);
     await ctx.db.patch(ruleId, clean);
+    await writeAudit(ctx, { user: ctx.user, projectId: rule.projectId, action: "update", targetTable: "accessRules", targetId: ruleId,
+      oldValue: Object.fromEntries(Object.keys(updates).map(key => [key, rule[key as keyof typeof rule]])), newValue: updates });
     await reconcileRuleSnapshots(ctx, hikSnapshots);
 
     // Plan-ilişkili alanlardan biri değiştiyse week plan'ı cihazlara yeniden yaz.
@@ -937,8 +948,13 @@ export const remove = authedMutation({
     const affectedEmployeeIds = members.map(m => m.employeeId);
     const hikSnapshots = await snapshotRuleHikEmployees(ctx, affectedEmployeeIds, rule.projectId, await ruleHikDevices(ctx, rule));
     await Promise.all([...members, ...devices, ...doors].map(link => ctx.db.delete(link._id)));
+    const departmentLinks = await ctx.db.query("groupDepartments").withIndex("by_group", q => q.eq("groupId", args.ruleId)).take(101);
+    if (departmentLinks.length > 100) throw new Error("Departman seçimi sınırı aşıldı");
+    for (const link of departmentLinks) await ctx.db.delete(link._id);
 
     await ctx.db.delete(args.ruleId);
+    await writeAudit(ctx, { user: ctx.user, projectId: rule.projectId, action: "delete", targetTable: "accessRules", targetId: args.ruleId,
+      oldValue: { name: rule.name, days: rule.days, startTime: rule.startTime, endTime: rule.endTime, memberCount: members.length, deviceCount: devices.length, doorCount: doors.length } });
 
     await reconcileRuleSnapshots(ctx, hikSnapshots, candidatePanels);
 
@@ -954,6 +970,7 @@ export const remove = authedMutation({
 
 export const createWithGroups = authedMutation({
   args: {
+    departmentSelections: v.optional(v.array(departmentSelectionValidator)),
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     targetType: v.optional(v.string()),
@@ -975,6 +992,7 @@ export const createWithGroups = authedMutation({
 });
 
 const updateWithGroupsArgs = {
+    departmentSelections: v.optional(v.array(departmentSelectionValidator)),
     ruleId: v.id("accessRules"),
     name: v.optional(v.string()),
     targetType: v.optional(v.string()),
@@ -1014,7 +1032,7 @@ async function saveWithGroups(
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
     assertAccessProjectUnchanged(rule.projectId, args.projectId);
-    const { ruleId, relationDiff, employeeIds: replacementEmployees, deviceIds: replacementDevices, doorIds: replacementDoors, projectId: _ignoredProjectId, ...updates } = args;
+    const { ruleId, relationDiff, departmentSelections, employeeIds: replacementEmployees, deviceIds: replacementDevices, doorIds: replacementDoors, projectId: _ignoredProjectId, ...updates } = args;
     const hasReplacement = replacementEmployees !== undefined || replacementDevices !== undefined || replacementDoors !== undefined;
     if (relationDiff && hasReplacement) {
       throw new ConvexError({ code: "RULE_DIFF_MIXED_MODE", message: "Tam liste ve ilişki farkı aynı istekte gönderilemez." });
@@ -1034,9 +1052,17 @@ async function saveWithGroups(
       ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", ruleId)).collect(),
     ]);
     const oldEmployeeIds = oldMembers.map(m => m.employeeId);
-    const employeeIds = relationDiff
-      ? (rule.targetType === "visitor" ? undefined : applyRelationDiff(oldEmployeeIds, relationDiff.employees))
-      : replacementEmployees;
+    const oldManualIds = oldMembers.filter(member => member.source !== "department").map(member => member.employeeId);
+    const manualIds = relationDiff ? applyRelationDiff(oldManualIds, relationDiff.employees) : replacementEmployees ?? oldManualIds;
+    const existingSelections = await ctx.db.query("groupDepartments").withIndex("by_group", q => q.eq("groupId", ruleId)).take(101);
+    if (existingSelections.length > 100) throw new Error("Departman seçimi sınırı aşıldı");
+    const selections = departmentSelections ?? existingSelections;
+    if ((updates.targetType ?? rule.targetType) === "visitor" && selections.length) throw new Error("Ziyaretçi kuralına departman atanamaz");
+    const inherited = selections.length ? await departmentMemberIds(ctx, rule.projectId, selections) : [];
+    const employeeIds = rule.targetType === "visitor" ? undefined
+      : relationDiff || replacementEmployees !== undefined || departmentSelections !== undefined
+        ? [...new Set([...manualIds, ...inherited])] : undefined;
+    if (selections.length && employeeIds && employeeIds.length > 500) throw new Error("Kural kişi sınırı aşıldı (500)");
     const deviceIds = relationDiff ? applyRelationDiff(oldDevices.map(d => d.deviceId), relationDiff.devices) : replacementDevices;
     let doorIds = relationDiff ? applyRelationDiff(oldDoors.map(d => d.doorId), relationDiff.doors) : replacementDoors;
     if (relationDiff && doorIds) {
@@ -1067,6 +1093,7 @@ async function saveWithGroups(
       if (updates.isActive !== false && !removedMembers.includes(employeeId)) snapshot.devices = snapshot.devices.filter(device => affectedDeviceIds.has(device._id));
     }
     await ctx.db.patch(ruleId, { ...toPatch(updates), updatedAt: now });
+    if (departmentSelections !== undefined) await writeRuleDepartments(ctx, ruleId, rule.projectId, departmentSelections);
     const ruleIdePanelsBefore = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
 
     if (employeeIds !== undefined && rule.targetType !== "visitor") {
@@ -1079,9 +1106,15 @@ async function saveWithGroups(
             employeeId: empId,
             projectId: rule.projectId,
             createdAt: now,
+            ...(selections.length || departmentSelections !== undefined ? { source: manualIds.includes(empId) ? "manual" as const : "department" as const } : {}),
           })
         )
       );
+      for (const member of oldMembers) {
+        if (!employeeIds.includes(member.employeeId)) continue;
+        const source = manualIds.includes(member.employeeId) ? "manual" : "department";
+        if ((member.source ?? "manual") !== source) await ctx.db.patch(member._id, { source });
+      }
     }
 
     const removedIdePanels: Id<"devices">[] = [];
@@ -1150,6 +1183,15 @@ async function saveWithGroups(
       activeChanged: updates.isActive !== undefined && updates.isActive !== rule.isActive,
       missingWeekPlan: !rule.hikWeekPlanNo,
     });
+    const changedFields = Object.keys(updates).filter(key => updates[key as keyof typeof updates] !== undefined &&
+      JSON.stringify(updates[key as keyof typeof updates]) !== JSON.stringify(rule[key as keyof typeof rule]));
+    if (changedFields.length || diffPlan.syncMembers.length || removedEmployeeIds.length || diffPlan.reconcileRoster || departmentSelections !== undefined) {
+      await writeAudit(ctx, { user: ctx.user, projectId: rule.projectId, action: "update", targetTable: "accessRules", targetId: ruleId,
+        oldValue: { ...Object.fromEntries(changedFields.map(key => [key, rule[key as keyof typeof rule]])), memberCount: oldEmployeeIds.length, deviceCount: oldDevices.length, doorCount: oldDoors.length },
+        newValue: { ...Object.fromEntries(changedFields.map(key => [key, updates[key as keyof typeof updates]])), memberCount: survivingMemberIds.length,
+          deviceCount: deviceIds?.length ?? oldDevices.length, doorCount: doorIds?.length ?? oldDoors.length,
+          ...(departmentSelections !== undefined ? { departmentSelections } : {}) } });
+    }
     if (relationDiff) {
       const hikDeletions = [];
       for (const [employeeId, snapshot] of hikSnapshots) {

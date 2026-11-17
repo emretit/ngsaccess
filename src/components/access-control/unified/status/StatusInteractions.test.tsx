@@ -27,7 +27,9 @@ vi.mock("@/components/ui/dropdown-menu", () => {
 });
 vi.mock("@/components/ui/dialog", () => {
   const Part = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
-  return { Dialog: Part, DialogContent: Part, DialogHeader: Part, DialogTitle: Part, DialogDescription: Part };
+  return { Dialog: Part, DialogContent: ({ children, onCloseAutoFocus }: { children: ReactNode; onCloseAutoFocus: typeof runner.focus }) => {
+    runner.focus = onCloseAutoFocus; return <div>{children}</div>;
+  }, DialogHeader: Part, DialogTitle: Part, DialogDescription: Part };
 });
 vi.mock("@/components/ui/sheet", () => {
   const Part = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
@@ -127,6 +129,19 @@ describe("Yetki Durumu etkileşimleri", () => {
     render(<EmployeeGrantSheet employee={row} setEmployee={() => {}} detail={null} detailError="" returnFocusRef={{ current: trigger }} />);
     runner.focus?.({ preventDefault });
     expect(focus).toHaveBeenCalledOnce(); expect(preventDefault).toHaveBeenCalledOnce();
+  });
+  it.each([true, false])("gönderim onayından odak geri gelir; seçili düğme bağlı: %s", (connected) => {
+    const selectedFocus = vi.fn(); const fallbackFocus = vi.fn(); const preventDefault = vi.fn();
+    const trigger = { isConnected: connected, focus: selectedFocus } as unknown as HTMLElement;
+    const fallback = { isConnected: true, focus: fallbackFocus } as unknown as HTMLElement;
+    render(<RedistributeDialog action="selected" selected={[row]} sending={false} send={async () => {}} setAction={() => {}} projectCounts={counts} error="" setError={() => {}} returnFocusRef={{ current: trigger }} fallbackFocusRef={{ current: fallback }} />);
+    runner.focus?.({ preventDefault });
+    expect(connected ? selectedFocus : fallbackFocus).toHaveBeenCalledOnce();
+    expect(connected ? fallbackFocus : selectedFocus).not.toHaveBeenCalled();
+    expect(preventDefault).toHaveBeenCalledOnce();
+  });
+  it("kişi ayrıntısı yüklenirken ekran okuyucuya durum bildirir", () => {
+    expect(render(<EmployeeGrantSheet employee={row} setEmployee={() => {}} detail={null} detailError="" />)).toContain('role="status">Yükleniyor…');
   });
   it("mobil seçim gerçek label ile en az 44px alan sunar; filtreler sayıyla açılır", () => {
     const html = render(<GrantRows rows={[row]} selected={[]} onToggle={() => {}} onEmployee={() => {}} canManage />);

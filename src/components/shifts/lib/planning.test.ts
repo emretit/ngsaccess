@@ -59,12 +59,10 @@ describe("Atama önizleme doğrulaması", () => {
     endDate: "2027-01-01",
     weekPattern: ["MON", "TUE", "WED", "THU", "FRI"],
   };
-  it("365 tarih farkını kabul eder; 366 farkı reddeder", () => {
-    expect(bulkAssignmentFormSchema.safeParse(values).success).toBe(true);
-    expect(
-      bulkAssignmentFormSchema.safeParse({ ...values, endDate: "2027-01-02" })
-        .success,
-    ).toBe(false);
+  it("365 günden uzun ve süresiz aralıkları kabul eder", () => {
+    for (const endDate of ["2027-01-01", "2027-01-02", "2035-12-31", "9999-12-31"]) {
+      expect(bulkAssignmentFormSchema.safeParse({ ...values, endDate }).success).toBe(true);
+    }
   });
   it("haftalık boş desen ve 101 kişi reddedilir", () => {
     expect(

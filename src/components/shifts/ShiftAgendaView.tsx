@@ -7,13 +7,13 @@ export function ShiftAgendaView({
   const day = days[0];
   if (!day) return null;
   return (
-    <section aria-label={`${dayLabel(day)} ajandası`} className="min-w-0 border-y divide-y">
+    <section aria-label={`${dayLabel(day)} ajandası`} className="min-w-0 divide-y px-3 text-sm">
       {selectAll && <CalendarSelectAll selection={selectAll} label="Tümünü seç" />}
       {employees.map((employee) => (
         <div key={employee._id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 py-1 min-w-0">
           <label className={`flex min-h-11 items-center gap-2 font-medium break-words ${onSelect ? "cursor-pointer" : ""}`}>
             {onSelect && <input
-              type="checkbox" className="size-6 shrink-0 accent-primary"
+              type="checkbox" className="size-4 shrink-0 rounded accent-primary"
               checked={selected.has(employee._id)}
               onChange={() => onSelect(employee._id)}
               aria-label={`${employee.firstName} ${employee.lastName} seç`}

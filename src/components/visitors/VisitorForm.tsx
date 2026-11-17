@@ -1,11 +1,8 @@
 import { FormFeedback } from "@/components/shared/FormFeedback";
 import { useEffect, useState } from "react";
 import type { VisitorDetail } from "@/types/visitor";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
-import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { FormActions } from "@/components/shared/FormActions";
 import VisitorFormFields from "./VisitorFormFields";
-import VisitorZoneDialog from "./VisitorZoneDialog";
 import { useVisitorFormData } from "./hooks/useVisitorFormData";
 import { useVisitorFormSubmit } from "./hooks/useVisitorFormSubmit";
 import { visitorFormSchema } from "./hooks/useVisitorFormSchema";
@@ -18,8 +15,7 @@ export default function VisitorForm({ visitor, onClose, onSave, onStateChange }:
 }) {
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
   const [failed, setFailed] = useState(false);
-  const [zoneOpen, setZoneOpen] = useState(false);
-  const { formData, setFormData, presetRules, hostEmployees, hostSearch, setHostSearch, hostsLoading, optionsLoading, isDirty } = useVisitorFormData(visitor);
+  const { formData, setFormData, hostEmployees, hostSearch, setHostSearch, hostsLoading, isDirty } = useVisitorFormData(visitor);
   const { isLoading, handleSubmit } = useVisitorFormSubmit(visitor, onSave);
   const isPreRegistration = canAssignVisitorPreset(visitor);
   useEffect(() => { onStateChange(isDirty, isLoading); }, [isDirty, isLoading, onStateChange]);
@@ -33,22 +29,21 @@ export default function VisitorForm({ visitor, onClose, onSave, onStateChange }:
         if (key && !errors[key]) errors[key] = issue.message;
       }
       setFieldErrors(errors);
-      const ids: Record<string, string> = { firstName: "v_first_name", lastName: "v_last_name", cardNumber: "v_card", presetRuleId: "v_zone", accessExpiresAt: "v_expires" };
-      const firstError = ["presetRuleId", "accessExpiresAt", "cardNumber", "firstName", "lastName"].find(key => errors[key]);
+      const ids: Record<string, string> = { firstName: "v_first_name", lastName: "v_last_name", cardNumber: "v_card", doors: "v_doors", accessExpiresAt: "v_expires" };
+      const firstError = ["doors", "accessExpiresAt", "cardNumber", "firstName", "lastName"].find(key => errors[key]);
       if (firstError) requestAnimationFrame(() => document.getElementById(ids[firstError])?.focus());
       return;
     }
     setFieldErrors({}); setFailed(false);
     if (!await handleSubmit(formData)) setFailed(true);
   };
-  return <>
+  return (
     <form onSubmit={onSubmit} className="min-w-0" noValidate>
       <fieldset disabled={isLoading} className="min-w-0 space-y-5 p-5">
-        {optionsLoading ? <SectionSkeleton rows={5} label="Form bilgileri yükleniyor" /> : <VisitorFormFields formData={formData} setFormData={setFormData} presetRules={presetRules} hostEmployees={hostEmployees} hostSearch={hostSearch} onHostSearchChange={setHostSearch} hostsLoading={hostsLoading} isCurrentlyActive={visitor?.isActive === true} isEditing={!!visitor} isPreRegistration={isPreRegistration} kvkkConsentAt={visitor?.kvkkConsent?.grantedAt} errors={fieldErrors} onNewZone={() => setZoneOpen(true)} />}
+        <VisitorFormFields formData={formData} setFormData={setFormData} assignedDoors={visitor?.presetRuleName} hostEmployees={hostEmployees} hostSearch={hostSearch} onHostSearchChange={setHostSearch} hostsLoading={hostsLoading} isCurrentlyActive={visitor?.isActive === true} isEditing={!!visitor} isPreRegistration={isPreRegistration} kvkkConsentAt={visitor?.kvkkConsent?.grantedAt} errors={fieldErrors} />
         {failed && <FormFeedback tone="error">Ziyaretçi kaydedilemedi. Girişleriniz korundu; bilgileri kontrol edip tekrar deneyin.</FormFeedback>}
       </fieldset>
-      <FormActions isLoading={isLoading} onClose={onClose} busyLabel="Kaydediliyor…" submitDisabled={optionsLoading} submitLabel={isPreRegistration && formData.isActive ? "Erişimi etkinleştir" : visitor ? "Değişiklikleri kaydet" : "Ziyaretçiyi kaydet"} />
+      <FormActions isLoading={isLoading} onClose={onClose} busyLabel="Kaydediliyor…" submitLabel={isPreRegistration && formData.isActive ? "Erişimi etkinleştir" : visitor ? "Değişiklikleri kaydet" : "Ziyaretçiyi kaydet"} />
     </form>
-    {zoneOpen && <QuerySectionBoundary title="Erişim bölgeleri yüklenemedi"><VisitorZoneDialog isOpen onClose={() => setZoneOpen(false)} onCreated={id => { setFormData({ ...formData, presetRuleId: id }); setZoneOpen(false); }} /></QuerySectionBoundary>}
-  </>;
+  );
 }

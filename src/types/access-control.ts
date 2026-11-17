@@ -57,6 +57,7 @@ export interface Door {
 }
 
 export interface GroupMember {
+  source?: "manual" | "department";
   _id: Id<"groupMembers">;
   groupId: Id<"accessRules">;
   employeeId: Id<"employees">;
@@ -109,6 +110,7 @@ export interface AccessRule {
   createdAt?: string;
   updatedAt?: string;
   groupMembers?: GroupMember[];
+  departmentSelections?: { departmentId: Id<"departments">; includeChildren: boolean; name?: string }[];
   groupDevices?: GroupDevice[];
   groupDoors?: GroupDoor[];
 }

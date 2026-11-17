@@ -38,6 +38,19 @@ async function setup() {
 }
 
 type Fixture = Awaited<ReturnType<typeof setup>>;
+it("records device secret changes as flags and remote open as an attributed queued command", async () => {
+  const f = await setup();
+  const member = await f.member("admin");
+  await member.as.mutation(api.devices.update, { deviceId: f.deviceId, devicePassword: "replacement-secret" });
+  await member.as.mutation(api.devices.regenerateApiToken, { deviceId: f.deviceId });
+  await member.as.action(api.actions.hikGatewayDevice.remoteOpenDoor, { deviceId: f.deviceId, doorNo: 2 });
+  const audit = await f.t.run(ctx => ctx.db.query("auditLog").collect());
+  expect(JSON.stringify(audit)).not.toContain("replacement-secret");
+  expect(audit).toContainEqual(expect.objectContaining({ userId: member.userId, newValue: { secretsChanged: ["devicePassword"] } }));
+  expect(audit).toContainEqual(expect.objectContaining({ userId: member.userId, newValue: { tokenRotated: true } }));
+  expect(audit).toContainEqual(expect.objectContaining({ userId: member.userId, projectId: f.projectId, targetId: f.deviceId,
+    newValue: expect.objectContaining({ channel: 2, stage: "queued", operationId: expect.any(String), eventId: expect.any(String) }) }));
+});
 type Member = Awaited<ReturnType<Fixture["member"]>>;
 const cases: { permission: Permission; allowed: Exclude<ProjectRole, "admin">; denied: ProjectRole; run: (f: Fixture, m: Member) => Promise<unknown> }[] = [
   { permission: "devices.manage", allowed: "technician", denied: "viewer", run: (f, m) => m.as.mutation(api.zones.create, { projectId: f.projectId, name: "Bölge" }) },

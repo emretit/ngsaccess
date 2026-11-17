@@ -128,7 +128,7 @@ export async function loadPayrollPeriod(
     .filter(record => record.manualEntry && record.projectId === args.projectId)
     .map(record => [`${record.employeeId}__${record.date}`, record]));
   const payrollBoundaryManual = manualByEmpDate;
-  const payrollBoundaryWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: readings, manualEntryFor: (id, date) => payrollBoundaryManual.get(`${id}__${date}`)?.entryTime, eligibleEntry: r => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolveLast(id, date), args.projectId));
+  const payrollBoundaryWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId), { readings: readings, manualEntryFor: (id, date) => payrollBoundaryManual.get(`${id}__${date}`)?.entryTime, eligibleEntry: (r, date) => filterPdksReadings([r], args.projectId, candidate => policies(candidate.projectId, date ?? trDateKey(candidate.accessTime))).length > 0 }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolveLast(id, date), args.projectId));
   const policies = await loadPdksPolicies(ctx, employees.map(e => e.projectId), payrollHasFlexible ? addWorkDate(overtimeRange.startDate, -1) : overtimeRange.startDate, overtimeRange.endDate);
   readings = filterPdksReadings(readings, args.projectId, r => policies(r.projectId, payrollBoundaryWorkDate(r)));
 
@@ -147,14 +147,14 @@ export async function loadPayrollPeriod(
 
   const payrollEmployeesById = new Map(employees.map(e => [String(e._id), e]));
   const payrollEmployeeReadings = buildPdksEmployeeReadingMap({ employees, readings });
-  const payrollWorkDate = [...payrollShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime }, undefined, (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId)) : payrollBoundaryWorkDate;
+  const payrollWorkDate = [...payrollShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId)) : payrollBoundaryWorkDate;
   const payrollAvailableDates = pdksAvailableDatesByProject(readings, payrollWorkDate);
   const payrollManualDates = pdksManualDatesByEmployee(manualByEmpDate.values());
   const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
   for (const [empId, employeeReadings] of payrollEmployeeReadings) {
     const employee = payrollEmployeesById.get(empId);
     if (!employee) continue;
-    const byDay = groupPdksWorkDays(employeeReadings, employee._id, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime, undefined, (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId));
+    const byDay = groupPdksWorkDays(employeeReadings, employee._id, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime, undefined, (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId), date => policies(employee.projectId, date));
     for (const [date, dayReadings] of byDay) empDayReadings.set(`${empId}__${date}`, dayReadings);
   }
 

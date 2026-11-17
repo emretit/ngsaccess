@@ -12,7 +12,7 @@ import { PrivacySettings } from "@/components/settings/sections/PrivacySettings"
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { PageHeader } from "@/components/shared/PageHeader";
+import { PageTemplate } from "@/components/shared/PageTemplate";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { usePermissions } from "@/hooks/usePermissions";
 import { RolesSettings } from "@/components/settings/sections/RolesSettings";
@@ -49,8 +49,8 @@ export default function Settings() {
     if (tab === "general") next.delete("tab"); else next.set("tab", tab);
     setSearchParams(next, { replace: true });
   };
-  if (loading) return <SectionSkeleton label="Ayarlar yükleniyor" />;
-  if (!permissions.settingsTabs.includes(activeTab)) return <><AccessDenied message="Bu ayar bölümünü görüntüleme yetkiniz yok." /><Link className="inline-flex min-h-11 items-center text-sm underline" to="/profile">Profilimi aç</Link></>;
+  if (loading) return <PageTemplate title="Ayarlar" scope={scope.activeProject?.name} width="form"><SectionSkeleton label="Ayarlar yükleniyor" /></PageTemplate>;
+  if (!permissions.settingsTabs.includes(activeTab)) return <PageTemplate title="Ayarlar" scope={scope.activeProject?.name} width="form"><AccessDenied message="Bu ayar bölümünü görüntüleme yetkiniz yok." /><Link className="inline-flex min-h-11 items-center text-sm underline" to="/profile">Profilimi aç</Link></PageTemplate>;
   const content = () => {
     switch (activeTab) {
       case "roles": return <RolesSettings />;
@@ -63,22 +63,21 @@ export default function Settings() {
       case "notifications": return <NotificationSettings />;
     }
   };
-  return <div className="min-w-0 space-y-8">
-    <PageHeader title="Ayarlar" scope={scope.activeProject?.name ?? "Proje seçilmedi"} />
-    <div className="flex min-w-0 flex-col gap-6 min-[761px]:flex-row min-[761px]:gap-12">
-      <SettingsSidebar selected={activeTab} onSelect={handleTabChange} disabled={pending} />
-      <div className="w-full min-w-0 max-w-[800px] flex-1 space-y-6">
-        <div><h2 ref={heading} tabIndex={-1} className="text-base font-semibold">{section.label}</h2><p className="mt-1 text-sm text-muted-foreground">{section.scope}</p></div>
-        {scope.loading ? <SectionSkeleton label="Proje yükleniyor" /> : !scope.projectId ? <EmptyState
-          title={scope.isSuperAdmin ? "Henüz aktif proje yok" : "Proje ataması bekleniyor"}
-          description={scope.isSuperAdmin ? "Projeleri Admin sayfasından kontrol edebilirsiniz." : "Projeye atanmak için yöneticinizle iletişime geçin."}
-          action={{ label: scope.isSuperAdmin ? "Admin sayfasını aç" : "Profilimi aç", onClick: () => navigate(scope.isSuperAdmin ? "/system-admin" : "/profile") }} /> :
-          <SettingsFormState.Provider value={reportForm}><QuerySectionBoundary key={`${scope.projectId}:${activeTab}`} resetKey={`${scope.projectId}:${activeTab}`}
-            title="Bu bölüm yüklenemedi" description="Diğer ayar bölümlerine geçebilir veya tekrar deneyebilirsiniz.">
-            {content()}
-          </QuerySectionBoundary></SettingsFormState.Provider>}
-      </div>
-    </div>
-    {dialog}
-  </div>;
+  return <PageTemplate
+    title="Ayarlar"
+    scope={scope.activeProject?.name ?? "Proje seçilmedi"}
+    width="form"
+    aside={{ label: "Ayar bölümleri", breakpoint: 761, content: <SettingsSidebar selected={activeTab} onSelect={handleTabChange} disabled={pending} /> }}
+    overlays={dialog}
+  >
+    <div><h2 ref={heading} tabIndex={-1} className="text-base font-semibold">{section.label}</h2><p className="mt-1 text-sm text-muted-foreground">{section.scope}</p></div>
+    {scope.loading ? <SectionSkeleton label="Proje yükleniyor" /> : !scope.projectId ? <EmptyState
+      title={scope.isSuperAdmin ? "Henüz aktif proje yok" : "Proje ataması bekleniyor"}
+      description={scope.isSuperAdmin ? "Projeleri Admin sayfasından kontrol edebilirsiniz." : "Projeye atanmak için yöneticinizle iletişime geçin."}
+      action={{ label: scope.isSuperAdmin ? "Admin sayfasını aç" : "Profilimi aç", onClick: () => navigate(scope.isSuperAdmin ? "/system-admin" : "/profile") }} /> :
+      <SettingsFormState.Provider value={reportForm}><QuerySectionBoundary key={`${scope.projectId}:${activeTab}`} resetKey={`${scope.projectId}:${activeTab}`}
+        title="Bu bölüm yüklenemedi" description="Diğer ayar bölümlerine geçebilir veya tekrar deneyebilirsiniz.">
+        {content()}
+      </QuerySectionBoundary></SettingsFormState.Provider>}
+  </PageTemplate>;
 }

@@ -18,6 +18,17 @@ const dept = (id: string, extra: Partial<Doc<"departmentShiftAssignments">> = {}
 const date = "2026-06-01";
 
 describe("shared DayPlan resolution", () => {
+  it("uses the department effective on the work date, including a later department removal", () => {
+    const current = { ...employee, departmentId: undefined };
+    const resolver = createShiftResolver([current], shifts, [[]], departments, [dept("child"), dept("parent")], [], [
+      { projectId, employeeId: employee._id, departmentId: "child" as Id<"departments">, validFrom: "0001-01-01" },
+      { projectId, employeeId: employee._id, departmentId: "parent" as Id<"departments">, validFrom: "2026-06-10" },
+      { projectId, employeeId: employee._id, validFrom: "2026-06-20" },
+    ]);
+    expect(resolver.resolvePlan(employee._id, "2026-06-09")).toMatchObject({ departmentId: "child", shifts: [shift("childShift")] });
+    expect(resolver.resolvePlan(employee._id, "2026-06-10")).toMatchObject({ departmentId: "parent", shifts: [shift("parentShift")] });
+    expect(resolver.resolvePlan(employee._id, "2026-06-20")).toMatchObject({ kind: "none" });
+  });
   it("requires a dated assignment even with the legacy shiftId", () => {
     const resolver = createShiftResolver([employee], shifts, [[personal({ startDate: "2026-06-15" })]]);
     expect(resolver.resolvePlan(employee._id, "2026-06-14").kind).toBe("none");

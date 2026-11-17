@@ -8,7 +8,7 @@ import { DayShiftsPicker } from './DayShiftsPicker';
 import { RotationEditor, RotationLengthInput, rotationNavigationIndex } from './RotationEditor';
 import { AssignmentPatternEditor } from './AssignmentPatternEditor';
 import { DepartmentPreviewPanel, departmentPreviewSummary } from './DepartmentTargetPicker';
-import { PreviewPanel } from './AssignShiftDialog';
+import { AssignShiftDialog } from './AssignShiftDialog';
 import { AssignmentEditDialog } from './AssignmentEditDialog';
 import { ShiftCalendarCell } from './ShiftCalendarCell';
 import { ShiftDayDetails } from './ShiftDayDetails';
@@ -160,7 +160,7 @@ describe('Departman ve takvim', () => {
     ['kişi', baseCell, 'data-source="employee"'],
     ['departman', { ...baseCell, source: 'department', assignmentId: undefined, departmentId: department._id, departmentAssignmentId: departmentAssignment._id }, 'Departmandan: Üretim'],
     ['plansız', { ...baseCell, kind: 'none', source: 'project', assignmentId: undefined, shiftIds: [] }, 'atama yok'],
-    ['boş', { ...baseCell, kind: 'rest', shiftIds: [] }, 'repeating-linear-gradient'],
+    ['boş', { ...baseCell, kind: 'rest', shiftIds: [] }, 'data-kind="rest"'],
     ['çoklu', { ...baseCell, shiftIds: shifts.map(s => s._id) }, '+1'],
   ] satisfies [string, PlanCell, string][])('%s hücre görünümü sunucu kararını gösterir', (_name, cell, expected) => {
     const html = renderToStaticMarkup(<ShiftCalendarCell data={dataFor(cell)} date={cell.date} employeeName="Ada Test" onOpen={() => {}} />);
@@ -291,14 +291,24 @@ describe('C1 denetim düzeltmeleri', () => {
     expect(request).not.toHaveProperty('employeeIds');
     expect(departmentAssignmentRequest({ ...values, departmentId: department._id }, projectId, false)).not.toHaveProperty('plan');
   });
-  it('planlı kişi önizlemesinde bugünkü karar listesi ve durum etiketi korunur', () => {
-    const plan: ShiftPlan = { kind: 'weekly', shiftIds: [morning._id, evening._id] };
-    const html = renderToStaticMarkup(<PreviewPanel values={{ ...values, plan }} projectId={projectId} forceConfirm={false} calendarConfirmed={false} setForceConfirm={() => {}} setCalendarConfirmed={() => {}} pending={false} onSave={() => {}} />);
-    expect(html).toContain('Ada Test');
-    expect(html).toContain('Atanacak');
-    expect(html).toContain('Uygun · 13 başlangıç günü');
-    expect(html).toContain('Önizlenen kişilere uygula');
-    expect(mocks.query).toHaveBeenCalledWith('shifts:previewBulkAssign', expect.objectContaining({ employeeIds: [employee._id], plan }));
+  it('vardiya atama tek tıklamayla kaydeder, önizleme istemez ve çift gönderimi engeller', async () => {
+    const onOpenChange = vi.fn();
+    mocks.mutate.mockResolvedValueOnce({
+      insertedCount: 1, skipped: [], overlapCount: 0,
+      results: [{ ...personPreview.results[0], status: 'assigned', previewStatus: 'will_assign', assignmentId: assignment._id }],
+    });
+    const scheduledShifts = [{ ...morning, scheduleMode: 'weekly' as const, dayPlan: [true, true, true, true, true, false, false] }, evening, night];
+    const html = renderToStaticMarkup(<AssignShiftDialog open projectId={projectId} employees={[employee]} shifts={scheduledShifts}
+      initial={{ shiftId: morning._id, employeeIds: [employee._id], startDate: values.startDate, endDate: values.endDate }} onOpenChange={onOpenChange} />);
+    expect(html).not.toContain('Önizle');
+    const submit = mocks.clicks.get('Vardiya ata');
+    expect(submit).toBeDefined();
+    submit?.();
+    submit?.();
+    await vi.waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(mocks.mutate).toHaveBeenCalledTimes(1);
+    expect(mocks.mutate).toHaveBeenCalledWith('shifts:bulkAssignShift', bulkAssignmentRequest(values, projectId, false, false));
+    expect(mocks.query).not.toHaveBeenCalledWith('shifts:previewBulkAssign', expect.anything());
   });
 });
 

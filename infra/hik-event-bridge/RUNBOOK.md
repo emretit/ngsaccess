@@ -49,7 +49,7 @@ köprü `MAX_EVENT_AGE_HOURS`'tan eski olanları atlar.
 
 ```bash
 mkdir -p /opt/ngs-hik-event-bridge
-cp bridge.mjs /opt/ngs-hik-event-bridge/
+cp bridge.mjs queue.mjs /opt/ngs-hik-event-bridge/
 cp bridge.env.example /etc/ngs-hik-event-bridge.env && chmod 600 /etc/ngs-hik-event-bridge.env
 # HIK_GATEWAY_PASS = `npx convex env get HIK_GATEWAY_PASS`; HIK_DEVICE_TOKENS = devIndex → devices.apiToken
 cp ngs-hik-event-bridge.service /etc/systemd/system/
@@ -84,7 +84,7 @@ Loglar kart numarası, kişi bilgisi, token veya HTTP yanıt gövdesi içermez.
 Bu geliştirme görevi deployment veya SSH yapmaz. Koordinatör mevcut env dosyasını koruyarak:
 
 ```bash
-cp bridge.mjs /opt/ngs-hik-event-bridge/bridge.mjs
+cp bridge.mjs queue.mjs /opt/ngs-hik-event-bridge/
 systemctl restart ngs-hik-event-bridge
 journalctl -u ngs-hik-event-bridge --since '5 minutes ago'
 ```
@@ -101,3 +101,11 @@ devIndex/brand/transport eşlemesini, `400` gövdeyi ve köprü/sunucu saatini k
 ```bash
 node --test infra/hik-event-bridge/bridge.nodetest.mjs
 ```
+
+## Kalıcı olay kuyruğu (2026-11-11)
+
+`queue.mjs` dosyası da bridge ile birlikte kurulmalıdır. Yeni systemd unit'i `StateDirectory=ngs-hik-event-bridge` ile yazılabilir, özel bir durum dizini oluşturur. Güncellemede unit'i de kopyalayıp `systemctl daemon-reload` çalıştırın; ardından servisi yeniden başlatın.
+
+`EVENT_QUEUE_DIR` varsayılanı `/var/lib/ngs-hik-event-bridge/queue`. İşler HTTP isteğinden önce atomik olarak diske yazılır, yalnız 2xx yanıtından sonra silinir. Token dosyaya yazılmaz; yeniden başlatmada güncel ortam token'ı kullanılır. Kayıt dosyaları 0600, dizin 0700 ile oluşturulur. Diskteki olaylar servis açılırken tekrar gönderilir; bağlantı hatası ve 429 sonrası kayıt tutulur ve tekrar denenir. 429 için `Retry-After` (en fazla 5 dakika) uygulanır. Teslim semantiği en az birdir; alıcıdaki olay tekilleştirmesi korunmalıdır.
+
+`post_pending` bir olayın henüz teslim edilmediğini, `queue_error` depolama sorununu gösterir. Kuyruk dizinini hata araştırırken silmeyin. `maxQueue` dolduğunda yeni olay kabul edilmez ve `queue_full` kaydı oluşur; geçmiş olaylar için AcsEvent backfill kullanın. Bu sürümün saha kabulü: 503/429 sırasında kuyruk dosyasını gözle → servisi yeniden başlat → bağlantıyı düzelt → olayın tek mantıksal kayıt olarak ulaştığını ve kuyruğun boşaldığını doğrula.

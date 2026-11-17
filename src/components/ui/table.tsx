@@ -3,8 +3,8 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import {
   COLUMN_SCALE_VAR,
+  columnWidth,
   ColumnResizeHandle,
-  FALLBACK_COLUMN_WIDTH,
   ColumnResizeProvider,
   useColumnResize,
   useColumnResizeState,
@@ -133,7 +133,7 @@ const TableHead = React.forwardRef<
     },
     [ref, register, columnId]
   )
-  const base = active && resize.frozen ? (resize.widths[columnId] ?? FALLBACK_COLUMN_WIDTH) : undefined
+  const base = active && resize.frozen ? columnWidth(resize.widths[columnId], minWidth) : undefined
   // Sürüklenebilir sütun kabı doldurmak için ölçeklenir; sabit sütun (onay kutusu, işlem) tabanda kalır.
   const width = base === undefined || !resizable ? base : `calc(${base}px * var(${COLUMN_SCALE_VAR}, 1))`
   return (
@@ -141,6 +141,7 @@ const TableHead = React.forwardRef<
       ref={setRef}
       data-column-id={active ? columnId : undefined}
       data-column-fixed={active && !resizable ? "" : undefined}
+      data-column-min-width={active ? minWidth : undefined}
       className={cn(
         "h-9 bg-subtle px-4 text-[11px] text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
         // className'den sonra gelmemeli: sticky/absolute başlıkları ezmesin.
@@ -148,7 +149,7 @@ const TableHead = React.forwardRef<
         className,
         active && resize.frozen && "overflow-hidden text-ellipsis whitespace-nowrap"
       )}
-      style={width === undefined ? style : { ...style, width }}
+      style={{ ...style, ...(minWidth === undefined ? {} : { minWidth }), ...(width === undefined ? {} : { width }) }}
       {...props}
     >
       {children}

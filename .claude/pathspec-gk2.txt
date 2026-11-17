@@ -1,0 +1,25 @@
+# GK2 (Geçiş Kontrol 2. tur) — bu oturumun dosyaları. KARIŞIK: RuleBasicInfo.tsx + DepartmentTree.tsx içinde 4d79c54d (tek pencere kural formu) değişiklikleri de var → commit öncesi o oturumla sıra belirle.
+src/components/access-control/unified/UnifiedAccessControl.tsx
+src/components/access-control/unified/UnifiedAccessControl.test.tsx
+src/components/access-control/unified/hooks/useAccessControlHeader.tsx
+src/components/access-control/unified/AccessRulesList.tsx
+src/components/access-control/unified/SyncRuns.tsx
+src/components/access-control/unified/SyncRuns.test.tsx
+src/components/access-control/unified/ProjectSyncButton.test.tsx
+src/components/access-control/unified/audit.test.tsx
+src/components/access-control/unified/rules-list/RulesPage.tsx
+src/components/access-control/unified/rules-list/RulesHeader.test.tsx
+src/components/access-control/unified/status/StatusPage.tsx
+src/components/access-control/unified/status/status.test.tsx
+src/components/access-control/door-plans/DoorPlansTab.tsx
+src/components/access-control/door-plans/DoorPlansTab.test.tsx
+src/components/access-control/door-plans/DoorPlanDialog.tsx
+src/components/access-control/door-plans/DoorPlanDialog.test.tsx
+src/components/access-control/door-plans/CopyDoorPlansDialog.test.tsx
+src/components/access-control/door-dialog/DoorStatusPlanSection.tsx
+src/components/access-control/door-dialog/DoorVerifyPlanSection.tsx
+docs/ui-audit-gk/tur2/
+.claude/plan-gecis-kontrol-2.md
+# karışık (Emre/4d79c54d ile netleştir):
+# src/components/access-control/unified/components/RuleBasicInfo.tsx
+# src/components/access-control/unified/components/DepartmentTree.tsx

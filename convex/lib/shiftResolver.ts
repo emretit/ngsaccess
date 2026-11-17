@@ -4,6 +4,7 @@ import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { parseHHMM, type EffectiveWorkSettings } from "./pdksHelpers";
 import { createVersionedShiftLookup, loadShiftVersions, type ShiftVersionRow } from "./shiftVersions";
+import { loadDepartmentHistory, departmentAt, type DepartmentHistoryRow } from "./employeeDepartmentHistory";
 
 type AnyCtx = QueryCtx | MutationCtx;
 
@@ -71,10 +72,11 @@ export async function buildShiftResolver(ctx: AnyCtx, employees: Doc<"employees"
   const [allShifts, assignmentLists, departmentData] = await Promise.all([
     ctx.db.query("shifts").collect(),
     Promise.all(employees.map(employee => ctx.db.query("shiftAssignments").withIndex("by_employee", q => q.eq("employeeId", employee._id)).collect())),
-    readDepartmentPlans(ctx, employees.flatMap(employee => employee.projectId && employee.departmentId ? [employee.projectId] : []), range),
+    readDepartmentPlans(ctx, employees.flatMap(employee => employee.projectId && (employee.departmentId || employee.hasDepartmentHistory) ? [employee.projectId] : []), range),
   ]);
   const versions = await loadShiftVersions(ctx, allShifts, range?.start);
-  return createShiftResolver(employees, allShifts, assignmentLists, departmentData.departments, departmentData.assignments, versions);
+  const history = departmentData.assignments.length ? await loadDepartmentHistory(ctx, employees) : [];
+  return createShiftResolver(employees, allShifts, assignmentLists, departmentData.departments, departmentData.assignments, versions, history);
 }
 
 /** Versioned/mobile paths load only referenced shifts and bounded assignments. */
@@ -83,7 +85,7 @@ export async function buildBoundedShiftResolver(ctx: AnyCtx, employees: Doc<"emp
     Promise.all(employees.map(employee => (range
       ? ctx.db.query("shiftAssignments").withIndex("by_employee_end", q => q.eq("employeeId", employee._id).gte("endDate", range.start))
       : ctx.db.query("shiftAssignments").withIndex("by_employee", q => q.eq("employeeId", employee._id))).take(1001))),
-    readDepartmentPlans(ctx, employees.flatMap(employee => employee.projectId && employee.departmentId ? [employee.projectId] : []), range),
+    readDepartmentPlans(ctx, employees.flatMap(employee => employee.projectId && (employee.departmentId || employee.hasDepartmentHistory) ? [employee.projectId] : []), range),
   ]);
   if (assignmentLists.some(list => list.length > 1000) || assignmentLists.flat().length > 10000) throw new ConvexError("Vardiya atama sınırı aşıldı; tarih aralığını daraltın");
   const relevantLists = assignmentLists.map(list => startingByRangeEnd(list, range));
@@ -91,7 +93,8 @@ export async function buildBoundedShiftResolver(ctx: AnyCtx, employees: Doc<"emp
   const ids = [...new Set(rows.flatMap(row => [row.shiftId, ...planShiftIds(row.plan)]))];
   const allShifts = (await Promise.all(ids.map(id => ctx.db.get(id)))).filter((shift): shift is NonNullable<typeof shift> => shift !== null);
   const versions = await loadShiftVersions(ctx, allShifts, range?.start);
-  return createShiftResolver(employees, allShifts, relevantLists, departmentData.departments, departmentData.assignments, versions);
+  const history = departmentData.assignments.length ? await loadDepartmentHistory(ctx, employees) : [];
+  return createShiftResolver(employees, allShifts, relevantLists, departmentData.departments, departmentData.assignments, versions, history);
 }
 
 /** Compute once per department; ignore corrupt cycles and cross-project parents. */
@@ -109,8 +112,10 @@ export function departmentChain(departmentId: Id<"departments"> | undefined, pro
   return chain;
 }
 export function createShiftResolver(employees: Doc<"employees">[], allShifts: Doc<"shifts">[], assignmentLists: Doc<"shiftAssignments">[][],
-  departments: Doc<"departments">[] = [], departmentAssignments: Doc<"departmentShiftAssignments">[] = [], versions: readonly ShiftVersionRow[] = []): ShiftResolver {
+  departments: Doc<"departments">[] = [], departmentAssignments: Doc<"departmentShiftAssignments">[] = [], versions: readonly ShiftVersionRow[] = [], history: readonly DepartmentHistoryRow[] = []): ShiftResolver {
   const shiftMap = new Map<string, Doc<"shifts">>(allShifts.map(shift => [shift._id, shift]));
+  const historyByEmployee = new Map<Id<"employees">, DepartmentHistoryRow[]>();
+  for (const row of history) historyByEmployee.set(row.employeeId, [...(historyByEmployee.get(row.employeeId) ?? []), row]);
   // Plan günü, o tarihte geçerli vardiya sürümünü alır; `shifts` haritası güncel tanımdır.
   const shiftAt = createVersionedShiftLookup(shiftMap, versions);
   const assignmentsByEmp = new Map<string, Doc<"shiftAssignments">[]>();
@@ -158,10 +163,11 @@ export function createShiftResolver(employees: Doc<"employees">[], allShifts: Do
       if (plan) return plan;
     }
     const employee = empById.get(employeeId);
-    if (employee?.departmentId) {
-      const key = `${employee.projectId}|${employee.departmentId}`;
+    const historicDepartment = employee ? departmentAt(employee, date, historyByEmployee.get(employee._id) ?? []) : undefined;
+    if (employee && historicDepartment) {
+      const key = `${employee.projectId}|${historicDepartment}`;
       let chain = chains.get(key);
-      if (!chain) { chain = departmentChain(employee.departmentId, employee.projectId, departmentMap); chains.set(key, chain); }
+      if (!chain) { chain = departmentChain(historicDepartment, employee.projectId, departmentMap); chains.set(key, chain); }
       for (const departmentId of chain) {
         for (const row of assignmentsByDepartment.get(departmentId) ?? []) {
           if (row.projectId !== employee.projectId) continue;
