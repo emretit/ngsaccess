@@ -1,3 +1,4 @@
+import { statusLabel } from "@/lib/reports/excel/common";
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { STATUS_META, STATUS_FILTER_LABELS, statusMetaFor } from "./statusMeta";
@@ -8,7 +9,7 @@ import { PdksRowStatus } from "./dashboard/PdksRowStatus";
 it.each(["08:00", "00:00"])("future + giriş %s: ortak etiket, rozet ve hücre Devam ediyor", firstEntry => {
   const item = { status: "future", firstEntry } as const;
   expect(statusMetaFor(item)).toMatchObject({ label: "Devam ediyor", tone: "info" });
-  expect(renderToStaticMarkup(<PdksRowStatus record={item as PdksRow} />)).toContain("Devam ediyor");
+  expect(renderToStaticMarkup(<PdksRowStatus record={item as unknown as PdksRow} />)).toContain("Devam ediyor");
   expect(cellLabel("Ada", "2026-10-23", item as PdksCell)).toContain("Devam ediyor");
   expect(STATUS_FILTER_LABELS.future).toContain(statusMetaFor(item).label);
 });
@@ -31,4 +32,12 @@ it("ısı haritası girişli/girişsiz future günleri ayırır", () => {
   const html = renderToStaticMarkup(<PDKSHeatmapView records={[row]} loading={false} startDate="2026-10-23" endDate="2026-10-24" />);
   expect(html).toMatch(/aria-label="Ada, [^"]*Devam ediyor/);
   expect(html).toMatch(/aria-label="Ada, [^"]*Henüz gelmedi/);
+});
+
+it("Veri bekleniyor hücre ve satırda nötr etiket gösterir", () => {
+  const item = { status: "awaitingData", firstEntry: null } as const;
+  expect(statusMetaFor(item)).toMatchObject({ label: "Veri bekleniyor", tone: "neutral", code: "—" });
+  expect(renderToStaticMarkup(<PdksRowStatus record={item as unknown as PdksRow} />)).toContain("Veri bekleniyor");
+  expect(cellLabel("Ada", "2026-11-17", item as PdksCell)).toContain("Veri bekleniyor");
+  expect(statusLabel(item as PdksCell)).toBe("Veri bekleniyor");
 });

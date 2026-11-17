@@ -25,7 +25,7 @@ import {
 import { calculatePeriodOvertime, overtimePeriodRange } from "./overtimeCalc";
 import { computePdksPlannedDay, plannedDayFields, splitReadingsByShift, type PdksSegment } from "./pdksMultiShift";
 import type { DayPlan } from "./shiftResolver";
-import { pdksLeaveMatchesProject } from "./pdksAvailability";
+import { pdksDataPending, pdksLeaveMatchesProject } from "./pdksAvailability";
 import { addWorkDate, groupPdksWorkDays } from "./pdksWorkDay";
 
 export type PdksDayStatus =
@@ -36,6 +36,7 @@ export type PdksDayStatus =
   | "weekend"
   | "holiday"
   | "future"
+  | "awaitingData"
   | "noData"
   | "notEmployed"
   | "incomplete";
@@ -50,6 +51,7 @@ export function classifyPdksDay(params: {
   date: string;
   today?: string;
   dataAvailable: boolean;
+  dataPending?: boolean;
   firstRecordDate?: string | null;
   shiftStart?: string;
   shiftEnd?: string;
@@ -81,8 +83,9 @@ export function classifyPdksDay(params: {
       const threshold = Date.parse(`${endDate}T${params.shiftEnd}:00+03:00`) + (params.earlyExitTolerance ?? 0) * 60000;
       if ((params.now ?? Date.now()) <= threshold) return "future";
     }
-    if (status === "absent" && params.firstRecordDate === null && !params.hasAttendance) return "noData";
     if (!params.hasAttendance && params.firstRecordDate && params.date < params.firstRecordDate) return "notEmployed";
+    if (status === "absent" && params.dataPending && !params.hasAttendance) return "awaitingData";
+    if (status === "absent" && params.firstRecordDate === null && !params.hasAttendance) return "noData";
     if (status === "absent" && !params.dataAvailable) return "noData";
     return status;
   }
@@ -99,6 +102,7 @@ export function classifyPdksDay(params: {
       (params.lateTolerance ?? 0) * 60000;
     if ((params.now ?? Date.now()) <= threshold) return "future";
   }
+  if (params.dataPending && !params.hasAttendance) return "awaitingData";
   if (params.firstRecordDate === null && !params.hasAttendance) return "noData";
   if (!params.hasAttendance && params.dataAvailable === false) return "noData";
   if (
@@ -206,6 +210,7 @@ export type PdksTableStatusFilter =
   | "weekend"
   | "holiday"
   | "future"
+  | "awaitingData"
   | "noData"
   | "notEmployed"
   | "incomplete";
@@ -259,7 +264,7 @@ export function computePdksTableRow(params: {
   today?: string;
   now?: number;
   firstRecordDate?: string | null;
-  /** Dates with at least one eligible reading in this employee's project. */
+  /** Project punch availability enriched with device scan completeness. */
   availableDateKeys: ReadonlySet<string>;
   empKey: string;
   empReadings: Doc<"cardReadings">[];
@@ -354,6 +359,7 @@ export function computePdksTableRow(params: {
       lateTolerance: shift?.lateToleranceMinutes ?? workSettings.maxLateMinutes,
       now: params.now,
       today: params.today,
+      dataPending: pdksDataPending(params.availableDateKeys, date, { shift: lastShift, shiftEnd: settings.workEndTime, earlyExitTolerance: settings.earlyExitToleranceMinutes, pendingUntil: day.pendingUntil }, !!manual || readings.length > 0),
       dataAvailable: employee !== null && (params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!manual)),
       classification: day.classification,
       pendingUntil: day.pendingUntil,
@@ -385,7 +391,7 @@ export function computePdksTableRow(params: {
       isLate: day.isLate,
       lateMinutes: day.lateMinutes,
       payrollCode:
-        status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
+        status === "incomplete" || status === "future" || status === "awaitingData" || status === "noData" || status === "notEmployed"
           ? "—"
           : code,
       detail: noShift ? undefined : {

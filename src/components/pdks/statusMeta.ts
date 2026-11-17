@@ -46,6 +46,7 @@ export const STATUS_META: Record<DayStatus, StatusMeta> = {
   holiday: meta("Resmî tatil", "RT"),
   future: meta("Henüz gelmedi", "—"),
   notEmployed: meta("—", "—"),
+  awaitingData: meta("Veri bekleniyor", "—"),
   noData: meta("Veri yok", "—"),
   overtime: meta("Fazla mesai", "FM"),
 };

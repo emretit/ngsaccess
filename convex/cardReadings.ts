@@ -452,6 +452,7 @@ export const getPdksTableData = authedQuery({
         v.literal("holiday"),
         v.literal("future"),
         v.literal("noData"),
+        v.literal("awaitingData"),
         v.literal("notEmployed"),
         v.literal("incomplete")
       )

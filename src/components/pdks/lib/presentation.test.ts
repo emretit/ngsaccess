@@ -76,7 +76,7 @@ describe("PDKS presentation", () => {
     expect(displayTime("25:30")).toBe("—");
   });
   it("shows unavailable durations as a dash while keeping actual zero durations", () => {
-    for (const status of ["future", "noData"] as const) {
+    for (const status of ["future", "noData", "awaitingData"] as const) {
       expect(displayDuration(0, status)).toBe("—");
       expect(displayDuration(500, status)).toBe("—");
     }

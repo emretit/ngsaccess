@@ -1,3 +1,4 @@
+import { pdksDataPending } from "./pdksAvailability";
 import { hasDirectionalPdksCheckpoints } from "./pdksRules";
 import { flexibleMinuteFields } from "./pdksFlexible";
 import type { PdksPolicyResolver } from "./pdksRules";
@@ -51,6 +52,7 @@ export function computePayrollCell(params: {
   const status = classifyPdksDay({
     noShift: day.noShift,
     date,
+    dataPending: pdksDataPending(params.availableDateKeys, date, { shift: lastShift, shiftEnd: settings.workEndTime, earlyExitTolerance: settings.earlyExitToleranceMinutes, pendingUntil: day.pendingUntil }, !!params.manual || params.dayReadings.length > 0),
     dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manual),
     firstRecordDate: params.firstRecordDate,
     shiftStart: dayShift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
@@ -81,7 +83,7 @@ export function computePayrollCell(params: {
     overtimeSegments: day.overtimeSegments,
     status,
     payrollCode:
-      status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
+      status === "incomplete" || status === "future" || status === "awaitingData" || status === "noData" || status === "notEmployed"
         ? "—"
         : code,
     totalMinutes: day.totalMinutes,

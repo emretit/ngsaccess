@@ -10,7 +10,7 @@ import { buildShiftResolver } from "./shiftResolver";
 import { overtimePeriodRange } from "./overtimeCalc";
 import { buildPeriodDateKeys } from "./pdksCalc";
 import { addWorkDate, buildPdksWorkDateResolver, hasFlexiblePdksShift, pdksWorkDayRange } from "./pdksWorkDay";
-import { pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
+import { withPdksDeviceAvailability, pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import { trDateKey, trTodayKey } from "./trDate";
 import { countExcludedUnknownPdksReadings, filterPdksReadings } from "./pdksSource";
 import { buildPdksEmployeeReadingMap, computePdksTableRow, filterPdksTableRows, type PdksTableStatusFilter } from "./pdksTable";
@@ -180,6 +180,9 @@ export async function getPdksTableData(
     readings: sourceReadings.filter(r => tablePeriodDates.has(tableWorkDate(r))),
   });
   const tableAvailableDates = pdksAvailableDatesByProject(readings, tableWorkDate);
+  await Promise.all([...new Set(availabilityEmployees.map(employee => employee.projectId))].map(async projectId => {
+    tableAvailableDates.set(projectId, await withPdksDeviceAvailability(ctx, projectId, tableAvailableDates.get(projectId) ?? new Set(), policies, overtimeRange.endDate));
+  }));
   const tableManualDates = pdksManualDatesByEmployee(manualPdksByEmpDate.values());
   const tableData = await Promise.all(
     Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {

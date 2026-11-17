@@ -39,6 +39,7 @@ export const SEGMENT_DECISION_LABELS: Record<PdksSegment["decision"], string> = 
 };
 export function segmentDecisionLabel(segment: PdksSegment, status: PdksPlanDay["status"]): string {
   if (segment.decision === "absent") {
+    if (status === "awaitingData") return "Veri bekleniyor";
     if (status === "future") return "Bekleniyor";
     if (status === "leave" || status === "holiday" || status === "weekend") return "—";
   }
@@ -60,7 +61,7 @@ export function formatDuration(minutes: number, compact = false): string {
 }
 export function displayDuration(minutes: number, status: PdksCell["status"], durationMeasured?: boolean): string {
   if (durationMeasured === false) return "Süre hesaplanamadı";
-  return minutes === 0 && status !== "present" && status !== "late" || status === "future" || status === "noData" || status === "notEmployed" ? "—" : formatDuration(minutes);
+  return minutes === 0 && status !== "present" && status !== "late" || status === "future" || status === "awaitingData" || status === "noData" || status === "notEmployed" ? "—" : formatDuration(minutes);
 }
 type FlexibleTarget = Pick<PdksCell, "scheduleType" | "requiredNetMinutes" | "shortfallMinutes" | "excessMinutes">;
 /** Esnek gün/satır: net hedef ve eksik ya da fazla süre. Sabit veya hedefsiz (tatil, izin) günde null. */
@@ -139,7 +140,7 @@ export function readableDate(date: string): string {
 export function cellLabel(name: string, date: string, cell?: PdksCell): string {
   const status = cell?.status ?? "noData";
   const duration =
-    cell?.durationMeasured === false ? "Süre hesaplanamadı" : status === "future" || status === "noData" || status === "notEmployed"
+    cell?.durationMeasured === false ? "Süre hesaplanamadı" : status === "future" || status === "awaitingData" || status === "noData" || status === "notEmployed"
       ? "Süre yok"
       : `${Math.floor((cell?.totalMinutes ?? 0) / 60)} saat ${(cell?.totalMinutes ?? 0) % 60} dakika`;
   return `${name}, ${readableDate(date)}, ${statusMetaFor(cell ?? { status }).label}, ${duration}${reviewHint(cell) ? `, ${reviewHint(cell)}` : ""}${planDayLabel(cell) ? `, ${planDayLabel(cell)}` : ""}${cell?.segments && cell.segments.length > 1 ? `, ${cell.segments.length} vardiya, ${segmentTimeRange(cell.segments)}` : ""}`;
@@ -147,7 +148,7 @@ export function cellLabel(name: string, date: string, cell?: PdksCell): string {
 export function periodTotals(days: readonly PdksCell[]) {
   return days.reduce(
     (sum, day) =>
-      day.status === "future" || day.status === "noData" || day.status === "notEmployed"
+      day.status === "future" || day.status === "awaitingData" || day.status === "noData" || day.status === "notEmployed"
         ? sum
         : {
             totalMinutes: sum.totalMinutes + day.totalMinutes,

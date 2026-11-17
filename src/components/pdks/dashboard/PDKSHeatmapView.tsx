@@ -90,6 +90,7 @@ export function PDKSHeatmapView({
                   const duration =
                     !cell ||
                     status === "future" ||
+                    status === "awaitingData" ||
                     status === "noData" ||
                     ([
                       "absent",

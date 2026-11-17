@@ -1,3 +1,4 @@
+import { withPdksDeviceAvailability } from "./lib/pdksAvailability";
 import { scopedPdksPlan, usesPlanDayRules } from "./lib/pdksMultiShift";
 import { usesShiftDayRules } from "./lib/pdksFixedRules";
 import { trDateKey } from "./lib/trDate";
@@ -160,7 +161,7 @@ export const summary = employeeAuthedQuery({
     const included = filterPdksReadings(rows.page, projectId, reading => policyFor(workDate(reading)));
     const row = computePdksTableRow({
       policyFor, employee, empKey: employee._id, empReadings: included, departmentName: "", periodDateKeys: dates,
-      availableDateKeys: new Set(included.map(workDate)), startDate: args.startDate, isSingleDay: false, viewMode: "matrix",
+      availableDateKeys: await withPdksDeviceAvailability(ctx, projectId, new Set(included.map(workDate)), policies, args.endDate), startDate: args.startDate, isSingleDay: false, viewMode: "matrix",
       manualPdksByEmpDate: manualByDate,
       allLeaves: leaves.filter(leave => leave.status === "approved" && (!leave.projectId || leave.projectId === projectId)),
       holidayMap: new Map([...globalHolidays, ...projectHolidays].map(holiday => [holiday.date, holiday])),

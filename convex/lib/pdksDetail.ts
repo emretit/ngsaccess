@@ -1,3 +1,4 @@
+import { pdksDataPending } from "./pdksAvailability";
 import { flexibleMinuteFields } from "./pdksFlexible";
 import type { PdksPolicyResolver } from "./pdksRules";
 // Reading inputs must already be source-filtered at the handler/loader boundary.
@@ -53,6 +54,7 @@ export function computeAttendanceDetailDay(params: {
   const status = classifyPdksDay({
     noShift: day.noShift,
     date,
+    dataPending: pdksDataPending(params.availableDateKeys, date, { shift: lastShift, shiftEnd: settings.workEndTime, earlyExitTolerance: settings.earlyExitToleranceMinutes, pendingUntil: day.pendingUntil }, !!params.manualDay || params.dayReadings.length > 0),
     dataAvailable: params.availableDateKeys.has(date) || (params.policyFor?.(date).punchMode === "requirements" && !!params.manualDay),
     firstRecordDate: params.firstRecordDate,
     shiftStart: dayShift?.startTime ?? (params.policyFor?.(date).punchMode === "requirements" ? settings.workStartTime : undefined),
@@ -93,7 +95,7 @@ export function computeAttendanceDetailDay(params: {
     isLate: day.isLate,
     isEarlyExit: day.isEarlyExit,
     payrollCode:
-      status === "incomplete" || status === "future" || status === "noData" || status === "notEmployed"
+      status === "incomplete" || status === "future" || status === "awaitingData" || status === "noData" || status === "notEmployed"
         ? "—"
         : code,
     overtimeMinutes: day.overtimeMinutes,

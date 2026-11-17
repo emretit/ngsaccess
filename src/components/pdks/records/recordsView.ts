@@ -72,7 +72,7 @@ export function derivePdksRecordsView({ projectId, filters, smartPreset, selecti
     ]
       .filter(Boolean)
       .join(" · ") || "Tüm personel";
-  const passive = (status: "weekend" | "holiday" | "noData" | "future") => allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(d => !d.noShift && d.status === status).length : Number(!row.noShift && row.status === status)), 0);
+  const passive = (status: "weekend" | "holiday" | "awaitingData" | "noData" | "future") => allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(d => !d.noShift && d.status === status).length : Number(!row.noShift && row.status === status)), 0);
   const inProgress = allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(isPdksInProgress).length : Number(isPdksInProgress(row))), 0);
   const counters = [
     { status: "present", value: summary.present },
@@ -81,6 +81,7 @@ export function derivePdksRecordsView({ projectId, filters, smartPreset, selecti
     { status: "leave", value: summary.leave },
     { status: "weekend", value: passive("weekend") },
     { status: "holiday", value: passive("holiday") },
+    { status: "awaitingData", value: passive("awaitingData") },
     { status: "noData", value: passive("noData") },
     { status: "future", value: passive("future") - inProgress },
   ] as const;

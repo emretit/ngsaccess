@@ -3,7 +3,7 @@ import type { ShiftResolver } from "./shiftResolver";
 import { hasFixedShiftRules, usesShiftDayRules } from "./pdksFixedRules";
 import { hasDirectionalPdksCheckpoints, hasVersionedPdksPolicy, loadPdksPolicies } from "./pdksRules";
 import { employedDuring, employedOn } from "./employment";
-import { pdksAvailableDateKeys, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
+import { PDKS_COMPLETENESS_START, withPdksDeviceAvailability, pdksAvailableDateKeys, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import type { enrichReadingsForList } from "./cardReadingAudit";
 import {
   classifyReadingSource,
@@ -55,7 +55,8 @@ export function summarizeAttendance(params: TableParams, today: string, issues: 
     expectedDays: issues.length ? null : expectedDays,
     absentDays: issues.length ? null : workDays.filter((day) => day.payrollCode === "DV").length,
     devamOrani: issues.length || expectedDays === 0 ? null : Math.round(presentDays / expectedDays * 100),
-    reliabilityNote: issues.join(" "),
+    reliabilityNote: [...issues, ...(periodDateKeys.some(date => date >= PDKS_COMPLETENESS_START)
+      ? ["Veri bekleniyor günleri devamsızlığa katılmaz. 17.11.2026 öncesi günler ve backfill takibi bulunmayan IDE, QR/mobil, sanal okuyucu ve localBridge kaynakları eski veri uygunluğu kuralını kullanır."] : [])].join(" "),
   };
 }
 
@@ -101,7 +102,7 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
     } : undefined, (_reading, date) => policies(projectId, date), (id, date) => { const shift = shiftResolver.resolveLast(id, date); return shift?.projectId === projectId || shift?.scheduleType === "flexible" && !shift.projectId ? shift : null; });
     const readings = flexible ? filterPdksReadings(raw, projectId, r => policies(projectId, workDate(r))) : await readReportReadings(ctx, [projectId], startISO, endISO, { policies, workDate });
     const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
-    const availableDateKeys = pdksAvailableDateKeys(readings, workDate);
+    const availableDateKeys = await withPdksDeviceAvailability(ctx, projectId, pdksAvailableDateKeys(readings, workDate), policies, endDate);
     return await Promise.all(employees.map(async (employee) => {
       const [records, department] = await Promise.all([
         earlyRecords?.get(employee._id) ?? ctx.db.query("pdksRecords").withIndex("by_employee_date", (q) => q.eq("employeeId", employee._id).gte("date", startDate).lte("date", endDate)).collect(),
@@ -337,7 +338,7 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     const [workSettings, overtimeRates, holidayMap] = await Promise.all([
       getEffectiveWorkSettings(ctx, projectId), getEffectiveOvertimeRates(ctx, projectId), getHolidaysMap(ctx, projectId, startDate, endDate),
     ]);
-    const availableDateKeys = pdksAvailableDateKeys(readings, workDate);
+    const availableDateKeys = await withPdksDeviceAvailability(ctx, projectId, pdksAvailableDateKeys(readings, workDate), policies, endDate);
     const employeeReadings = buildPdksEmployeeReadingMap({ employees: allEmployees, readings });
     for (const employee of allEmployees.filter(e => employedDuring(e, startDate, endDate))) {
       const [manual, leaves] = await Promise.all([

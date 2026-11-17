@@ -10,7 +10,7 @@ import { buildBoundedShiftResolver, type ShiftResolver } from "./shiftResolver";
 import { overtimePeriodRange, calculatePeriodOvertime } from "./overtimeCalc";
 import { buildPeriodDateKeys } from "./pdksCalc";
 import { addWorkDate, buildPdksWorkDateResolver, hasFlexiblePdksShift, pdksWorkDayRange, groupPdksWorkDays } from "./pdksWorkDay";
-import { pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
+import { withPdksDeviceAvailability, pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import { trDayRangeISO, trDateKey } from "./trDate";
 import { filterPdksReadings } from "./pdksSource";
 import { buildPdksEmployeeReadingMap } from "./pdksTable";
@@ -149,6 +149,9 @@ export async function loadPayrollPeriod(
   const payrollEmployeeReadings = buildPdksEmployeeReadingMap({ employees, readings });
   const payrollWorkDate = [...payrollShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId)) : payrollBoundaryWorkDate;
   const payrollAvailableDates = pdksAvailableDatesByProject(readings, payrollWorkDate);
+  await Promise.all([...new Set(employees.map(employee => employee.projectId))].map(async projectId => {
+    payrollAvailableDates.set(projectId, await withPdksDeviceAvailability(ctx, projectId, payrollAvailableDates.get(projectId) ?? new Set(), policies, overtimeRange.endDate));
+  }));
   const payrollManualDates = pdksManualDatesByEmployee(manualByEmpDate.values());
   const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
   for (const [empId, employeeReadings] of payrollEmployeeReadings) {
