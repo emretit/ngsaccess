@@ -7,6 +7,7 @@ import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
 import { trDayRangeISO, trTodayKey } from "./lib/trDate";
 import { addWorkDate } from "./lib/pdksWorkDay";
+import { writePdksRuleVersion } from "./lib/pdksRuleWrite";
 
 const choice = v.union(v.literal("absent"), v.literal("review"));
 const target = v.object({
@@ -194,14 +195,8 @@ export const publishRuleVersion = authedMutation({
     const existing = await ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", args.projectId).eq("effectiveFrom", args.effectiveFrom)).unique();
     const { targets: _targets, ...fields } = args;
     const data = { ...fields, createdAt: new Date().toISOString(), createdBy: ctx.user._id };
-    let id: Id<"pdksRuleVersions">;
-    if (existing) {
-      if (existing.effectiveFrom <= trTodayKey()) throw new Error("Yürürlüğe girmiş kural değiştirilemez");
-      id = existing._id;
-      for (const row of await selections(ctx, id)) await ctx.db.delete(row._id);
-      await ctx.db.replace(id, data);
-    } else id = await ctx.db.insert("pdksRuleVersions", data);
-    for (const snapshot of snapshots) await ctx.db.insert("pdksCheckpointSelections", { ...snapshot, projectId: args.projectId, ruleVersionId: id });
+    if (existing && existing.effectiveFrom <= trTodayKey()) throw new Error("Yürürlüğe girmiş kural değiştirilemez");
+    const id = await writePdksRuleVersion(ctx, data, snapshots, existing);
     await writeAudit(ctx, { user: ctx.user, projectId: args.projectId, action: existing ? "update" : "create", targetTable: "pdksRuleVersions", targetId: id, oldValue: existing, newValue: data });
     return id;
   },
