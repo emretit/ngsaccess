@@ -147,10 +147,14 @@ describe("unrecorded fixed lunch in eachPunch reports", () => {
   it("deducts only the attended part of lunch and no legal fallback outside its window", () => {
     expect(run(readings(punch("12:30", "entry"), punch("17:00", "exit")), { shift })).toMatchObject({ totalMinutes: 240, breakMinutes: 30 });
     expect(run(readings(punch("13:00", "entry"), punch("17:00", "exit")), { shift })).toMatchObject({ totalMinutes: 240, breakMinutes: 0 });
-    expect(run(readings(punch("08:00", "entry"), punch("17:00", "exit")))).toMatchObject({ totalMinutes: 540, breakMinutes: 0 });
   });
-  it("never deducts a second break from recorded gaps or incomplete evidence", () => {
-    expect(run(readings(punch("08:00", "entry"), punch("12:00", "exit"), punch("12:30", "entry"), punch("17:00", "exit")), { shift })).toMatchObject({ totalMinutes: 510, breakMinutes: 0 });
+  it("uses a legal break when no break window is defined", () => {
+    expect(run(readings(punch("08:00", "entry"), punch("17:00", "exit"))))
+      .toMatchObject({ rawTotalMinutes: 540, totalMinutes: 480, breakMinutes: 60 });
+  });
+  it("deducts only the remaining attended lunch after a recorded gap and no break for incomplete evidence", () => {
+    expect(run(readings(punch("08:00", "entry"), punch("12:00", "exit"), punch("12:30", "entry"), punch("17:00", "exit")), { shift }))
+      .toMatchObject({ rawTotalMinutes: 510, totalMinutes: 480, breakMinutes: 30 });
     expect(run(readings(punch("08:00", "entry"), punch("13:00", "exit"), punch("14:00", "entry")), { shift })).toMatchObject({ totalMinutes: 300, breakMinutes: 0, punchQuality: "missingExit" });
     expect(run([], { shift })).toMatchObject({ totalMinutes: 0, breakMinutes: 0 });
   });

@@ -184,10 +184,10 @@ describe("Denetim 2 yarım gün sınırı", () => {
       readings: [reading("22:00", "entry", sunday), reading("06:00", "exit", monday)],
       overtimeRates: { ...DEFAULT_OVERTIME_RATES, nightShiftDayMode: "shiftStart", nightShiftMultiplier: 1 },
     });
-    expect(minutesByClass(day)).toEqual({ [kind === "rest" ? "weekend" : "holiday"]: 480 });
+    expect(minutesByClass(day)).toEqual({ [kind === "rest" ? "weekend" : "holiday"]: 420 });
     expect(day.overtimeSegments.every(segment => segment.calendarDate === sunday)).toBe(true);
     expect(calculatePeriodOvertime([day], { startDate: sunday, endDate: monday, hourlyRate: 100 }))
-      .toMatchObject({ overtimeMinutes: 480, overtimePayTRY: 1600 });
+      .toMatchObject({ overtimeMinutes: 420, overtimePayTRY: 1400 });
   });
 
   it.each([

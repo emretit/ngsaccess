@@ -22,9 +22,9 @@ describe.each(["firstLast", "eachPunch"] as const)("B1 scheduled breaks %s", mod
     expect(run("23:45", { breakStart: "23:30", breakEnd: "00:30" }, mode)).toMatchObject({ breakMinutes: 45, totalMinutes: 330 });
   });
 });
-it("B2 deliberately preserves automatic-break semantics of both calculation modes", () => {
+it("B2 applies automatic legal breaks in both calculation modes", () => {
   expect(run("22:00", undefined, "firstLast")).toMatchObject({ breakMinutes: 60, totalMinutes: 420 });
-  expect(run("22:00", undefined, "eachPunch")).toMatchObject({ breakMinutes: 0, totalMinutes: 480 });
+  expect(run("22:00", undefined, "eachPunch")).toMatchObject({ breakMinutes: 60, totalMinutes: 420 });
 });
 it("a recorded hour between night visits is never deducted again", () => {
   expect(run("22:00", { breakStart: "02:00", breakEnd: "03:00" }, "eachPunch", [reading(date, "22:00", "entry"), reading("2027-01-01", "02:00", "exit"), reading("2027-01-01", "03:00", "entry"), reading("2027-01-01", "06:00", "exit")])).toMatchObject({ rawTotalMinutes: 420, breakMinutes: 0, totalMinutes: 420 });

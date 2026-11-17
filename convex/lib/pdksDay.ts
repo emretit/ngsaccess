@@ -159,58 +159,55 @@ export function computePdksDay(params: {
   })) ?? [];
   const rawTotalMinutes = pairResult ? pairResult.totalMinutes :
     firstISO && lastISO ? Math.max(0, minutesBetweenISO(firstISO, lastISO)) : 0;
-  const interval = eachPunch ? { start: Math.min(entry ?? Infinity, pairIntervals[0]?.start ?? Infinity), end: Math.max(exit ?? 0, pairIntervals[pairIntervals.length - 1]?.end ?? 0) } : { start: entry ?? 0, end: exit ?? entry ?? 0 };
+  // Keep seconds for interval overlap, just as rawTotalMinutes measures the
+  // elapsed timestamp difference before truncating it to whole minutes.
+  const exactEntry = firstISO ? (Date.parse(firstISO) - origin) / 60000 : 0;
+  const exactExit = lastISO ? (Date.parse(lastISO) - origin) / 60000 : exactEntry;
+  const interval = eachPunch
+    ? { start: Math.min(entry ?? Infinity, pairIntervals[0]?.start ?? Infinity), end: Math.max(exit ?? 0, pairIntervals[pairIntervals.length - 1]?.end ?? 0) }
+    : { start: exactEntry, end: exactExit };
   if (!Number.isFinite(interval.start)) interval.start = 0;
-  // A complete, uninterrupted visit has no recorded lunch gap. Apply the
-  // configured fixed break to that visit, including historical report dates.
-  // Multiple visits already exclude outside time; incomplete days add no break.
-  const singleVisitBreak = eachPunch && pairIntervals.length === 1 &&
+  // Legacy deliberately ignores intermediate punches; eachPunch deducts only
+  // the part of a scheduled break that is still included in its paired visits.
+  // Missing sides never justify an assumed break, even with other closed visits.
+  const completeDay = endpoints.durationMeasured &&
     !pairResult?.missingEntry && !pairResult?.missingExit;
-  const breakInterval = singleVisitBreak ? pairIntervals[0] : interval;
+  const workedIntervals = eachPunch ? pairIntervals : [interval];
   const scheduledBreaks =
-    (!eachPunch || singleVisitBreak) && !flex && shift?.breakStart && shift.breakEnd
-      ? recurringWindows(
-          shift.breakStart,
-          shift.breakEnd,
-          breakInterval.start,
-          breakInterval.end,
-        )
+    completeDay && !flex && shift?.breakStart && shift.breakEnd
+      ? recurringWindows(shift.breakStart, shift.breakEnd, interval.start, interval.end)
       : [];
-  const scheduledBreakMinutes = scheduledBreaks.reduce(
-    (sum, window) => sum + overlap(breakInterval, window),
-    0,
-  );
-  const actualVisitMinutes = singleVisitBreak ? breakInterval.end - breakInterval.start : 0;
-  const breakMinutes = eachPunch ? singleVisitBreak
-    ? flex?.breakMode === "duration" ? flexibleBreak(flex, rawTotalMinutes)
-      : rawTotalMinutes - Math.max(0, Math.floor(actualVisitMinutes - scheduledBreakMinutes))
-    : 0 : Math.min(
-    rawTotalMinutes,
-    flex ? flexibleBreak(flex, rawTotalMinutes) : (shift?.breakStart && shift.breakEnd ? scheduledBreakMinutes : legalBreakMinutes(rawTotalMinutes)),
-  );
+  const scheduledOverlap = (window: Interval) => workedIntervals.reduce(
+    (sum, visit) => sum + scheduledBreaks.reduce(
+      (minutes, pause) => minutes + overlap({
+        start: Math.max(visit.start, window.start),
+        end: Math.min(visit.end, window.end),
+      }, pause), 0), 0);
+  const scheduledBreakMinutes = scheduledOverlap(interval);
+  const workedMinutes = workedIntervals.reduce((sum, visit) => sum + Math.max(0, visit.end - visit.start), 0);
+  const outsideMinutes = eachPunch ? Math.floor(pairIntervals.reduce((sum, visit, index) => {
+    const previous = pairIntervals[index - 1];
+    return sum + (previous ? Math.max(0, visit.start - previous.end) : 0);
+  }, 0)) : 0;
+  const hasScheduledBreak = !flex && !!shift?.breakStart && !!shift.breakEnd;
+  const scheduledDeduction = eachPunch
+    ? rawTotalMinutes - Math.floor(workedMinutes - scheduledBreakMinutes)
+    : Math.floor(scheduledBreakMinutes);
+  const breakMinutes = !completeDay ? 0 : Math.min(rawTotalMinutes, Math.max(0,
+    hasScheduledBreak ? scheduledDeduction :
+      (flex ? flexibleBreak(flex, rawTotalMinutes) : legalBreakMinutes(rawTotalMinutes)) - outsideMinutes));
   const totalMinutes = rawTotalMinutes - breakMinutes;
   const netOverlap = (window: Interval) => {
-    const raw = eachPunch ? pairIntervals.reduce((sum, pair) => sum + overlap(pair, window), 0) : overlap(interval, window);
-    if (eachPunch && !singleVisitBreak) return raw;
-    if (scheduledBreakMinutes > 0) {
-      return (
-        raw -
-        scheduledBreaks.reduce(
-          (sum, pause) =>
-            sum +
-            overlap(
-              {
-                start: Math.max(breakInterval.start, window.start),
-                end: Math.min(breakInterval.end, window.end),
-              },
-              pause,
-            ),
-          0,
-        )
-      );
+    const raw = workedIntervals.reduce((sum, visit) => sum + overlap(visit, window), 0);
+    if (hasScheduledBreak) {
+      const net = raw - scheduledOverlap(window);
+      if (eachPunch) return net;
+      // Legacy truncates gross and break minutes independently. Allocate that
+      // whole-minute net total across portions without reintroducing seconds.
+      const exactNet = workedMinutes - scheduledBreakMinutes;
+      return exactNet > 0 ? net * totalMinutes / exactNet : 0;
     }
-    const gross = eachPunch ? actualVisitMinutes : rawTotalMinutes;
-    return gross > 0 ? (raw * totalMinutes) / gross : 0;
+    return workedMinutes > 0 ? (raw * totalMinutes) / workedMinutes : 0;
   };
   const wholeMinutes = eachPunch ? Math.floor : Math.round;
   const holidayFor = (holiday: Doc<"holidays"> | null | undefined) => shift?.holidayWorkRequired ? undefined : holiday;

@@ -54,8 +54,12 @@ describe("night visit windows preserve session boundaries", () => {
   });
   it.each([fixed, flexible])("a return beyond checkout cutoff is excluded", schedule => {
     const rows = visits.slice(0, 2).concat(reading(next, "07:01", "entry"), reading(next, "08:00", "exit"));
-    expect(run(schedule, rows).totalMinutes).toBe(240);
-    expect(run(schedule, rows).lastISO).toBe(visits[1]?.accessTime);
+    const day = run(schedule, rows);
+    expect(day.rawTotalMinutes).toBe(240);
+    expect(day.lastISO).toBe(visits[1]?.accessTime);
+    const expectedBreak = schedule.scheduleType === "flexible" ? 0 : 15;
+    expect(day.breakMinutes).toBe(expectedBreak);
+    expect(day.totalMinutes).toBe(240 - expectedBreak);
   });
   it("N2: maxSpan still excludes an otherwise in-window return", () => {
     const limited = { ...flexible, flexible: { ...flexible.flexible ?? DEFAULT_FLEXIBLE, maxSpanMinutes: 240, requiredNetMinutes: 120 } };
