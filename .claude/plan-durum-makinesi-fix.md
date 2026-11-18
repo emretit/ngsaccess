@@ -18,13 +18,13 @@ Kararlar (Emre 2026-11-14):
 ### Dalga 2: geç gelen sonucun yeni durumu ezmesi (~3 saat, tek worker)
 - [x] 2a (worker ctx_d41745f02ee6, 2026-11-14) · A-03 + C-03 + A-04 deneme/nesil token'ı (Hik kuyruğu, IDE kuyruğu, toplu grant sonucu) (worker, Codex sol high)
 - [x] 2b · Denetim: Claude opus high (3 tur, son LOW reconciliationScheduled begin'de sıfırlama düzeltildi; koordinatör 280/280 + tsc 0)
-- [ ] 2c · Commit + yayın → Emre onayı
+- [x] 2c · Commit + yayın (a0a77c65, CANLI 2026-11-17 14:51)
 
 ### Dalga 3: medium/low temizlik (~3 saat, 2 worker paralel)
 - [x] 3a (worker ctx_c0bdecc22460, koordinatör testi yeşil) · C-05 saklama zincirinde proje bazlı adil bütçe + B-04/B-05 rapor teslim kaydı ve retry (worker, Codex sol medium)
 - [x] 3b (worker ctx_a8a1a63587b1, koordinatör testi yeşil) · C-01 davet şifre yarışı + C-04 SMTP commit kapısı (worker, Codex sol medium)
 - [x] 3c (worker ctx_1790110bff02, rapor `docs/audits/2026-11-14-implicit-state-machines/dalga3c-olu-degerler.md`; canlı sayım + daraltma ayrı onay) · Ölü değerler: A-07, A-08, B-06, B-07, C-07, C-08 belgele veya kaldır; A-06 için önce canlı veride status değerlerini say (salt okuma), sonra union'a daralt (ayrı onay)
-- [x] 3d · Denetim (3a+3b: 2 tur, tüm medium/low düzeltildi) · [ ] commit + yayın → Emre onayı
+- [x] 3d · Denetim (3a+3b: 2 tur, tüm medium/low düzeltildi) · [x] commit + yayın (a0a77c65, CANLI 2026-11-17)
 
 ### Kapsam dışı (ayrı proje)
 - A-01/A-02 Windows köprüsünün yeniden yazımı: kalıcı disk kuyruğu + cihaz token'lı poll/ack. DS-K2804 açık riskiyle birlikte ele alınacak.
