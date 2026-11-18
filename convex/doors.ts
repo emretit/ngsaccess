@@ -170,7 +170,7 @@ export const create = authedMutation({
     deviceId: v.optional(v.id("devices")),
     location: v.optional(v.string()),
     doorCode: v.optional(v.string()),
-    status: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     ioId: v.optional(v.number()),
     requireSensor: v.optional(v.boolean()),
     readerDirection: v.optional(
@@ -263,7 +263,7 @@ export const update = authedMutation({
     deviceId: v.optional(v.id("devices")),
     location: v.optional(v.string()),
     doorCode: v.optional(v.string()),
-    status: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     ioId: v.optional(v.number()),
     requireSensor: v.optional(v.boolean()),
     readerName: v.optional(v.string()),

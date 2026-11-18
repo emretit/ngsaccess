@@ -71,8 +71,6 @@ export const projectDeletionMatrix = [
   { table: "holidays", index: "by_project", label: "Tatiller", policy: "delete" },
   { table: "reportScheduleSettings", index: "by_project", label: "Rapor zamanlamaları", policy: "delete" },
   { table: "reportDeliveries", index: "by_projectId", label: "Rapor teslim kayıtları", policy: "delete" },
-  { table: "leaveBalances", index: "by_project", label: "İzin bakiyeleri", policy: "delete" },
-  { table: "chatConversations", index: "by_project", label: "Sohbetler", policy: "delete" },
   { table: "projectPrivacySettings", index: "by_project", label: "Gizlilik ayarları", policy: "delete" },
   { table: "projectRolePermissions", index: "by_projectId_and_role", label: "Rol yetkileri", policy: "delete" },
   { table: "invites", index: "scan", label: "Davetler", policy: "delete" },

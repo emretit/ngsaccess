@@ -7,7 +7,7 @@ import { writeAudit } from "./audit";
 
 export const TRANSFER_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const TRANSFER_LIMIT = 500;
-export const activeTransferStatuses = ["requested", "revoking", "revoked", "provisioning", "stuck"] as const;
+export const activeTransferStatuses = ["revoking", "revoked", "provisioning", "stuck"] as const;
 const allStatuses = [...activeTransferStatuses, "done", "cancelled"] as const;
 export type ReadCtx = Pick<QueryCtx, "db">;
 export function transferError(code: string, message: string): never { throw new ConvexError({ code, message }); }
@@ -108,7 +108,7 @@ export async function transferBlocksAddition(ctx: ReadCtx, op: { deviceId: Id<"d
 
 export async function advanceTransfer(ctx: MutationCtx, transferId: Id<"accessTransfers">): Promise<void> {
   const transfer = await ctx.db.get(transferId);
-  if (!transfer || !["requested", "revoking", "stuck"].includes(transfer.status)) return;
+  if (!transfer || !["revoking", "stuck"].includes(transfer.status)) return;
   const targets = await transferTargets(ctx, transferId);
   if (targets.some(target => target.state !== "confirmed" && target.state !== "deviceRemoved")) return;
   await ctx.db.patch(transferId, { status: "revoked", stuckReason: undefined, lastError: undefined });

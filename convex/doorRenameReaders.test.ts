@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
+import { makeFunctionReference } from "convex/server";
 import { describe, expect, it } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
@@ -112,5 +113,52 @@ describe("kapı yeniden adlandırıldığında okuyucu adları", () => {
       .rejects.toThrow("Seçilen bölge bu kapının projesinde değil");
     expect(await f.readers()).toEqual(before);
     expect((await f.t.run((ctx) => ctx.db.get(f.doorId)))?.name).toBe("Kapı 1");
+  });
+});
+
+
+describe("kapı ve okuyucu mantıksal etkinliği", () => {
+  it.each(["active", "inactive", undefined] as const)("create kabul eder, eksik durum active olur: %s", async (status) => {
+    const f = await setup();
+    const door = await f.t.run(ctx => ctx.db.get(f.doorId));
+    const doorId = await f.caller.mutation(api.doors.create, { name: "Yeni kapı", projectId: door?.projectId, status });
+    const readerId = await f.caller.mutation(api.readers.create, { doorId, name: "Yeni okuyucu", direction: "exit", status });
+    expect((await f.t.run(ctx => ctx.db.get(doorId)))?.status).toBe(status ?? "active");
+    expect((await f.t.run(ctx => ctx.db.get(readerId)))?.status).toBe(status ?? "active");
+  });
+
+  it("update active/inactive kabul eder ve durum gönderilmezse eski alanı korur", async () => {
+    const f = await setup();
+    const readerId = f.readerIds[0];
+    if (!readerId) throw new Error("okuyucu fixture eksik");
+    await f.caller.mutation(api.doors.update, { doorId: f.doorId, location: "Kat 1" });
+    await f.caller.mutation(api.readers.update, { readerId, name: "Okuyucu" });
+    expect((await f.t.run(ctx => ctx.db.get(f.doorId)))?.status).toBeUndefined();
+    expect((await f.t.run(ctx => ctx.db.get(readerId)))?.status).toBeUndefined();
+    for (const status of ["inactive", "active"] as const) {
+      await f.caller.mutation(api.doors.update, { doorId: f.doorId, status });
+      await f.caller.mutation(api.readers.update, { readerId, status });
+      await f.caller.mutation(api.doors.update, { doorId: f.doorId, location: "Kat 2" });
+      await f.caller.mutation(api.readers.update, { readerId, name: "Okuyucu 2" });
+      expect((await f.t.run(ctx => ctx.db.get(f.doorId)))?.status).toBe(status);
+      expect((await f.t.run(ctx => ctx.db.get(readerId)))?.status).toBe(status);
+    }
+  });
+
+  it.each(["online", "", "actve"])("geçersiz API durumu hiçbir kayda yazılmaz: %s", async (status) => {
+    const f = await setup();
+    const before = await f.t.run(async ctx => ({ doors: await ctx.db.query("doors").collect(), readers: await ctx.db.query("readers").collect() }));
+    // Model dışındaki istemcileri taklit etmek için yalnız bu çağrılarda serbest payload kullanılır.
+    const calls = [
+      { name: "doors:create", args: { name: "Geçersiz kapı", projectId: before.doors[0]?.projectId, status } },
+      { name: "doors:update", args: { doorId: f.doorId, status } },
+      { name: "readers:create", args: { doorId: f.doorId, name: "Geçersiz okuyucu", direction: "entry", status } },
+      { name: "readers:update", args: { readerId: f.readerIds[0], status } },
+    ];
+    for (const call of calls) {
+      const ref = makeFunctionReference<"mutation", Record<string, unknown>>(call.name);
+      await expect(f.caller.mutation(ref, call.args)).rejects.toThrow(/Validator error: Expected one of literal, literal/);
+    }
+    expect(await f.t.run(async ctx => ({ doors: await ctx.db.query("doors").collect(), readers: await ctx.db.query("readers").collect() }))).toEqual(before);
   });
 });

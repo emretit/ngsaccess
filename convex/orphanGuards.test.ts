@@ -56,7 +56,6 @@ function fixture(role: Role, projectId: string | undefined, memberships = ["own"
     { _id: "employee", table: "employees", projectId },
     { _id: "rule", table: "accessRules", projectId },
     { _id: "device", table: "devices", projectId, isActive: true, brand: "ide_smart" },
-    { _id: "balance", table: "leaveBalances", employeeId: "employee", year: 2026 },
     ...memberships.map((id, i) => ({ _id: `membership-${i}`, table: "userProjects", userId: "actor", projectId: id })),
   ];
   const patch = vi.fn(); const remove = vi.fn(); const insert = vi.fn(); const schedule = vi.fn();

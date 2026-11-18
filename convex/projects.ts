@@ -122,7 +122,6 @@ export const remove = authedMutation({
       // Her tablo sınırlı okunur; limit aşımında tüm işlem geri alınır.
       const rows = await projectDeletionCleanupQuery(ctx, table, args.id).take(501);
       if (rows.length > 500) throw new ConvexError("Proje temizleme sınırı aşıldı; önce bağlı kayıtları azaltın veya projeyi pasife alın");
-      // Sohbet mesajları chatConversations satırının içinde tutulur.
       for (const row of rows) await ctx.db.delete(row._id);
     }
     // auditLog geçmişi korunur.

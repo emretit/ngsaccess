@@ -39,7 +39,6 @@ describe("ADM-20 bağlı proje kayıtları", () => {
     expect(projectDeletionError(blockers)).toBeNull();
     expect(projectDeletionCleanupTables).toContain("userProjects");
     expect(projectDeletionCleanupTables).toContain("generalSettings");
-    expect(projectDeletionCleanupTables).toContain("chatConversations");
     expect(projectDeletionCleanupTables).toContain("invites");
     expect(projectDeletionCleanupTables).not.toContain("auditLog");
   });

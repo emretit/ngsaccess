@@ -16,6 +16,6 @@ export const transferLabel = "Başka projeye taşındı";
 export type EmployeeTransfer = NonNullable<FunctionReturnType<typeof api.employeeTermination.getEmployeeTransfer>>;
 
 export function isTransferActive(transfer: EmployeeTransfer | null | undefined): boolean {
-  return transfer?.status === "requested" || transfer?.status === "revoking" || transfer?.status === "stuck" ||
+  return transfer?.status === "revoking" || transfer?.status === "stuck" ||
     transfer?.status === "revoked" || transfer?.status === "provisioning";
 }

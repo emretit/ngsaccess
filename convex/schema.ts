@@ -347,7 +347,9 @@ export default defineSchema({
     deviceId: v.optional(v.id("devices")),
     location: v.optional(v.string()),
     doorCode: v.optional(v.string()),
-    status: v.optional(v.string()),
+    // Mantıksal etkinlik: active veya inactive. Boş eski alan mevcut davranışta etkin kabul edilir.
+    // Cihazın çevrimiçi/çevrimdışı durumunu temsil etmez.
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     // IDE Smart aktüatör index'i (io_id 0–3). Diğer markalarda boş.
     ioId: v.optional(v.number()),
     // Kapıda fiziksel "kapı açıldı" sensörü var mı → panel ACTUATOR{ioId}.REQUIRE_SENSOR_ACTIVATION.
@@ -415,7 +417,9 @@ export default defineSchema({
     hikLastCfgAt: v.optional(v.number()),
     // IDE Smart aktüatör index'i (door.ioId ile eşlenir) — son okuma çözümünde kullanılır.
     ioId: v.optional(v.number()),
-    status: v.optional(v.string()), // "active" | "inactive"
+    // Mantıksal etkinlik: active veya inactive. Boş eski alan mevcut davranışta etkin kabul edilir.
+    // Cihazın çevrimiçi/çevrimdışı durumunu temsil etmez.
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
@@ -534,6 +538,8 @@ export default defineSchema({
     projectId: v.id("projects"),
     token: v.string(),
     name: v.optional(v.string()),
+    // lastSeenAt/lastClientInfo eski roster protokolünden kalan bilgilerdir; güncel protokol bunları yenilemez.
+    // lastSeenAt imha doğrulamasında hâlâ okunur; canlı bağlantı kanıtı sayılmadan protokol yenilenmelidir.
     lastSeenAt: v.optional(v.number()),
     /** Son roster çağrısının User-Agent'ı (köprü sürümü + makine adı; ≤200 karakter). */
     lastClientInfo: v.optional(v.string()),
@@ -546,8 +552,8 @@ export default defineSchema({
 
   // ═══════ 4 · ERİŞİM KURALLARI · GRUP BAĞLARI ══════════════════════════
   accessTransfers: defineTable({
-    kind: v.union(v.literal("employee"), v.literal("ide_panel")),
-    status: v.union(v.literal("requested"), v.literal("revoking"), v.literal("revoked"), v.literal("provisioning"), v.literal("done"), v.literal("stuck"), v.literal("cancelled")),
+    kind: v.literal("employee"),
+    status: v.union(v.literal("revoking"), v.literal("revoked"), v.literal("provisioning"), v.literal("done"), v.literal("stuck"), v.literal("cancelled")),
     sourceProjectId: v.id("projects"), targetProjectId: v.id("projects"),
     employeeId: v.id("employees"), targetEmployeeId: v.id("employees"), cardNumber: v.string(),
     targetPlan: v.object({ accessRuleIds: v.array(v.id("accessRules")), departmentId: v.optional(v.id("departments")) }),
@@ -864,11 +870,7 @@ export default defineSchema({
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
-    /**
-     * Bu op'u claim eden bridge. Aynı projede iki bridge token varsa, B bridge'i
-     * A'nın claim ettiği op'u ack edemesin (cross-bridge çift-uygulama sinyali).
-     * Stale-requeue bunu temizler; yeni claim yeniden damgalar.
-     */
+    /** Legacy claim kimliği; mevcut enqueue/retry yalnız temizler, ACK sahiplik kontrolü sağlamaz. */
     claimedBy: v.optional(v.id("hikBridges")),
     /** Kullanıcı uyarıyı kapattı; operasyon sonucu (status) DEĞİŞMEZ. */
     dismissedAt: v.optional(v.number()),
@@ -1248,20 +1250,6 @@ export default defineSchema({
     updatedAt: v.string(),
   }),
 
-  chatConversations: defineTable({
-    projectId: v.optional(v.id("projects")),
-    title: v.optional(v.string()),
-    messages: v.array(
-      v.object({
-        role: v.union(v.literal("user"), v.literal("assistant")),
-        content: v.string(),
-        data: v.optional(v.any()),
-      })
-    ),
-    createdAt: v.string(),
-    updatedAt: v.string(),
-  }).index("by_project", ["projectId"]),
-
   // ═══════ 10 · İZİN · MESAİ · ÇALIŞMA AYARLARI ═════════════════════════
   leaves: defineTable({
     employeeId: v.id("employees"),
@@ -1332,21 +1320,6 @@ export default defineSchema({
     .index("by_project_status", ["projectId", "status"])
     .index("by_employee_date", ["employeeId", "date"]),
 
-  leaveBalances: defineTable({
-    employeeId: v.id("employees"),
-    projectId: v.optional(v.id("projects")),
-    leaveType: v.string(),
-    year: v.number(),
-    totalDays: v.number(),
-    usedDays: v.number(),
-    remainingDays: v.number(),
-    createdAt: v.string(),
-    updatedAt: v.string(),
-  })
-    .index("by_employee", ["employeeId"])
-    .index("by_project", ["projectId"])
-    .index("by_employee_year", ["employeeId", "year"]),
-
   workSettings: defineTable({
     projectId: v.optional(v.id("projects")),
     workStartTime: v.optional(v.string()),
@@ -1387,6 +1360,9 @@ export default defineSchema({
 
   employeeConsents: defineTable({
     employeeId: v.id("employees"),
+    // biometric_face, biometric_fingerprint, card ve photo yalnız eski rıza kayıtlarını okumak içindir;
+    // güncel personel akışı bunları üretmez. visitor_kvkk aktif ziyaretçi onay türüdür.
+    // Legacy kayıtlar ve bağlı belgeleri silinmez.
     consentType: v.union(
       v.literal("biometric_face"),
       v.literal("biometric_fingerprint"),
@@ -1537,7 +1513,9 @@ export default defineSchema({
   // KVKK Faz 1: proje bazlı gizlilik ayarları (biyometri modülü, okuma saklama
   // süresi, asistan isim maskeleme). Satır YOKSA eski davranış (bkz.
   // convex/lib/privacySettings.ts DEFAULT_PRIVACY): biyometri açık, saklama süresiz,
-  // asistan isimleri maskeli. Yeni projeler biyometri KAPALI başlar.
+  // asistan isimleri maskeli. Satır/alan yoksa biyometri varsayılan olarak açıktır.
+  // Yeni projeler de biometricEnabled=true ile oluşturulur;
+  // yönetici Ayarlar → Gizlilik üzerinden kapatabilir.
   projectPrivacySettings: defineTable({
     projectId: v.id("projects"),
     biometricEnabled: v.optional(v.boolean()),

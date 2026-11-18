@@ -11,6 +11,9 @@ import { requirePermission } from "./lib/permissions";
  *
  * Eski roster akışı (/hik-bridge/roster + roster-ack, claimBridgeRoster, ackBridgeOperation)
  * 2026-10-19'da kaldırıldı; Windows köprüsü baştan yazılacak.
+ * lastSeenAt/lastClientInfo eski roster protokolünden kalan bilgilerdir; güncel protokol bunları yenilemez.
+ * lastSeenAt imha doğrulamasında hâlâ okunur; canlı bağlantı kanıtı sayılmadan protokol yenilenmelidir.
+ * Legacy claimedBy kimliği mevcut enqueue/retry'da yalnız temizlenir, ACK sahiplik kontrolü sağlamaz.
  */
 
 /** Aynı projedeki işleri köprü başına en fazla iki saniyede bir uyandırır. */

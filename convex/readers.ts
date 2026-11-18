@@ -64,7 +64,7 @@ export const create = authedMutation({
     name: v.string(),
     direction: v.union(v.literal("entry"), v.literal("exit"), v.literal("both")),
     hikReaderNo: v.optional(v.number()),
-    status: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
   },
   returns: v.id("readers"),
   handler: async (ctx, args) => {
@@ -169,7 +169,7 @@ export const update = authedMutation({
       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
     ),
     hikReaderNo: v.optional(v.number()),
-    status: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
