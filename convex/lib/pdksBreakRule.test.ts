@@ -83,8 +83,8 @@ it("deducts no scheduled break when the entire window was spent outside", () => 
   expect(run("eachPunch", visits(["11:30", "13:30"])))
     .toMatchObject({ rawTotalMinutes: 360, breakMinutes: 0, totalMinutes: 360 });
 });
-it.each(["duration", "existingLegal"] as const)("credits recorded exits in flexible %s mode", breakMode => {
-  const day = run("eachPunch", visits(["11:00", "11:20"]), { scheduleType: "flexible", flexible: { ...DEFAULT_FLEXIBLE, breakMode } });
+it("credits recorded exits in flexible mode", () => {
+  const day = run("eachPunch", visits(["11:00", "11:20"]), { scheduleType: "flexible", flexible: DEFAULT_FLEXIBLE });
   expect(day).toMatchObject({ rawTotalMinutes: 460, breakMinutes: 40, totalMinutes: 420 });
   conserved(day);
 });

@@ -269,8 +269,66 @@ export function AddShiftDialog({
               <fieldset disabled={pending} className="grid min-w-0 gap-5 md:grid-cols-2 md:gap-6">
                 <section aria-label="Vardiya bilgileri" className="min-w-0 space-y-4">
                   {textFields(["name"])}
-                  <ShiftScheduleField value={values} editing={Boolean(editingShift)} error={errors.dayPlan}
-                    onChange={schedule => setValues({ ...values, ...schedule })} />
+                  <section aria-labelledby="shift-type-label" className="space-y-3">
+                    <p id="shift-type-label" className="text-sm font-medium">Vardiya türü</p>
+                    <div role="group" aria-labelledby="shift-type-label" className="flex gap-1">
+                      {([["fixed", "Sabit"], ["flexible", "Esnek"]] as const).map(([value, label]) => (
+                        <Button key={value} type="button" size="sm" variant={(values.scheduleType ?? "fixed") === value ? "default" : "outline"}
+                          aria-pressed={(values.scheduleType ?? "fixed") === value}
+                          onClick={() => { setValues({ ...values, scheduleType: value }); setErrors({}); }}>{label}</Button>
+                      ))}
+                    </div>
+                    {values.scheduleType === "flexible" && errors.flexible && (
+                      <p role="alert" className="text-sm text-danger">{errors.flexible}</p>
+                    )}
+                    {values.scheduleType === "flexible" ? (
+                      <FlexibleHoursFields value={values.flexible ?? DEFAULT_FLEXIBLE} errors={errors}
+                        onChange={flexible => setValues({ ...values, flexible })} />
+                    ) : <>
+                      <div className="grid grid-cols-2 gap-3">
+                        {textFields(["startTime", "endTime"])}
+                      </div>
+                      {values.endTime &&
+                        values.startTime &&
+                        values.endTime < values.startTime && (
+                          <p className="text-xs text-muted-foreground">
+                            Bitiş ertesi gün (+1 gün).
+                          </p>
+                        )}
+                    </>}
+                    {values.scheduleType === "flexible" ? (
+                      <FlexibleBreakFields value={values.flexible ?? DEFAULT_FLEXIBLE} errors={errors}
+                        onChange={flexible => setValues({ ...values, flexible })} />
+                    ) : <>
+                      <div className="flex flex-wrap items-center justify-between gap-x-3">
+                        <label className="flex gap-2 items-center text-sm">
+                          <input
+                            type="checkbox" className="size-6 shrink-0 accent-primary"
+                            checked={breakEnabled}
+                            onChange={(e) => setBreakEnabled(e.target.checked)}
+                          />
+                          Mola tanımla
+                        </label>
+                      </div>
+                      {breakEnabled && (
+                        <div className="grid grid-cols-2 gap-3">
+                          {textFields(["breakStart", "breakEnd"])}
+                        </div>
+                      )}
+                      {duration && duration.net > 0 && (
+                        <p role="status" className="text-sm text-muted-foreground tabular-nums">
+                          {breakEnabled ? `Planlanan net çalışma ${duration.net} dk` : `Vardiya süresi ${duration.gross} dk`}
+                          <span className="block text-xs">
+                            {breakEnabled ? "Saat aralığından tanımlı mola çıkarılarak hesaplanır." : "Mola kesintisi uygulanmadan önceki süre."}
+                          </span>
+                        </p>
+                      )}
+                    </>}
+                  </section>
+                  <div className="border-t pt-4">
+                    <ShiftScheduleField value={values} editing={Boolean(editingShift)} error={errors.dayPlan}
+                      onChange={schedule => setValues({ ...values, ...schedule })} />
+                  </div>
                   <div className="space-y-3">
                     <label className="flex gap-2 items-start text-sm">
                       <input
@@ -299,67 +357,7 @@ export function AddShiftDialog({
                     </FormFieldWrapper>
                   )}
                 </section>
-                <section aria-labelledby="shift-type-label" className="min-w-0 space-y-4 border-t pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
-                  <div className="space-y-1.5">
-                    <p id="shift-type-label" className="text-sm font-medium">Vardiya türü</p>
-                    <div role="group" aria-labelledby="shift-type-label" className="flex gap-1">
-                      {([["fixed", "Sabit"], ["flexible", "Esnek"]] as const).map(([value, label]) => (
-                        <Button key={value} type="button" variant={(values.scheduleType ?? "fixed") === value ? "secondary" : "ghost"}
-                          aria-pressed={(values.scheduleType ?? "fixed") === value}
-                          onClick={() => { setValues({ ...values, scheduleType: value }); setErrors({}); }}>{label}</Button>
-                      ))}
-                    </div>
-                  </div>
-                  {values.scheduleType === "flexible" && errors.flexible && (
-                    <p role="alert" className="text-sm text-danger">{errors.flexible}</p>
-                  )}
-                  <FormSection title="Çalışma saatleri">
-                    {values.scheduleType === "flexible" ? (
-                      <FlexibleHoursFields value={values.flexible ?? DEFAULT_FLEXIBLE} errors={errors}
-                        onChange={flexible => setValues({ ...values, flexible })} />
-                    ) : <>
-                      <div className="grid grid-cols-2 gap-3">
-                        {textFields(["startTime", "endTime"])}
-                      </div>
-                      {values.endTime &&
-                        values.startTime &&
-                        values.endTime < values.startTime && (
-                          <p className="text-xs text-muted-foreground">
-                            Bitiş ertesi gün (+1 gün).
-                          </p>
-                        )}
-                      {duration && duration.net > 0 && (
-                        <p role="status" className="text-sm text-muted-foreground tabular-nums">
-                          {breakEnabled ? `Planlanan net çalışma ${duration.net} dk` : `Vardiya süresi ${duration.gross} dk`}
-                          <span className="block text-xs">
-                            {breakEnabled ? "Saat aralığından tanımlı mola çıkarılarak hesaplanır." : "Mola kesintisi uygulanmadan önceki süre."}
-                          </span>
-                        </p>
-                      )}
-                    </>}
-                  </FormSection>
-                  <FormSection title="Mola">
-                    {values.scheduleType === "flexible" ? (
-                      <FlexibleBreakFields value={values.flexible ?? DEFAULT_FLEXIBLE} errors={errors}
-                        onChange={flexible => setValues({ ...values, flexible })} />
-                    ) : <>
-                      <div className="flex flex-wrap items-center justify-between gap-x-3">
-                        <label className="flex gap-2 items-center text-sm">
-                          <input
-                            type="checkbox" className="size-6 shrink-0 accent-primary"
-                            checked={breakEnabled}
-                            onChange={(e) => setBreakEnabled(e.target.checked)}
-                          />
-                          Mola tanımla
-                        </label>
-                      </div>
-                      {breakEnabled && (
-                        <div className="grid grid-cols-2 gap-3">
-                          {textFields(["breakStart", "breakEnd"])}
-                        </div>
-                      )}
-                    </>}
-                  </FormSection>
+                <section aria-label="Çalışma kuralları" className="min-w-0 space-y-4 [&>details:first-of-type]:border-t-0 [&>details:first-of-type]:pt-0 border-t pt-4 md:border-l md:border-t-0 md:pl-6 md:pt-0">
                   <FormSection title="Kayıt kabul aralığı" collapsible
                     hasError={values.scheduleType === "flexible"
                       ? Boolean(errors.flexible || ["checkInStart", "checkInEnd", "checkOutStart", "checkOutEnd", "checkOutEndDayOffset", "maxSpanMinutes"].some(key => errors[`flexible.${key}`]))
@@ -480,20 +478,10 @@ function FlexibleRecordFields({ value, errors, onChange }: FlexibleFieldProps) {
 }
 
 function FlexibleBreakFields({ value, errors, onChange }: FlexibleFieldProps) {
-  return <div className="space-y-3">
-    <FormFieldWrapper htmlFor="flex-breakMode" label="Mola hesabı" error={errors["flexible.breakMode"]}>
-      <NativeSelect id="flex-breakMode" value={value.breakMode}
-        onChange={event => onChange({ ...value, breakMode: event.target.value === "duration" ? "duration" : "existingLegal" })}>
-        <option value="duration">Belirli bir süre düş</option><option value="existingLegal">Genel otomatik mola kuralını kullan</option>
-      </NativeSelect>
-    </FormFieldWrapper>
-    {value.breakMode === "duration" && (
-      <FormFieldWrapper htmlFor="flex-breakMinutes" label="Mola süresi (dk)" error={errors["flexible.breakMinutes"]}>
-        <Input id="flex-breakMinutes" type="number" min={0} max={1439} step={1} value={value.breakMinutes ?? ""}
-          onChange={event => onChange({ ...value, breakMinutes: event.target.value === "" ? undefined : Number(event.target.value) })} />
-      </FormFieldWrapper>
-    )}
-  </div>;
+  return <FormFieldWrapper htmlFor="flex-breakMinutes" label="Mola süresi (dk)" error={errors["flexible.breakMinutes"]}>
+    <Input id="flex-breakMinutes" type="number" min={0} max={1439} step={1} value={value.breakMinutes ?? ""}
+      onChange={event => onChange({ ...value, breakMinutes: event.target.value === "" ? undefined : Number(event.target.value) })} />
+  </FormFieldWrapper>;
 }
 
 function withoutCosmetic(values: ShiftFormValues, breakEnabled: boolean) {

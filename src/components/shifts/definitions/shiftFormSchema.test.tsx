@@ -61,7 +61,7 @@ it("rules hydrate in their named sections and blank fields clear through null", 
   expect(shiftPayloadSchema.parse({ ...fixed, ...rules })).toMatchObject(rules);
   expect(shiftPayloadSchema.parse(fixed)).toMatchObject({ validWindow: null, absentAfterLateMinutes: null, minWorkMinutes: null, missingCheckInLateMinutes: null, holidayWorkRequired: null });
   const html = render({ ...fixed, ...rules, _id: "shift" as Id<"shifts"> });
-  for (const section of ["Çalışma saatleri", "Mola", "Kayıt kabul aralığı", "Geç giriş ve erken çıkış", "Fazla mesai", "Devamsızlık", "Resmi tatiller"]) {
+  for (const section of ["Vardiya türü", "Mola", "Kayıt kabul aralığı", "Geç giriş ve erken çıkış", "Fazla mesai", "Devamsızlık", "Resmi tatiller"]) {
     expect(html).toContain(section);
   }
   expect(html).not.toContain("Gelişmiş");

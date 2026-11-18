@@ -11,7 +11,7 @@ export const flexibleFormSchema = z.object({
   checkInStart: flexibleTimeSchema, checkInEnd: flexibleTimeSchema, checkOutStart: flexibleTimeSchema, checkOutEnd: flexibleTimeSchema,
   checkOutEndDayOffset: z.union([z.literal(0), z.literal(1)]),
   maxSpanMinutes: z.number({ message: "Azami oturum dakika olmalıdır" }).int("Azami oturum 1–1440 arasında tam sayı dakika olmalıdır").min(1, "Azami oturum 1–1440 arasında tam sayı dakika olmalıdır").max(1440, "Azami oturum 1–1440 arasında tam sayı dakika olmalıdır"),
-  breakMode: z.enum(["duration", "existingLegal"]),
+  breakMode: z.literal("duration"),
   breakMinutes: z.number({ message: "Mola süresi dakika olmalıdır" }).optional(),
 });
 

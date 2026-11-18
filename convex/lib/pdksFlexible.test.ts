@@ -150,11 +150,10 @@ describe("esnek eşleme, mola ve mesai", () => {
     const preceding = { date: "2026-05-30", totalMinutes: 2700, overtimeSegments: [{ netMinutes: 2700, dailyOvertimeMinutes: 0, eligible: false, classification: "workday" as const, multiplier: 1.5 }] };
     expect(calculatePeriodOvertime([preceding, day], { startDate: date, endDate: "2026-06-01", overtimeBasis: "weekly45" }).overtimeMinutes).toBe(160);
   });
-  it("gece/tatil segmentlerinde süre molasını oranlar; existingLegal ve yarım tatil desteklenir", () => {
+  it("gece/tatil segmentlerinde süre molasını oranlar; yarım tatil desteklenir", () => {
     const day = run([reading("21:00", "entry"), reading("07:01", "exit", addWorkDate(date, 1))], { shift: shift({ flexible: { ...DEFAULT_FLEXIBLE, breakMinutes: 61 } }), overtimeRates: { ...rates, nightShiftDayMode: "splitAtMidnight" } });
     expect(day.breakMinutes + day.totalMinutes).toBe(601);
     expect(day.overtimeSegments.reduce((sum, s) => sum + s.netMinutes, 0)).toBe(day.totalMinutes);
-    expect(run([reading("09:00", "entry"), reading("13:00", "exit")], { shift: shift({ flexible: { ...DEFAULT_FLEXIBLE, breakMode: "existingLegal" } }) })).toMatchObject({ totalMinutes: 225, breakMinutes: 15 });
     expect(run([], { holiday: { isHalfDay: true } as Doc<"holidays"> }).requiredNetMinutes).toBe(240);
   });
   it("legacy kurala da ortak kanıt çözümleyicisini uygular", () => {
@@ -169,7 +168,7 @@ describe("doğrulama ve atama", () => {
     { breakMinutes: -1 }, { breakMinutes: 960 }, { breakMinutes: 2.5 }, { breakMinutes: undefined },
     { checkInStart: "22:00", checkInEnd: "05:00" }, { checkInEnd: "24:00" },
     { checkOutEndDayOffset: 2 }, { checkOutEndDayOffset: 0, checkOutEnd: "23:59" },
-    { requiredNetMinutes: 950 }, { breakMode: "existingLegal", requiredNetMinutes: 950 },
+    { requiredNetMinutes: 950 }, { breakMode: "existingLegal" },
   ])("geçersiz tanımı reddeder: %j", patch => {
     expect(() => validateFlexible({ ...DEFAULT_FLEXIBLE, ...patch } as FlexibleSchedule)).toThrow();
   });

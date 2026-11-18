@@ -20,7 +20,7 @@ export function ShiftScheduleField({ value, onChange, error, editing }: {
     setLengthDraft(null);
     onChange({ scheduleMode, dayPlan: scheduleMode === "weekly" ? [...DEFAULT_WEEKLY_PLAN] : scheduleMode === "cycle" ? [...DEFAULT_CYCLE_PLAN] : [] });
   };
-  return <section aria-label="Vardiya deseni" className="space-y-2 rounded-lg border p-3">
+  return <section aria-label="Vardiya deseni" className="space-y-2">
     <h3 className="text-sm font-medium">Desen</h3>
     <div className="flex flex-wrap items-center gap-2">
       <div role="group" aria-label="Desen" className="flex flex-wrap gap-1">

@@ -1,5 +1,4 @@
 import type { Doc } from "../_generated/dataModel";
-import { legalBreakMinutes } from "./breakDeduction";
 
 export type FlexibleSchedule = NonNullable<Doc<"shifts">["flexible"]>;
 export type ShiftSchedule = Pick<Doc<"shifts">, "startTime" | "endTime" | "scheduleType" | "flexible">;
@@ -17,7 +16,7 @@ export function clockMinute(time: string): number {
   return hour * 60 + minute;
 }
 export function flexibleBreak(schedule: FlexibleSchedule, gross: number) {
-  return Math.min(gross, schedule.breakMode === "duration" ? schedule.breakMinutes ?? 0 : legalBreakMinutes(gross));
+  return Math.min(gross, schedule.breakMinutes ?? 0);
 }
 export function flexibleExitEnd(schedule: FlexibleSchedule) {
   return clockMinute(schedule.checkOutEnd) + 1440 * schedule.checkOutEndDayOffset;
@@ -28,18 +27,18 @@ export function flexibleSessionEnd(schedule: FlexibleSchedule) {
 }
 export function validateFlexible(schedule: FlexibleSchedule | undefined) {
   if (!schedule) throw new Error("Esnek vardiya bilgileri gereklidir");
-  const { requiredNetMinutes: target, maxSpanMinutes: span, breakMinutes: pause, breakMode } = schedule;
+  const { requiredNetMinutes: target, maxSpanMinutes: span, breakMinutes: pause } = schedule;
   if (!Number.isInteger(target) || target <= 0) throw new Error("Hedef süre pozitif tam sayı dakika olmalıdır");
   if (!Number.isInteger(span) || span <= 0 || span > 1440) throw new Error("Azami oturum 1–1440 arasında tam sayı dakika olmalıdır");
-  if (breakMode !== "duration" && breakMode !== "existingLegal") throw new Error("Geçerli mola modu seçin");
-  if (breakMode === "duration" && pause === undefined) throw new Error("Mola süresi gereklidir");
+  if (schedule.breakMode !== "duration") throw new Error("Geçerli mola modu seçin");
+  if (pause === undefined) throw new Error("Mola süresi gereklidir");
   if (pause !== undefined && (!Number.isInteger(pause) || pause < 0 || pause >= span)) throw new Error("Mola 0 ile azami oturum arasında tam sayı dakika olmalıdır");
   if (schedule.checkOutEndDayOffset !== 0 && schedule.checkOutEndDayOffset !== 1) throw new Error("Çıkış gün farkı 0 veya 1 olmalıdır");
   const start = clockMinute(schedule.checkInStart), end = clockMinute(schedule.checkInEnd);
   const exitStart = clockMinute(schedule.checkOutStart), exitEnd = flexibleExitEnd(schedule);
   if (start > end) throw new Error("Giriş penceresi aynı gün içinde olmalıdır; başlangıç bitişten sonra olamaz");
   if (exitStart > exitEnd) throw new Error("Çıkış penceresi başlangıcı bitişten sonra olamaz");
-  // Search is bounded by one day and also handles legal-break threshold jumps.
+  // Search is bounded by one day.
   for (let entry = start; entry <= end; entry++) {
     let reachable = false;
     for (let gross = Math.max(1, exitStart - entry); gross <= Math.min(span, exitEnd - entry); gross++) {

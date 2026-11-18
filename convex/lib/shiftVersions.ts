@@ -20,7 +20,7 @@ export const shiftRuleFields = {
     requiredNetMinutes: v.number(),
     ...windowFields,
     maxSpanMinutes: v.number(),
-    breakMode: v.union(v.literal("duration"), v.literal("existingLegal")),
+    breakMode: v.literal("duration"),
     breakMinutes: v.optional(v.number()),
   })),
   validWindow: v.optional(v.object(windowFields)),

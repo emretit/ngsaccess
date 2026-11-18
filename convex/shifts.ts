@@ -495,7 +495,7 @@ const scheduleArgs = {
     requiredNetMinutes: v.number(), checkInStart: v.string(), checkInEnd: v.string(),
     checkOutStart: v.string(), checkOutEnd: v.string(),
     checkOutEndDayOffset: v.union(v.literal(0), v.literal(1)), maxSpanMinutes: v.number(),
-    breakMode: v.union(v.literal("duration"), v.literal("existingLegal")), breakMinutes: v.optional(v.number()),
+    breakMode: v.literal("duration"), breakMinutes: v.optional(v.number()),
   })),
 };
 
