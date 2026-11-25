@@ -1,0 +1,24 @@
+# P1-4 talep-eki planı
+
+- Mevcut: `convex/leaveRequests.ts:22` ve `convex/attendanceCorrections.ts:16` ek kabul etmiyor.
+- Geri çekme: `convex/leaveRequests.ts:42` izin satırını siler; `convex/attendanceCorrections.ts:40` withdrawn yapar.
+- Mobil: `mobile/lib/screens/requests/requests_screen.dart:410` / `mobile/lib/repositories/request_repository.dart:49` yalnız metin gönderir.
+- Web: `src/components/leaves/LeaveRequestsPanel.tsx:34`, `src/components/pdks/CorrectionRequestsPanel.tsx:37` belge göstermiyor.
+- `mobile/pubspec.yaml:9` dosya seçici bağımlılığı içermiyor (ownership dışı onay gerekli).
+- Şema: requestAttachments + requestAttachmentTickets; belge sahipliği/metadata/talep bağlantısı, hash'li tek kullanımlık biletler ve indeksler.
+- Upload: employee oturumuyla generateUploadUrl; dosya tamamlanınca storage metadata MIME/boyut doğrulaması, en fazla 3 dosya ve dosya başına 5 MiB.
+- Talep oluşturma ekleri aynı transaction içinde sahiplik/proje kontrolüyle talebe bağlar; başarısız/terkedilmiş yüklemeler zaman aşımıyla temizlenir.
+- Okuma: talep sahibi veya aynı projede attendance.approve yetkisi; başka çalışan/proje, taşınmış çalışan ve yetkisiz yönetici kapalı.
+- KVKK kararı gerekli: Convex getUrl süreli değildir; HTTP action ile yetki kontrolü sonrası bytes servis edilmeli, ham storage URL istemciye verilmemeli.
+- Kaynak: https://docs.convex.dev/file-storage/overview (getUrl bearer URL, yalnız dosya silinerek iptal edilir).
+- Öneri: convex/http.ts sahipliğine yalnız /request-attachments indirme route ekleme izni; private/no-store yanıt ve kısa süreli indirme bileti.
+- Değişecek: convex/schema.ts, convex/_generated/api.d.ts, convex/leaveRequests.ts, convex/attendanceCorrections.ts, yeni convex/requestAttachments.ts ve ilgili testler.
+- Değişecek: iki web paneli ve ilgili testleri; mobile/lib içindeki request ekran/repository/provider/model ve ilgili testler.
+- İstenen ek sahiplik: mobile/pubspec.yaml, mobile/pubspec.lock (dosya seçici), convex/http.ts (özel route).
+- Şema/onay kararı gelene kadar uygulama başlamaz; AGENTS görevlendirmesindeki 1. adım gereği koordinatöre sorulur.
+- Test: dosya sayı/boyut/MIME sınırları; çapraz çalışan/proje IDOR; yönetici permission/scope; talep bağlama/yinelenen ek reddi; withdraw sonrası storage temizliği; süre dolmuş bilet.
+- Test: web ek görüntüle/indir ve boş tabloda başlık; mobil seçme/çıkarma, yükleme hatası ve session değişiminde veri temizliği.
+- Kapılar: tsc app 0, eslint değişen dosyalar 0 error, ilgili vitest yeşil, find-node-leak temiz, flutter analyze 0 error ve ilgili flutter test yeşil.
+- Koordinatör kararı: app tsc merkezî koşuya devredildi; worker tam tsc başlatmaz.
+- Ek onay: macOS otomatik GeneratedPluginRegistrant.swift; screenshot harness yalnız talep imzalarıyla güncellendi.
+- Ek onay: convex/files.ts yalnız claimUpload/getUploadUrl/saveUserPhoto içinde talep belgelerini by_storageId ile reddeder; ilgili regression testi eklenir.
