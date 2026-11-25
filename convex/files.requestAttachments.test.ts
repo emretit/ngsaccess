@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { MutationCtx } from "./_generated/server";
+import type { ActionCtx, MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { claimUpload, getUploadUrl, saveUserPhoto } from "./files";
+import { claimUpload, getUploadUrl, saveUserPhoto, upload } from "./files";
 
-vi.mock("./lib/customFunctions", () => ({ authedMutation: (definition: { handler: unknown }) => ({ _handler: definition.handler }) }));
+vi.mock("./lib/customFunctions", () => ({ authedAction: (definition: { handler: unknown }) => ({ _handler: definition.handler }), authedMutation: (definition: { handler: unknown }) => ({ _handler: definition.handler }) }));
 type Ctx = MutationCtx & { user: Doc<"users"> };
 const handler = (fn: unknown) => (fn as { _handler: (ctx: Ctx, args: { storageId: string }) => Promise<unknown> })._handler;
 function fixture(attachment: boolean, pending = true) {
@@ -16,7 +16,7 @@ function fixture(attachment: boolean, pending = true) {
     const chain = { withIndex: () => chain, first: async () => value, unique: async () => value };
     return chain;
   };
-  const ctx = { user: { _id: "user-1" }, db: { query, insert, patch, delete: remove, system: { get: async () => ({ _id: storageId }) } }, storage: { getUrl } } as unknown as Ctx;
+  const ctx = { user: { _id: "user-1" }, db: { query, insert, patch, delete: remove, system: { get: async () => ({ _id: storageId, contentType: "image/jpeg" }) } }, storage: { getUrl } } as unknown as Ctx;
   return { ctx, storageId, getUrl, insert, patch, remove };
 }
 describe("request documents cannot escape through the general file API", () => {
@@ -29,13 +29,24 @@ describe("request documents cannot escape through the general file API", () => {
     expect(f.remove).not.toHaveBeenCalled();
   });
   it("continues to claim ordinary uploads and return/save the owner's photo URL", async () => {
-    const upload = fixture(false, false);
+    const upload = fixture(false);
     await handler(claimUpload)(upload.ctx, { storageId: upload.storageId });
-    expect(upload.insert).toHaveBeenCalledWith("pendingUploads", expect.objectContaining({ storageId: upload.storageId, userId: "user-1" }));
+    expect(upload.insert).not.toHaveBeenCalled();
     const photo = fixture(false);
     expect(await handler(getUploadUrl)(photo.ctx, { storageId: photo.storageId })).toBe("https://storage.example/photo");
     expect(await handler(saveUserPhoto)(photo.ctx, { storageId: photo.storageId })).toBe("https://storage.example/photo");
     expect(photo.patch).toHaveBeenCalledWith("user-1", expect.objectContaining({ photoUrl: "https://storage.example/photo" }));
     expect(photo.remove).toHaveBeenCalledWith("pending-1");
   });
+});
+
+it("removes the newly stored blob when ownership registration fails", async () => {
+  const store = vi.fn(async () => "new-storage");
+  const remove = vi.fn();
+  const runMutation = vi.fn().mockRejectedValue(new Error("registration failed"));
+  const ctx = { storage: { store, delete: remove }, runMutation } as unknown as ActionCtx;
+  const run = (upload as unknown as { _handler: (ctx: ActionCtx, args: { bytes: ArrayBuffer; mimeType: string }) => Promise<unknown> })._handler;
+  await expect(run(ctx, { bytes: new Uint8Array([0xff, 0xd8, 0xff]).buffer, mimeType: "image/jpeg" })).rejects.toThrow("registration failed");
+  expect(runMutation).toHaveBeenCalledOnce();
+  expect(remove).toHaveBeenCalledWith("new-storage");
 });

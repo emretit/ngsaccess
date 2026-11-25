@@ -1500,6 +1500,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_storage", ["storageId"])
+    .index("by_user", ["userId", "createdAt"])
     .index("by_created", ["createdAt"]),
 
   reportScheduleSettings: defineTable({

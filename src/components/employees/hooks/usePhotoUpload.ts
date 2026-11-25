@@ -1,14 +1,13 @@
 import { errorMessage } from "@/lib/notify";
 import { useRef, useState } from "react";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 export function usePhotoUpload() {
   const [error, setError] = useState<string>();
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const claimUpload = useMutation(api.files.claimUpload);
+  const uploadFile = useAction(api.files.upload);
   const getUploadUrl = useMutation(api.files.getUploadUrl);
   const preview = useRef<string | null>(null);
   const upload = useAsyncAction(
@@ -29,26 +28,9 @@ export function usePhotoUpload() {
       preview.current = URL.createObjectURL(file);
       onPreviewChange(preview.current);
       try {
-        const uploadUrl = await generateUploadUrl();
-        const result = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-        if (!result.ok) throw new Error("Dosya sunucuya yüklenemedi");
-        const payload: unknown = await result.json();
-        if (
-          typeof payload !== "object" ||
-          payload === null ||
-          !("storageId" in payload) ||
-          typeof payload.storageId !== "string"
-        )
-          throw new Error("Dosya sunucusu geçersiz yanıt verdi");
-        await claimUpload({ storageId: payload.storageId as Id<"_storage"> });
-        const url = await getUploadUrl({
-          storageId: payload.storageId as Id<"_storage">,
-        });
-        onPhotoChange(url, payload.storageId as Id<"_storage">);
+        const storageId = await uploadFile({ bytes: await file.arrayBuffer(), mimeType: file.type });
+        const url = await getUploadUrl({ storageId });
+        onPhotoChange(url, storageId);
         onPreviewChange(url);
       } catch (error: unknown) {
         setError(errorMessage(error));

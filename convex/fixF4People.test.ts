@@ -36,7 +36,9 @@ describe("K-05 profile photo lifecycle", () => {
   it("deletes the replaced file and retains the newly claimed file", async () => {
     const f = await fixture();
     const storageId = await f.t.run(async ctx => {
-      const id = await ctx.storage.store(new Blob(["new-photo"]));
+      const id = await ctx.storage.store(new Blob(["new-photo"], { type: "image/jpeg" }));
+      // convex-test storeBlob omits the real storage contentType metadata.
+      await Reflect.apply(ctx.db.patch, ctx.db, [id, { contentType: "image/jpeg" }]);
       await ctx.db.insert("pendingUploads", { storageId: id, userId: f.userId, createdAt: Date.now() });
       return id;
     });
@@ -62,7 +64,8 @@ describe("K-05 profile photo lifecycle", () => {
     if (mode === "update") await f.caller.mutation(api.employees.update, { employeeId: f.employeeId, photoStorageId: null });
     else if (mode === "replace") {
       const storageId = await f.t.run(async ctx => {
-        const id = await ctx.storage.store(new Blob(["replacement"]));
+        const id = await ctx.storage.store(new Blob(["replacement"], { type: "image/jpeg" }));
+        await Reflect.apply(ctx.db.patch, ctx.db, [id, { contentType: "image/jpeg" }]);
         await ctx.db.insert("pendingUploads", { storageId: id, userId: f.userId, createdAt: Date.now() });
         return id;
       });

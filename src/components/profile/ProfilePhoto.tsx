@@ -3,9 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { notify } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Id } from "../../../convex/_generated/dataModel";
 import { Loader2, Camera } from "lucide-react";
 
 interface ProfilePhotoProps {
@@ -22,16 +21,11 @@ export default function ProfilePhoto({
 }: ProfilePhotoProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const claimUpload = useMutation(api.files.claimUpload);
+  const uploadFile = useAction(api.files.upload);
   const saveUserPhoto = useMutation(api.files.saveUserPhoto);
 
   const { run: upload, pending: isLoading } = useAsyncAction(async (file: File) => {
-    const uploadUrl = await generateUploadUrl();
-    const result = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": file.type }, body: file });
-    if (!result.ok) throw new Error("Dosya yüklenemedi");
-    const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
-    await claimUpload({ storageId });
+    const storageId = await uploadFile({ bytes: await file.arrayBuffer(), mimeType: file.type });
     const publicUrl = await saveUserPhoto({ storageId });
     onPhotoUpdated(publicUrl);
   }, { success: "Fotoğraf güncellendi", error: "Fotoğraf yüklenemedi" });

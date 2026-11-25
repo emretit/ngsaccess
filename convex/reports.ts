@@ -1,3 +1,4 @@
+import { cardKey } from "./lib/employeeUx";
 import { canSeePayInProject, maskPay } from "./lib/payVisibility";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
@@ -41,7 +42,7 @@ export const getSgkMonthlyReport = authedQuery({
     );
 
     const employeesById = new Map(ruleReport.employees.map(employee => [employee._id, employee]));
-    const employeesByCard = new Map(ruleReport.employees.map(employee => [`${employee.projectId}:${employee.cardNumber}`, employee]));
+    const employeesByCard = new Map(ruleReport.employees.filter(employee => cardKey(employee.cardNumber)).map(employee => [`${employee.projectId}:${employee.cardNumber}`, employee]));
     const employeeMap = new Map<string, typeof readings>();
     for (const r of readings) {
       const employee = r.employeeId ? employeesById.get(r.employeeId) : employeesByCard.get(`${r.projectId}:${r.cardNo}`);
