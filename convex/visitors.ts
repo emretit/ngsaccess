@@ -29,9 +29,11 @@ import { writeAudit } from "./lib/audit";
 import { cardConflictMessage, cardNumericKey } from "./lib/cardIdentity";
 import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
 import { resolveVisitorDoorRule } from "./lib/visitorDoorRule";
+import { generateVisitorCard } from "./lib/visitorPass";
 
 /** Freeze the old credential and targets before checkout, release or badge reuse. */
-async function scheduleVisitorCardRemoval(ctx: MutationCtx, visitor: Doc<"employees">) {
+export async function scheduleVisitorCardRemoval(ctx: MutationCtx, visitor: Doc<"employees">) {
+  if (visitor.visitorCredential === "pass") return;
   const snapshot = await snapshotEmployeeHikDevices(ctx, visitor);
   const deviceIds = await resolveEmployeeIdeDeviceIds(ctx, visitor._id, visitor.projectId);
   if (snapshot.devices.length) await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
@@ -182,6 +184,7 @@ async function visitorListRow(ctx: QueryCtx, visitor: Doc<"employees">, now: num
   ]);
   return {
     _id: visitor._id,
+    visitorCredential: visitor.visitorCredential ?? "card",
     firstName: visitor.firstName,
     lastName: visitor.lastName,
     company: visitor.visitorCompany ?? null,
@@ -353,7 +356,8 @@ export const create = authedMutation({
     firstName: v.string(),
     lastName: v.string(),
     email: v.optional(v.string()),
-    cardNumber: v.string(),
+    cardNumber: v.optional(v.string()),
+    credential: v.optional(v.union(v.literal("card"), v.literal("pass"))),
     // Web formu kapı seçer (doorIds); presetRuleId mevcut ziyaretçi kuralı için geriye uyumlu.
     presetRuleId: v.optional(v.id("accessRules")),
     doorIds: v.optional(v.array(v.id("doors"))),
@@ -369,6 +373,7 @@ export const create = authedMutation({
     kvkkDocumentVersion: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    if (args.credential === "pass" && !args.projectId) throw new Error("Geçiş kodlu ziyaretçi için proje seçin");
     await requirePermission(ctx, ctx.user, args.projectId, "visitors.manage");
     await resolveProjectScope(ctx, args.projectId);
     if ((args.doorIds === undefined) === (args.presetRuleId === undefined)) throw new Error("Ziyaretçinin geçeceği kapıları seçin");
@@ -376,10 +381,10 @@ export const create = authedMutation({
     await validateVisitorAccessRelations(ctx, args.projectId, ruleId, args.hostEmployeeId);
     const inAllowed = (projectId: Id<"projects"> | undefined) => projectId === args.projectId;
 
-    const validationError = visitorDetailsError(args, Date.now(), false) ?? visitorExpiryValidation(args.accessExpiresAt)
+    const cardNumber = args.credential === "pass" ? await generateVisitorCard(ctx) : args.cardNumber?.trim() ?? "";
+    const validationError = visitorDetailsError({ ...args, cardNumber }, Date.now(), false) ?? visitorExpiryValidation(args.accessExpiresAt)
       ?? visitorAccessRangeError(args.accessStartsAt ?? new Date().toISOString(), args.accessExpiresAt);
     if (validationError) throw new Error(validationError);
-    const cardNumber = args.cardNumber.trim();
     if (!cardNumber) throw new Error("Kart numarası zorunludur");
     await validateVisitorPresetCard(ctx, args.projectId, ruleId, cardNumber);
     const dupCard = await findDuplicateEmployee(ctx, "cardNumber", cardNumber);
@@ -425,6 +430,7 @@ export const create = authedMutation({
       accessRuleId: ruleId,
       isActive,
       isVisitor: true,
+      visitorCredential: args.credential ?? "card",
       visitorStatus: isActive ? "checkedIn" : "preRegistered",
       accessExpiresAt: new Date(visitorTime(args.accessExpiresAt)).toISOString(),
       accessStartsAt: args.accessStartsAt ?? now,
@@ -441,14 +447,10 @@ export const create = authedMutation({
     if (args.kvkkConsent) {
       await grantKvkkConsent(ctx, ctx.user, id, args.projectId, args.kvkkDocumentVersion);
     }
-    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
-      employeeId: id,
-    });
-    await ctx.scheduler.runAfter(
-      0,
-      internal.actions.ideGatewayDevice.syncEmployeeToIdePanels,
-      { employeeId: id },
-    );
+    if (args.credential !== "pass") {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: id });
+      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId: id });
+    }
     return id;
   },
   returns: v.id("employees"),
@@ -528,7 +530,8 @@ export const update = authedMutation({
     const activeChanged = args.isActive !== undefined && args.isActive !== visitor.isActive;
     const expiryChanged = args.accessExpiresAt !== undefined && args.accessExpiresAt !== visitor.accessExpiresAt;
     const deactivating = activeChanged && args.isActive === false;
-    const needsDeviceSync = cardChanged || activeChanged || (expiryChanged && effective.isActive !== false);
+    const physicalCredential = visitor.visitorCredential !== "pass";
+    const needsDeviceSync = physicalCredential && (cardChanged || activeChanged || (expiryChanged && effective.isActive !== false));
 
     // IDE panellerini patch'ten ÖNCE çöz (capture-before-mutation): kart değişiminde ESKİ
     // kartı, deaktivasyonda paneldeki kartı FİZİKSEL sökmek için kullanılır. Deaktivasyonda
@@ -537,10 +540,10 @@ export const update = authedMutation({
     // kaldığından remaining panel listesi boşalmaz (orphan üretmez) ve helper'ın trailing
     // syncEmployeeToIdePanels'ı kartı status=0 ile geri yazardı.
     let ideRemovalPanels: Id<"devices">[] = [];
-    if (cardChanged || deactivating) {
+    if (physicalCredential && (cardChanged || deactivating)) {
       ideRemovalPanels = await resolveEmployeeIdeDeviceIds(ctx, args.visitorId, visitor.projectId);
     }
-    const previousHikSnapshot = cardChanged || deactivating ? await snapshotEmployeeHikDevices(ctx, visitor) : undefined;
+    const previousHikSnapshot = physicalCredential && (cardChanged || deactivating) ? await snapshotEmployeeHikDevices(ctx, visitor) : undefined;
 
     const now = new Date().toISOString();
     const patch: Record<string, unknown> = { updatedAt: now };

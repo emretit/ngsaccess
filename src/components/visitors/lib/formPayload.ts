@@ -18,7 +18,7 @@ export function visitorFormPayload(formData: VisitorFormData, visitor?: VisitorD
       visitorId: visitor._id, projectId: formData.projectId, ...shared,
       ...(isPreRegistration && parsed.selected_doors.length ? { doorIds: parsed.selected_doors as Id<"doors">[] } : {}),
       ...(parsed.accessExpiresAt !== originalExpiry ? { accessExpiresAt: localInputToIso(parsed.accessExpiresAt) } : {}),
-      cardNumber: parsed.cardNumber || undefined,
+      cardNumber: parsed.credential === "pass" ? undefined : parsed.cardNumber || undefined,
       visitorPhone: formData.visitorPhone.trim() || null,
       visitorCompany: formData.visitorCompany.trim() || null,
       visitPurpose: formData.visitPurpose.trim() || null,
@@ -27,7 +27,8 @@ export function visitorFormPayload(formData: VisitorFormData, visitor?: VisitorD
   }
   return { kind: "create", args: {
     ...shared, projectId: formData.projectId, accessExpiresAt: localInputToIso(parsed.accessExpiresAt),
-    doorIds: parsed.selected_doors as Id<"doors">[], cardNumber: parsed.cardNumber,
+    doorIds: parsed.selected_doors as Id<"doors">[], credential: parsed.credential ?? "card",
+    cardNumber: parsed.credential === "pass" ? undefined : parsed.cardNumber, email: parsed.email?.trim() || undefined,
     visitorPhone: formData.visitorPhone.trim() || undefined,
     visitorCompany: formData.visitorCompany.trim() || undefined,
     visitPurpose: formData.visitPurpose.trim() || undefined,

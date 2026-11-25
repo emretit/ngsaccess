@@ -21,6 +21,11 @@ const MAX_MEMBERS = 500;
 const MAX_OPS = 2000;
 const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** Cloud-only visitor passes never participate in physical device delivery. */
+export function usesPhysicalCredential(employee: { visitorCredential?: "card" | "pass" }): boolean {
+  return employee.visitorCredential !== "pass";
+}
+
 async function updateSummary(ctx: MutationCtx, runId: Id<"deviceSyncRuns">,
   loaded?: { run: Doc<"deviceSyncRuns">; targets: Doc<"deviceSyncRunTargets">[] }) {
   const run = loaded?.run ?? await ctx.db.get(runId);
@@ -155,7 +160,7 @@ async function readRuleDispatch(ctx: QueryCtx, args: {
   const employees = await Promise.all(members.map(m => ctx.db.get(m.employeeId)));
   if (employees.some(e => e !== null && e.projectId !== args.projectId)) throw new ConvexError("Kural başka projeye ait kişi içeriyor; gönderim durduruldu");
   return { deviceIds, employeeIds: [...new Set(employees.filter((e): e is NonNullable<typeof e> => e !== null)
-    .filter(e => e.projectId === args.projectId && e.isActive === true).map(e => e._id))] };
+    .filter(e => e.projectId === args.projectId && e.isActive === true && usesPhysicalCredential(e)).map(e => e._id))] };
 }
 
 /** Fail explicitly before calling the legacy graph readers if a rule exceeds the bound. */
@@ -584,6 +589,7 @@ export const executeRuleDiffTarget = internalAction({
         try {
           const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId });
           if (!data || data.employee.projectId !== run.projectId) throw new ConvexError("Çalışan bulunamadı veya proje değişti");
+          if (!usesPhysicalCredential(data.employee)) continue;
           const hasAccess = data.deviceRules.some(dr => dr.device._id === device._id);
           if (hasAccess && (device.brand !== "hikvision" || data.employee.isActive !== false)) {
             worked = true;
@@ -651,6 +657,7 @@ export async function createGrantRun(ctx: MutationCtx, args: {
   for (const pair of args.pairs) {
     const [employee, device] = await Promise.all([ctx.db.get(pair.employeeId), ctx.db.get(pair.deviceId)]);
     if ((employee && employee.projectId !== args.projectId) || !device || device.projectId !== args.projectId) throw new ConvexError("Kişi ve cihaz aynı projede olmalı");
+    if (employee && !usesPhysicalCredential(employee)) continue;
     if (!employee && (device.brand !== "hikvision" || !(await pendingPersonDeletions(ctx, { ...pair, projectId: args.projectId })).length)) throw new ConvexError("Silinmiş kişi için kayıtlı cihaz silme işi bulunamadı");
     const entry = byDevice.get(device._id) ?? { device, employeeIds: new Set<Id<"employees">>() };
     entry.employeeIds.add(pair.employeeId); byDevice.set(device._id, entry);
@@ -681,6 +688,7 @@ export const executeGrantTarget = internalAction({
         if (Date.now() - run.startedAt >= RUN_TIMEOUT_MS) throw new ConvexError("Gönderim zaman sınırı aşıldı");
         const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId });
         if (data && data.employee.projectId !== run.projectId) throw new ConvexError("Çalışanın projesi değişti");
+        if (data && !usesPhysicalCredential(data.employee)) continue;
         const deletions = device.brand === "hikvision" ? await ctx.runQuery(internal.hikvisionSync.getPendingPersonDeletions, { projectId: run.projectId, employeeId, deviceId: device._id }) : [];
         if (!data && !deletions.length) throw new ConvexError("Silinmiş kişi için silme işi bulunamadı");
         for (const cardNumber of new Set(deletions.map(op => op.cardNumber))) {

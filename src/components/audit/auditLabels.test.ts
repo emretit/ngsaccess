@@ -46,6 +46,8 @@ describe("denetim değişiklik ayrıntısı", () => {
     expect(auditChanges("a", "b")[0]?.field).toBe("Değer");
   });
   it("tabloya özel Türkçe etiketleri ve bilinmeyen ham alanı gösterir", () => {
+    expect(auditFieldLabel("visitorPasses", "maxUses")).toBe("Geçiş limiti");
+    expect(auditFieldLabel("visitorPasses", "usedCount")).toBe("Kullanılan giriş");
     expect(auditFieldLabel("holidays", "name")).toBe("Tatil adı");
     expect(auditFieldLabel("employees", "name")).toBe("Ad");
     expect(auditFieldLabel("employees", "cascade.faces")).toBe(

@@ -8,7 +8,7 @@ import { getCurrentUser } from "./lib/auth";
 import { requirePermission } from "./lib/permissions";
 import { resolveProjectScope } from "./lib/projectScope";
 import { bounded, departmentGrantCandidates, grantEmployees, employeeGrantGraph, grantRuleScope, grantStale, grantState, upsertGrantStatus } from "./lib/grantStatus";
-import { createGrantRun, createRunInTransaction } from "./deviceSyncRuns";
+import { createGrantRun, createRunInTransaction, usesPhysicalCredential } from "./deviceSyncRuns";
 import { deviceConnection } from "./lib/deviceConnection";
 import { employeeWithinAccessEpoch, mobileRuleAllows } from "./lib/mobileAccess";
 
@@ -27,7 +27,7 @@ async function membershipStale(ctx: QueryCtx, row: GrantRow, employee: Doc<"empl
   let current = memberships.get(row.employeeId);
   if (!current) {
     current = (async () => {
-      if (!employee || employee.isActive === false) return [];
+      if (!employee || employee.isActive === false || !usesPhysicalCredential(employee)) return [];
       const links = bounded(await ctx.db.query("groupMembers").withIndex("by_project_employee", q =>
         q.eq("projectId", row.projectId).eq("employeeId", row.employeeId)).take(101), 100);
       const rules = await Promise.all(links.map(async link => ({ rule: await ctx.db.get(link.groupId), createdAt: link.createdAt })));
@@ -94,7 +94,7 @@ async function unknownGrantPairs(ctx: QueryCtx, projectId: Id<"projects">, depar
   if (departmentEmployees) {
     let examinedPairs = 0;
     department: for (const employee of departmentEmployees.values()) {
-      if (employee.isActive === false) continue;
+      if (employee.isActive === false || !usesPhysicalCredential(employee)) continue;
       let graph: Awaited<ReturnType<typeof employeeGrantGraph>>;
       try { graph = await employeeGrantGraph(ctx, employee); } catch (error) {
         if (!(error instanceof ConvexError)) throw error;
@@ -126,7 +126,7 @@ async function unknownGrantPairs(ctx: QueryCtx, projectId: Id<"projects">, depar
     for (const member of members.slice(0, 1000)) {
       if (++examinedMembers > 1000) { capped = true; break outer; }
       const employee = await ctx.db.get(member.employeeId);
-      if (!employee || employee.projectId !== projectId || employee.isActive === false) continue;
+      if (!employee || employee.projectId !== projectId || employee.isActive === false || !usesPhysicalCredential(employee)) continue;
       for (const scope of scopes) {
         const key = `${employee._id}:${scope.device._id}`;
         if (seen.has(key)) { unknown.get(key)?.ruleIds.push(rule._id); continue; }
@@ -255,6 +255,7 @@ export const byEmployee = authedQuery({
     const projectId = employee.projectId;
     await requirePermission(ctx, ctx.user, projectId, "accessRules.manage");
     await resolveProjectScope(ctx, projectId);
+    if (!usesPhysicalCredential(employee)) return { rows: [], unauthorizedDoors: [] };
     const graph = await employeeGrantGraph(ctx, employee);
     const checkedAt = Date.now();
     const currentRules = new Map(await Promise.all([...new Set([...graph.values()].flatMap(scope => scope.ruleIds))].map(async id => [id, await ctx.db.get(id)] as const)));
@@ -307,6 +308,12 @@ export const redistribute = authedMutation({
       remainingFailed = Math.max(0, failed.length - 100);
       remainingCapped = failed.length > 100;
       pairs = failed.slice(0, 100).map(row => ({ employeeId: row.employeeId, deviceId: row.deviceId }));
+    }
+    if (pairs) {
+      pairs = (await Promise.all(pairs.map(async pair => {
+        const employee = await ctx.db.get(pair.employeeId);
+        return employee?.projectId === args.projectId && !usesPhysicalCredential(employee) ? null : pair;
+      }))).filter((pair): pair is NonNullable<typeof pair> => pair !== null);
     }
     const pairCount = pairs ? new Set(pairs.map(pair => `${pair.employeeId}:${pair.deviceId}`)).size : undefined;
     return { pairCount, remainingFailed, remainingCapped, runId: pairs ? await createGrantRun(ctx, { projectId: args.projectId, pairs, startedBy: ctx.user._id }) : await createRunInTransaction(ctx, { projectId: args.projectId }, "devices.manage") };

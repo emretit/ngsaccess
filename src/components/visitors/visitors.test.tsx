@@ -19,6 +19,7 @@ vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ p
 vi.mock("convex/react", () => ({ useQuery: query, useMutation: () => vi.fn() }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project" }) }));
 const row: Visitor = {
+  visitorCredential: "card",
   _id: "visitor" as Id<"employees">, firstName: "İpek", lastName: "Yıldız", company: "Gizli Şirket",
   visitorPhone: null, notes: null, visitPurpose: null,
   cardNumber: "•••• 1234", hostName: "Ev Sahibi", presetRuleName: "Lobi", visitStart: null,

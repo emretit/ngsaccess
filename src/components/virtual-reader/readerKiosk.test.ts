@@ -29,4 +29,17 @@ describe("sanal okuyucu ekranı", () => {
     gate.release(9_500);
     expect(gate.tryAcquire("A", 9_600)).toBe(true);
   });
+
+  it.each(["TOKEN_INVALID", "READER_INACTIVE", "PIN_LOCKED", "NOT_ALLOWED", "NOT_ACTIVE", "NOT_STARTED", "EXPIRED", "REVOKED", "EXHAUSTED"] as const)("ziyaretçi reddini Türkçe açıklar: %s", reason => {
+    const presentation = scanPresentation({ status: "denied", reason });
+    expect(presentation.tone).toBe("error");
+    expect(presentation.title).toBeTruthy();
+    expect(presentation.detail).toBeTruthy();
+    expect(presentation.title).not.toContain(reason);
+  });
+
+  it("kapı açma başarısızsa ziyaretçi adıyla resepsiyona yönlendirir", () => {
+    const result = { status: "granted" as const, employeeName: "Ziyaretçi Ada", direction: "entry" as const, accessTime: "2026-11-25T06:05:00Z", doorOpen: "failed" as const };
+    expect(scanPresentation(result)).toEqual({ tone: "error", title: "Ziyaretçi Ada", detail: "Kapı açılamadı — resepsiyona başvurun" });
+  });
 });

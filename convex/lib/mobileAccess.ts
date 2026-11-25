@@ -6,6 +6,7 @@ import { employmentEnded } from "./employment";
 import { trDateKey } from "./trDate";
 import { isVirtualReader } from "./virtualReader";
 import { isRuleOpenAt } from "./ruleSchedule";
+import { visitorTime } from "./visitorStatus";
 
 const GRAPH_LIMIT = 500;
 export type MobileTransport = "ide_mqtt" | "hik_local_bridge" | "hik_gateway" | "unsupported";
@@ -42,8 +43,9 @@ export function employeeWithinAccessEpoch(employee: Doc<"employees">, now: numbe
   // boşlukta QR/mobil kapı/check-in de kapansın (kart yolu ve mobil oturum aynı kuralı uygular).
   // Ziyaretçiyi erişim penceresi kapatır. Bitiş tarihi yoksa tarih dönüşümü hiç yapılmaz.
   if (employee.employmentEndDate && employmentEnded(employee, trDateKey(new Date(now).toISOString()))) return false;
-  const start = employee.accessStartsAt === undefined ? -Infinity : Date.parse(employee.accessStartsAt);
-  const end = employee.accessExpiresAt === undefined ? Infinity : Date.parse(employee.accessExpiresAt);
+  const parseTime = employee.isVisitor ? visitorTime : Date.parse;
+  const start = employee.accessStartsAt === undefined ? -Infinity : parseTime(employee.accessStartsAt);
+  const end = employee.accessExpiresAt === undefined ? Infinity : parseTime(employee.accessExpiresAt);
   return !Number.isNaN(start) && !Number.isNaN(end) && now >= start && now < end;
 }
 
@@ -209,6 +211,23 @@ export async function mobileOperationOutcome(ctx: QueryCtx, row: Doc<"mobileAcce
   return { status, ...(errorCode ? { errorCode } : {}) };
 }
 
+/** Mirror asynchronous command outcomes onto the granted reading, without changing usage. */
+export async function syncVisitorDoorReading(ctx: MutationCtx, operationId: Id<"mobileAccessOperations">) {
+  const row = await ctx.db.get(operationId);
+  if (!row?.visitorPassId) return;
+  const readingId = ctx.db.normalizeId("cardReadings", row.requestId.split(":")[3] ?? "");
+  const reading = readingId ? await ctx.db.get(readingId) : null;
+  if (!reading || reading.employeeId !== row.employeeId || reading.projectId !== row.projectId) return;
+  const outcome = await mobileOperationOutcome(ctx, row);
+  const doorOpen = outcome.status === "confirmed" ? "confirmed"
+    : outcome.status === "failed" || outcome.status === "unknown" ? "failed" : "pending";
+  const raw: unknown = JSON.parse(reading.rawData ?? "{}");
+  await ctx.db.patch(reading._id, { rawData: JSON.stringify({
+    ...(typeof raw === "object" && raw !== null ? raw : {}), doorOpen,
+    doorOpenMessage: doorOpen === "failed" ? "Kapı açılamadı — resepsiyona başvurun" : undefined,
+  }) });
+}
+
 export async function settleMobileIdeOperation(ctx: MutationCtx, command: Doc<"idePendingOperations">, status: "acked" | "failed") {
   const marker = mobileOperationId(command.payload);
   const id = marker === undefined ? null : ctx.db.normalizeId("mobileAccessOperations", marker);
@@ -219,6 +238,7 @@ export async function settleMobileIdeOperation(ctx: MutationCtx, command: Doc<"i
     : command.attempts > 0 ? { status: "unknown" as const, errorCode: row.errorCode ?? "COMMAND_OUTCOME_UNKNOWN" }
     : { status: "failed" as const, errorCode: row.errorCode ?? "COMMAND_FAILED" };
   await ctx.db.patch(row._id, outcome);
+  await syncVisitorDoorReading(ctx, row._id);
 }
 
 /** Persist local-bridge ACKs in the mobile history in the same transaction. */
@@ -231,6 +251,7 @@ export async function settleMobileHikOperation(ctx: MutationCtx, command: Doc<"h
   await ctx.db.patch(row._id, status === "acked" ? { status: "confirmed", errorCode: undefined }
     : command.attemptCount > 0 ? { status: "unknown", errorCode: row.errorCode ?? "COMMAND_OUTCOME_UNKNOWN" }
     : { status: "failed", errorCode: row.errorCode ?? "COMMAND_FAILED" });
+  await syncVisitorDoorReading(ctx, row._id);
 }
 
 export function mobileOperationId(payload: unknown): string | undefined {
@@ -243,6 +264,37 @@ export async function mobileOperationAllowed(ctx: QueryCtx, row: Doc<"mobileAcce
   const now = Date.now();
   const requestedAt = Date.parse(row.requestedAt);
   if (row.status !== "pending" || !Number.isFinite(requestedAt) || now < requestedAt || now - requestedAt >= MOBILE_COMMAND_TTL_MS) return false;
+  if (row.visitorPassId) {
+    const pass = await ctx.db.get(row.visitorPassId);
+    const visitor = await ctx.db.get(row.employeeId);
+    const [, hash, readerId, readingId] = row.requestId.split(":");
+    const readerKey = ctx.db.normalizeId("devices", readerId ?? "");
+    const readingKey = ctx.db.normalizeId("cardReadings", readingId ?? "");
+    const reader = readerKey ? await ctx.db.get(readerKey) : null;
+    const reading = readingKey ? await ctx.db.get(readingKey) : null;
+    if (!pass || !visitor?.isVisitor || visitor.visitorCredential !== "pass" || !visitor.isActive ||
+        visitor.projectId !== row.projectId || pass.projectId !== row.projectId || pass.visitorId !== visitor._id ||
+        pass.status === "revoked" || !pass.tokenHash || hash !== pass.tokenHash ||
+        !visitor.accessStartsAt || !visitor.accessExpiresAt || !employeeWithinAccessEpoch(visitor, now) ||
+        !reader || !isVirtualReader(reader) || reader.isActive === false || reader.projectId !== row.projectId || reader.virtualReaderDoorId !== row.doorId ||
+        !reading || reading.deviceId !== reader._id || reading.employeeId !== visitor._id || reading.projectId !== row.projectId ||
+        reading.accessTime !== row.requestedAt || reading.accessStatus !== "izin_verildi") return false;
+    const rule = visitor.accessRuleId ? await ctx.db.get(visitor.accessRuleId) : null;
+    if (!rule || rule.projectId !== row.projectId || rule.isActive === false) return false;
+    const memberships = await ctx.db.query("groupMembers").withIndex("by_project_employee", q => q.eq("projectId", row.projectId).eq("employeeId", visitor._id)).take(201);
+    const links = await ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", rule._id)).take(201);
+    if (memberships.length > 200 || links.length > 200 || !memberships.some(link => link.groupId === rule._id) ||
+        !links.some(link => link.doorId === row.doorId)) return false;
+    const device = await ctx.db.get(row.deviceId);
+    const lastSeen = device?.lastSeen ? Date.parse(device.lastSeen) : NaN;
+    if (!Number.isFinite(lastSeen) || lastSeen > now || now - lastSeen >= 5 * 60_000) return false;
+    // A consumed final entry remains deliverable while exhausted; rotation/revocation invalidates it.
+    try {
+      const target = await resolveMobileTarget(ctx, visitor, row.deviceId, row.doorId);
+      return target.transport === row.transport && target.actuator === row.actuator;
+    } catch { return false; }
+  }
+  if (!row.sessionId || row.authVersion === undefined) return false;
   const [employee, session] = await Promise.all([ctx.db.get(row.employeeId), ctx.db.get(row.sessionId)]);
   if (!employee || employee.projectId !== row.projectId || !session || session.employeeId !== employee._id ||
       !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= now || (session.passwordVersion ?? 0) !== row.authVersion) return false;

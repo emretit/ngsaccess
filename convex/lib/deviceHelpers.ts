@@ -15,6 +15,14 @@ import { transferDeviceRemoved } from "./accessTransfer";
 
 /** Kapı silinmeden önce tüm kural bağlarını, proje alanından bağımsız temizler. */
 export async function deleteGroupDoorsForDoor(ctx: MutationCtx, doorId: Id<"doors">): Promise<void> {
+  const door = await ctx.db.get(doorId);
+  if (door) {
+    const devices = await ctx.db.query("devices").withIndex("by_project", q => q.eq("projectId", door.projectId)).take(501);
+    if (devices.length > 500) throw new Error("Kapıya bağlı sanal okuyucu temizleme sınırı aşıldı (500 cihaz)");
+    for (const device of devices) {
+      if (device.virtualReaderDoorId === doorId) await ctx.db.patch(device._id, { virtualReaderDoorId: undefined });
+    }
+  }
   for (;;) {
     const links = await ctx.db
       .query("groupDoors")
@@ -36,6 +44,10 @@ export async function purgeDeviceCascade(
   projectId: Id<"projects"> | undefined,
 ) {
   await transferDeviceRemoved(ctx, deviceId, projectId);
+  const passAttempts = await ctx.db.query("visitorPassAttempts")
+    .withIndex("by_deviceId", q => q.eq("deviceId", deviceId)).take(2);
+  if (passAttempts.length > 1) throw new Error("Ziyaretçi PIN deneme kaydı tutarsız");
+  for (const attempt of passAttempts) await ctx.db.delete(attempt._id);
   // Kart okuma geçmişi ve deviceId referansı denetim için korunur.
   const groupDevices = await ctx.db
     .query("groupDevices")

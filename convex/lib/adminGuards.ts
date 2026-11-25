@@ -35,6 +35,7 @@ export function userProtectionError({
 
 /** Every projectId table has one policy; schema coverage is tested. Histories retain their project reference. */
 export const projectDeletionMatrix = [
+  { table: "visitorPasses", index: "by_projectId", label: "ziyaretçi geçiş kodları", policy: "block" },
   { table: "employees", index: "by_project", label: "personel", policy: "block" },
   { table: "devices", index: "by_project", label: "cihaz", policy: "block" },
   { table: "zones", index: "by_project", label: "bölge", policy: "block" },

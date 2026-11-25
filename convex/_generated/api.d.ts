@@ -24,6 +24,7 @@ import type * as actions_ideGatewayDevice from "../actions/ideGatewayDevice.js";
 import type * as actions_openaiChat from "../actions/openaiChat.js";
 import type * as actions_pdksImport from "../actions/pdksImport.js";
 import type * as actions_projectMail from "../actions/projectMail.js";
+import type * as actions_visitorPassMail from "../actions/visitorPassMail.js";
 import type * as actions_sendAlarmEmail from "../actions/sendAlarmEmail.js";
 import type * as actions_sendEmail from "../actions/sendEmail.js";
 import type * as actions_sendScheduledReports from "../actions/sendScheduledReports.js";
@@ -175,6 +176,7 @@ import type * as lib_legacyOvertime from "../lib/legacyOvertime.js";
 import type * as lib_liveReadings from "../lib/liveReadings.js";
 import type * as lib_logRedact from "../lib/logRedact.js";
 import type * as lib_mailSecret from "../lib/mailSecret.js";
+import type * as lib_doorOpenDispatch from "../lib/doorOpenDispatch.js";
 import type * as lib_mobileAccess from "../lib/mobileAccess.js";
 import type * as lib_mobileAttendance from "../lib/mobileAttendance.js";
 import type * as lib_mobileErrors from "../lib/mobileErrors.js";
@@ -282,6 +284,9 @@ import type * as users from "../users.js";
 import type * as virtualReaders from "../virtualReaders.js";
 import type * as visitorHosts from "../visitorHosts.js";
 import type * as visitors from "../visitors.js";
+import type * as visitorPassMailData from "../visitorPassMailData.js";
+import type * as visitorPasses from "../visitorPasses.js";
+import type * as lib_visitorPass from "../lib/visitorPass.js";
 import type * as zones from "../zones.js";
 
 import type {
@@ -307,6 +312,7 @@ declare const fullApi: ApiFromModules<{
   "actions/openaiChat": typeof actions_openaiChat;
   "actions/pdksImport": typeof actions_pdksImport;
   "actions/projectMail": typeof actions_projectMail;
+  "actions/visitorPassMail": typeof actions_visitorPassMail;
   "actions/sendAlarmEmail": typeof actions_sendAlarmEmail;
   "actions/sendEmail": typeof actions_sendEmail;
   "actions/sendScheduledReports": typeof actions_sendScheduledReports;
@@ -458,6 +464,7 @@ declare const fullApi: ApiFromModules<{
   "lib/liveReadings": typeof lib_liveReadings;
   "lib/logRedact": typeof lib_logRedact;
   "lib/mailSecret": typeof lib_mailSecret;
+  "lib/doorOpenDispatch": typeof lib_doorOpenDispatch;
   "lib/mobileAccess": typeof lib_mobileAccess;
   "lib/mobileAttendance": typeof lib_mobileAttendance;
   "lib/mobileErrors": typeof lib_mobileErrors;
@@ -565,6 +572,9 @@ declare const fullApi: ApiFromModules<{
   virtualReaders: typeof virtualReaders;
   visitorHosts: typeof visitorHosts;
   visitors: typeof visitors;
+  visitorPassMailData: typeof visitorPassMailData;
+  visitorPasses: typeof visitorPasses;
+  "lib/visitorPass": typeof lib_visitorPass;
   zones: typeof zones;
 }>;
 

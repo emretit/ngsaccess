@@ -124,6 +124,7 @@ export const syncEmployeeToIdePanels = internalAction({
       employeeId: args.employeeId,
     });
     if (!data) return { ok: false, queued: 0, skipped: [], opIds: [], error: "Çalışan bulunamadı" };
+    if (data.employee.visitorCredential === "pass") return { ok: true, queued: 0, skipped: [], opIds: [] };
 
     // IDE paneline bağlı (kural×cihaz) çiftleri. Hiç yoksa sessiz no-op: Hikvision-only
     // kurulumda her employee mutation'ı boşa IDE push tetiklemesin.

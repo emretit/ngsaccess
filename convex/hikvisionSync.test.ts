@@ -17,6 +17,16 @@ vi.mock("./lib/hikGateway", async original => ({
 const modules = import.meta.glob("./**/*.ts");
 afterEach(() => { vi.clearAllMocks(); wire.remove.mockResolvedValue({ ok: true }); });
 
+it.each(["gateway", "localBridge"] as const)("never delivers a cloud visitor pass to %s hardware", async transport => {
+  const f = await fixture(transport);
+  await f.t.run(ctx => ctx.db.patch(f.employeeId, { isVisitor: true, visitorCredential: "pass" }));
+  const result = await f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId });
+  expect(result).toEqual({ synced: 0, failed: 0, errors: [] });
+  for (const operation of Object.values(wire)) expect(operation).not.toHaveBeenCalled();
+  expect(await f.t.run(ctx => ctx.db.query("hikPendingOperations").take(10))).toEqual([]);
+  expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toEqual([]);
+});
+
 async function fixture(transport: "gateway" | "localBridge" = "gateway") {
   const t = convexTest(schema, modules);
   const ids = await t.run(async ctx => {

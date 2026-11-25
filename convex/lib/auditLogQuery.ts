@@ -1,6 +1,7 @@
 import { trDayRangeISO } from "./trDate";
 
 export const AUDIT_TARGET_LABELS: Record<string, string> = {
+  visitorPasses: "Ziyaretçi geçiş kodu",
   hikPendingOperations: "Hikvision senkron uyarısı",
   shifts: "Vardiya tanımları",
   shiftAssignments: "Vardiya atamaları",

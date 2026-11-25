@@ -32,6 +32,7 @@ const form: VisitorFormData = {
   projectId: "project" as Id<"projects">,
 };
 const detail: VisitorDetail = {
+  visitorCredential: "card",
   _id: "visitor" as Id<"employees">, firstName: "Ada", lastName: "Test", company: null, cardNumber: "1234", hostName: null,
   presetRuleName: null, visitStart: null, visitEnd: null, status: "checkedOut", lastSeenAt: null, lastDirection: null,
   presence: "unknown", hasKvkkConsent: false, projectId: "project" as Id<"projects">, tcNo: null, sensitiveMasked: false,

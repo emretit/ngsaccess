@@ -25,6 +25,7 @@ vi.mock("convex/react", () => ({
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project", loading: false }) }));
 
 const visitor: VisitorDetail = {
+  visitorCredential: "card",
   _id: "prereg" as Id<"employees">, projectId: "project" as Id<"projects">,
   firstName: "Synthetic", lastName: "Visitor", company: null, cardNumber: "PRE:synthetic-reference",
   hostName: null, presetRuleName: null, visitStart: null, visitEnd: "2099-01-01T15:00:00.000Z",

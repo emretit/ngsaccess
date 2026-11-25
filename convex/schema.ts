@@ -163,6 +163,7 @@ export default defineSchema({
     // Bu kayıt bir ziyaretçi mi? true ise Kişiler listesinden gizlenir, Ziyaretçiler
     // sekmesinde görünür. Cihaz sync / kart eşleştirme / canlı izleme aynen çalışır.
     isVisitor: v.optional(v.boolean()),
+    visitorCredential: v.optional(v.union(v.literal("card"), v.literal("pass"))),
     // ISO UTC — bu andan sonra erişim cron ile otomatik iptal (isActive=false → desync).
     accessExpiresAt: v.optional(v.string()),
     // Ziyaret başlangıcı (log/raporlama; cihaz erişimini etkilemez).
@@ -259,11 +260,30 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_employee", ["employeeId"]),
 
+  visitorPasses: defineTable({
+    projectId: v.id("projects"), visitorId: v.id("employees"),
+    tokenHash: v.optional(v.string()), pinHash: v.optional(v.string()),
+    maxUses: v.optional(v.number()), usedCount: v.number(),
+    status: v.union(v.literal("active"), v.literal("exhausted"), v.literal("revoked")),
+    lastUsedAt: v.optional(v.string()), createdBy: v.id("users"),
+    createdAt: v.string(), updatedAt: v.string(),
+  }).index("by_tokenHash", ["tokenHash"])
+    .index("by_projectId_and_pinHash", ["projectId", "pinHash"])
+    .index("by_projectId_and_pinHash_and_status", ["projectId", "pinHash", "status"])
+    .index("by_visitorId", ["visitorId"])
+    .index("by_projectId", ["projectId"]),
+
+  visitorPassAttempts: defineTable({
+    deviceId: v.id("devices"), windowStart: v.number(), failures: v.number(),
+    lockedUntil: v.optional(v.number()),
+  }).index("by_deviceId", ["deviceId"]),
+
   mobileAccessOperations: defineTable({
     projectId: v.id("projects"),
     employeeId: v.id("employees"),
-    sessionId: v.id("employeeSessions"),
-    authVersion: v.number(),
+    sessionId: v.optional(v.id("employeeSessions")),
+    authVersion: v.optional(v.number()),
+    visitorPassId: v.optional(v.id("visitorPasses")),
     requestId: v.string(),
     deviceId: v.id("devices"),
     doorId: v.optional(v.id("doors")),
@@ -437,6 +457,7 @@ export default defineSchema({
     // kapı seçimi yerine bu sayı girilir; kapılar ayrıca bölge altında yönetilir.
     doorCount: v.optional(v.number()),
     deviceType: v.optional(v.string()),
+    virtualReaderDoorId: v.optional(v.id("doors")),
     deviceIp: v.optional(v.string()),
     deviceSerial: v.optional(v.string()),
     accessDirection: v.optional(

@@ -1,3 +1,4 @@
+import { VisitorPassManagement } from "./VisitorPassCard";
 import { DetailFieldList, type DetailField } from "@/components/shared/DetailFieldList";
 import { useCallback, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -78,9 +79,10 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
     <div className="flex flex-wrap items-center justify-between gap-2"><StatusBadge tone={status.tone}>{status.label}</StatusBadge>{canManage && <Button variant="outline" onClick={onEdit}>{canAssignVisitorPreset(detail) ? "Kart ve erişim ata" : "Düzenle"}</Button>}</div>
     <DetailFieldList fields={[
       ...fields,
-      { key: "card", label: "Kart", numeric: true, value: <span className="break-all">{detail.cardReleased ? "İade edildi" : needsCard ? "Henüz kart atanmadı" : showCard ? detail.cardNumber : `•••• ${detail.cardNumber.slice(-4)}`}
+      { key: "card", label: "Kimlik", numeric: true, value: detail.visitorCredential === "pass" ? "QR + PIN (kartsız)" : <span className="break-all">{detail.cardReleased ? "İade edildi" : needsCard ? "Henüz kart atanmadı" : showCard ? detail.cardNumber : `•••• ${detail.cardNumber.slice(-4)}`}
         {!detail.sensitiveMasked && !detail.cardReleased && !needsCard && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</span> },
     ]} />
+    {detail.visitorCredential === "pass" && canManage && <VisitorPassManagement visitorId={detail._id} name={name} expiresAt={detail.visitEnd} doors={visitorDoorsLabel(detail.presetRuleName)} />}
     {detail.presence && <p className="text-xs text-muted-foreground">Son konum izinli okumaya dayanır. Sürenin dolması veya manuel sonlandırma fiziksel çıkış okuması oluşturmaz.</p>}
     <VisitorCollapsible title="Şirket, iletişim ve ek bilgiler"><DetailFieldList className="whitespace-pre-wrap" fields={[
       { key: "company", label: "Şirket", value: detail.visitorCompany },
@@ -96,7 +98,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
     {canManage && <div className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t bg-surface py-3">
       {detail.isActive && <Button variant="outline" onClick={() => setConfirmation("checkout")}>Ziyareti sonlandır</Button>}
       <RowActions label={`${name} kayıt işlemleri`}>
-        {!detail.isActive && !detail.cardReleased && !needsCard && <DropdownMenuItem onSelect={() => setConfirmation("release")}>Kartı serbest bırak</DropdownMenuItem>}
+        {detail.visitorCredential !== "pass" && !detail.isActive && !detail.cardReleased && !needsCard && <DropdownMenuItem onSelect={() => setConfirmation("release")}>Kartı serbest bırak</DropdownMenuItem>}
         <DropdownMenuItem className="text-destructive" onSelect={() => setConfirmation("delete")}>Ziyaretçi kaydını sil</DropdownMenuItem>
       </RowActions>
     </div>}

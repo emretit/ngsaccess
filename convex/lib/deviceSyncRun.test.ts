@@ -264,7 +264,7 @@ describe("durable diff dispatch", () => {
         case "deviceSyncRuns:loadTarget": return { device, run: { _id: "run", projectId: "project", startedAt: Date.now() }, target: { _id: "target", status: "queued" } };
         case "hikvisionSync:getAccessRuleWithDevices": return { rule: { projectId: "project", isActive: true }, devices: [device] };
         case "deviceSyncRuns:diffIdeContext": return ideRoster;
-        case "hikvisionSync:getEmployeeWithDevices": return { employee: { _id: args.employeeId, projectId: "project", cardNumber: "123", isActive: true }, deviceRules: hasAccess ? [{ device }] : [] };
+        case "hikvisionSync:getEmployeeWithDevices": return { employee: { _id: args.employeeId, projectId: "project", cardNumber: "123", isActive: true, visitorCredential: args.employeeId === "cloud" ? "pass" : "card" }, deviceRules: hasAccess ? [{ device }] : [] };
         default: throw new Error(getFunctionName(ref));
       }
     });
@@ -279,6 +279,13 @@ describe("durable diff dispatch", () => {
     expect(f.runAction).toHaveBeenCalledOnce();
     expect(f.runAction.mock.calls[0][1]).toMatchObject({ employeeId: "new", runId: "run", targetDeviceIds: ["device"] });
     expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toMatchObject({ targetId: "target", directSent: brand === "hikvision", failure: undefined, skipped: undefined });
+  });
+  it.each(["hikvision", "ide_smart"] as const)("skips the pass visitor in a mixed %s rule diff without failing the card visitor", async brand => {
+    const f = actionFixture(brand);
+    await invoke(runs.executeRuleDiffTarget, f, { ...f.args, syncMembers: ["new", "cloud"] });
+    expect(f.runAction).toHaveBeenCalledOnce();
+    expect(f.runAction.mock.calls[0][1]).toMatchObject({ employeeId: "new" });
+    expect(f.runMutation.mock.calls[f.runMutation.mock.calls.length - 1]?.[1]).toMatchObject({ targetId: "target", failure: undefined, skipped: undefined });
   });
   it.each(["hikvision", "ide_smart"] as const)("revokes former %s targets after removal and retains run evidence", async brand => {
     const f = actionFixture(brand, false);

@@ -97,7 +97,9 @@ describe("denetim sorgusu", () => {
       "shifts",
       "userProjects",
       "users",
+      "visitorPasses",
     ]);
+    expect(AUDIT_TARGET_LABELS.visitorPasses).toBe("Ziyaretçi geçiş kodu");
   });
 });
 

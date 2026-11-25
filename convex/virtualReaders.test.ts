@@ -92,6 +92,7 @@ describe("sanal okuyucu", () => {
     expect(await t.mutation(api.virtualReaders.connect, { readerToken: "yok" })).toBeNull();
     const issued = await t.mutation(api.employeeCheckIn.createMyCheckInToken, { sessionToken: "session-a" });
     expect(await t.mutation(api.virtualReaders.scan, { readerToken: panelToken, code: issued.token })).toEqual({ status: "reader_invalid" });
+    expect(await t.mutation(api.virtualReaders.scanPin, { readerToken: panelToken, pin: "123456" })).toEqual({ status: "reader_invalid" });
   });
 
   it("yalnız cihaz yönetebilen rol oluşturur", async () => {
@@ -101,6 +102,32 @@ describe("sanal okuyucu", () => {
     const admin = await member("admin");
     await expect(admin.mutation(api.virtualReaders.create, { projectId: otherProjectId, name: "Kapı" })).rejects.toThrow();
     await expect(admin.mutation(api.virtualReaders.create, { projectId, name: "   " })).rejects.toThrow("Okuyucu adı zorunlu");
+  });
+
+  it("bağlı kapıyı aynı projeyle sınırlar ve PIN/QR retlerinde sır saklamaz", async () => {
+    const { t, member, projectId, otherProjectId } = await fixture();
+    const admin = await member("admin");
+    const { deviceId, readerToken } = await admin.mutation(api.virtualReaders.create, { projectId, name: "Kiosk" });
+    const doors = await t.run(async ctx => {
+      const panelId = await ctx.db.insert("devices", { projectId, brand: "other", name: "Panel", createdAt: now, updatedAt: now });
+      const doorId = await ctx.db.insert("doors", { projectId, deviceId: panelId, name: "Kapı" });
+      const foreignDoorId = await ctx.db.insert("doors", { projectId: otherProjectId, deviceId: panelId, name: "Yabancı" });
+      return { doorId, foreignDoorId };
+    });
+    await expect(admin.mutation(api.virtualReaders.setDoor, { deviceId, doorId: doors.foreignDoorId })).rejects.toThrow();
+    const viewer = await member("viewer");
+    await expect(viewer.mutation(api.virtualReaders.setDoor, { deviceId, doorId: doors.doorId })).rejects.toThrow();
+    await admin.mutation(api.virtualReaders.setDoor, { deviceId, doorId: doors.doorId });
+    expect((await t.run(ctx => ctx.db.get(deviceId)))?.virtualReaderDoorId).toBe(doors.doorId);
+    await admin.mutation(api.virtualReaders.setDoor, { deviceId, doorId: null });
+    expect((await t.run(ctx => ctx.db.get(deviceId)))?.virtualReaderDoorId).toBeUndefined();
+    const code = "NGSV1.invalid-secret";
+    expect(await t.mutation(api.virtualReaders.scan, { readerToken, code })).toEqual({ status: "denied", reason: "TOKEN_INVALID" });
+    expect(await t.mutation(api.virtualReaders.scanPin, { readerToken, pin: "not-a-pin" })).toEqual({ status: "denied", reason: "TOKEN_INVALID" });
+    const readings = await t.run(ctx => ctx.db.query("cardReadings").take(10));
+    expect(readings).toHaveLength(2);
+    expect(JSON.stringify(readings)).not.toContain(code);
+    expect(JSON.stringify(readings)).not.toContain("not-a-pin");
   });
 
   it("aynı token /card-reader yolunda da erişim kuralı aramadan kabul edilir; yön sırayla belirlenir", async () => {

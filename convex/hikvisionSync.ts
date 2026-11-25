@@ -167,6 +167,7 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
       lastName: employee.lastName,
       cardNumber: employee.cardNumber,
       hikCardless: employee.hikCardless,
+      visitorCredential: employee.visitorCredential,
       projectId: employee.projectId,
       isActive: employee.isActive,
       accessStartsAt: employee.accessStartsAt,
@@ -250,7 +251,7 @@ export const getAccessRuleWithDevices = internalQuery({
 
     for (const gm of groupMembers) {
       const emp = await ctx.db.get(gm.employeeId);
-      if (!emp || !emp.isActive) continue;
+      if (!emp || !emp.isActive || emp.visitorCredential === "pass") continue;
       employees.push({
         _id: emp._id,
         firstName: emp.firstName,

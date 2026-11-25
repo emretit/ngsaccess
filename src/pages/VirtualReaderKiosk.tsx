@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
+import type { Id } from "../../convex/_generated/dataModel";
 import { CircleCheck, CircleX, LoaderCircle, RefreshCw, ScanLine } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { VIRTUAL_READER_HEARTBEAT_MS } from "../../convex/lib/virtualReader";
@@ -93,28 +94,44 @@ export default function VirtualReaderKiosk() {
   return <ReaderScreen token={token} reader={reader} onReaderInvalid={() => setReader(null)} />;
 }
 
-type Phase = { kind: "idle" } | { kind: "checking" } | { kind: "result"; presentation: ScanPresentation };
+type Phase = { kind: "idle" } | { kind: "checking" } | { kind: "result"; presentation: ScanPresentation; operationId?: Id<"mobileAccessOperations"> };
 
-function ReaderScreen({ token, reader, onReaderInvalid }: { token: string; reader: ReaderInfo; onReaderInvalid: () => void }) {
+export function ReaderScreen({ token, reader, onReaderInvalid }: { token: string; reader: ReaderInfo; onReaderInvalid: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const gate = useRef(createScanGate());
   const scan = useMutation(api.virtualReaders.scan);
+  const scanPin = useMutation(api.virtualReaders.scanPin);
+  const [pin, setPin] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const doorStatus = useQuery(api.mobileAccess.visitorDoorOpenStatus,
+    phase.kind === "result" && phase.operationId ? { readerToken: token, operationId: phase.operationId } : "skip");
+  const visiblePhase = phase.kind === "result" && phase.operationId ? {
+    ...phase,
+    presentation: {
+      ...phase.presentation,
+      tone: doorStatus === null || doorStatus?.doorOpen === "failed" ? "error" as const : "success" as const,
+      detail: doorStatus?.doorOpen === "confirmed" ? "Kapı açıldı" : doorStatus === null || doorStatus?.doorOpen === "failed"
+        ? "Kapı açılamadı — resepsiyona başvurun" : "Kapının açılması bekleniyor…",
+    },
+  } : phase;
+  const waitingForDoor = phase.kind === "result" && !!phase.operationId && (doorStatus === undefined || doorStatus?.doorOpen === "pending");
   const [facing, setFacing] = useState<CameraFacing>(
     () => localStorage.getItem(READER_CAMERA_STORAGE_KEY) === "environment" ? "environment" : "user",
   );
   const now = useNow(15_000);
   useScreenWakeLock(true);
 
-  const onCode = useCallback((code: string) => {
+  const submitCode = useCallback((code: string, source: "qr" | "pin") => {
     if (!gate.current.tryAcquire(code, Date.now())) return;
+    setPin("");
     setPhase({ kind: "checking" });
     void (async () => {
       let presentation: ScanPresentation;
+      let operationId: Id<"mobileAccessOperations"> | undefined;
       let timer: number | undefined;
       try {
         const result = await Promise.race([
-          scan({ readerToken: token, code }),
+          source === "pin" ? scanPin({ readerToken: token, pin: code }) : scan({ readerToken: token, code }),
           new Promise<"timeout">(resolve => { timer = window.setTimeout(() => resolve("timeout"), SCAN_TIMEOUT_MS); }),
         ]);
         if (result === "timeout") {
@@ -122,19 +139,21 @@ function ReaderScreen({ token, reader, onReaderInvalid }: { token: string; reade
         } else {
           if (result.status === "reader_invalid") onReaderInvalid();
           presentation = scanPresentation(result);
+          if (result.status === "granted" && "doorOpen" in result && result.doorOpen === "pending") operationId = result.doorOpenOperationId;
         }
       } catch {
         presentation = { tone: "error", title: "Okutma tamamlanamadı", detail: "Birkaç saniye sonra tekrar okutun." };
       } finally {
         window.clearTimeout(timer);
       }
-      setPhase({ kind: "result", presentation });
+      setPhase({ kind: "result", presentation, operationId });
       window.setTimeout(() => {
         gate.current.release(Date.now());
         setPhase({ kind: "idle" });
       }, RESULT_VISIBLE_MS);
     })();
-  }, [onReaderInvalid, scan, token]);
+  }, [onReaderInvalid, scan, scanPin, token]);
+  const onCode = useCallback((code: string) => submitCode(code, "qr"), [submitCode]);
 
   const camera = useQrCamera(videoRef, facing, onCode);
   const switchCamera = () => {
@@ -146,7 +165,7 @@ function ReaderScreen({ token, reader, onReaderInvalid }: { token: string; reade
   const date = dateFormat.format(now);
 
   return (
-    <main className="flex min-h-dvh flex-col bg-canvas text-text [color-scheme:light] lg:h-dvh lg:flex-row">
+    <main className="flex min-h-dvh flex-col bg-canvas text-text [color-scheme:light] lg:min-h-dvh lg:flex-row">
       <section aria-label="Kamera" className="relative flex min-h-[55dvh] flex-1 items-center justify-center overflow-hidden bg-black">
         <video
           ref={videoRef}
@@ -170,7 +189,7 @@ function ReaderScreen({ token, reader, onReaderInvalid }: { token: string; reade
           </div>
         )}
         {camera === "starting" && <LoaderCircle aria-label="Kamera açılıyor" className="relative h-10 w-10 animate-spin text-white" />}
-        {phase.kind !== "idle" && <ScanOverlay phase={phase} />}
+        {visiblePhase.kind !== "idle" && <ScanOverlay phase={visiblePhase} waitingForDoor={waitingForDoor} />}
       </section>
 
       <aside className="flex w-full flex-col gap-6 border-t border-line bg-surface p-6 lg:w-[380px] lg:border-l lg:border-t-0 lg:p-8">
@@ -190,8 +209,15 @@ function ReaderScreen({ token, reader, onReaderInvalid }: { token: string; reade
         )}
         <div className="flex gap-3 text-sm text-muted-foreground">
           <ScanLine aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
-          <p>Mobil uygulamada <strong className="text-text">QR</strong> sekmesini açın ve kodu kameraya gösterin.</p>
+          <p>Mobil uygulama QR kodunu veya ziyaretçi QR kodunu kameraya gösterin. Ziyaretçi PIN kodunu aşağıdan girebilirsiniz.</p>
         </div>
+        <form className="space-y-3" onSubmit={e => { e.preventDefault(); if (/^\d{6}$/.test(pin)) submitCode(pin, "pin"); }}>
+          <label htmlFor="reader-pin" className="text-sm font-medium">Ziyaretçi PIN kodu</label>
+          <input id="reader-pin" type="password" inputMode="numeric" autoComplete="off" maxLength={6} className="h-12 w-full rounded-md border bg-background px-3 text-center text-2xl tracking-[.3em]" value={pin} disabled={phase.kind !== "idle"} onChange={e => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} />
+          <div className="grid grid-cols-3 gap-2" aria-label="PIN tuş takımı">{["1", "2", "3", "4", "5", "6", "7", "8", "9", "Temizle", "0", "Sil"].map(key => <Button key={key} type="button" variant="outline" className="min-h-12" disabled={phase.kind !== "idle"} onClick={() => setPin(value => key === "Temizle" ? "" : key === "Sil" ? value.slice(0, -1) : (value + key).slice(0, 6))}>{key}</Button>)}</div>
+          <Button type="submit" className="min-h-12 w-full" disabled={pin.length !== 6 || phase.kind !== "idle" || !reader.isActive}>PIN ile geçiş yap</Button>
+        </form>
+        {visiblePhase.kind === "result" && <div role={visiblePhase.presentation.tone === "error" ? "alert" : "status"} className="rounded-md border p-3 text-sm"><p className="break-words font-semibold">{visiblePhase.presentation.title}</p>{waitingForDoor && <LoaderCircle aria-hidden="true" className="h-5 w-5 animate-spin" />}<p>{visiblePhase.presentation.detail}</p></div>}
         <div className="mt-auto">
           <Button type="button" variant="outline" className="min-h-11 w-full" onClick={switchCamera}>
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -203,7 +229,7 @@ function ReaderScreen({ token, reader, onReaderInvalid }: { token: string; reade
   );
 }
 
-function ScanOverlay({ phase }: { phase: Exclude<Phase, { kind: "idle" }> }) {
+function ScanOverlay({ phase, waitingForDoor }: { phase: Exclude<Phase, { kind: "idle" }>; waitingForDoor: boolean }) {
   if (phase.kind === "checking") {
     return (
       <div role="status" className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-white">
@@ -213,13 +239,13 @@ function ScanOverlay({ phase }: { phase: Exclude<Phase, { kind: "idle" }> }) {
     );
   }
   const success = phase.presentation.tone === "success";
-  const Icon = success ? CircleCheck : CircleX;
+  const Icon = waitingForDoor ? LoaderCircle : success ? CircleCheck : CircleX;
   return (
     <div
       role={success ? "status" : "alert"}
       className={`absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center ${success ? "bg-success-bg text-success" : "bg-danger-bg text-danger"}`}
     >
-      <Icon aria-hidden="true" className="h-24 w-24" />
+      <Icon aria-hidden="true" className={`h-24 w-24 ${waitingForDoor ? "animate-spin" : ""}`} />
       <p className="text-4xl font-semibold tracking-[-.02em] text-text">{phase.presentation.title}</p>
       <p className="text-xl text-text">{phase.presentation.detail}</p>
     </div>

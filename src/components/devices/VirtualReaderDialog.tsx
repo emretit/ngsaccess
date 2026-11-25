@@ -1,10 +1,11 @@
+import { VisitorCombobox } from "@/components/visitors/VisitorCombobox";
 import { useState, type FormEvent } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { QRCodeSVG } from "qrcode.react";
 import { Copy, ExternalLink, Loader2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { virtualReaderPath } from "../../../convex/lib/virtualReader";
+import { isVirtualReader, virtualReaderPath } from "../../../convex/lib/virtualReader";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +47,7 @@ export function VirtualReaderDialog({ state, projectId, onClose }: VirtualReader
     <Dialog open={state !== null} onOpenChange={open => !open && close()}>
       <DialogContent className="sm:max-w-md">
         {view ? (
-          <ReaderLink name={view.name} readerToken={view.readerToken} onDone={close} />
+          <ReaderLink name={view.name} readerToken={view.readerToken} projectId={projectId} onDone={close} />
         ) : (
           <CreateReaderForm projectId={projectId} onCreated={setCreated} onCancel={close} />
         )}
@@ -62,10 +63,11 @@ function CreateReaderForm({ projectId, onCreated, onCancel }: {
 }) {
   const createReader = useMutation(api.virtualReaders.create);
   const [name, setName] = useState("");
+  const [doorId, setDoorId] = useState<Id<"doors"> | null>(null);
   const [attempted, setAttempted] = useState(false);
   const { run, pending } = useAsyncAction(async (readerName: string) => {
     if (!projectId) throw new Error("Önce bir proje seçin");
-    const { readerToken } = await createReader({ projectId, name: readerName });
+    const { readerToken } = await createReader({ projectId, name: readerName, doorId: doorId ?? undefined });
     onCreated({ name: readerName, readerToken });
   }, { error: "Sanal okuyucu eklenemedi" });
 
@@ -83,7 +85,7 @@ function CreateReaderForm({ projectId, onCreated, onCancel }: {
         <DialogTitle>Sanal okuyucu ekle</DialogTitle>
         <DialogDescription>
           Girişe koyacağınız tablet veya telefon, kamerasıyla çalışanın mobil uygulamadaki QR kodunu okur.
-          Kapı açmaz; okutmalar PDKS'ye düşer, giriş-çıkış yönünü PDKS ayarları belirler.
+          Ziyaretçi QR ve PIN geçişlerinde bağlı kapıyı açar. Bağlantı yoksa yalnız okutma kaydı oluşturur.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-2">
@@ -99,6 +101,7 @@ function CreateReaderForm({ projectId, onCreated, onCancel }: {
         />
         {nameMissing && <p id="virtual-reader-name-error" className="text-sm text-destructive">Okuyucu adı zorunlu</p>}
       </div>
+      <DoorPicker projectId={projectId} value={doorId} onChange={setDoorId} disabled={pending} />
       <DialogFooter className="gap-2 sm:gap-0">
         <Button type="button" variant="outline" onClick={onCancel}>İptal</Button>
         <Button type="submit" disabled={pending || !projectId}>
@@ -110,7 +113,15 @@ function CreateReaderForm({ projectId, onCreated, onCancel }: {
   );
 }
 
-function ReaderLink({ name, readerToken, onDone }: { name: string; readerToken: string; onDone: () => void }) {
+function ReaderLink({ name, readerToken, projectId, onDone }: { name: string; readerToken: string; projectId?: Id<"projects">; onDone: () => void }) {
+  const devices = useQuery(api.devices.list, projectId ? { projectId } : "skip");
+  const device = devices?.find(row => row.apiToken === readerToken && isVirtualReader(row));
+  const setDoor = useMutation(api.virtualReaders.setDoor);
+  const binding = useAsyncAction(async (doorId: Id<"doors"> | null) => {
+    if (!device) throw new Error("Okuyucu bilgisi yüklenemedi");
+    await setDoor({ deviceId: device._id, doorId });
+    notify.success(doorId ? "Okuyucu kapıya bağlandı" : "Kapı bağlantısı kaldırıldı");
+  }, { error: "Kapı bağlantısı değiştirilemedi" });
   const url = virtualReaderUrl(readerToken);
   const copy = async () => {
     try {
@@ -134,6 +145,7 @@ function ReaderLink({ name, readerToken, onDone }: { name: string; readerToken: 
           <QRCodeSVG value={url} size={200} level="M" role="img" aria-label={`${name} okuyucu ekranı bağlantısı`} />
         </div>
       </div>
+      <DoorPicker projectId={projectId} value={device?.virtualReaderDoorId ?? null} disabled={!device || binding.pending} onChange={value => void binding.run(value)} />
       <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
         <li>Bağlantıyı girişteki tablette açın, kamera izni verin.</li>
         <li>Çalışan mobil uygulamada QR sekmesini açıp kodunu kameraya gösterir.</li>
@@ -157,4 +169,11 @@ function ReaderLink({ name, readerToken, onDone }: { name: string; readerToken: 
       </DialogFooter>
     </div>
   );
+}
+
+function DoorPicker({ projectId, value, onChange, disabled }: { projectId?: Id<"projects">; value: Id<"doors"> | null; onChange: (value: Id<"doors"> | null) => void; disabled?: boolean }) {
+  const doors = useQuery(api.doors.list, projectId ? { projectId } : "skip");
+  const devices = useQuery(api.devices.list, projectId ? { projectId } : "skip");
+  const physicalIds = new Set(devices?.filter(device => !isVirtualReader(device)).map(device => device._id));
+  return <div className="space-y-2"><Label htmlFor="virtual-reader-door">Açılacak kapı</Label><VisitorCombobox id="virtual-reader-door" label="Açılacak kapı" value={value} allowClear disabled={disabled || doors === undefined || devices === undefined} options={(doors ?? []).filter(door => door.deviceId && physicalIds.has(door.deviceId)).map(door => ({ id: door._id, name: door.name }))} onChange={id => onChange(id as Id<"doors"> | null)} /><p className="text-xs text-muted-foreground">Ziyaretçi QR/PIN kabul edildiğinde bu kapı açılır.</p></div>;
 }

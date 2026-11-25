@@ -2,7 +2,7 @@ import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../convex/_generated/api";
 import { READER_TOKEN_PATTERN } from "../../../convex/lib/virtualReader";
 
-export type ScanResult = FunctionReturnType<typeof api.virtualReaders.scan>;
+export type ScanResult = FunctionReturnType<typeof api.virtualReaders.scan> | FunctionReturnType<typeof api.virtualReaders.scanPin>;
 export type ReaderInfo = NonNullable<FunctionReturnType<typeof api.virtualReaders.connect>>;
 
 export const READER_TOKEN_STORAGE_KEY = "ngs.virtualReader.token";
@@ -22,7 +22,13 @@ export function readerTokenFromHash(hash: string): string | null {
 export type ScanPresentation = { tone: "success" | "error"; title: string; detail: string };
 
 const DENIAL_TEXT: Record<Extract<ScanResult, { status: "denied" }>["reason"], ScanPresentation> = {
-  TOKEN_INVALID: { tone: "error", title: "Kod tanınmadı", detail: "Mobil uygulamadaki QR sekmesindeki kodu gösterin." },
+  TOKEN_INVALID: { tone: "error", title: "Kod tanınmadı", detail: "Geçerli QR kodunu gösterin veya ziyaretçi PIN kodunu kontrol edin." },
+  PIN_LOCKED: { tone: "error", title: "PIN girişi kilitlendi", detail: "Çok sayıda hatalı deneme. 5 dakika sonra tekrar deneyin." },
+  NOT_ACTIVE: { tone: "error", title: "Ziyaretçi erişimi pasif", detail: "Resepsiyona başvurun." },
+  NOT_STARTED: { tone: "error", title: "Ziyaret henüz başlamadı", detail: "Geçerlilik başlangıcını bekleyin." },
+  EXPIRED: { tone: "error", title: "Ziyaret süresi doldu", detail: "Resepsiyona başvurun." },
+  REVOKED: { tone: "error", title: "Geçiş kodu iptal edildi", detail: "Resepsiyondan yeni kod isteyin." },
+  EXHAUSTED: { tone: "error", title: "Giriş limiti doldu", detail: "Resepsiyona başvurun." },
   TOKEN_USED: { tone: "error", title: "Bu kod kullanıldı", detail: "Uygulamada yeni kodun gelmesini bekleyip tekrar okutun." },
   TOKEN_EXPIRED: { tone: "error", title: "Kodun süresi doldu", detail: "Uygulamada yeni kodun gelmesini bekleyip tekrar okutun." },
   SESSION_INVALID: { tone: "error", title: "Oturum geçersiz", detail: "Mobil uygulamada yeniden giriş yapın." },
@@ -39,7 +45,8 @@ export function formatReaderTime(iso: string): string {
 export function scanPresentation(result: ScanResult): ScanPresentation {
   if (result.status === "granted") {
     const label = result.direction === "exit" ? "Çıkış" : "Giriş";
-    return { tone: "success", title: result.employeeName, detail: `${label} kaydedildi · ${formatReaderTime(result.accessTime)}` };
+    const failed = "doorOpen" in result && result.doorOpen === "failed";
+    return { tone: failed ? "error" : "success", title: result.employeeName, detail: failed ? "Kapı açılamadı — resepsiyona başvurun" : `${label} kaydedildi · ${formatReaderTime(result.accessTime)}` };
   }
   if (result.status === "denied") return DENIAL_TEXT[result.reason];
   return { tone: "error", title: "Okuyucu bağlantısı geçersiz", detail: "Yöneticiden yeni okuyucu bağlantısı isteyin." };

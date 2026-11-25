@@ -117,6 +117,9 @@ export async function cascadeRemoveEmployeePII(
   readingsAnonymized: number;
 }> {
   const employee = await ctx.db.get(employeeId);
+  const passes = await ctx.db.query("visitorPasses").withIndex("by_visitorId", q => q.eq("visitorId", employeeId)).take(201);
+  if (passes.length > 200) throw new ConvexError("Ziyaretçi geçiş kodu silme sınırı aşıldı (200)");
+  for (const pass of passes) await ctx.db.delete(pass._id);
   const departmentHistory = await ctx.db.query("employeeDepartmentHistory").withIndex("by_employee_validFrom", q => q.eq("employeeId", employeeId)).take(201);
   if (departmentHistory.length > 200) throw new ConvexError("Departman geçmişi silme sınırı aşıldı (200)");
   for (const period of departmentHistory) await ctx.db.delete(period._id);

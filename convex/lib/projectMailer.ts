@@ -15,6 +15,7 @@ export interface OutgoingMail {
   to: string;
   subject: string;
   html: string;
+  attachments?: Array<{ filename: string; content: Buffer; contentType: "image/png" }>;
 }
 
 export type MailChannel = "smtp" | "resend";
@@ -46,6 +47,7 @@ export async function sendViaProjectSmtp(projectId: Id<"projects">, config: Proj
       to: mail.to,
       subject: mail.subject,
       html: mail.html,
+      ...(mail.attachments ? { attachments: mail.attachments } : {}),
     });
     return { ok: true, channel: "smtp" };
   } catch (error: unknown) {
@@ -69,6 +71,9 @@ export async function sendViaDefaultProvider(mail: OutgoingMail): Promise<MailDe
         to: [mail.to],
         subject: mail.subject,
         html: mail.html,
+        ...(mail.attachments ? { attachments: mail.attachments.map(attachment => ({
+          filename: attachment.filename, content: attachment.content.toString("base64"), content_type: attachment.contentType,
+        })) } : {}),
       }),
       signal: AbortSignal.timeout(15_000),
     });

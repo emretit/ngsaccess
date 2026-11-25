@@ -13,9 +13,10 @@ import { VisitorDetailView } from "./VisitorSlideOverPanel";
 const mocks = vi.hoisted(() => ({
   formData: undefined as VisitorFormData | undefined,
   create: vi.fn(), update: vi.fn(), saved: vi.fn(), success: vi.fn(), error: vi.fn(),
+  readers: [] as { brand: string; deviceType: string; isActive: boolean; virtualReaderDoorId?: string }[],
 }));
 vi.mock("convex/react", () => ({
-  useQuery: () => ({ url: null, version: null }),
+  useQuery: (reference: Parameters<typeof getFunctionName>[0]) => getFunctionName(reference) === "devices:list" ? mocks.readers : { url: null, version: null },
   useMutation: (reference: Parameters<typeof getFunctionName>[0]) => getFunctionName(reference) === "visitors:update" ? mocks.update : mocks.create,
 }));
 vi.mock("@/lib/notify", () => ({ notify: { success: mocks.success, error: mocks.error } }));
@@ -26,6 +27,7 @@ vi.mock("./VisitorCardCapture", () => ({ default: () => null }));
 vi.mock("@/components/access-control/unified/components/ZoneDeviceTree", () => ({ ZoneDeviceTree: () => <div id="door-tree" /> }));
 
 const visitor: VisitorDetail = {
+  visitorCredential: "card",
   _id: "prereg" as Id<"employees">, projectId: "project" as Id<"projects">,
   firstName: "Synthetic", lastName: "Visitor", company: null, cardNumber: "PRE:synthetic-reference",
   hostName: "Test Host", presetRuleName: null, visitStart: null, visitEnd: "2099-01-01T15:00:00.000Z",
@@ -65,6 +67,7 @@ function formEvent(): FormEvent {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.formData = { ...initialForm };
+  mocks.readers = [];
   mocks.update.mockResolvedValue(visitor._id);
   mocks.create.mockResolvedValue("new-visitor");
   // Invalid submissions schedule focus after React displays the errors.
@@ -73,6 +76,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("operator activation of mobile visitor preregistration", () => {
+  it("blocks cardless creation when no active kiosk serves the selected doors", async () => {
+    mocks.formData = { ...initialForm, credential: "pass", cardNumber: "" };
+    await renderForm(null)(formEvent());
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("hides the physical card field and offers a single-entry shortcut in pass mode", () => {
+    const html = renderToStaticMarkup(<VisitorFormFields formData={{ ...initialForm, credential: "pass", cardNumber: "" }} setFormData={noop} hostEmployees={[]} isEditing={false} />);
+    expect(html).not.toContain('id="v_card"');
+    expect(html).toContain('id="v_limit"');
+    expect(html).toContain("Tek giriş");
+    expect(html).toContain("Yalnız girişler sayılır");
+  });
   it("submits selected doors and actual card together through the existing update, then reports success", async () => {
     await renderForm()(formEvent());
     expect(mocks.create).not.toHaveBeenCalled();

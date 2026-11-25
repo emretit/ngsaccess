@@ -132,6 +132,8 @@ export async function syncEmployeeDevices(
   if (!data?.employee.cardNumber) {
     return { synced: 0, failed: 0, errors: [] };
   }
+  // Phase 1 visitor passes are cloud-only, including rule-wide resyncs.
+  if (data.employee.visitorCredential === "pass") return { synced: 0, failed: 0, errors: [] };
   if (!isAllowed(data.employee.projectId)) {
     return { synced: 0, failed: 0, errors: ["Bu çalışana erişim yetkiniz yok"] };
   }
@@ -588,7 +590,7 @@ export async function syncWeekPlanDevices(
     for (let offset = 0; offset < targets.length; offset += 20) {
       const batch = targets.slice(offset, offset + 20);
       const employeeData = await ctx.runQuery(internal.hikvisionSync.getEmployeesWithDevices, { employeeIds: batch.map(emp => emp._id) });
-      const pairs = employeeData.flatMap(data => !data?.employee.cardNumber || data.employee.isActive === false ? []
+      const pairs = employeeData.flatMap(data => !data?.employee.cardNumber || data.employee.isActive === false || data.employee.visitorCredential === "pass" ? []
         : [...new Map(data.deviceRules.filter(({ device }) => device.brand === "hikvision" && !isLocalBridgeDevice(device) &&
             isAllowed(device.projectId) && allowedDevices.some(target => target._id === device._id))
           .map(({ device }) => [device._id, { employeeId: data.employee._id, deviceId: device._id, projectId: device.projectId }])).values()]);
@@ -644,6 +646,7 @@ export async function syncEmployeeDoorRights(
   const { device } = args;
   const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: args.employeeId });
   if (!data || data.employee.projectId !== device.projectId || data.employee.cardNumber !== args.cardNumber) return { ok: false, error: "Kişinin kartı veya projesi değişti; kapı yetkisi doğrulanamadı" };
+  if (data.employee.visitorCredential === "pass") return { ok: true };
   // The bridge consumer does not implement an empty-rights update. Keep a visible
   // retryable failure instead of falling back to deleting the person or granting all doors.
   if (isLocalBridgeDevice(device)) return { ok: false, error: "Bu cihaz bağlantısında kişiyi koruyan kapı yetkisi güncellemesi desteklenmiyor" };

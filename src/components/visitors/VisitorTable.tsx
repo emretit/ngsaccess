@@ -14,7 +14,7 @@ import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 
 export default function VisitorTable({ visitors, onOpen, loading = false, emptyState }: { loading?: boolean; emptyState?: ReactNode; visitors: Visitor[]; onOpen: (visitor: Visitor) => void }) {
   const name = (visitor: Visitor) => <button type="button" className="max-w-full break-words text-left font-medium focus-visible:outline-primary" onClick={() => onOpen(visitor)}>{visitor.firstName} {visitor.lastName}</button>;
-  const badge = (visitor: Visitor) => <StatusBadge tone={visitorStatusInfo[visitor.status].tone}>{visitorStatusInfo[visitor.status].label}</StatusBadge>;
+  const badge = (visitor: Visitor) => <div className="flex flex-wrap gap-1"><StatusBadge tone={visitorStatusInfo[visitor.status].tone}>{visitorStatusInfo[visitor.status].label}</StatusBadge><StatusBadge tone="neutral">{visitor.visitorCredential === "pass" ? "QR+PIN" : "Kart"}</StatusBadge></div>;
   const menu = (visitor: Visitor) => <RowActions label={`${visitor.firstName} ${visitor.lastName} işlemleri`}><DropdownMenuItem onSelect={() => onOpen(visitor)}>Ziyaret ayrıntısını aç</DropdownMenuItem></RowActions>;
   return <ResponsiveResults label="Ziyaretçiler" mobile={loading ? <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" /> : !visitors.length ? emptyState : <ul className="divide-y">
       {visitors.map(visitor => <li key={visitor._id} onClick={onRowActivate(() => onOpen(visitor))} className={`${ROW_CLICK_CLASS} grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_36px] items-center gap-2 px-3 py-3`}>

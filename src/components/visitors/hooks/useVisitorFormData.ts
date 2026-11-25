@@ -15,6 +15,9 @@ export interface VisitorFormData {
   visitPurpose: string;
   hostEmployeeId: Id<"employees"> | null;
   cardNumber: string;
+  credential?: "card" | "pass";
+  maxUses?: string;
+  email?: string;
   // ZoneDeviceTree seçimi; sunucu kapı setine göre ziyaretçi kuralını bulur ya da oluşturur.
   selected_doors: string[];
   selected_devices: string[];
@@ -34,6 +37,9 @@ const emptyForm = (projectId?: Id<"projects">): VisitorFormData => ({
   visitPurpose: "",
   hostEmployeeId: null,
   cardNumber: "",
+  credential: "card",
+  maxUses: "",
+  email: "",
   selected_doors: [],
   selected_devices: [],
   accessExpiresAt: defaultExpiryLocalInput(),
@@ -83,6 +89,9 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
         hostEmployeeId: visitor.hostEmployeeId ?? null,
         // Maskeli, iade ve ön kayıt değerleri gerçek kart yerine kaydedilmez.
         cardNumber: visitor.sensitiveMasked || isVisitorCardPlaceholder(visitor.cardNumber) ? "" : visitor.cardNumber || "",
+        credential: visitor.visitorCredential ?? "card",
+        email: visitor.email ?? "",
+        maxUses: "",
         selected_doors: [],
         selected_devices: [],
         accessExpiresAt: visitor.visitEnd

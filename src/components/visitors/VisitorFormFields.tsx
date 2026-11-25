@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery } from "convex/react";
@@ -40,12 +41,19 @@ export default function VisitorFormFields({ formData, setFormData, assignedDoors
       {errors.doors && <p id="v_doors-error" role="alert" className="text-sm text-destructive">{errors.doors}</p>}
     </div>}
     <FormFieldWrapper htmlFor="v_expires" label="Geçerlilik bitişi *" error={errors.accessExpiresAt} hint="Türkiye saati. Sürenin dolması fiziksel çıkış kaydı oluşturmaz; cihaz işlemlerini proje senkronizasyon şeridinden izleyin.">{control => <div className="flex min-w-0 gap-2"><DateInput {...control} required className="min-w-0 flex-1" value={formData.accessExpiresAt.slice(0, 10)} onChange={date => change("accessExpiresAt", `${date}T${formData.accessExpiresAt.slice(11, 16) || "00:00"}`)} /><Input id={`${control.id}-time`} type="time" className="w-28 shrink-0" aria-label="Geçerlilik bitiş saati" aria-invalid={control["aria-invalid"]} value={formData.accessExpiresAt.slice(11, 16)} onChange={e => change("accessExpiresAt", `${formData.accessExpiresAt.slice(0, 10)}T${e.target.value}`)} /></div>}</FormFieldWrapper>
-    <FormFieldWrapper htmlFor="v_card" label="Kart numarası *" error={errors.cardNumber}><Input id="v_card" value={formData.cardNumber} onChange={e => change("cardNumber", e.target.value)} placeholder="Okuyucudan alın veya elle girin" /></FormFieldWrapper>
-    <VisitorCardCapture currentCard={formData.cardNumber} onCapture={card => change("cardNumber", card)} />
+    <div className="space-y-2"><Label htmlFor="v_credential">Kimlik türü</Label><VisitorCombobox id="v_credential" label="Kimlik türü" value={formData.credential ?? "card"} disabled={isEditing} options={[{ id: "card", name: "Kart" }, { id: "pass", name: "QR + PIN (kartsız)" }]} onChange={value => change("credential", value === "pass" ? "pass" : "card")} /></div>
+    {formData.credential === "pass" ? <div className="space-y-3">
+      <p className="rounded-md border p-3 text-sm">QR ve PIN yalnız sanal okuyucudan geçer. Seçilen kapıda bağlı bir sanal okuyucu kullanın.</p>
+      {!isEditing && <FormFieldWrapper htmlFor="v_limit" label="Geçiş limiti" error={errors.maxUses} hint="Boş = sınırsız. Yalnız girişler sayılır; çıkış sayılmaz."><div className="flex min-w-0 gap-2"><Input id="v_limit" type="number" min={1} step={1} className="min-w-0" value={formData.maxUses ?? ""} onChange={e => change("maxUses", e.target.value)} /><Button type="button" variant="outline" onClick={() => change("maxUses", "1")}>Tek giriş</Button></div></FormFieldWrapper>}
+    </div> : <>
+      <FormFieldWrapper htmlFor="v_card" label="Kart numarası *" error={errors.cardNumber}><Input id="v_card" value={formData.cardNumber} onChange={e => change("cardNumber", e.target.value)} placeholder="Okuyucudan alın veya elle girin" /></FormFieldWrapper>
+      <VisitorCardCapture currentCard={formData.cardNumber} onCapture={card => change("cardNumber", card)} />
+    </>}
     {isCurrentlyActive ? <p className="text-sm text-muted-foreground">Erişimi kapatmak için ayrıntıdaki 'Ziyareti sonlandır'ı kullanın.</p> : <div className="flex items-center gap-2"><Checkbox id="v_active" checked={formData.isActive} onCheckedChange={checked => change("isActive", checked === true)} /><Label htmlFor="v_active">Erişim izni ver</Label></div>}<p className="text-xs text-muted-foreground">Erişim geçerlilik bitişiyle sınırlıdır; süresi dolan kayıt aktif sayılmaz.</p>
     <h3 className="text-base font-semibold">Ziyaretçi bilgileri</h3>
     <div className="grid gap-4 min-[761px]:grid-cols-2"><FormFieldWrapper htmlFor="v_first_name" label="Ad *" error={errors.firstName}><Input id="v_first_name" value={formData.firstName} onChange={e => change("firstName", e.target.value)} autoComplete="given-name" /></FormFieldWrapper>
     <FormFieldWrapper htmlFor="v_last_name" label="Soyad *" error={errors.lastName}><Input id="v_last_name" value={formData.lastName} onChange={e => change("lastName", e.target.value)} autoComplete="family-name" /></FormFieldWrapper></div>
+    {!isEditing && <FormFieldWrapper htmlFor="v_email" label="E-posta" error={errors.email}><Input id="v_email" type="email" value={formData.email ?? ""} onChange={e => change("email", e.target.value)} /></FormFieldWrapper>}
     <FormFieldWrapper htmlFor="v_company" label="Şirket / kurum"><Input id="v_company" value={formData.visitorCompany} onChange={e => change("visitorCompany", e.target.value)} /></FormFieldWrapper>
     <h3 className="border-t pt-4 text-base font-semibold">Ziyaret</h3>
     <FormFieldWrapper htmlFor="v_host" label="Ziyaret edilen kişi"><VisitorCombobox id="v_host" label="Ziyaret edilen kişi" value={formData.hostEmployeeId} options={hostEmployees} search={hostSearch} onSearchChange={onHostSearchChange} loading={hostsLoading} allowClear onChange={value => change("hostEmployeeId", value as Id<"employees"> | null)} /></FormFieldWrapper>

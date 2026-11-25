@@ -1,12 +1,29 @@
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { internalMutation, mutation } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { employeeAuthedQuery } from "./lib/customFunctions";
-import { accessError, listMobileTargets, resolveMobileTarget, MOBILE_COMMAND_TTL_MS, mobileOperationAllowed, mobileOperationOutcome } from "./lib/mobileAccess";
+import { accessError, listMobileTargets, resolveMobileTarget, MOBILE_COMMAND_TTL_MS, mobileOperationAllowed, mobileOperationOutcome, syncVisitorDoorReading } from "./lib/mobileAccess";
 import { getCurrentEmployee } from "./lib/employeeAuth";
-import { scheduleBridgeWakeForProject } from "./hikBridge";
+import { dispatchDoorOpen } from "./lib/doorOpenDispatch";
+import { isVirtualReader, READER_TOKEN_PATTERN } from "./lib/virtualReader";
+
+/** Reader-scoped subscription for the asynchronous visitor door command. */
+export const visitorDoorOpenStatus = query({
+  args: { readerToken: v.string(), operationId: v.id("mobileAccessOperations") },
+  returns: v.union(v.null(), v.object({ doorOpen: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("failed")), doorOpenMessage: v.optional(v.string()) })),
+  handler: async (ctx, args) => {
+    if (!READER_TOKEN_PATTERN.test(args.readerToken)) return null;
+    const reader = await ctx.db.query("devices").withIndex("by_api_token", q => q.eq("apiToken", args.readerToken)).first();
+    const row = await ctx.db.get(args.operationId);
+    if (!reader || !isVirtualReader(reader) || reader.isActive === false || !row?.visitorPassId ||
+        reader.projectId !== row.projectId || row.requestId.split(":")[2] !== reader._id) return null;
+    const outcome = await mobileOperationOutcome(ctx, row);
+    const doorOpen = outcome.status === "confirmed" ? "confirmed" as const
+      : outcome.status === "failed" || outcome.status === "unknown" ? "failed" as const : "pending" as const;
+    return { doorOpen, ...(doorOpen === "failed" ? { doorOpenMessage: "Kapı açılamadı — resepsiyona başvurun" } : {}) };
+  },
+});
 
 export type OperationResult = {
   operationId: string;
@@ -62,25 +79,7 @@ export const requestOpen = mutation({
     });
     const device = await ctx.db.get(target.deviceId);
     if (!device) throw accessError("TARGET_NOT_ALLOWED");
-    if (target.transport === "ide_mqtt") {
-      const ideOperationId = await ctx.db.insert("idePendingOperations", {
-        projectId: employee.projectId, deviceId: device._id, opType: "openDoor",
-        payload: { dstId: device.ideUuid, ioId: target.actuator, keep: 1, mobileOperationId: operationId },
-        idempotencyKey: `mobile:${operationId}`, status: "pending", attempts: 0, maxAttempts: 1, nextRetryAt: now, createdAt: now,
-      });
-      await ctx.db.patch(operationId, { ideOperationId });
-    } else if (target.transport === "hik_local_bridge") {
-      const hikOperationId = await ctx.db.insert("hikPendingOperations", {
-        projectId: employee.projectId, deviceId: device._id, operation: "openDoor",
-        payload: { doorNo: target.actuator, mobileOperationId: operationId },
-        status: "pending", attemptCount: 0, nextRetryAt: now, createdAt: now,
-      });
-      await ctx.db.patch(operationId, { hikOperationId });
-      await scheduleBridgeWakeForProject(ctx, employee.projectId);
-    } else {
-      await ctx.scheduler.runAfter(0, internal.mobileAccessGateway.send, { operationId });
-    }
-    await ctx.scheduler.runAfter(MOBILE_COMMAND_TTL_MS, internal.mobileAccess.expireQueue, { operationId });
+    await dispatchDoorOpen(ctx, operationId, device, target.actuator);
     return { operationId, status: "pending", deviceId: target.deviceId,
       ...(target.doorId ? { doorId: target.doorId } : {}), deviceName: target.name, requestedAt: new Date(now).toISOString() };
   },
@@ -116,6 +115,7 @@ export const claimGateway = internalMutation({
     if (!row || row.transport !== "hik_gateway" || row.status !== "pending") return null;
     if (!(await mobileOperationAllowed(ctx, row))) {
       await ctx.db.patch(row._id, { status: "failed", errorCode: "TARGET_NOT_ALLOWED" });
+      await syncVisitorDoorReading(ctx, row._id);
       return null;
     }
     const device = await ctx.db.get(row.deviceId);
@@ -132,6 +132,7 @@ export const finishGateway = internalMutation({
     const row = await ctx.db.get(args.operationId);
     if (row?.transport === "hik_gateway" && (row.status === "sent" || (row.status === "unknown" && args.status === "confirmed"))) {
       await ctx.db.patch(row._id, { status: args.status, errorCode: args.status === "unknown" ? "COMMAND_OUTCOME_UNKNOWN" : undefined });
+      await syncVisitorDoorReading(ctx, row._id);
     }
     return null;
   },
@@ -146,6 +147,7 @@ export const expireQueue = internalMutation({
     if (row.status === "unknown") {
       const outcome = await mobileOperationOutcome(ctx, row);
       if (outcome.status === "confirmed") await ctx.db.patch(row._id, { status: "confirmed", errorCode: undefined });
+      await syncVisitorDoorReading(ctx, row._id);
       return null;
     }
     let unsent = row.transport === "hik_gateway" && row.status === "pending";
@@ -166,6 +168,7 @@ export const expireQueue = internalMutation({
     const outcome = unsent ? { status: "failed" as const, errorCode: "COMMAND_EXPIRED" }
       : await mobileOperationOutcome(ctx, row);
     await ctx.db.patch(row._id, outcome);
+    await syncVisitorDoorReading(ctx, row._id);
     return null;
   },
 });

@@ -391,6 +391,40 @@ describe("grant write call budgets", () => {
 
 
 describe("grant graph and dispatch boundaries", () => {
+  it("targets only the card visitor in a rule shared with a cloud-only pass visitor", async () => {
+    const { t, ids, admin } = await fixture();
+    const passId = await t.run(async ctx => {
+      await ctx.db.patch(ids.employeeId, { isVisitor: true, visitorCredential: "card" });
+      const employeeId = await ctx.db.insert("employees", { projectId: ids.projectId, departmentId: ids.departmentId,
+        firstName: "Cloud", lastName: "Visitor", email: "cloud@test.test", cardNumber: "987654", isActive: true, isVisitor: true, visitorCredential: "pass" });
+      await ctx.db.insert("groupMembers", { projectId: ids.projectId, groupId: ids.ruleId, employeeId, createdAt: now });
+      return employeeId;
+    });
+    expect(await t.query(internal.deviceSyncRuns.prepareRule, { projectId: ids.projectId, ruleId: ids.ruleId, deviceId: ids.hikId })).toEqual([ids.employeeId]);
+    expect(await t.query(internal.deviceSyncRuns.prepareIdeRule, { projectId: ids.projectId, ruleId: ids.ruleId, deviceIds: [ids.ideId] })).toEqual({ deviceIds: [ids.ideId], employeeIds: [ids.employeeId] });
+    const unknownArgs = { projectId: ids.projectId, state: "unknown" as const, paginationOpts: { numItems: 50, cursor: null } };
+    for (const args of [unknownArgs, { ...unknownArgs, departmentId: ids.departmentId }]) {
+      const unknown = await admin.query(api.accessGrantStatus.listByProject, args);
+      expect(unknown.page).toHaveLength(3);
+      expect(unknown.page.every(row => row.employeeId === ids.employeeId)).toBe(true);
+    }
+    expect(await admin.query(api.accessGrantStatus.counts, { projectId: ids.projectId })).toMatchObject({ personCount: 1, unknown: 3 });
+    expect(await admin.query(api.accessGrantStatus.byEmployee, { employeeId: passId })).toEqual({ rows: [], unauthorizedDoors: [] });
+    const { runId, pairCount } = await admin.mutation(api.accessGrantStatus.redistribute, { projectId: ids.projectId,
+      pairs: [ids.employeeId, passId].map(employeeId => ({ employeeId, deviceId: ids.hikId })) });
+    expect(pairCount).toBe(1);
+    const target = await t.run(ctx => ctx.db.query("deviceSyncRunTargets").withIndex("by_run", q => q.eq("runId", runId)).unique());
+    if (!target) throw new Error("Missing device target");
+    const jobs = await t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs.find(job => job.name.includes("executeGrantTarget"))?.args[0]).toMatchObject({ employeeIds: [ids.employeeId] });
+    // Even an already queued payload containing both people must skip the pass.
+    await t.action(internal.deviceSyncRuns.executeGrantTarget, { targetId: target._id, employeeIds: [ids.employeeId, passId] });
+    await t.mutation(internal.deviceSyncRuns.refreshSummary, { runId, pollAttempt: 1 });
+    expect(await t.run(ctx => ctx.db.get(runId))).toMatchObject({ status: "done", counts: { sent: 1, failed: 0 } });
+    expect(wire.card).toHaveBeenCalledTimes(1);
+    expect((await admin.query(api.accessGrantStatus.byEmployee, { employeeId: passId })).rows).toEqual([]);
+  });
+
   it("caps unknown graph enumeration rather than materializing every pair", async () => {
     const { t, ids, admin } = await fixture();
     await t.run(async ctx => {
