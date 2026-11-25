@@ -12,6 +12,11 @@ function findPendingUpload(ctx: Pick<QueryCtx, "db">, storageId: Id<"_storage">)
   return ctx.db.query("pendingUploads").withIndex("by_storage", q => q.eq("storageId", storageId)).unique();
 }
 
+async function rejectRequestAttachment(ctx: Pick<QueryCtx, "db">, storageId: Id<"_storage">) {
+  const attachment = await ctx.db.query("requestAttachments").withIndex("by_storageId", q => q.eq("storageId", storageId)).first();
+  if (attachment) throw new Error("Talep belgelerine yalnız talep üzerinden erişilebilir");
+}
+
 export const generateUploadUrl = authedMutation({
   args: {},
   handler: async (ctx) => {
@@ -22,6 +27,7 @@ export const generateUploadUrl = authedMutation({
 export const claimUpload = authedMutation({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
+    await rejectRequestAttachment(ctx, args.storageId);
     const consent = await ctx.db.query("employeeConsents").withIndex("by_document_storage", q => q.eq("documentStorageId", args.storageId)).first();
     if (consent) throw new Error("Dosya zaten bir rızaya bağlı");
     const pending = await findPendingUpload(ctx, args.storageId);
@@ -41,6 +47,7 @@ export const saveUserPhoto = authedMutation({
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
+    await rejectRequestAttachment(ctx, args.storageId);
     const pending = await findPendingUpload(ctx, args.storageId);
     assertUploadOwner(pending?.userId, ctx.user._id);
     const url = await ctx.storage.getUrl(args.storageId);
@@ -57,6 +64,7 @@ export const saveUserPhoto = authedMutation({
 export const getUploadUrl = authedMutation({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
+    await rejectRequestAttachment(ctx, args.storageId);
     const employee = await ctx.db.query("employees").withIndex("by_photo_storage", q => q.eq("photoStorageId", args.storageId)).first();
     if (employee) {
       await requirePermission(ctx, ctx.user, employee.projectId, "employees.manage");

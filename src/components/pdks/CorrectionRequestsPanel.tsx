@@ -20,8 +20,7 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { TableStateRow } from "@/components/shared/TableStateRow";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/notify";
@@ -45,6 +44,18 @@ export function CorrectionRequestsPanel({
     setCursor(requestsCursor(cursor, result?.page.length));
   }, [cursor, result?.page.length]);
   const approve = useMutation(api.attendanceCorrections.approve);
+  const downloadAttachment = useMutation(api.requestAttachments.download);
+  async function downloadDocument(attachmentId: Id<"requestAttachments">) {
+    try {
+      const { url } = await downloadAttachment({ attachmentId });
+      const link = document.createElement("a");
+      link.href = url;
+      link.rel = "noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) { notify.error("Belge indirilemedi", error); }
+  }
   const reject = useMutation(api.attendanceCorrections.reject);
   const [decision, setDecision] = useState<{
     id: Id<"attendanceCorrections">;
@@ -72,11 +83,6 @@ export function CorrectionRequestsPanel({
   }
   return (
     <section className="space-y-4" aria-label="Düzeltme talepleri">
-      {result === undefined ? (
-        <SectionSkeleton rows={4} label="Talepler yükleniyor." />
-      ) : result.page.length === 0 ? (
-        <EmptyState title="Bekleyen düzeltme talebi yok." />
-      ) : (
         <Table framed resizeKey="pdks-correction-requests">
           <TableHeader>
             <TableRow>
@@ -90,7 +96,11 @@ export function CorrectionRequestsPanel({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {result.page.map((row) => (
+            {result === undefined ? (
+              <TableStateRow colSpan={7} state="loading" label="Talepler yükleniyor." />
+            ) : result.page.length === 0 ? (
+              <TableStateRow colSpan={7} state="empty" title="Bekleyen düzeltme talebi yok." />
+            ) : result.page.map((row) => (
               <TableRow key={row._id}>
                 <TableCell className="truncate" title={row.employeeName}>{row.employeeName}</TableCell>
                 <TableCell>
@@ -109,8 +119,15 @@ export function CorrectionRequestsPanel({
                   {row.requestedCheckIn || "—"} /{" "}
                   {row.requestedCheckOut || "—"}
                 </TableCell>
-                <TableCell className="max-w-full truncate" title={row.reason}>
-                  {row.reason}
+                <TableCell>
+                  <div className="truncate" title={row.reason}>{row.reason}</div>
+                  {row.attachments?.map(attachment => (
+                    <Button key={attachment._id} variant="link" size="sm" className="block max-w-full truncate px-0"
+                      aria-label={`Belgeyi indir: ${attachment.name}`}
+                      onClick={() => void downloadDocument(attachment._id)}>
+                      {attachment.name} ({Math.ceil(attachment.size / 1024)} KB)
+                    </Button>
+                  ))}
                 </TableCell>
                 <TableCell>
                   {new Date(row.createdAt).toLocaleString("tr-TR", {
@@ -140,7 +157,6 @@ export function CorrectionRequestsPanel({
             ))}
           </TableBody>
         </Table>
-      )}
       {result && (
         <div className="flex gap-2">
           <Button

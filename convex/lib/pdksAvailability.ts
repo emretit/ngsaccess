@@ -5,6 +5,7 @@ import { isPdksIncludedReading } from "./pdksSource";
 import { clockMinute, flexibleSessionEnd } from "./pdksFlexible";
 import { pdksWorkDayRange } from "./pdksWorkDay";
 import { trDateKey } from "./trDate";
+import { cardKey } from "./employeeUx";
 
 /** Fixed rollout boundary preserves historical payroll for devices without old checkpoints.
  * Cursor values are event serial numbers, never timestamp watermarks. */
@@ -84,7 +85,8 @@ export async function pdksFirstRecordDate(ctx: QueryCtx, employee: Doc<"employee
   }
   const policyFor = (reading: Doc<"cardReadings">) => historical.get(workDay(reading))?.(workDay(reading)) ?? policies?.(reading.projectId, workDay(reading));
   const eligibleCandidates = candidates.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r)));
-  const periodReadings = readings.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r))).filter(r => r.employeeId === employee._id || r.cardNo === employee.cardNumber);
+  const employeeCard = cardKey(employee.cardNumber);
+  const periodReadings = readings.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r))).filter(r => r.employeeId === employee._id || (!r.employeeId && employeeCard !== undefined && r.cardNo === employee.cardNumber));
   const allowed = [...eligibleCandidates, ...periodReadings].filter(r => r.accessStatus === "izin_verildi");
   // Rejected attempts only preserve the legacy fallback when no granted record is known.
   const history = allowed.length > 0 ? allowed : [...eligibleCandidates.slice(0, 1), ...periodReadings];

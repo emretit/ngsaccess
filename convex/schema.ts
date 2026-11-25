@@ -819,6 +819,7 @@ export default defineSchema({
   // Gateway cihazlarda worker failed kayıtları retry eder; localBridge cihazlarda
   // Windows bridge pending kayıtları claim edip SDK ile panele uygular.
   hikPendingOperations: defineTable({
+    employeeId: v.optional(v.id("employees")),
     attempt: v.optional(v.number()),
     legacyAckUnsafe: v.optional(v.boolean()),
     hasBeenClaimed: v.optional(v.boolean()),
@@ -883,7 +884,8 @@ export default defineSchema({
     .index("by_status_nextRetry", ["status", "nextRetryAt"])
     .index("by_project_status_created", ["projectId", "status", "createdAt"])
     .index("by_project_status_dismissed_created", ["projectId", "status", "dismissedAt", "createdAt"])
-    .index("by_run_device", ["runId", "deviceId"]),
+    .index("by_run_device", ["runId", "deviceId"])
+    .index("by_employee_operation", ["employeeId", "operation"]),
 
   // Global monotonically increasing permission numbers, including retired slots.
   ideSequences: defineTable({
@@ -1294,6 +1296,36 @@ export default defineSchema({
     .index("by_project_employee_end", ["projectId", "employeeId", "endDate"])
     .index("by_project_employee_type_end", ["projectId", "employeeId", "leaveType", "endDate"])
     .index("by_employee_start", ["employeeId", "startDate"]),
+
+  // Belge URL'leri saklanmaz/paylaşılmaz. Bekleyen yüklemeler 24 saatte zaman aşımına uğrar.
+  requestAttachments: defineTable({
+    employeeId: v.id("employees"),
+    projectId: v.id("projects"),
+    name: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+    storageId: v.optional(v.id("_storage")),
+    leaveId: v.optional(v.id("leaves")),
+    correctionId: v.optional(v.id("attendanceCorrections")),
+    expiresAt: v.optional(v.number()),
+    uploadUrl: v.optional(v.string()),
+    uploadHash: v.optional(v.string()),
+    sessionId: v.id("employeeSessions"),
+  }).index("by_leaveId", ["leaveId"])
+    .index("by_correctionId", ["correctionId"])
+    .index("by_employeeId", ["employeeId"])
+    .index("by_storageId", ["storageId"])
+    .index("by_expiresAt", ["expiresAt"])
+    .index("by_uploadHash", ["uploadHash"]),
+
+  requestAttachmentTickets: defineTable({
+    attachmentId: v.id("requestAttachments"),
+    tokenHash: v.string(),
+    expiresAt: v.number(),
+    userId: v.optional(v.id("users")),
+    sessionId: v.optional(v.id("employeeSessions")),
+  }).index("by_tokenHash", ["tokenHash"])
+    .index("by_expiresAt", ["expiresAt"]),
 
   // PDKS düzeltme talebi (P3): çalışan ister, yönetici onaylar; onayda pdksRecords'a manuel kayıt yazılır.
   attendanceCorrections: defineTable({

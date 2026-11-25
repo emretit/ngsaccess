@@ -18,6 +18,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { EmployeeRecentReadings } from "./EmployeeRecentReadings";
 import { EmployeeFingerprintCard } from "./EmployeeFingerprintCard";
+import { EmployeeFaceCard } from "./faces/EmployeeFaceCard";
 export default function EmployeeDetails({
   employee,
   renderEditForm,
@@ -106,6 +107,9 @@ export default function EmployeeDetails({
       {/* Cihaz senkron sorunları Kişiler sayfasındaki senkron uyarıları bandında; drawer'da tekrarlanmaz. */}
       <EmployeeActivityBoundary employeeId={employee._id} projectId={projectId} title="Parmak izi" description="Parmak izi kayıtları yüklenemedi.">
         <EmployeeFingerprintCard key={employee._id} employeeId={employee._id} />
+      </EmployeeActivityBoundary>
+      <EmployeeActivityBoundary employeeId={employee._id} projectId={projectId} title="Yüz" description="Yüz kayıtları yüklenemedi.">
+        <EmployeeFaceCard key={employee._id} employeeId={employee._id} cardNumber={employee.cardNumber} />
       </EmployeeActivityBoundary>
       {/* Düzenleme ekranı yalnız kişi bilgisi + biyometri; geçişler Canlı İzleme geçmişinde. */}
       {!editing && (

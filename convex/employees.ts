@@ -11,7 +11,7 @@ import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
 import { employeeCompanyForDepartment, employeeRelationsToValidate, validateEmployeeRelations } from "./lib/peopleRelations";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
-import { assertSameProject, validatePay, validateEmployeeText, employeeDependentTables, assertEmployeeBulkDeleteLimit } from "./lib/employeeUx";
+import { assertSameProject, validatePay, validateEmployeeText, employeeDependentTables, assertEmployeeBulkDeleteLimit, canSyncEmployeeToDevices } from "./lib/employeeUx";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -245,7 +245,8 @@ export const create = authedMutation({
       }
     }
 
-    validateEmployeeText(args);
+    args.cardNumber = args.cardNumber.trim();
+    validateEmployeeText(args, { allowCardless: true });
     for (const field of ["cardNumber", "email", "tcNo"] as const) {
       const value = field === "email" ? normalizeEmployeeEmail(args.email) : args[field];
       if (!value) continue;
@@ -277,14 +278,16 @@ export const create = authedMutation({
     await recordDepartmentChange(ctx, id);
     await reconcileEmployeeDepartmentRules(ctx, id);
     // DB import gibi UI dışı insert akışlarında da push tetiklensin diye burada (idempotent).
-    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
-      employeeId: id,
-    });
-    // IDE Smart panellerine de otomatik push (MQTT kuyruğu üzerinden). internalAction:
-    // scheduler context'inde auth identity yok, authedAction throw ederdi.
-    await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
-      employeeId: id,
-    });
+    if (canSyncEmployeeToDevices(args)) {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
+        employeeId: id,
+      });
+      // IDE Smart panellerine de otomatik push (MQTT kuyruğu üzerinden). internalAction:
+      // scheduler context'inde auth identity yok, authedAction throw ederdi.
+      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+        employeeId: id,
+      });
+    }
     return id;
   },
   returns: v.id("employees"),
@@ -355,16 +358,17 @@ export const update = authedMutation({
     }
 
     if (updates.email !== undefined) updates.email = normalizeEmployeeEmail(updates.email) ?? "";
+    if (updates.cardNumber !== undefined) updates.cardNumber = updates.cardNumber.trim();
     // Yalnız değişen metinler denetlenir: aktarılmış/eski kayıtların dokunulmayan alanı başka düzenlemeyi engellemez.
     const changedText = <K extends "firstName" | "lastName" | "email" | "tcNo" | "cardNumber">(key: K) =>
       updates[key] !== emp[key] ? updates[key] : undefined;
-    validateEmployeeText({ firstName: changedText("firstName"), lastName: changedText("lastName"), email: changedText("email"), tcNo: changedText("tcNo"), cardNumber: changedText("cardNumber") });
+    validateEmployeeText({ firstName: changedText("firstName"), lastName: changedText("lastName"), email: changedText("email"), tcNo: changedText("tcNo"), cardNumber: changedText("cardNumber") }, { allowCardless: !emp.cardNumber.trim() });
 
     // Sadece DEĞİŞEN alanlar için duplicate kontrol — mevcut çoğaltma kayıtlar
     // başka alanları güncellenirken (örn. pozisyon) bozulmadan saklanır.
     for (const field of ["cardNumber", "email", "tcNo"] as const) {
       const newValue = changedText(field);
-      if (newValue != null) {
+      if (newValue != null && newValue !== "") {
         const dup = await findDuplicateEmployee(ctx, field, newValue, employeeId);
         if (dup) throw new Error(field === "cardNumber" ? cardConflictMessage(newValue, dup, DUPLICATE_MESSAGES[field]) : DUPLICATE_MESSAGES[field]);
       }
@@ -383,7 +387,7 @@ export const update = authedMutation({
       updates.companyId = await employeeCompanyForDepartment(ctx, departmentId, companyId, updates.companyId !== undefined) ?? null;
     }
     validatePay(updates.hourlyRate, updates.monthlySalary);
-    const previousHikSnapshot = updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber
+    const previousHikSnapshot = emp.cardNumber.trim() && updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber
       ? await snapshotEmployeeHikDevices(ctx, emp) : undefined;
     const deactivating = emp.isActive === true && updates.isActive === false;
     const reactivating = emp.isActive === false && updates.isActive === true;
@@ -432,7 +436,7 @@ export const update = authedMutation({
     // Eski kart temizliği yetki kaldırması değildir: employeeId taşımaz.
     if (cardChanged) await scheduleEmployeeCardChange(ctx, employeeId, emp.projectId, emp.cardNumber, previousHikSnapshot);
 
-    if (!cardChanged && (activeChanged || groupMemberAdded || accessStartChanged)) {
+    if (!cardChanged && canSyncEmployeeToDevices({ cardNumber: updates.cardNumber ?? emp.cardNumber }) && (activeChanged || groupMemberAdded || accessStartChanged)) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId,
       });

@@ -20,6 +20,10 @@ vi.mock("./EmployeeSyncConfirmDialog", () => ({ EmployeeSyncConfirmDialog: ({ on
 const employee: Employee = { _id: "e" as Id<"employees">, firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", isActive: true };
 function render(employees = [employee]) { mocks.cursor = 0; mocks.items = []; return renderToStaticMarkup(<EmployeeTable employees={employees} onViewDetails={() => {}} />); }
 beforeEach(() => { mocks.permissions = null; vi.clearAllMocks(); mocks.states = []; mocks.selected = []; mocks.confirm = undefined; mocks.sync.mockResolvedValue({ synced: 1, failed: 0, errors: [] }); });
+it.each(["", "  "])("shows a cardless badge by the person name for blank card %j", cardNumber => {
+  expect(render([{ ...employee, cardNumber }])).toContain("Kartsız");
+  expect(render()).not.toContain("Kartsız");
+});
 it("02-O2: row send opens confirmation and calls device action only after confirmation", () => {
   render();
   mocks.items.find(item => item.children === "Cihazlara gönder")?.onSelect?.();

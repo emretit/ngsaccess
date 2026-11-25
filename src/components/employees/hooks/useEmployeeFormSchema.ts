@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isValidTurkishIdentityNumber } from "../../../../convex/lib/employeeImportValidation";
-import { TC_NO_INVALID_MESSAGE } from "../../../../convex/lib/employeeUx";
+import { cardKey, TC_NO_INVALID_MESSAGE } from "../../../../convex/lib/employeeUx";
 
 const EMAIL_SCHEMA = z.email();
 
@@ -11,7 +11,7 @@ export const employeeFormSchema = z
     // İsteğe bağlı: cihazdan aktarılan kişiler e-postasız gelir; doluysa biçim denetlenir.
     email: z.string().trim().refine(value => !value || EMAIL_SCHEMA.safeParse(value).success, "Geçerli bir e-posta adresi girin"),
     tcNo: z.string().optional(),
-    cardNumber: z.string().trim().min(1, "Kart numarası zorunludur"),
+    cardNumber: z.string().trim(),
     hourlyRate: z
       .number()
       .finite()
@@ -45,3 +45,11 @@ export const employeeFormSchema = z
   });
 
 export type EmployeeFormSchemaInput = z.infer<typeof employeeFormSchema>;
+
+/** A card may be assigned later, but an existing credential cannot be removed here. */
+export function employeeFormSchemaFor(existingCardNumber?: string) {
+  return employeeFormSchema.refine(
+    data => !existingCardNumber || !cardKey(existingCardNumber) || cardKey(data.cardNumber) !== undefined,
+    { message: "Kart numarası zorunludur", path: ["cardNumber"] },
+  );
+}

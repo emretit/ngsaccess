@@ -43,6 +43,18 @@ export function LeaveRequestsPanel({
     setCursor(requestsCursor(cursor, result?.page.length));
   }, [cursor, result?.page.length]);
   const approve = useMutation(api.leaveRequests.approve);
+  const downloadAttachment = useMutation(api.requestAttachments.download);
+  async function downloadDocument(attachmentId: Id<"requestAttachments">) {
+    try {
+      const { url } = await downloadAttachment({ attachmentId });
+      const link = document.createElement("a");
+      link.href = url;
+      link.rel = "noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) { notify.error("Belge indirilemedi", error); }
+  }
   const reject = useMutation(api.leaveRequests.reject);
   const [decision, setDecision] = useState<{
     id: Id<"leaves">;
@@ -99,8 +111,15 @@ export function LeaveRequestsPanel({
                   {dateLabel(row.startDate)} – {dateLabel(row.endDate)}
                 </TableCell>
                 <TableCell>{row.calendarDays ?? "—"}</TableCell>
-                <TableCell className="max-w-full truncate" title={row.notes || "—"}>
-                  {row.notes || "—"}
+                <TableCell>
+                  <div className="truncate" title={row.notes || "—"}>{row.notes || "—"}</div>
+                  {row.attachments?.map(attachment => (
+                    <Button key={attachment._id} variant="link" size="sm" className="block max-w-full truncate px-0"
+                      aria-label={`Belgeyi indir: ${attachment.name}`}
+                      onClick={() => void downloadDocument(attachment._id)}>
+                      {attachment.name} ({Math.ceil(attachment.size / 1024)} KB)
+                    </Button>
+                  ))}
                 </TableCell>
                 <TableCell className="truncate" title={new Date(row.createdAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}>
                   {new Date(row.createdAt).toLocaleString("tr-TR", {

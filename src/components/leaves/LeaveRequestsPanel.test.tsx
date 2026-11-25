@@ -74,6 +74,7 @@ describe("LeaveRequestsPanel", () => {
         {
           _id: "request-1",
           employeeName: "Ada Yılmaz",
+          attachments: [{ _id: "attachment-1", name: "rapor.pdf", size: 1024, contentType: "application/pdf" }],
           createdAt: "2026-10-20T09:00:00Z",
           leaveType: "annual", startDate: "2026-10-21", endDate: "2026-10-22",
           calendarDays: null, notes: "Aile ziyareti", departmentName: "Operasyon",
@@ -85,6 +86,9 @@ describe("LeaveRequestsPanel", () => {
     const html = render();
     for (const label of [
       "Ada Yılmaz",
+      "rapor.pdf",
+      "Belgeyi indir: rapor.pdf",
+      "1 KB",
       "Onayla",
       "Reddet",
       "Sonraki sayfa",

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../core/errors.dart';
 import '../models/employee_request.dart';
+import '../models/request_attachment.dart';
 import '../repositories/request_repository.dart';
 import 'auth_provider.dart';
 
@@ -12,9 +13,11 @@ class RequestProvider extends ChangeNotifier {
   int _generation = 0, _load = 0;
   bool _disposed = false;
   ({String? token, int epoch})? _identity;
+  Object? get sessionIdentity => _identity;
   List<LeaveRequest> leaves = [];
   List<AttendanceCorrectionRequest> corrections = [];
   bool loading = false, busy = false, uncertain = false;
+  bool attachmentUploadFailed = false;
   AppError? error, commandError;
   void synchronizeSession(AuthProvider auth) {
     final identity = (
@@ -31,6 +34,7 @@ class RequestProvider extends ChangeNotifier {
     loading = false;
     busy = false;
     uncertain = false;
+    attachmentUploadFailed = false;
     error = null;
     commandError = null;
     _publish();
@@ -100,6 +104,7 @@ class RequestProvider extends ChangeNotifier {
     busy = true;
     commandError = null;
     uncertain = false;
+    attachmentUploadFailed = false;
     _publish();
     var success = false;
     try {
@@ -109,7 +114,7 @@ class RequestProvider extends ChangeNotifier {
       if (!_current(generation)) return false;
       final mapped = AppError.fromException(e, stack);
       commandError = mapped;
-      uncertain = _isUncertainResult(mapped);
+      uncertain = !attachmentUploadFailed && _isUncertainResult(mapped);
       _expiry(mapped);
     }
     if (!_current(generation)) return false;
@@ -125,12 +130,17 @@ class RequestProvider extends ChangeNotifier {
     required String startDate,
     required String endDate,
     String? notes,
+    List<RequestAttachmentFile> attachments = const [],
   }) => _command(
-    () => _repo.submitLeave(
-      leaveType: leaveType,
-      startDate: startDate,
-      endDate: endDate,
-      notes: notes,
+    () => _withAttachments(
+      attachments,
+      (ids) => _repo.submitLeave(
+        leaveType: leaveType,
+        startDate: startDate,
+        endDate: endDate,
+        notes: notes,
+        attachmentIds: ids,
+      ),
     ),
   );
   Future<bool> submitCorrection({
@@ -139,15 +149,52 @@ class RequestProvider extends ChangeNotifier {
     required String reason,
     String? requestedCheckIn,
     String? requestedCheckOut,
+    List<RequestAttachmentFile> attachments = const [],
   }) => _command(
-    () => _repo.submitCorrection(
-      date: date,
-      correctionType: correctionType,
-      reason: reason,
-      requestedCheckIn: requestedCheckIn,
-      requestedCheckOut: requestedCheckOut,
+    () => _withAttachments(
+      attachments,
+      (ids) => _repo.submitCorrection(
+        date: date,
+        correctionType: correctionType,
+        reason: reason,
+        requestedCheckIn: requestedCheckIn,
+        requestedCheckOut: requestedCheckOut,
+        attachmentIds: ids,
+      ),
     ),
   );
+  Future<String> _withAttachments(
+    List<RequestAttachmentFile> files,
+    Future<String> Function(List<String>) submit,
+  ) async {
+    if (files.length > 3) throw const ProtocolError();
+    final identity = _identity;
+    final ids = <String>[];
+    var submitted = false;
+    try {
+      for (final file in files) {
+        ids.add(await _repo.uploadAttachment(file));
+        if (_disposed || identity != _identity) throw const AuthExpiredError();
+      }
+      if (_disposed || identity != _identity) throw const AuthExpiredError();
+      submitted = true;
+      return await submit(ids);
+    } catch (_) {
+      // The server refuses to discard already-linked files after an uncertain submit.
+      if (identity == _identity) {
+        attachmentUploadFailed = !submitted;
+        for (final id in ids) {
+          try {
+            await _repo.discardAttachment(id);
+          } catch (_) {
+            /* Daily server cleanup retries abandoned slots. */
+          }
+        }
+      }
+      rethrow;
+    }
+  }
+
   Future<bool> withdrawLeave(LeaveRequest row) async =>
       row.canWithdraw ? _command(() => _repo.withdrawLeave(row.id)) : false;
   Future<bool> withdrawCorrection(AttendanceCorrectionRequest row) async =>

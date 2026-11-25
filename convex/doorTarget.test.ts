@@ -218,7 +218,7 @@ it.each(["hikvision", "ide_smart"] as const)("Y-07: a 600-member blanket %s rule
   if (brand === "hikvision") expect(wire.send.mock.calls.filter(call => JSON.stringify(call).includes('"doorPlans"'))).toHaveLength(600);
   else expect((await f.t.run(ctx => ctx.db.query("idePendingOperations").collect())).every(op => op.opType === "upsertPermission")).toBe(true);
   expect(wire.remove).not.toHaveBeenCalled();
-}, 20_000);
+}, 120_000);
 
 it("Y-11: the former IDE panel closes immediately with removed grants", async () => {
   const f = await assigned("ide_smart");

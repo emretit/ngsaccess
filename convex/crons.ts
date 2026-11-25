@@ -106,4 +106,6 @@ crons.cron("purge-access-retention", "55 0 * * *", internal.privacyRetention.sta
 
 crons.cron("purge-report-deliveries", "5 1 * * *", internal.privacyRetention.purgeReportDeliveries, {});
 
+crons.cron("cleanup-request-attachments", "25 4 * * *", internal.requestAttachments.cleanup, {});
+
 export default crons;

@@ -60,7 +60,10 @@ describe("CorrectionRequestsPanel", () => {
     state.result = undefined;
     expect(render()).toContain("Talepler yükleniyor.");
     state.result = { page: [], isDone: true, continueCursor: "" };
-    expect(render()).toContain("Bekleyen düzeltme talebi yok.");
+    const html = render();
+    expect(html).toContain("Bekleyen düzeltme talebi yok.");
+    expect(html).toContain("<thead");
+    expect(html).toContain('colSpan="7"');
   });
   it("renders request details and decision controls", () => {
     state.result = {
@@ -68,6 +71,7 @@ describe("CorrectionRequestsPanel", () => {
         {
           _id: "request-1",
           employeeName: "Ada Yılmaz",
+          attachments: [{ _id: "attachment-1", name: "rapor.pdf", size: 1024, contentType: "application/pdf" }],
           createdAt: "2026-10-20T09:00:00Z",
           date: "2026-10-19",
           correctionType: "both",
@@ -82,6 +86,9 @@ describe("CorrectionRequestsPanel", () => {
     const html = render();
     for (const label of [
       "Ada Yılmaz",
+      "rapor.pdf",
+      "Belgeyi indir: rapor.pdf",
+      "1 KB",
       "Onayla",
       "Reddet",
       "Sonraki sayfa",

@@ -15,12 +15,13 @@ import {
 } from "./lib/customFunctions";
 import { requestError, istanbulToday, overlaps, validateLeaveRequestRange } from "./lib/requestRules";
 import { writeAudit } from "./lib/audit";
+import { attachmentsFor, bindRequestAttachments, deleteRequestAttachments } from "./requestAttachments";
 
 const leaveType = v.union(v.literal("annual"), v.literal("sick"), v.literal("excuse"), v.literal("unpaid"), v.literal("parental"), v.literal("marriage"), v.literal("bereavement"), v.literal("paternity"), v.literal("lactation"), v.literal("compensatory"));
 const SCAN_LIMIT = 5000;
 
 export const submit = employeeAuthedMutation({
-  args: { leaveType, startDate: v.string(), endDate: v.string(), notes: v.optional(v.string()) },
+  args: { leaveType, startDate: v.string(), endDate: v.string(), notes: v.optional(v.string()), attachmentIds: v.optional(v.array(v.id("requestAttachments"))) },
   handler: async (ctx, args) => {
     const employee = ctx.employee;
     if (!employee.projectId) throw requestError("REQUEST_PROJECT_MISSING");
@@ -33,7 +34,9 @@ export const submit = employeeAuthedMutation({
     if (rows.some(row => row.status === "pending" && overlaps(args.startDate, args.endDate, row.startDate, row.endDate))) throw requestError("REQUEST_OVERLAP_PENDING");
     if (rows.some(row => row.status === "approved" && overlaps(args.startDate, args.endDate, row.startDate, row.endDate))) throw requestError("REQUEST_OVERLAP_APPROVED");
     const now = new Date().toISOString();
-    const id = await ctx.db.insert("leaves", { employeeId: employee._id, projectId: employee.projectId, ...args, status: "pending", source: "employee", createdAt: now, updatedAt: now });
+    const { attachmentIds, ...fields } = args;
+    const id = await ctx.db.insert("leaves", { employeeId: employee._id, projectId: employee.projectId, ...fields, status: "pending", source: "employee", createdAt: now, updatedAt: now });
+    await bindRequestAttachments(ctx, employee, attachmentIds, { leaveId: id });
     await writeAudit(ctx, { user: null, projectId: employee.projectId, action: "create", targetTable: "leaves", targetId: id, newValue: { actorType: "employee", employeeId: employee._id, status: "pending" }, note: "Çalışan talebi" });
     return id;
   },
@@ -45,6 +48,7 @@ export const withdraw = employeeAuthedMutation({
     const leave = await ctx.db.get(leaveId);
     if (!leave || leave.employeeId !== ctx.employee._id) throw requestError("REQUEST_NOT_FOUND");
     if (leave.status !== "pending" || leave.source !== "employee") throw requestError("REQUEST_NOT_PENDING");
+    await deleteRequestAttachments(ctx, { leaveId });
     await ctx.db.delete(leaveId);
     await writeAudit(ctx, { user: null, projectId: leave.projectId, action: "delete", targetTable: "leaves", targetId: leaveId, oldValue: { actorType: "employee", employeeId: ctx.employee._id, status: leave.status }, note: "Çalışan talebi" });
     return null;
@@ -58,12 +62,14 @@ export const listMine = employeeAuthedQuery({
     status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
     notes: v.optional(v.string()), decisionNote: v.optional(v.string()), decidedAt: v.optional(v.string()),
     source: v.optional(v.union(v.literal("admin"), v.literal("employee"))), createdAt: v.string(),
+    attachments: v.optional(v.array(v.object({ _id: v.id("requestAttachments"), name: v.string(), contentType: v.string(), size: v.number() }))),
   })),
   handler: async (ctx) => {
     const since = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
     const rows = await ctx.db.query("leaves").withIndex("by_employee_start", q => q.eq("employeeId", ctx.employee._id).gte("startDate", since)).order("desc").take(100);
-    return rows.map(({ _id, leaveType, startDate, endDate, status, notes, decisionNote, decidedAt, source, createdAt }) => ({
-      _id, leaveType, startDate, endDate, status, notes, decisionNote, decidedAt, source, createdAt,
+    return Promise.all(rows.map(async ({ _id, projectId, leaveType, startDate, endDate, status, notes, decisionNote, decidedAt, source, createdAt }) => {
+      const attachments = projectId === ctx.employee.projectId ? await attachmentsFor(ctx, { leaveId: _id }) : [];
+      return { _id, leaveType, startDate, endDate, status, notes, decisionNote, decidedAt, source, createdAt, ...(attachments.length ? { attachments } : {}) };
     }));
   },
 });
@@ -118,6 +124,7 @@ export const listPending = authedQuery({
         }
         return {
           ...leave,
+          attachments: visible ? await attachmentsFor(ctx, { leaveId: leave._id }) : [],
           employeeName: visible
             ? `${visible.firstName} ${visible.lastName}`.trim()
             : "Personel bulunamadı",

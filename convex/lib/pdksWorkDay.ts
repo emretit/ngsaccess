@@ -5,6 +5,7 @@ import { isoTimeToTRMinutes, parseHHMM } from "./pdksHelpers";
 import { effectiveDirection, matchesPdksCheckpoint, type PdksDayPolicy } from "./pdksRules";
 import { isPdksIncludedReading } from "./pdksSource";
 import { trDateKey, trDayRangeISO } from "./trDate";
+import { cardKey } from "./employeeUx";
 
 export type PdksShift = ShiftSchedule & FixedShiftRules;
 export type PdksShiftResolver = (
@@ -241,10 +242,13 @@ export function buildPdksWorkDateResolver(
     employees.map((employee) => [String(employee._id), employee]),
   );
   const byCard = new Map(
-    employees.map((employee) => [employee.cardNumber, employee]),
+    employees.flatMap((employee) => {
+      const key = cardKey(employee.cardNumber);
+      return key ? [[employee.cardNumber, employee] as const] : [];
+    }),
   );
   const employeeFor = (reading: Pick<Doc<"cardReadings">, "employeeId" | "cardNo">) =>
-    (reading.employeeId ? byId.get(String(reading.employeeId)) : undefined) ?? byCard.get(reading.cardNo);
+    reading.employeeId ? byId.get(String(reading.employeeId)) : byCard.get(reading.cardNo);
   // Resolve the previous shift's policy for a night tail before choosing a day.
   // This also preserves the previous version across a midnight rule transition.
   const withDirection = <T extends WorkDateReading>(reading: T): T => {

@@ -9,6 +9,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RowActions } from "@/components/shared/RowActions";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 interface Props {
   employee: Employee;
   canManage: boolean;
@@ -81,6 +82,7 @@ export function EmployeeTableRow({
             >
               {employee.firstName} {employee.lastName}
             </button>
+            {!employee.cardNumber.trim() && <Badge variant="outline" className="text-xs">Kartsız</Badge>}
             <p className="truncate text-xs text-muted-foreground min-[760px]:hidden">
               {[
                 showDepartment && (employee.departments?.name ?? "Atanmamış"),

@@ -4,6 +4,7 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { resolveEmployeeIdeDeviceIds } from "./accessGraph";
 import { assertNoEmployeeTransfer } from "./transferGuard";
+import { canSyncEmployeeToDevices } from "./employeeUx";
 
 /** employees.ts update kart değişimi bloğunun (302-351) ortaklaştırılmış akışıdır. */
 export async function scheduleEmployeeCardChange(
@@ -14,6 +15,12 @@ export async function scheduleEmployeeCardChange(
   previousHikSnapshot?: HikSnapshot,
 ): Promise<void> {
   await assertNoEmployeeTransfer(ctx, employeeId);
+  // First card assignment has no old device identity to remove or purge.
+  if (!canSyncEmployeeToDevices({ cardNumber: previousCardNumber })) {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+    await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
+    return;
+  }
   await scheduleFingerprintPurge(ctx, employeeId, previousCardNumber, { deleteTemplates: false });
   const ideDeviceIds = await resolveEmployeeIdeDeviceIds(ctx, employeeId, projectId);
   if (ideDeviceIds.length > 0) {

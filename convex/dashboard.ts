@@ -7,6 +7,7 @@ import { resolveAttendanceEvidence } from "./lib/pdksEvidence";
 import { addWorkDate, buildPdksWorkDateResolver, groupPdksWorkDays } from "./lib/pdksWorkDay";
 import type { PdksTableRow } from "./lib/pdksTable";
 import { filterPdksReadings } from "./lib/pdksSource";
+import { cardKey } from "./lib/employeeUx";
 import { summarizeDailyReadings } from "./lib/dashboardActivity";
 import { countDashboardRows } from "./lib/dashboardCounts";
 import { createHourlyCounter } from "./lib/dashboardTimeline";
@@ -279,14 +280,18 @@ async function loadPdksDataset(
   const workDate = dashboardWorkDateResolver(employees, shiftResolver, ruleReport.workDate);
   const filtered = filterPdksReadings(readings, filters.projectId, r => ruleReport.policies(r.projectId, workDate(r)));
   const employeesById = new Map(employees.map(employee => [employee._id, employee]));
-  const employeesByCard = new Map(employees.map(employee => [employee.cardNumber, employee]));
+  const employeesByCard = new Map(employees.flatMap(employee => {
+    const key = cardKey(employee.cardNumber);
+    return key ? [[employee.cardNumber, employee] as const] : [];
+  }));
   const legacy = filtered.filter(r => {
     const employee = r.employeeId ? employeesById.get(r.employeeId) : employeesByCard.get(r.cardNo);
     return employee && shiftResolver.resolvePlan(employee._id, workDate(r)).kind !== "none" && !ruleReport.managesReading(r);
   });
   const versioned: Doc<"cardReadings">[] = [];
   for (const employee of employees) {
-    for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve, ruleReport.manualEntryFor, undefined, shiftResolver.resolveLast, date => ruleReport.policies(employee.projectId, date))) {
+    const employeeCard = cardKey(employee.cardNumber);
+    for (const [date, list] of groupPdksWorkDays(ruleReport.readings.filter(r => r.employeeId === employee._id || (!r.employeeId && employeeCard !== undefined && r.cardNo === employee.cardNumber)), employee._id, shiftResolver.resolve, ruleReport.manualEntryFor, undefined, shiftResolver.resolveLast, date => ruleReport.policies(employee.projectId, date))) {
       const policy = ruleReport.policies(employee.projectId, date);
       if (policy.punchMode !== "requirements" && !usesPlanDayRules(shiftResolver.resolvePlan(employee._id, date)) && !usesShiftDayRules(shiftResolver.resolve(employee._id, date))) continue;
       const cell = ruleReport.ruleRows.get(employee._id)?.days.find(day => day.date === date);
@@ -308,7 +313,10 @@ export function dashboardWorkDateResolver(
   const legacyWorkDate = buildPdksWorkDateResolver(employees, shifts.resolve, undefined, undefined, shifts.resolveLast);
   const hasShiftRules = [...shifts.shifts.values()].some(usesShiftDayRules);
   const byId = new Map(employees.map(employee => [employee._id, employee]));
-  const byCard = new Map(employees.map(employee => [employee.cardNumber, employee]));
+  const byCard = new Map(employees.flatMap(employee => {
+    const key = cardKey(employee.cardNumber);
+    return key ? [[employee.cardNumber, employee] as const] : [];
+  }));
   return (reading: Doc<"cardReadings">) => {
     const employee = reading.employeeId ? byId.get(reading.employeeId) : byCard.get(reading.cardNo);
     const date = trDateKey(reading.accessTime);
@@ -475,7 +483,10 @@ export const getAnnualOvertimeBalance = authedQuery({
     const settingsByProject = new Map(await Promise.all([...new Set(targetEmployees.map(e => e.projectId))].map(async projectId =>
       [projectId, projectId === workSettingsProjectId ? workSettings : projectId ? await getEffectiveWorkSettings(ctx, projectId) : DEFAULT_WORK_SETTINGS] as const,
     )));
-    const employeesByCard = new Map(targetEmployees.map(employee => [`${employee.projectId}__${employee.cardNumber}`, employee._id]));
+    const employeesByCard = new Map(targetEmployees.flatMap(employee => {
+      const key = cardKey(employee.cardNumber);
+      return key ? [[`${employee.projectId}__${employee.cardNumber}`, employee._id] as const] : [];
+    }));
     const readingsByEmployee = new Map<Id<"employees">, Doc<"cardReadings">[]>();
     for (const reading of activityReadings) {
       const employeeId = reading.employeeId ?? employeesByCard.get(`${reading.projectId}__${reading.cardNo}`);

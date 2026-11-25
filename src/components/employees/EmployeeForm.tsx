@@ -17,7 +17,7 @@ import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog
 import { Button } from "@/components/ui/button";
 import { useEmployeeFormSubmit } from "./hooks/useEmployeeFormSubmit";
 import { usePhotoUpload } from "./hooks/usePhotoUpload";
-import { employeeFormSchema } from "./hooks/useEmployeeFormSchema";
+import { employeeFormSchemaFor } from "./hooks/useEmployeeFormSchema";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
@@ -162,7 +162,7 @@ export default function EmployeeForm({
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (uploading || isLoading || stages.length > 0) return;
-    const result = employeeFormSchema.safeParse(formData);
+    const result = employeeFormSchemaFor(employee?.cardNumber).safeParse(formData);
     if (!result.success) {
       const errors: Record<string, string> = {};
       for (const issue of result.error.issues) {

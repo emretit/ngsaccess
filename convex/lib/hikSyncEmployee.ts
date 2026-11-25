@@ -5,6 +5,7 @@
 import { gatewayApiCallChecked } from "./gateway/core";
 import { accessEndsAtMs } from "./accessEnd";
 import { toUtcISO } from "./trDate";
+import { cardKey } from "./employeeUx";
 
 
 import type { GrantResult } from "./grantStatus";
@@ -639,6 +640,7 @@ export async function syncEmployeeDoorRights(
   ctx: ActionCtx,
   args: { employeeId: Id<"employees">; cardNumber: string; device: HikDeviceRef; runId?: Id<"deviceSyncRuns"> },
 ): Promise<{ ok: boolean; removed?: boolean; error?: string }> {
+  if (!cardKey(args.cardNumber)) return { ok: true };
   const { device } = args;
   const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: args.employeeId });
   if (!data || data.employee.projectId !== device.projectId || data.employee.cardNumber !== args.cardNumber) return { ok: false, error: "Kişinin kartı veya projesi değişti; kapı yetkisi doğrulanamadı" };

@@ -304,6 +304,7 @@ export const captureFaceFromDevice = authedAction({
     ctx,
     args,
   ): Promise<{ ok: boolean; faceDataBase64?: string; faceURL?: string; error?: string }> => {
+    if (args.employeeId) await ctx.runQuery(internal.employeeFaces.authorizeUpload, { employeeId: args.employeeId, deviceId: args.deviceId, userId: ctx.user._id });
     return await runCaptureFaceFromDevice(ctx, args);
   },
 });

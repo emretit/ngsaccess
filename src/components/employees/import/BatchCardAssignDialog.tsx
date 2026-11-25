@@ -94,7 +94,7 @@ export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees
     setBusy(true);
     setMessage(null);
     try {
-      const candidates = rows.filter((row) => row.cardNumber.trim());
+      const candidates = rows.filter((row) => row.cardNumber.trim() && row.status !== "assigned");
       const resultRows = [...rows];
       for (let index = 0; index < candidates.length; index += 100) {
         const response: AssignResult[] = await assignCards({ assignments: candidates.slice(index, index + 100).map((row) => ({ employeeId: row.employeeId as Id<"employees">, cardNumber: row.cardNumber.trim() })) });

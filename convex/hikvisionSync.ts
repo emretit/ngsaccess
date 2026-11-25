@@ -1078,7 +1078,7 @@ export const cleanupStaleSyncIssues = internalMutation({
       .withIndex("by_status_created", (q) => q.eq("status", "failed"))
       .order("asc")
       .paginate({ numItems: CLEANUP_BATCH_SIZE * 4, cursor: null });
-    const failed = result.page.filter(op => !isPersonDeletion(op));
+    const failed = result.page.filter(op => !isPersonDeletion(op) && op.operation !== "addFace" && op.operation !== "deleteFace");
 
     // Cihaz lookup'unu dedupe et — aynı cihazda biriken birden fazla failure varsa tek get.
     const deviceIds = Array.from(new Set(failed.map((f) => f.deviceId)));

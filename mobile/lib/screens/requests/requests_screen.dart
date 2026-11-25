@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/attendance_date.dart';
@@ -6,6 +8,7 @@ import '../../core/error_localizer.dart';
 import '../../core/errors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/employee_request.dart';
+import '../../models/request_attachment.dart';
 import '../../providers/request_provider.dart';
 import '../../widgets/ui/ui.dart';
 
@@ -209,6 +212,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                           status: row.status,
                           details: row.notes,
                           decision: row.decisionNote,
+                          attachments: row.attachments,
                           admin: row.isAdmin,
                           withdraw: row.canWithdraw
                               ? () => _withdraw(
@@ -231,6 +235,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                           row.reason,
                         ].whereType<String>().join(' · '),
                         decision: row.decisionNote,
+                        attachments: row.attachments,
                         withdraw: row.canWithdraw
                             ? () => _withdraw(
                                 '${correctionLabel(l, row.correctionType)} · $range',
@@ -256,6 +261,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
     required String status,
     String? details,
     String? decision,
+    List<RequestAttachment> attachments = const [],
     bool admin = false,
     VoidCallback? withdraw,
   }) {
@@ -305,6 +311,13 @@ class _RequestsScreenState extends State<RequestsScreen> {
                 ),
               ),
             ],
+            for (final attachment in attachments) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Ek: ${attachment.name} (${(attachment.size / 1024).ceil()} KB)',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
             if (admin) ...[
               const SizedBox(height: 8),
               Text(l.requestsAdmin, style: theme.textTheme.bodySmall),
@@ -350,8 +363,104 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   String? _in, _out;
   AppError? _validation;
   bool _sending = false;
+  bool _picking = false;
+  String? _attachmentError;
+  Object? _attachmentIdentity;
+  final _attachments = <RequestAttachmentFile>[];
+  final _formScrollController = ScrollController();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final identity = context.watch<RequestProvider>().sessionIdentity;
+    if (_attachmentIdentity != identity) {
+      _attachments.clear();
+      _attachmentError = null;
+      _attachmentIdentity = identity;
+    }
+  }
+
+  Future<void> _pickAttachments() async {
+    if (_picking || _sending) return;
+    final identity = _attachmentIdentity;
+    setState(() {
+      _picking = true;
+      _attachmentError = null;
+    });
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+        allowMultiple: true,
+        withData: false,
+      );
+      if (!mounted || identity != _attachmentIdentity || result == null) return;
+      if (_attachments.length + result.files.length > 3) {
+        setState(() => _attachmentError = 'En fazla 3 belge ekleyebilirsiniz.');
+        return;
+      }
+      final added = <RequestAttachmentFile>[];
+      for (final picked in result.files) {
+        final path = picked.path;
+        final mime = RequestAttachmentFile.contentTypeFor(picked.name);
+        if (path == null ||
+            mime == null ||
+            picked.size <= 0 ||
+            picked.size > RequestAttachmentFile.maxBytes) {
+          if (mounted) {
+            setState(
+              () => _attachmentError =
+                  'Fotoğraf veya PDF seçin. Her dosya en fazla 5 MB olabilir.',
+            );
+          }
+          return;
+        }
+        final file = File(path);
+        if (await file.length() > RequestAttachmentFile.maxBytes) {
+          if (mounted) {
+            setState(
+              () => _attachmentError = 'Her dosya en fazla 5 MB olabilir.',
+            );
+          }
+          return;
+        }
+        final bytes = await file.readAsBytes();
+        if (bytes.isEmpty || bytes.length > RequestAttachmentFile.maxBytes) {
+          throw const FormatException();
+        }
+        added.add(
+          RequestAttachmentFile(
+            name: picked.name,
+            contentType: mime,
+            bytes: bytes,
+          ),
+        );
+      }
+      if (mounted && identity == _attachmentIdentity) {
+        setState(() => _attachments.addAll(added));
+      }
+    } catch (_) {
+      if (mounted && identity == _attachmentIdentity) {
+        setState(
+          () => _attachmentError = 'Belge seçilemedi. Lütfen yeniden deneyin.',
+        );
+      }
+    } finally {
+      // The picker caches private copies; remove them after reading into memory.
+      try {
+        await FilePicker.platform.clearTemporaryFiles();
+      } catch (_) {
+        /* Some desktop platforms have no picker cache. */
+      }
+      if (mounted) setState(() => _picking = false);
+      if (mounted && _attachmentError != null) _focusError();
+    }
+  }
+
   @override
   void dispose() {
+    _attachments.clear();
+    _formScrollController.dispose();
     _text.dispose();
     for (final node in [
       _textFocus,
@@ -394,6 +503,16 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   void _focusError() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (_attachmentError != null && _formScrollController.hasClients) {
+        unawaited(
+          _formScrollController.animateTo(
+            _formScrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+          ),
+        );
+        return;
+      }
       final node = switch (_errorField) {
         'text' => _textFocus,
         'date' => _dateFocus,
@@ -408,7 +527,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   }
 
   Future<void> _submit() async {
-    if (_sending) return;
+    if (_sending || _picking) return;
     final p = context.read<RequestProvider>();
     if (p.busy) return;
     final today = AttendanceDate.instantKey(_now());
@@ -448,6 +567,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             startDate: _start,
             endDate: _end,
             notes: notes,
+            attachments: List.unmodifiable(_attachments),
           )
         : await p.submitCorrection(
             date: _start,
@@ -455,6 +575,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
             reason: _text.text.trim(),
             requestedCheckIn: _correction == 'checkOut' ? null : _in,
             requestedCheckOut: _correction == 'checkIn' ? null : _out,
+            attachments: List.unmodifiable(_attachments),
           );
     if (!mounted) return;
     setState(() => _sending = false);
@@ -473,7 +594,12 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         navigator.removeRoute(ownRoute, result);
       }
     } else {
-      setState(() => _validation = p.commandError);
+      setState(() {
+        _validation = p.attachmentUploadFailed ? null : p.commandError;
+        _attachmentError = p.attachmentUploadFailed
+            ? 'Belge yüklenemedi. Talebiniz gönderilmedi; dosyaları kontrol edip yeniden deneyin.'
+            : null;
+      });
       _focusError();
     }
   }
@@ -481,7 +607,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final busy = _sending || context.watch<RequestProvider>().busy;
+    final busy = _sending || _picking || context.watch<RequestProvider>().busy;
     final today = AttendanceDate.parseDay(AttendanceDate.instantKey(_now()));
     final first = today.subtract(const Duration(days: 30));
     final error = _validation;
@@ -548,6 +674,7 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 480),
                   child: ListView(
+                    controller: _formScrollController,
                     padding: const EdgeInsets.all(20),
                     children: [
                       if (widget.isLeave) ...[
@@ -653,6 +780,49 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
                         errorText: errorFor('text'),
                         errorMaxLines: 6,
                       ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Belgeler (isteğe bağlı)',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const Text(
+                        'En fazla 3 fotoğraf veya PDF; dosya başına 5 MB.',
+                      ),
+                      for (var i = 0; i < _attachments.length; i++)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            _attachments[i].name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '${(_attachments[i].bytes.length / 1024).ceil()} KB',
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'Belgeyi çıkar: ${_attachments[i].name}',
+                            onPressed: busy
+                                ? null
+                                : () =>
+                                      setState(() => _attachments.removeAt(i)),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ),
+                      TextButton.icon(
+                        key: const Key('request-add-attachment'),
+                        onPressed: busy || _attachments.length >= 3
+                            ? null
+                            : _pickAttachments,
+                        icon: const Icon(Icons.attach_file),
+                        label: Text(
+                          _picking ? 'Belge seçiliyor…' : 'Belge ekle',
+                        ),
+                      ),
+                      if (_attachmentError case final message?)
+                        AppDataNotice(
+                          message: message,
+                          tone: AppStatusTone.danger,
+                        ),
                       if (errorFor('notice') case final message?)
                         Focus(
                           key: _noticeKey,

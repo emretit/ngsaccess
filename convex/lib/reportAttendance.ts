@@ -20,6 +20,7 @@ import { getTurkishHolidaysForYear, hasReligiousData } from "./turkishHolidays";
 import { trDateKey, trDayRangeISO, trTodayKey } from "./trDate";
 import { buildPdksWorkDateResolver, pdksWorkDayRange, addWorkDate, hasFlexiblePdksShift } from "./pdksWorkDay";
 import { readReportReadings, reportPeriod, flexibleReportProjects } from "./reportScope";
+import { cardKey } from "./employeeUx";
 
 export const ATTENDANCE_RELIABILITY_NOTE = "Güvenilirlik sınırı: İşe giriş tarihi tutulmadığından ay ortasında işe başlayanlar ayrıştırılamaz; ayrılanların son çalışma gününden sonraki günleri hesaplanmaz. Günler PDKS tablo motoruyla hesaplanır; yarım tatil günleri PDKS gibi tatil sayılır. Devam oranı, tamamlanmış beklenen günlerden izinler çıkarılarak hesaplanır. Tek izinli okuma veya manuel giriş devam kabul edilir; bu bir bordro onayı değildir.";
 
@@ -323,7 +324,10 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
       eligibleEntry: (reading, date) => filterPdksReadings([reading], projectId, r => policies(projectId, date ?? trDateKey(r.accessTime))).length > 0,
     }, (_reading, date) => policies(projectId, date), shifts.resolveLast) : boundaryWorkDate;
     const employeesById = new Map(allEmployees.map(employee => [employee._id, employee]));
-    const employeesByCard = new Map(allEmployees.map(employee => [employee.cardNumber, employee]));
+    const employeesByCard = new Map(allEmployees.flatMap(employee => {
+      const key = cardKey(employee.cardNumber);
+      return key ? [[employee.cardNumber, employee] as const] : [];
+    }));
     const workDate = (reading: Doc<"cardReadings">) => {
       if (activeProjects.includes(projectId)) return flexibleWorkDate(reading);
       const employee = reading.employeeId ? employeesById.get(reading.employeeId) : employeesByCard.get(reading.cardNo);
@@ -365,7 +369,10 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     }
   }
   const dateFor = (reading: Doc<"cardReadings">) => workDates.get(reading._id) ?? trDateKey(reading.accessTime);
-  const employeeByCard = new Map([...ruleEmployees.values()].map(employee => [`${employee.projectId}__${employee.cardNumber}`, employee]));
+  const employeeByCard = new Map([...ruleEmployees.values()].flatMap(employee => {
+    const key = cardKey(employee.cardNumber);
+    return key ? [[`${employee.projectId}__${employee.cardNumber}`, employee] as const] : [];
+  }));
   const managesReading = (reading: Doc<"cardReadings">) => {
     const date = dateFor(reading);
     const employeeId = reading.employeeId ?? employeeByCard.get(`${reading.projectId}__${reading.cardNo}`)?._id;
@@ -379,7 +386,10 @@ export async function loadRuleReportDays(ctx: QueryCtx, projectIds: Id<"projects
     return employees;
   }))).flat();
   const planById = new Map(planEmployees.map(employee => [employee._id, employee]));
-  const planByCard = new Map(planEmployees.map(employee => [`${employee.projectId}__${employee.cardNumber}`, employee]));
+  const planByCard = new Map(planEmployees.flatMap(employee => {
+    const key = cardKey(employee.cardNumber);
+    return key ? [[`${employee.projectId}__${employee.cardNumber}`, employee] as const] : [];
+  }));
   const hasPlan = (employee: Doc<"employees">, date: string) => {
     const resolver = employee.projectId ? planResolvers.get(employee.projectId) : undefined;
     return resolver !== undefined && scopedPdksPlan(resolver.resolvePlan(employee._id, date), employee.projectId).kind !== "none";

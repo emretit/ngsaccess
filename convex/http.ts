@@ -8,10 +8,14 @@ import { auth } from "./auth";
 import { parseCardReaderBody, readLimitedBody, parseJsonObject, HttpInputError, cardReaderBodyLimit } from "./lib/cardReaderParse";
 import { shouldCreateCardReadingForHikEvent } from "./lib/hikEventCatalog";
 import { resolveCardReaderAuth } from "./lib/cardReaderAuth";
+import { serve as serveRequestAttachment, upload as uploadRequestAttachment } from "./requestAttachments";
 
 const http = httpRouter();
 
 auth.addHttpRoutes(http);
+
+http.route({ path: "/request-attachments", method: "GET", handler: serveRequestAttachment });
+http.route({ path: "/request-attachments", method: "POST", handler: uploadRequestAttachment });
 
 /** Gateway status uses only a device Bearer token; relay/legacy auth is never accepted. */
 http.route({

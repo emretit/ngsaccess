@@ -8,6 +8,7 @@ import { canEmployeeAccessDevice } from "./accessDecision";
 import { ideTimeToISO, resolveDirection, resolveActiveMatchingRuleIds, type AccessDirection } from "./cardReadingProcess";
 import { isVirtualReader, READER_TOKEN_PATTERN, type ReaderScanDenial } from "./virtualReader";
 import { toUtcISO } from "./trDate";
+import { cardKey } from "./employeeUx";
 
 export interface ProcessCardReadingArgs {
   cardNo: string;
@@ -81,7 +82,10 @@ export async function processCardReadingCore(
     hikEventState: args.hikEventState,
   } as const;
 
-  const state: ReadingState = { accessTime, projectForRow, hikFields, findDeviceCardEmployee };
+  const state: ReadingState = { accessTime, projectForRow, hikFields,
+    findDeviceCardEmployee: (context, cardNo, projectId) => cardKey(cardNo)
+      ? findDeviceCardEmployee(context, cardNo, projectId) : Promise.resolve(null),
+  };
   const device = await resolveReadingDevice(ctx, args);
 
   // Reader credentials must never be misinterpreted as native IDE/Hik card identifiers.
@@ -355,7 +359,8 @@ export async function consumeReaderTokenDetailed(
   const protocol = isVirtualReader(device) ? "virtual_reader" : "generic_reader";
   await ctx.db.insert("cardReadings", {
     projectId: device.projectId, deviceId: device._id, employeeId: tokenEmployee._id,
-    cardNo: tokenEmployee.cardNumber, employeeName, accessTime: consumedAt,
+    // Token identity is employeeId; an absent physical card stays anonymous as a card.
+    cardNo: cardKey(tokenEmployee.cardNumber) ? tokenEmployee.cardNumber : "", employeeName, accessTime: consumedAt,
     accessStatus: "izin_verildi", direction, rawData: JSON.stringify({ source: "qr", protocol }),
     createdAt: consumedAt, updatedAt: consumedAt,
   });

@@ -6,6 +6,7 @@ import { bounded, upsertGrantStatus } from "./grantStatus";
 import { summarizeRun } from "./deviceSyncRun";
 import { assertDeviceDoorTargets } from "./doorTarget";
 import { allocateIdePermissionNos, buildIdePermissionRecord, enqueueIdeOpInTransaction, ideRuleSegments, ruleIoIdsForPanel } from "../ideSync";
+import { canSyncEmployeeToDevices } from "./employeeUx";
 
 export async function snapshotDoorTarget(ctx: MutationCtx, door: Doc<"doors">, nextDeviceId?: Id<"devices">) {
   const links = bounded(await ctx.db.query("groupDoors").withIndex("by_door", q => q.eq("doorId", door._id)).take(101), 100);
@@ -92,6 +93,7 @@ export async function syncChangedDoorTarget(ctx: MutationCtx, before: Awaited<Re
         continue;
       }
       for (const employee of employees) {
+        if (!canSyncEmployeeToDevices(employee)) continue;
         await upsertGrantStatus(ctx, { projectId, employeeId: employee._id, deviceId: device._id, state: "pending", lastRunId: runId });
         if (device.brand !== "hikvision") continue;
         // Durable queue evidence exists before the first network call. Retrying this
@@ -121,7 +123,7 @@ export async function syncChangedDoorTarget(ctx: MutationCtx, before: Awaited<Re
           if (no === undefined) continue;
           await enqueueIdeOpInTransaction(ctx, { deviceId: device._id, projectId, runId, opType: "upsertPermission", payload: { mode: "create", permissionRecord: { ...buildIdePermissionRecord(no, ioIds, {}), schedule } } });
         }
-        const employeeIds = employees.filter(employee => employee.isActive !== false).map(employee => employee._id);
+        const employeeIds = employees.filter(employee => employee.isActive !== false && canSyncEmployeeToDevices(employee)).map(employee => employee._id);
         if (blanket && ioIds.length && hasMembers) {
           await ctx.db.patch(targetId, { dispatchFinished: false });
           await ctx.scheduler.runAfter(0, internal.doors.syncDoorBlanketRule, { ruleId: rule._id, deviceId: device._id, targetId, runId });
@@ -130,10 +132,10 @@ export async function syncChangedDoorTarget(ctx: MutationCtx, before: Awaited<Re
           await ctx.scheduler.runAfter(0, internal.doors.syncDoorIdeTarget, { employeeIds, deviceId: device._id, targetId, runId });
         } else {
           await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId, skipped: "Panelde kalan kapı hakkı yok" });
-          for (const employee of employees) await upsertGrantStatus(ctx, { projectId, employeeId: employee._id, deviceId: device._id, state: "removed", lastRunId: runId });
+          for (const employee of employees.filter(employee => canSyncEmployeeToDevices(employee))) await upsertGrantStatus(ctx, { projectId, employeeId: employee._id, deviceId: device._id, state: "removed", lastRunId: runId });
         }
       }
-      if (!employees.length && device.brand === "hikvision") await ctx.db.patch(targetId, { status: "skipped", reason: "Etkilenen kişi yok" });
+      if (!employees.some(employee => canSyncEmployeeToDevices(employee)) && device.brand === "hikvision") await ctx.db.patch(targetId, { status: "skipped", reason: "Etkilenen kişi yok" });
     }
     await ctx.scheduler.runAfter(5000, internal.deviceSyncRuns.refreshSummary, { runId });
     await ctx.scheduler.runAfter(600000, internal.deviceSyncRuns.expireRun, { runId });

@@ -12,6 +12,29 @@ vi.mock("convex/react", () => ({
   useAction: (ref: Parameters<typeof getFunctionName>[0]) => async () => { if (getFunctionName(ref).includes("syncEmployee")) state.syncCalls(); return { success: true, synced: 0, failed: 0, errors: [] }; },
 }));
 beforeEach(() => { state.pay = false; state.sync = false; state.syncCalls.mockClear(); state.calls = []; });
+it("rejects clearing an existing card before any mutation is sent", async () => {
+  let current: ReturnType<typeof useEmployeeFormSubmit> | undefined;
+  function Harness() { current = useEmployeeFormSubmit({ _id: "employee" as Id<"employees">, cardNumber: "00123" }, () => {}, () => {}); return null; }
+  renderToStaticMarkup(<Harness />);
+  if (!current) throw new Error("Missing hook");
+  await current.handleSubmit({ ...employeeFormValues(), firstName: "Ada", lastName: "Test", email: "", cardNumber: "  " });
+  expect(state.calls).toHaveLength(0);
+  expect(state.syncCalls).not.toHaveBeenCalled();
+});
+it("saves a cardless person without invoking a device action, then syncs after a card is supplied", async () => {
+  state.sync = true;
+  let current: ReturnType<typeof useEmployeeFormSubmit> | undefined;
+  function Harness() { current = useEmployeeFormSubmit(null, () => {}, () => {}); return null; }
+  renderToStaticMarkup(<Harness />);
+  if (!current) throw new Error("Missing hook");
+  const form = { ...employeeFormValues(), firstName: "Ada", lastName: "Test", email: "", cardNumber: "  " };
+  await current.handleSubmit(form);
+  expect(state.calls[0]).toMatchObject({ name: "employees:create", args: { cardNumber: "" } });
+  expect(state.syncCalls).not.toHaveBeenCalled();
+  await current.handleSubmit({ ...form, cardNumber: "00123" });
+  expect(state.calls[1].args.cardNumber).toBe("00123");
+  expect(state.syncCalls).toHaveBeenCalledOnce();
+});
 it.each([false, true])("D-1: salary fields are absent from submitted payload when editing=%s without pay.view", async editing => {
   let current: ReturnType<typeof useEmployeeFormSubmit> | undefined;
   function Harness() {

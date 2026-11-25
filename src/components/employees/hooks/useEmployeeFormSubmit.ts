@@ -6,7 +6,8 @@ import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { Employee } from "@/types/employee";
 import { EmployeeFormData } from "./useEmployeeFormData";
-import { employeeFormSchema } from "./useEmployeeFormSchema";
+import { employeeFormSchemaFor } from "./useEmployeeFormSchema";
+import { canSyncEmployeeToDevices } from "../../../../convex/lib/employeeUx";
 
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { FunctionArgs } from "convex/server";
@@ -38,7 +39,7 @@ export type EmployeeSaveResult = { employeeId: Id<"employees"> };
 export type { EmployeeFormData };
 
 export const useEmployeeFormSubmit = (
-  employee: Pick<Employee, "_id" | "isVisitor"> | null | undefined,
+  employee: (Pick<Employee, "_id" | "isVisitor"> & Partial<Pick<Employee, "cardNumber">>) | null | undefined,
   _onClose: () => void,
   _onSave: (payload: EmployeeSaveResult) => void,
   onFieldError?: (key: string, message: string) => void,
@@ -64,7 +65,7 @@ export const useEmployeeFormSubmit = (
 
   const { run: handleSubmit, pending: isLoading } = useAsyncAction(
     async (formData: EmployeeFormData, baseline?: string) => {
-      const parsed = employeeFormSchema.safeParse(formData);
+      const parsed = employeeFormSchemaFor(employee?.cardNumber).safeParse(formData);
       if (!parsed.success) {
         const firstError = parsed.error.issues[0];
         setServerError(firstError?.message ?? "Form bilgileri geçersiz");
@@ -149,6 +150,10 @@ export const useEmployeeFormSubmit = (
         } catch {
           append("Kurulum e-postası gönderilemedi.");
         }
+      }
+      if (!canSyncEmployeeToDevices(sharedPayload)) {
+        append("Kişi kartsız kaydedildi. Kişi listesinden Toplu kart ata ile kart atayabilirsiniz.");
+        return;
       }
       if (!can("accessRules.manage")) return;
       try {

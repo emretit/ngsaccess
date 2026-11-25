@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { assertDepartmentEmpty, assertSameProject, validatePay, validateEmployeeText, employeeDependentTables, EMPLOYEE_BULK_DELETE_LIMIT, assertEmployeeBulkDeleteLimit } from "./employeeUx";
+import { assertDepartmentEmpty, assertSameProject, validatePay, validateEmployeeText, employeeDependentTables, EMPLOYEE_BULK_DELETE_LIMIT, assertEmployeeBulkDeleteLimit, canSyncEmployeeToDevices, cardKey } from "./employeeUx";
+it("card keys exclude blanks and retain leading zeroes", () => {
+  expect(cardKey("")).toBeUndefined();
+  expect(cardKey(" \t ")).toBeUndefined();
+  expect(cardKey(" 00123 ")).toBe("00123");
+});
 describe("personel metin kuralları", () => {
+  it("kartsız kaydı açık seçenekle kabul eder, varsayılan kart güvenliğini korur", () => {
+    expect(() => validateEmployeeText({ cardNumber: "  " }, { allowCardless: true })).not.toThrow();
+    expect(() => validateEmployeeText({ firstName: "", cardNumber: "" }, { allowCardless: true })).toThrow("Ad alanı");
+  });
+  it("cihaz kimliği yoksa göndermez; kart veya bağımsız biyometri kimliği varsa izin verir", () => {
+    expect(canSyncEmployeeToDevices({ cardNumber: "  " })).toBe(false);
+    expect(canSyncEmployeeToDevices({ cardNumber: "00123" })).toBe(true);
+    expect(canSyncEmployeeToDevices({ cardNumber: "" }, "biometric-person-1")).toBe(true);
+    expect(canSyncEmployeeToDevices({ cardNumber: "" }, "  ")).toBe(false);
+  });
   it("geçerli kaydı ve boş e-postayı/TC'yi kabul eder", () => {
     expect(() => validateEmployeeText({ firstName: "Ada", lastName: "Test", email: "ada@example.test", tcNo: "10000000146", cardNumber: "007" })).not.toThrow();
     expect(() => validateEmployeeText({ firstName: "Ada", lastName: "Test", email: "", tcNo: null, cardNumber: "1" })).not.toThrow();

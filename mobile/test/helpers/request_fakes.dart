@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:ngsplusapp/models/employee_request.dart';
+import 'package:ngsplusapp/models/request_attachment.dart';
 import 'package:ngsplusapp/repositories/request_repository.dart';
 import 'mocks.dart';
 
@@ -10,6 +11,22 @@ class RequestFakeRepository extends RequestRepository {
   Completer<void>? withdrawGate;
   Completer<String>? gate;
   Completer<List<LeaveRequest>>? listGate;
+  Object? uploadFailure;
+  Completer<String>? uploadGate;
+  final uploaded = <String>[], discarded = <String>[];
+  List<String> submittedAttachments = [];
+  @override
+  Future<String> uploadAttachment(RequestAttachmentFile file) async {
+    uploaded.add(file.name);
+    if (uploadFailure case final e?) throw e;
+    return uploadGate?.future ?? 'attachment-${uploaded.length}';
+  }
+
+  @override
+  Future<void> discardAttachment(String id) async {
+    discarded.add(id);
+  }
+
   List<LeaveRequest> leaves = [];
   List<AttendanceCorrectionRequest> corrections = [];
   @override
@@ -28,8 +45,10 @@ class RequestFakeRepository extends RequestRepository {
     required String startDate,
     required String endDate,
     String? notes,
+    List<String> attachmentIds = const [],
   }) async {
     submits++;
+    submittedAttachments = attachmentIds;
     if (failure case final e?) throw e;
     return gate == null ? 'id' : gate?.future ?? 'id';
   }
@@ -41,8 +60,10 @@ class RequestFakeRepository extends RequestRepository {
     required String reason,
     String? requestedCheckIn,
     String? requestedCheckOut,
+    List<String> attachmentIds = const [],
   }) async {
     submits++;
+    submittedAttachments = attachmentIds;
     if (failure case final e?) throw e;
     return gate == null ? 'id' : gate?.future ?? 'id';
   }

@@ -8,12 +8,13 @@ import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from
 import { findManualPdksRecord, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
 import { writeAudit } from "./lib/audit";
 import { requestError, istanbulToday, validateCorrectionDate } from "./lib/requestRules";
+import { attachmentsFor, bindRequestAttachments, deleteRequestAttachments } from "./requestAttachments";
 
 const correctionType = v.union(v.literal("checkIn"), v.literal("checkOut"), v.literal("both"));
 const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const submit = employeeAuthedMutation({
-  args: { date: v.string(), correctionType, requestedCheckIn: v.optional(v.string()), requestedCheckOut: v.optional(v.string()), reason: v.string() },
+  args: { date: v.string(), correctionType, requestedCheckIn: v.optional(v.string()), requestedCheckOut: v.optional(v.string()), reason: v.string(), attachmentIds: v.optional(v.array(v.id("requestAttachments"))) },
   handler: async (ctx, args) => {
     const { employee } = ctx;
     if (!employee.projectId) throw requestError("REQUEST_PROJECT_MISSING");
@@ -27,7 +28,9 @@ export const submit = employeeAuthedMutation({
     const sameDay = await ctx.db.query("attendanceCorrections").withIndex("by_employee_date", q => q.eq("employeeId", employee._id).eq("date", args.date)).take(100);
     if (sameDay.some(item => item.status === "pending")) throw requestError("CORRECTION_PENDING_EXISTS");
     const now = new Date().toISOString();
-    const id = await ctx.db.insert("attendanceCorrections", { ...args, reason: args.reason.trim(), employeeId: employee._id, projectId: employee.projectId, status: "pending", createdAt: now, updatedAt: now });
+    const { attachmentIds, ...fields } = args;
+    const id = await ctx.db.insert("attendanceCorrections", { ...fields, reason: args.reason.trim(), employeeId: employee._id, projectId: employee.projectId, status: "pending", createdAt: now, updatedAt: now });
+    await bindRequestAttachments(ctx, employee, attachmentIds, { correctionId: id });
     await writeAudit(ctx, { user: null, projectId: employee.projectId, action: "create", targetTable: "attendanceCorrections", targetId: id, newValue: { actorType: "employee", employeeId: employee._id, status: "pending" }, note: "Çalışan talebi" });
     return id;
   },
@@ -39,6 +42,7 @@ export const withdraw = employeeAuthedMutation({
     const row = await ctx.db.get(id);
     if (!row || row.employeeId !== ctx.employee._id) throw requestError("REQUEST_NOT_FOUND", "Bu düzeltme talebine erişim yetkiniz yok");
     if (row.status !== "pending") throw requestError("REQUEST_NOT_PENDING", "Yalnız bekleyen düzeltme talebinizi geri çekebilirsiniz");
+    await deleteRequestAttachments(ctx, { correctionId: id });
     await ctx.db.patch(id, { status: "withdrawn", updatedAt: new Date().toISOString() });
     await writeAudit(ctx, { user: null, projectId: row.projectId, action: "update", targetTable: "attendanceCorrections", targetId: id, oldValue: { actorType: "employee", employeeId: ctx.employee._id, status: row.status }, newValue: { actorType: "employee", employeeId: ctx.employee._id, status: "withdrawn" }, note: "Çalışan talebi" });
     return null;
@@ -52,12 +56,14 @@ export const listMine = employeeAuthedQuery({
     requestedCheckIn: v.optional(v.string()), requestedCheckOut: v.optional(v.string()), reason: v.string(),
     status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"), v.literal("withdrawn")),
     decisionNote: v.optional(v.string()), decidedAt: v.optional(v.string()), createdAt: v.string(),
+    attachments: v.optional(v.array(v.object({ _id: v.id("requestAttachments"), name: v.string(), contentType: v.string(), size: v.number() }))),
   })),
   handler: async (ctx) => {
     const since = istanbulToday(Date.now() - 90 * 86_400_000);
     const rows = await ctx.db.query("attendanceCorrections").withIndex("by_employee_date", q => q.eq("employeeId", ctx.employee._id).gte("date", since)).order("desc").take(100);
-    return rows.map(({ _id, date, correctionType, requestedCheckIn, requestedCheckOut, reason, status, decisionNote, decidedAt, createdAt }) => ({
-      _id, date, correctionType, requestedCheckIn, requestedCheckOut, reason, status, decisionNote, decidedAt, createdAt,
+    return Promise.all(rows.map(async ({ _id, projectId, date, correctionType, requestedCheckIn, requestedCheckOut, reason, status, decisionNote, decidedAt, createdAt }) => {
+      const attachments = projectId === ctx.employee.projectId ? await attachmentsFor(ctx, { correctionId: _id }) : [];
+      return { _id, date, correctionType, requestedCheckIn, requestedCheckOut, reason, status, decisionNote, decidedAt, createdAt, ...(attachments.length ? { attachments } : {}) };
     }));
   },
 });
@@ -71,7 +77,7 @@ export const listPending = authedQuery({
     if (args.projectId && !isProjectAllowed(allowed, args.projectId)) throw new ConvexError("Bu projeye erişim yetkiniz yok");
     const withNames = async (page: Doc<"attendanceCorrections">[]) => {
       const employees = await Promise.all(page.map(row => ctx.db.get(row.employeeId)));
-      return page.map((row, index) => ({ ...row, employeeName: employees[index] ? `${employees[index].firstName} ${employees[index].lastName}` : "Silinmiş çalışan" }));
+      return Promise.all(page.map(async (row, index) => ({ ...row, attachments: employees[index]?.projectId === row.projectId ? await attachmentsFor(ctx, { correctionId: row._id }) : [], employeeName: employees[index] ? `${employees[index].firstName} ${employees[index].lastName}` : "Silinmiş çalışan" })));
     };
     // Tek proje: gerçek index cursor'ı; kuyruğun en eski talebine de sayfalayarak ulaşılır.
     if (args.projectId) {

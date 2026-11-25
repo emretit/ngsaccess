@@ -1,5 +1,6 @@
 import '../core/attendance_date.dart';
 import '../core/errors.dart';
+import 'request_attachment.dart';
 
 const leaveTypes = [
   'annual',
@@ -56,11 +57,13 @@ class LeaveRequest {
     this.decisionNote,
     this.decidedAt,
     this.source,
+    this.attachments = const [],
   });
   final String id, leaveType, startDate, endDate, status;
   final DateTime createdAt;
   final String? notes, decisionNote, source;
   final DateTime? decidedAt;
+  final List<RequestAttachment> attachments;
   bool get canWithdraw => status == 'pending' && source == 'employee';
   bool get isAdmin => source == null || source == 'admin';
   factory LeaveRequest.fromJson(Object? value) {
@@ -76,6 +79,7 @@ class LeaveRequest {
       notes: _optional(value, 'notes'),
       decisionNote: _optional(value, 'decisionNote'),
       source: _optional(value, 'source'),
+      attachments: RequestAttachment.parseList(value['attachments']),
       decidedAt: decided == null ? null : _instant(decided),
     );
   }
@@ -93,8 +97,10 @@ class AttendanceCorrectionRequest {
     this.requestedCheckOut,
     this.decisionNote,
     this.decidedAt,
+    this.attachments = const [],
   });
   final String id, date, correctionType, reason, status;
+  final List<RequestAttachment> attachments;
   final DateTime createdAt;
   final String? requestedCheckIn, requestedCheckOut, decisionNote;
   final DateTime? decidedAt;
@@ -114,6 +120,7 @@ class AttendanceCorrectionRequest {
       date: _day(value, 'date'),
       correctionType: _text(value, 'correctionType'),
       reason: _text(value, 'reason'),
+      attachments: RequestAttachment.parseList(value['attachments']),
       status: _text(value, 'status'),
       createdAt: _instant(_text(value, 'createdAt')),
       requestedCheckIn: checkIn,

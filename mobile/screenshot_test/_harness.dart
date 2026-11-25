@@ -13,6 +13,7 @@ import 'package:ngsplusapp/models/attendance_summary.dart';
 import 'package:ngsplusapp/models/device.dart';
 import 'package:ngsplusapp/models/door_operation.dart';
 import 'package:ngsplusapp/models/visitor.dart';
+import 'package:ngsplusapp/models/request_attachment.dart';
 import 'package:ngsplusapp/providers/auth_provider.dart';
 import 'package:ngsplusapp/providers/door_operation_provider.dart';
 import 'package:ngsplusapp/providers/request_provider.dart';
@@ -245,6 +246,7 @@ class AuditRequests extends RequestProvider {
     required String startDate,
     required String endDate,
     String? notes,
+    List<RequestAttachmentFile> attachments = const [],
   }) async {
     commandError = const NetworkError();
     return false;
@@ -257,6 +259,7 @@ class AuditRequests extends RequestProvider {
     required String reason,
     String? requestedCheckIn,
     String? requestedCheckOut,
+    List<RequestAttachmentFile> attachments = const [],
   }) async {
     commandError = const NetworkError();
     return false;

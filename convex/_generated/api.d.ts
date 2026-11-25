@@ -267,6 +267,7 @@ import type * as privacyRetention from "../privacyRetention.js";
 import type * as projects from "../projects.js";
 import type * as readers from "../readers.js";
 import type * as reports from "../reports.js";
+import type * as requestAttachments from "../requestAttachments.js";
 import type * as roles from "../roles.js";
 import type * as seedCardReaderTest from "../seedCardReaderTest.js";
 import type * as seedHikvisionLanDevice from "../seedHikvisionLanDevice.js";
@@ -549,6 +550,7 @@ declare const fullApi: ApiFromModules<{
   projects: typeof projects;
   readers: typeof readers;
   reports: typeof reports;
+  requestAttachments: typeof requestAttachments;
   roles: typeof roles;
   seedCardReaderTest: typeof seedCardReaderTest;
   seedHikvisionLanDevice: typeof seedHikvisionLanDevice;

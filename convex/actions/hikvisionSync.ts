@@ -189,140 +189,45 @@ export const syncWeekPlanToDevicesInternal = internalAction({
 // mutation'ları yetkiyi zaten denetledi). Scheduler auth identity taşımadığı için
 // authedAction burada "Giriş yapmanız gerekiyor" fırlatırdı → internalAction.
 
+const faceDeliveryArgs = { employeeId: v.id("employees"), operationIds: v.array(v.id("hikPendingOperations")) };
+
+/** Each batch reserves and completes all device results with two mutations total. */
 export const syncEmployeeFaceToDevicesInternal = internalAction({
-  args: {
-    employeeId: v.id("employees"),
-    allowedProjectIds: v.optional(v.array(v.id("projects"))),
-  },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ synced: number; failed: number; errors: string[] }> => {
-    await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: args.employeeId });
-    const inScope = makeProjectGuard(args.allowedProjectIds);
-    const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
-      employeeId: args.employeeId,
-    });
-    if (!data) return { synced: 0, failed: 0, errors: [] };
-
-    // Yüz blob'unu bir kez oku — ctx.storage.get sadece action ctx'inde mevcut.
-    const face = await ctx.runQuery(internal.employeeFaces.getStorageRef, {
-      employeeId: args.employeeId,
-    });
-    if (!face) return { synced: 0, failed: 0, errors: ["Bu çalışanın yüz fotoğrafı yok"] };
-    const blob = await ctx.storage.get(face.pictureStorageId);
-    if (!blob) {
-      return { synced: 0, failed: 0, errors: ["Yüz dosyası storage'da bulunamadı"] };
-    }
-    const jpegBytes = new Uint8Array(await blob.arrayBuffer());
-
-    const seen = new Set<string>();
-    const targets: { device: typeof data.deviceRules[number]["device"] }[] = [];
-    const hikRules = data.deviceRules.filter((dr) => dr.device.brand === "hikvision");
-    for (const { device } of hikRules) {
-      if (!inScope(device.projectId)) continue;
-      if (!device.hikDevIndex || seen.has(device.hikDevIndex)) continue;
-      seen.add(device.hikDevIndex);
-      targets.push({ device });
-    }
-
-    const employeeNo = data.employee.cardNumber;
-    const results = await Promise.all(
-      targets.map(async (t) => {
-        await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: args.employeeId, deviceId: t.device._id });
-        const r = await addFaceToDevice(t.device.hikDevIndex!, employeeNo, jpegBytes, {
-          name: `${data.employee.firstName} ${data.employee.lastName}`,
-        });
-        return { ...r, device: t.device };
-      }),
-    );
-
-    let synced = 0;
-    let failed = 0;
-    const errors: string[] = [];
-    const failureWrites: Promise<unknown>[] = [];
-    for (const r of results) {
-      if (r.ok) {
-        synced++;
-        continue;
-      }
-      failed++;
-      const msg = r.error ?? "Bilinmeyen hata";
-      errors.push(`${r.device.name}: ${msg}`);
-      failureWrites.push(
-        ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
-          deviceId: r.device._id,
-          projectId: r.device.projectId,
-          operation: "addFace",
-          lastError: msg,
-          payload: { employeeId: args.employeeId },
-        }),
-      );
-    }
-    await Promise.all(failureWrites);
-    return { synced, failed, errors };
-  },
+  args: faceDeliveryArgs,
+  handler: deliverFaces,
 });
 
 export const deleteEmployeeFaceFromDevicesInternal = internalAction({
-  args: {
-    employeeId: v.id("employees"),
-    allowedProjectIds: v.optional(v.array(v.id("projects"))),
-  },
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ removed: number; failed: number; errors: string[] }> => {
-    const inScope = makeProjectGuard(args.allowedProjectIds);
-    const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
-      employeeId: args.employeeId,
-    });
-    if (!data) return { removed: 0, failed: 0, errors: [] };
-
-    const seen = new Set<string>();
-    const targets: { device: typeof data.deviceRules[number]["device"] }[] = [];
-    const hikRules = data.deviceRules.filter((dr) => dr.device.brand === "hikvision");
-    for (const { device } of hikRules) {
-      if (!inScope(device.projectId)) continue;
-      if (!device.hikDevIndex || seen.has(device.hikDevIndex)) continue;
-      seen.add(device.hikDevIndex);
-      targets.push({ device });
-    }
-
-    const employeeNo = data.employee.cardNumber;
-    const results = await Promise.all(
-      targets.map(async (t) => {
-        const r = await deleteFaceFromDevice(t.device.hikDevIndex!, employeeNo);
-        return { ...r, device: t.device };
-      }),
-    );
-
-    let removed = 0;
-    let failed = 0;
-    const errors: string[] = [];
-    const failureWrites: Promise<unknown>[] = [];
-    for (const r of results) {
-      if (r.ok) {
-        removed++;
-        continue;
-      }
-      failed++;
-      const msg = r.error ?? "Bilinmeyen hata";
-      errors.push(`${r.device.name}: ${msg}`);
-      failureWrites.push(
-        ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
-          deviceId: r.device._id,
-          projectId: r.device.projectId,
-          operation: "deleteFace",
-          lastError: msg,
-          payload: { employeeId: args.employeeId },
-        }),
-      );
-    }
-    await Promise.all(failureWrites);
-    return { removed, failed, errors };
-  },
+  args: faceDeliveryArgs,
+  handler: deliverFaces,
 });
+
+async function deliverFaces(
+  ctx: import("../_generated/server").ActionCtx,
+  args: { employeeId: Id<"employees">; operationIds: Id<"hikPendingOperations">[] },
+): Promise<{ synced: number; failed: number; errors: string[] }> {
+  const targets = await ctx.runMutation(internal.employeeFaces.startDelivery, args);
+  const results = await Promise.all(targets.map(async target => {
+    try {
+      let result: { ok: boolean; error?: string };
+      if (target.removing) result = await deleteFaceFromDevice(target.devIndex, target.employeeNo);
+      else {
+        const blob = target.storageId ? await ctx.storage.get(target.storageId) : null;
+        if (!blob) throw new Error("Yüz dosyası bulunamadı.");
+        if (target.replacing) {
+          const removed = await deleteFaceFromDevice(target.devIndex, target.employeeNo);
+          if (!removed.ok) throw new Error(removed.error ?? "Cihazdaki önceki yüz silinemedi.");
+        }
+        result = await addFaceToDevice(target.devIndex, target.employeeNo, new Uint8Array(await blob.arrayBuffer()));
+      }
+      return { operationId: target.operationId, ok: result.ok, ...(result.error ? { error: result.error } : {}) };
+    } catch (error) {
+      return { operationId: target.operationId, ok: false, error: error instanceof Error ? error.message : "Yüz işlemi tamamlanamadı." };
+    }
+  }));
+  await ctx.runMutation(internal.employeeFaces.finishDelivery, { results });
+  return { synced: results.filter(result => result.ok).length, failed: results.filter(result => !result.ok).length, errors: results.flatMap(result => result.error ? [result.error] : []) };
+}
 
 // ============================================================================
 // FINGERPRINT — sync/delete (Phase 3)

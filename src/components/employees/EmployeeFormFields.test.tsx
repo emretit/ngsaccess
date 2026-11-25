@@ -8,6 +8,15 @@ vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => p
 afterEach(() => { permission.accessRules = true; });
 const formData: EmployeeFormData = { firstName: "", lastName: "", email: "", tcNo: "", cardNumber: "", payrollCode: "", companyId: null, departmentId: null, positionId: null, accessRuleId: null, shift: null, shiftId: null, photoUrl: null, notes: "", isActive: true, hourlyRate: null, monthlySalary: null };
 function render(autoFocusFirstName: boolean) { return renderToStaticMarkup(<EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} autoFocusFirstName={autoFocusFirstName} />); }
+it("kartsız kayda izin verir ve sonradan toplu kart atama yolunu açıklar", () => {
+  const html = render(false);
+  const card = html.match(/<input[^>]*id="employee-cardNumber"[^>]*>/)?.[0];
+  expect(card).toBeDefined();
+  expect(card).not.toContain('required=""');
+  expect(html).not.toContain("Kart numarası *");
+  expect(html).toContain("Toplu kart ata");
+  expect(html).toMatch(/<input[^>]*id="employee-firstName"[^>]*required=""/);
+});
 it("02-O8: gives access its own fieldset and unambiguous empty option", () => {
   const html = render(false);
   expect(html).toMatch(/<legend[^>]*>Erişim<\/legend>[\s\S]*<label[^>]*>Erişim kuralı ekle/);

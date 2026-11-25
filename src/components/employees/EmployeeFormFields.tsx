@@ -107,7 +107,7 @@ export default function EmployeeFormFields({
         name={key}
         autoFocus={key === "firstName" && autoFocusFirstName}
         type={type}
-        required={["firstName", "lastName", "cardNumber"].includes(
+        required={["firstName", "lastName"].includes(
           key,
         )}
         value={formData[key] ?? ""}
@@ -256,7 +256,7 @@ export default function EmployeeFormFields({
         "Kart / kimlik",
         <>
           <div className="grid gap-x-4 gap-y-3 sm:grid-cols-3">
-            {input("cardNumber", "Kart numarası *", "text", "Baştaki sıfırlar dahil")}
+            {input("cardNumber", "Kart numarası", "text", "İsteğe bağlı. Baştaki sıfırlar dahil. Boş bırakırsanız kişi listesinden Toplu kart ata ile daha sonra atayabilirsiniz.")}
             {input("tcNo", "TC kimlik no", "text", "11 hane, 0 ile başlamaz")}
             {input("payrollCode", "Bordro kodu")}
           </div>

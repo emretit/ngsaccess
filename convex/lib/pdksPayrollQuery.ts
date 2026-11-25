@@ -18,6 +18,7 @@ import { isPdksIncludedReading } from "./pdksSource";
 import { filterPdksReadings } from "./pdksSource";
 import { buildPdksEmployeeReadingMap } from "./pdksTable";
 import { computePayrollCell } from "./pdksPayroll";
+import { cardKey } from "./employeeUx";
 
 export type PdksPayrollQueryArgs = {
   projectId: Id<"projects">;
@@ -298,7 +299,8 @@ async function snapshotFirstRecordDate(ctx: QueryCtx, employee: Doc<"employees">
   const historyStart = policies.historyStart(employee.projectId);
   if (historyStart) await Promise.all([...new Set(candidates.map(workDay).filter(date => date < historyStart))].map(async date => historical.set(date, await loadPdksRulePolicy(ctx, employee.projectId, date, date))));
   const eligible = (reading: Doc<"cardReadings">) => isPdksIncludedReading(reading, employee.projectId, historical.get(workDay(reading))?.(workDay(reading)) ?? policies(reading.projectId, workDay(reading)));
-  const oldReadings = candidates.filter(eligible), periodReadings = readings.filter(eligible).filter(reading => reading.employeeId === employee._id || reading.cardNo === employee.cardNumber);
+  const employeeCard = cardKey(employee.cardNumber);
+  const oldReadings = candidates.filter(eligible), periodReadings = readings.filter(eligible).filter(reading => reading.employeeId === employee._id || (!reading.employeeId && employeeCard !== undefined && reading.cardNo === employee.cardNumber));
   const allowed = [...oldReadings, ...periodReadings].filter(reading => reading.accessStatus === "izin_verildi");
   return [...manualDates, ...(allowed.length ? allowed : [...oldReadings.slice(0, 1), ...periodReadings]).map(workDay)].sort()[0] ?? null;
 }

@@ -61,6 +61,7 @@ export const projectDeletionMatrix = [
   { table: "groupDoors", index: "by_project_group", label: "grup kapı bağlantısı", policy: "block" },
   { table: "deviceEvents", index: "by_project", label: "cihaz olayı", policy: "block" },
   { table: "attendanceCorrections", index: "by_project_status", label: "puantaj düzeltmesi", policy: "block" },
+  { table: "requestAttachments", index: "scan", label: "talep belgesi", policy: "block" },
   { table: "deviceFingerprintEnrollments", index: "scan", label: "cihaz parmak izi kaydı", policy: "block" },
   { table: "userProjects", index: "by_project", label: "Kullanıcı proje üyelikleri", policy: "delete" },
   { table: "generalSettings", index: "by_project", label: "Genel ayarlar", policy: "delete" },

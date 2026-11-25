@@ -34,6 +34,7 @@ dependencies:
   
   # HTTP requests
   http: ^1.2.1
+  file_picker: 10.3.10
   
   # Internationalization
   intl: ^0.20.2

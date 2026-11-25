@@ -20,6 +20,7 @@ import { matchesPersonSearch, readingSearchTerm } from "./lib/readingSearch";
 import { getEmployeeTargetDevices } from "./lib/peopleHikSnapshot";
 import { writeAudit } from "./lib/audit";
 import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./lib/alarmNotify";
+import { hikDoorReaderNumbers } from "./lib/hikDoorReaders";
 import { hikWallClockToUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { internalMutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
@@ -189,8 +190,8 @@ export const listFiltered = authedQuery({
     const bounds = cardReadingDateBounds(args.startDate, args.endDate);
     const search = readingSearchTerm(args.search);
     const door = args.doorId ? await ctx.db.get(args.doorId) : null;
-    if (args.doorId && (!door || door.projectId !== args.projectId || !door.deviceId || door.ioId === undefined)) {
-      throw new ConvexError("Bu kapı seçili projede bir IDE okuyucusuyla eşleşmiyor");
+    if (args.doorId && (!door || door.projectId !== args.projectId || !door.deviceId)) {
+      throw new ConvexError("Bu kapı seçili projede bir okuyucuyla eşleşmiyor");
     }
     if (door?.deviceId && args.deviceId && door.deviceId !== args.deviceId) {
       throw new ConvexError("Seçili kapı bu cihaza bağlı değil");
@@ -199,6 +200,18 @@ export const listFiltered = authedQuery({
     if (deviceId) {
       const device = await ctx.db.get(deviceId);
       if (device?.projectId !== args.projectId) throw new ConvexError("Cihaz seçili projede bulunamadı");
+      if (door && door.ioId === undefined && device.brand !== "hikvision") {
+        throw new ConvexError("Bu kapı seçili projede bir okuyucuyla eşleşmiyor");
+      }
+    }
+    // Resolve once per request, never once per reading. Reader numbers can be
+    // customized and must take precedence over the conventional door numbering.
+    let hikReaderNos: Set<number> | undefined;
+    if (door && door.ioId === undefined) {
+      const readers = await ctx.db.query("readers")
+        .withIndex("by_door", q => q.eq("doorId", door._id)).take(101);
+      if (readers.length > 100) throw new ConvexError("Kapıda 100'den fazla okuyucu var; okuyucu eşlemesini kontrol edin");
+      hikReaderNos = new Set(hikDoorReaderNumbers(door, readers));
     }
     if (args.employeeId) {
       const employee = await ctx.db.get(args.employeeId);
@@ -267,13 +280,14 @@ export const listFiltered = authedQuery({
       return row.projectId === args.projectId
         && (deviceId === undefined || row.deviceId === deviceId)
         && (door?.ioId === undefined || row.ideIoId === door.ioId)
+        && (hikReaderNos === undefined || (row.ideIoId === undefined && row.hikCardReaderNo !== undefined && hikReaderNos.has(row.hikCardReaderNo)))
         && (args.employeeId === undefined || row.employeeId === args.employeeId)
         && matchesReadingResult(row.accessStatus, args.result)
         && (args.source === undefined || liveReadingSource(row) === args.source);
     }).paginate({ ...args.paginationOpts, numItems: Math.min(args.paginationOpts.numItems, 200), maximumRowsRead: 2000, maximumBytesRead: 2_000_000 });
     return {
       ...page,
-      page: await enrichReadingsForList(ctx, page.page),
+      page: await enrichReadingsForList(ctx, page.page, hikReaderNos === undefined ? undefined : door ?? undefined),
       scannedCount,
       matchedCount: page.page.length,
       scanLimitReached: page.pageStatus === "SplitRequired",
@@ -490,6 +504,7 @@ export const getMonthlyPayrollSheet = authedQuery({
 
 /** Kart adaylarını cihazın projesine göre seç; projesiz cihazın legacy davranışını koru. */
 async function findDeviceCardEmployee(ctx: MutationCtx, cardNo: string, projectId?: Id<"projects">) {
+  if (!cardNo.trim()) return null;
   const candidates = await ctx.db.query("employees")
     .withIndex("by_card", q => q.eq("cardNumber", cardNo))
     .take(20);

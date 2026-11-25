@@ -36,6 +36,76 @@ async function fixture() {
 }
 
 describe("Y-09 project deletion", () => {
+  it("blocks a project containing request documents without deleting their stored bytes", async () => {
+    const f = await fixture();
+    const records = await f.t.run(async ctx => {
+      const employeeId = await ctx.db.insert("employees", { projectId: f.projectId, firstName: "Ada", lastName: "Test", cardNumber: "123", email: "ada@example.test" });
+      const sessionId = await ctx.db.insert("employeeSessions", { employeeId, token: "deleted-session", createdAt: "now", expiresAt: "2099-01-01T00:00:00Z" });
+      const storageId = await ctx.storage.store(new Blob(["%PDF-private"], { type: "application/pdf" }));
+      const attachmentId = await ctx.db.insert("requestAttachments", { employeeId, projectId: f.projectId, sessionId, name: "rapor.pdf", contentType: "application/pdf", size: 12, storageId, expiresAt: Date.now() + 86_400_000 });
+      // A legacy orphan must still prevent project deletion until it is cleaned up.
+      await ctx.db.delete(sessionId);
+      await ctx.db.delete(employeeId);
+      return { attachmentId, storageId };
+    });
+    const impact = await f.admin.query(api.projects.getDeletionImpact, { projectId: f.projectId });
+    expect(impact.canDelete).toBe(false);
+    expect(impact.blockers).toEqual([expect.objectContaining({ table: "requestAttachments", count: 1 })]);
+    await expect(f.admin.mutation(api.projects.remove, { id: f.projectId })).rejects.toThrow("talep belgesi");
+    await f.t.run(async ctx => {
+      expect(await ctx.db.get(f.projectId)).not.toBeNull();
+      expect(await ctx.db.get(records.attachmentId)).not.toBeNull();
+      expect(await ctx.storage.get(records.storageId)).not.toBeNull();
+    });
+    expect((await f.admin.query(api.projects.getDeletionImpact, { projectId: f.otherProjectId })).canDelete).toBe(true);
+  });
+  it("deletes all request attachments and stored bytes on employee removal, preserving another employee's files", async () => {
+    const f = await fixture();
+    const records = await f.t.run(async ctx => {
+      const employeeId = await ctx.db.insert("employees", { projectId: f.projectId, firstName: "Ada", lastName: "Test", cardNumber: "123", email: "ada@example.test" });
+      const otherId = await ctx.db.insert("employees", { projectId: f.otherProjectId, firstName: "Other", lastName: "Employee", cardNumber: "456", email: "other@example.test" });
+      const sessionId = await ctx.db.insert("employeeSessions", { employeeId, token: "owner", createdAt: "now", expiresAt: "2099-01-01T00:00:00Z" });
+      const otherSessionId = await ctx.db.insert("employeeSessions", { employeeId: otherId, token: "other-owner", createdAt: "now", expiresAt: "2099-01-01T00:00:00Z" });
+      const leaveId = await ctx.db.insert("leaves", { employeeId, projectId: f.projectId, leaveType: "sick", startDate: "2026-11-25", endDate: "2026-11-25", status: "approved", source: "employee", createdAt: "now", updatedAt: "now" });
+      const correctionId = await ctx.db.insert("attendanceCorrections", { employeeId, projectId: f.projectId, date: "2026-11-25", correctionType: "checkIn", reason: "Giriş eksik", status: "pending", createdAt: "now", updatedAt: "now" });
+      const owned = [];
+      for (const link of [{ leaveId }, { correctionId }, { expiresAt: Date.now() + 86_400_000 }]) {
+        const storageId = await ctx.storage.store(new Blob(["%PDF-private"], { type: "application/pdf" }));
+        const id = await ctx.db.insert("requestAttachments", { employeeId, projectId: f.projectId, sessionId, name: "rapor.pdf", contentType: "application/pdf", size: 12, storageId, ...link });
+        owned.push({ id, storageId });
+      }
+      const otherStorage = await ctx.storage.store(new Blob(["%PDF-other"], { type: "application/pdf" }));
+      const otherAttachment = await ctx.db.insert("requestAttachments", { employeeId: otherId, projectId: f.otherProjectId, sessionId: otherSessionId, name: "other.pdf", contentType: "application/pdf", size: 10, storageId: otherStorage, expiresAt: Date.now() + 86_400_000 });
+      return { employeeId, owned, otherAttachment, otherStorage };
+    });
+    await f.admin.mutation(api.employees.remove, { employeeId: records.employeeId });
+    await f.t.run(async ctx => {
+      expect(await ctx.db.get(records.employeeId)).toBeNull();
+      for (const file of records.owned) {
+        expect(await ctx.db.get(file.id)).toBeNull();
+        expect(await ctx.storage.get(file.storageId)).toBeNull();
+      }
+      expect(await ctx.db.get(records.otherAttachment)).not.toBeNull();
+      expect(await ctx.storage.get(records.otherStorage)).not.toBeNull();
+    });
+  });
+  it("fails employee deletion atomically when the request attachment cleanup bound is exceeded", async () => {
+    const f = await fixture();
+    const records = await f.t.run(async ctx => {
+      const employeeId = await ctx.db.insert("employees", { projectId: f.projectId, firstName: "Ada", lastName: "Test", cardNumber: "123", email: "ada@example.test" });
+      const sessionId = await ctx.db.insert("employeeSessions", { employeeId, token: "owner", createdAt: "now", expiresAt: "2099-01-01T00:00:00Z" });
+      const storageId = await ctx.storage.store(new Blob(["%PDF-private"], { type: "application/pdf" }));
+      for (let i = 0; i < 1001; i++) await ctx.db.insert("requestAttachments", { employeeId, projectId: f.projectId, sessionId, name: "rapor.pdf", contentType: "application/pdf", size: 12, storageId, expiresAt: Date.now() + 86_400_000 });
+      return { employeeId, sessionId, storageId };
+    });
+    await expect(f.admin.mutation(api.employees.remove, { employeeId: records.employeeId })).rejects.toThrow("talep geçmişi");
+    await f.t.run(async ctx => {
+      expect(await ctx.db.get(records.employeeId)).not.toBeNull();
+      expect(await ctx.db.get(records.sessionId)).not.toBeNull();
+      expect(await ctx.storage.get(records.storageId)).not.toBeNull();
+      expect(await ctx.db.query("requestAttachments").withIndex("by_employeeId", q => q.eq("employeeId", records.employeeId)).take(1002)).toHaveLength(1001);
+    });
+  });
   it("preserves physical IDE roster ownership after project deletion", async () => {
     const f = await fixture();
     const rosterId = await f.t.run(async ctx => {

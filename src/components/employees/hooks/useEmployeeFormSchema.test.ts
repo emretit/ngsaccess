@@ -1,6 +1,18 @@
 import { expect, it } from "vitest";
-import { employeeFormSchema } from "./useEmployeeFormSchema";
+import { employeeFormSchema, employeeFormSchemaFor } from "./useEmployeeFormSchema";
 const required = { firstName: "Ada", lastName: "Test", email: "ada@example.test", cardNumber: "123" };
+it.each(["", "  "])("existing card cannot be cleared to %j", cardNumber => {
+  const result = employeeFormSchemaFor("00123").safeParse({ ...required, cardNumber });
+  expect(result.success).toBe(false);
+  expect(result.error?.issues).toContainEqual(expect.objectContaining({ path: ["cardNumber"], message: "Kart numarası zorunludur" }));
+});
+it.each([undefined, "", "  "])("new or already cardless person may remain cardless: %j", existingCard => {
+  expect(employeeFormSchemaFor(existingCard).safeParse({ ...required, cardNumber: "" }).success).toBe(true);
+  expect(employeeFormSchemaFor(existingCard).parse({ ...required, cardNumber: "00123" }).cardNumber).toBe("00123");
+});
+it.each(["", "  ", "00123"])("accepts an optional card and preserves leading zeroes %j", cardNumber => {
+  expect(employeeFormSchema.parse({ ...required, cardNumber }).cardNumber).toBe(cardNumber.trim());
+});
 it.each([undefined, "", "2026-11-01", "2028-02-29"])("accepts an optional calendar date %s", accessStartsAt => {
   expect(employeeFormSchema.safeParse({ ...required, accessStartsAt }).success).toBe(true);
 });

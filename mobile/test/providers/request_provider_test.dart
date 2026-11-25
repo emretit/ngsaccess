@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:ngsplusapp/models/request_attachment.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngsplusapp/core/errors.dart';
 import 'package:ngsplusapp/providers/request_provider.dart';
@@ -34,6 +36,74 @@ void main() {
     leaveType: 'annual',
     startDate: '2026-10-19',
     endDate: '2026-10-20',
+  );
+  RequestAttachmentFile attachment() => RequestAttachmentFile(
+    name: 'rapor.pdf',
+    contentType: 'application/pdf',
+    bytes: Uint8List.fromList([37, 80, 68, 70, 45]),
+  );
+  test('uploads files before submitting and passes their server IDs', () async {
+    expect(
+      await p.submitLeave(
+        leaveType: 'sick',
+        startDate: '2026-11-25',
+        endDate: '2026-11-25',
+        attachments: [attachment()],
+      ),
+      true,
+    );
+    expect(repo.uploaded, ['rapor.pdf']);
+    expect(repo.submittedAttachments, ['attachment-1']);
+  });
+  test(
+    'upload failure never submits or marks the request result uncertain',
+    () async {
+      repo.uploadFailure = const NetworkError();
+      expect(
+        await p.submitLeave(
+          leaveType: 'sick',
+          startDate: '2026-11-25',
+          endDate: '2026-11-25',
+          attachments: [attachment()],
+        ),
+        false,
+      );
+      expect(repo.submits, 0);
+      expect(p.attachmentUploadFailed, true);
+      expect(p.uncertain, false);
+    },
+  );
+  test('an upload completing after sign-out cannot submit a request', () async {
+    repo.uploadGate = Completer<String>();
+    final pending = p.submitLeave(
+      leaveType: 'sick',
+      startDate: '2026-11-25',
+      endDate: '2026-11-25',
+      attachments: [attachment()],
+    );
+    await Future<void>.delayed(Duration.zero);
+    await auth.signOut();
+    repo.uploadGate?.complete('old-attachment');
+    expect(await pending, false);
+    expect(repo.submits, 0);
+  });
+  test(
+    'failed submission discards unbound uploads without automatic resubmit',
+    () async {
+      repo.failure = const NetworkError();
+      expect(
+        await p.submitLeave(
+          leaveType: 'sick',
+          startDate: '2026-11-25',
+          endDate: '2026-11-25',
+          attachments: [attachment()],
+        ),
+        false,
+      );
+      expect(repo.submits, 1);
+      expect(repo.discarded, ['attachment-1']);
+      expect(p.uncertain, true);
+    },
   );
   test(
     'skipped busy or invalid-session command clears the previous withdraw error',

@@ -127,8 +127,15 @@ export async function cascadeRemoveEmployeePII(
     .withIndex("by_employee", q => q.eq("employeeId", employeeId)).take(requestLimit + 1);
   const leaves = await ctx.db.query("leaves")
     .withIndex("by_employee", q => q.eq("employeeId", employeeId)).take(requestLimit + 1);
-  if (corrections.length > requestLimit || leaves.length > requestLimit) {
+  const requestAttachments = await ctx.db.query("requestAttachments")
+    .withIndex("by_employeeId", q => q.eq("employeeId", employeeId)).take(requestLimit + 1);
+  if (corrections.length > requestLimit || leaves.length > requestLimit || requestAttachments.length > requestLimit) {
     throw new ConvexError({ code: "EMPLOYEE_REQUEST_CASCADE_LIMIT", message: "Kişinin talep geçmişi silme sınırını aşıyor. Talepleri arşivlemek için yöneticinizle iletişime geçin." });
+  }
+  // Belge (sağlık verisi dahil) geçmişi çalışan kaydı silindikten sonra tutulmaz.
+  for (const attachment of requestAttachments) {
+    if (attachment.storageId) await ctx.storage.delete(attachment.storageId);
+    await ctx.db.delete(attachment._id);
   }
   const decidedAt = new Date().toISOString();
   for (const correction of corrections) {
