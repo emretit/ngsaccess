@@ -1,0 +1,35 @@
+{
+  "annual": {
+    "employees": 500,
+    "transactions": 115,
+    "peak": 4,
+    "bytes": 1103621221
+  },
+  "annualFixture": {
+    "employees": 500,
+    "devices": 10,
+    "year": 2026,
+    "workdays": 261,
+    "readings": 522000,
+    "rawPaddingBytes": 1600,
+    "method": "indexed badge templates expanded into every month before SDK read accounting",
+    "includes": "query/get/auth/metadata documents"
+  },
+  "monthlyTableAndPayroll": {
+    "sourceBytes": 85548320,
+    "tableBytes": 87170022,
+    "tableAndPayrollBytes": 88785445,
+    "ratio": 1.0378397261337218,
+    "transactions": 135,
+    "peak": 4
+  },
+  "dailyLive": {
+    "groupSize": 64,
+    "employeesTested": [
+      500,
+      1000
+    ],
+    "queryMode": "bounded native Convex group subscriptions; no full snapshot reload per badge event"
+  },
+  "productionUsageMeasured": false
+}
