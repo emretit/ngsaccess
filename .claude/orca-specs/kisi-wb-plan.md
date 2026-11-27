@@ -1,0 +1,12 @@
+# WB plan
+- F04/F08: shared `cardNumberError(value: string, options?: { allowEmpty?: boolean; deviceBrand?: "hikvision" | "ide_smart" }): string | undefined` in convex/lib/cardNumberRules.ts.
+- Preserve trimmed text and leading zeroes; ASCII letters/digits/_/-, max 128 chars, decimal max 20 digits (existing uniqueness lookup bound); IDE positive safe integer decimal only.
+- WC/WA consume this pure validator in backend/form/import; WB records IDE validation failures through existing sync issues.
+- F02: preserve imported device employeeNo independently of physical card; coordinate persisted identity/model changes with WC before adapting Hik card writes.
+- F12: bounded device pages with explicit continuation; no unbounded scan, per-row mutation loop, or fingerprint reads without permission/module.
+- Request ownership expansion for backend import batch helpers and UI continuation if needed; no schema changes without approval.
+- Approved expansion: import batch backend + person import dialog/tests; card-change helper; IDE native failure helper; biometric identity adapters and sync projections.
+- WC owns optional hikEmployeeNo + by_project_hikEmployeeNo schema additions; no migration/backfill.
+- Keep scheduleEmployeeCardChange(ctx, employeeId, projectId, previousCardNumber, previousHikSnapshot?) signature; caller patches card first in the same transaction.
+- Add targeted validator, Hik identity/card, IDE persistent rejection, and paged import tests.
+- Gates: changed-file eslint, related vitest, node scripts/find-node-leak.mjs; no full tsc/vitest or device commands.
