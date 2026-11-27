@@ -127,6 +127,12 @@ function memoryContext(seed: Record<string, MemoryRow[]>) {
     };
     const result = {
       withIndex(name: string, callback: (q: typeof bounds) => unknown) { index = name; callback(bounds); return result; },
+      order() { return result; },
+      async *[Symbol.asyncIterator]() {
+        let limit = 0;
+        try { for (const row of (tables.get(table) ?? []).filter(row => predicates.every(predicate => predicate(row)))) { limit++; yield row; } }
+        finally { reads.push({ table, index, limit }); }
+      },
       async take(limit: number) { reads.push({ table, index, limit }); return (tables.get(table) ?? []).filter(row => predicates.every(predicate => predicate(row))).slice(0, limit); },
       async collect() { reads.push({ table, index, limit: null }); return (tables.get(table) ?? []).filter(row => predicates.every(predicate => predicate(row))); },
     };

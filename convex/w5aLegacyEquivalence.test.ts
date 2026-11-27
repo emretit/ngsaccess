@@ -6,7 +6,7 @@ import type { QueryCtx } from "./_generated/server";
 import schema from "./schema";
 import { getPdksTableData } from "./cardReadings";
 import { getSgkMonthlyReport, getOvertimeSummaryReport, getDepartmentCostReport, getAttendanceSummaryReport } from "./reports";
-import { getActivitySummary, getAnnualOvertimeBalance } from "./dashboard";
+import { getActivitySummary, annualOvertimePart } from "./dashboard";
 import { buildAphbForMonth } from "./sgkExport";
 import { DEFAULT_FLEXIBLE } from "./lib/pdksFlexible";
 const modules = import.meta.glob("./**/*.ts");
@@ -42,6 +42,11 @@ afterEach(() => vi.useRealTimers());
 //   employee + Sep 28–Oct 31 by_employee_date take(1001); no numeric DTO changes.
 // The shared 8-day prefix covers the longest ISO-week + split + flexible boundary.
 // Other query outputs and cross-project isolation remain strict.
+// First-record probe now streams at most 20 candidates and stops at a proven date;
+// attendanceReport changes only take(20) -> async iterator, with identical result data.
+// Query-limit change: terminal collect/take operations now use a shared bounded iterator;
+// dashboard leaves/departments and table shifts use scoped indexes, annual is traced via
+// its internal reference calculation; all eight result snapshot blocks remain byte-identical.
 it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK aynı indeks/aralık/sonuç kümesini kullanır", async () => {
   const t = convexTest(schema, modules);
   const ids = await t.run(async ctx => {
@@ -75,7 +80,7 @@ it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK ayn�
     ["departmentReport", getDepartmentCostReport, { projectId: ids.projectId, year: 2026, month: 10 }],
     ["attendanceReport", getAttendanceSummaryReport, { projectId: ids.projectId, year: 2026, month: 10 }],
     ["dashboard", getActivitySummary, { projectId: ids.projectId }],
-    ["annual", getAnnualOvertimeBalance, { projectId: ids.projectId, year: 2026 }],
+    ["annual", annualOvertimePart, { projectId: ids.projectId, year: 2026, startDate: "2026-01-01", endDate: "2026-12-31" }],
     ["sgk", buildAphbForMonth, { projectId: ids.projectId, year: 2026, month: 10 }],
   ] as const;
   const baseline = new Map<string, { reads: string[]; result: unknown }>();
@@ -121,7 +126,7 @@ it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK ayn�
         for (const read of discovery) {
           const scope: unknown = Array.isArray(read[2]) ? read[2][2] : null;
           expect(scope === undefined || scope === ids.projectId).toBe(true);
-          expect(read).toEqual(["shifts", ["withIndex", "by_project"], ["eq", "projectId", scope], ["export"], ["take", 1001]]);
+          expect([["shifts", ["withIndex", "by_project"], ["eq", "projectId", scope], ["export"], ["Symbol(Symbol.asyncIterator)"]], ["shifts", ["withIndex", "by_project"], ["eq", "projectId", scope], ["export"], ["take", 1001]]]).toContainEqual(read);
         }
         // yetki meta okuması (docs/roles/PLAN.md), DTO'yu etkilemez
         const permissionMetadata = (read: unknown[]) => read[0] === "projectRolePermissions" || (read[0] === "userProjects" && read.some(call => Array.isArray(call) && call[0] === "withIndex" && call[1] === "by_user") && read.some(call => Array.isArray(call) && call[0] === "take" && call[1] === 1000));

@@ -13,15 +13,19 @@ import { buildPersonMonthRows } from '@/lib/reports/personMonth';
 import { dailyReportArgs } from '@/lib/reports/query';
 import { REPORTS, type ReportDefinition } from '@/lib/reports/registry';
 import Reports from '@/pages/Reports';
-const mocks = vi.hoisted(() => ({ permissionsLoading: false, reportsAllowed: true, role: 'project_user', scoped: false, query: vi.fn(), convexQuery: vi.fn() }));
+const mocks = vi.hoisted(() => ({ permissionsLoading: false, reportsAllowed: true, role: 'project_user', scoped: false, snapshotPending: false, query: vi.fn(), convexQuery: vi.fn() }));
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { role: mocks.role, _id: 'user-a' } }) }));
 vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ loading: false, projectId: mocks.scoped ? 'project-a' : null }) }));
+vi.mock('@/hooks/usePdksSnapshot', () => ({
+  usePdksTableSnapshot: (args: unknown) => ({ data: (() => { const data = mocks.query('pdksBatches:table', args); return mocks.snapshotPending ? undefined : data; })(), refresh: vi.fn() }),
+  usePdksPayrollSnapshot: (args: unknown) => ({ data: mocks.query('pdksBatches:payroll', args), refresh: vi.fn() }),
+}));
 vi.mock('convex/react', () => ({ useQuery: mocks.query, useConvex: () => ({ query: mocks.convexQuery }) }));
 const definition: ReportDefinition = { slug: 'example', group: 'gunluk', title: 'Örnek rapor', description: 'Örnek', dataSource: 'pdksMatrix', filters: [], formats: ['csv'], columns: [
   { key: 'name', label: 'Ad Soyad', defaultVisible: true, value: row => row.kind === 'daily' ? row.name : null },
   { key: 'department', label: 'Departman', defaultVisible: true, value: row => row.kind === 'daily' ? row.department : null },
 ] };
-afterEach(() => { vi.unstubAllGlobals(); mocks.permissionsLoading = false; mocks.reportsAllowed = true; mocks.role = 'project_user'; mocks.scoped = false; mocks.query.mockReset(); });
+afterEach(() => { vi.unstubAllGlobals(); mocks.permissionsLoading = false; mocks.reportsAllowed = true; mocks.role = 'project_user'; mocks.scoped = false; mocks.snapshotPending = false; mocks.query.mockReset(); });
 describe('generic report display', () => {
   it('honors saved column hiding for both the header and data', () => {
     const hidden = toggleHiddenColumn([], 'department');
@@ -178,11 +182,12 @@ it('uses month filters for the daily matrix summary and requests the full leap m
 it('fetches month summaries once instead of subscribing to every new reading', () => {
   const report = REPORTS.find(item => item.slug === 'aylik-ozet');
   if (!report) throw new Error('Missing summary');
+  mocks.snapshotPending = true;
   mocks.query.mockReturnValue([dailySource([dailyCell()])]);
   const html = renderToStaticMarkup(<ReportResults definition={report} projectId={'project-a' as Id<'projects'>} from="2026-10-01" to="2026-10-31" person="" year={2026} month={10} />);
-  expect(mocks.query).toHaveBeenCalledWith(expect.anything(), 'skip');
+  expect(mocks.query).toHaveBeenCalledWith('pdksBatches:table', expect.objectContaining({ startDate: '2026-10-01', endDate: '2026-10-31' }));
   expect(html).toContain('Rapor yükleniyor');
-  expect(html).toContain('Yeniden yükle');
+  expect(html).toContain('Verileri yenile');
 });
 it('displays one summary row per person and labels the specialized exports', () => {
   const report = REPORTS.find(item => item.slug === 'aylik-ozet');

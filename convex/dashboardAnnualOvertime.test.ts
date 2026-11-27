@@ -67,7 +67,7 @@ it.each([{ start: "13:00", end: "17:30", expected: 270 }, { start: "08:00", end:
     for (const [time, direction] of [[start, "entry"], [end, "exit"]] as const) await ctx.db.insert("cardReadings", { projectId, employeeId, cardNo: "1", accessStatus: "izin_verildi", accessTime: new Date(`2026-06-28T${time}:00+03:00`).toISOString(), direction });
     return { projectId, employeeId, userId, sessionId };
   });
-  const result = await t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` }).query(api.dashboard.getAnnualOvertimeBalance, { projectId: ids.projectId, year: 2026 });
+  const result = await t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` }).action(api.dashboard.getAnnualOvertimeBalance, { projectId: ids.projectId, year: 2026 });
   expect(result).toHaveLength(1);
   expect(result[0]).toMatchObject({ employeeId: ids.employeeId, totalOvertimeMinutes: expected });
 });

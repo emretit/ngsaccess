@@ -1,3 +1,4 @@
+import { loadPdksPayroll } from "@/lib/pdksBatches";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from '@/components/auth/AuthProvider';
 import { readPDKSPreferences, savePDKSPreferences, type PDKSExportPreferences } from '@/lib/pdksExportColumns';
@@ -131,8 +132,8 @@ function ExportPanel({
         a.click();
         URL.revokeObjectURL(url);
       } else if (type === "payroll") {
-        const data = await convex.query(
-          api.cardReadings.getMonthlyPayrollSheet,
+        const data = await loadPdksPayroll(
+          convex,
           {
             projectId,
             year: selectedDate.getFullYear(),

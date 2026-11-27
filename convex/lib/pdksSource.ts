@@ -5,7 +5,7 @@ import type { Doc } from "../_generated/dataModel";
 export type PdksReadingSource = "card" | "pin" | "qr" | "mobile" | "manual" | "biometric" | "unknown";
 export type PdksSourceReading = Partial<Pick<Doc<"cardReadings">,
   "direction" | "hikCardReaderNo" | "deviceId" | "accessTime" | "projectId" | "cardNo" | "rawData" | "ideIoId" | "hikCurrentVerifyMode" | "hikMajorEventType" | "hikSubEventType" | "hikDevIndex" | "hikSerialNo" | "hikFrontSerialNo" | "hikDateTime" | "hikPictureURL"
->>;
+>> & { pdksSource?: PdksReadingSource };
 
 function object(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -29,6 +29,7 @@ function knownNonBiometricMinor(minor: number): PdksReadingSource | undefined {
 
 /** Only explicit event evidence classifies biometrics; a card number is not proof of card authentication. */
 export function classifyReadingSource(reading: PdksSourceReading): PdksReadingSource {
+  if (reading.pdksSource) return reading.pdksSource;
   const parsed = reading.rawData ? parseCardReaderBody(reading.rawData, null) : undefined;
   const rawMode = String(reading.hikCurrentVerifyMode ?? parsed?.hikCurrentVerifyMode ?? "");
   const mode = rawMode.toLowerCase().replace(/[^a-z]/g, "");

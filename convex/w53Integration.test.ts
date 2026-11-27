@@ -93,7 +93,7 @@ describe.each([false, true])("W5.3 legacy/versioned=%s", versioned => {
     expect(aphb.blockedByReview).toBe(false);
     expect(aphb.employees[0]?.reviewDays).toEqual([]);
     expect(aphb.xml).toContain("<calismaGunu>7</calismaGunu>");
-    const annual = await f.caller.query(api.dashboard.getAnnualOvertimeBalance, { projectId: f.projectId, year: 2026 });
+    const annual = await f.caller.action(api.dashboard.getAnnualOvertimeBalance, { projectId: f.projectId, year: 2026 });
     expect(annual[0]?.totalOvertimeMinutes).toBe(excess);
     // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
     vi.setSystemTime(new Date(iso(date, "23:59")));

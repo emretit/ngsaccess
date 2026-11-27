@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -63,9 +64,10 @@ export function CorrectionRequestsPanel({
   } | null>(null);
   const [note, setNote] = useState("");
   const { run, pending: busy } = useAsyncAction(async (current: NonNullable<typeof decision>, decisionNote: string) => {
-    if (current.approve)
+    if (current.approve) {
       await approve({ id: current.id, note: decisionNote.trim() || undefined });
-    else await reject({ id: current.id, note: decisionNote.trim() });
+      invalidatePdksSnapshots();
+    } else await reject({ id: current.id, note: decisionNote.trim() });
     notify.success(current.approve ? "Talep onaylandı" : "Talep reddedildi");
   }, { error: "Talep sonuçlandırılamadı" });
   const validNote = note.trim().length >= 3 && note.trim().length <= 500;

@@ -12,8 +12,9 @@ const employee = { _id: "e", projectId: "p", cardNumber: "123" } as Doc<"employe
 const reading = (date: string, mode = "card") => ({ employeeId: employee._id, projectId: employee.projectId, cardNo: "123", accessStatus: "izin_verildi", accessTime: `${date}T06:00:00Z`, hikCurrentVerifyMode: mode }) as Doc<"cardReadings">;
 function context(rows: Doc<"cardReadings">[]) {
   const take = vi.fn(async (limit: number) => rows.slice(0, limit));
-  const chain = { withIndex: () => chain, order: () => chain, take };
-  return { ctx: { db: { query: () => chain } } as unknown as QueryCtx, take };
+  const seen = vi.fn();
+  const chain = { withIndex: () => chain, order: () => chain, take, async *[Symbol.asyncIterator]() { for (const row of rows) { seen(row); yield row; } } };
+  return { ctx: { db: { query: () => chain } } as unknown as QueryCtx, take, seen };
 }
 describe("PDKS veri kapsamı", () => {
   it("yalnız geçerli proje olaylarının İstanbul günlerini kullanır", () => {
@@ -21,9 +22,10 @@ describe("PDKS veri kapsamı", () => {
     expect([...pdksAvailableDateKeys(filterPdksReadings(raw, "p"))]).toEqual(["2026-10-01", "2026-10-03"]);
   });
   it("ilk biyometrik okumayı geçerli kayıt sayar; sorgu 20 ile sınırlıdır", async () => {
-    const { ctx, take } = context([reading("2026-10-01", "face"), reading("2026-10-03")]);
+    const { ctx, take, seen } = context([reading("2026-10-01", "face"), reading("2026-10-03")]);
     expect(await pdksFirstRecordDate(ctx, employee, [])).toBe("2026-10-01");
-    expect(take).toHaveBeenCalledWith(20);
+    expect(take).not.toHaveBeenCalled();
+    expect(seen).toHaveBeenCalledTimes(2);
   });
   it("20 adayın hiçbiri geçerli değilse dönem kaydına döner; kayıt yoksa bilinmeyen kalır", async () => {
     const { ctx } = context(Array.from({ length: 21 }, () => reading("2026-10-01", "unknown")));

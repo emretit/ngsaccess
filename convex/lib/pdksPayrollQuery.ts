@@ -1,3 +1,4 @@
+import { readBoundedPdks, withPdksReadBudget, pdksReadBudget, readPdksManualRecords, readPdksLeaves, readPdksBatchReadings, type PdksBatchScope } from "./pdksTableQuery";
 import { scopedPdksPlan } from "./pdksMultiShift";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
@@ -12,7 +13,7 @@ import { buildBoundedShiftResolver, type ShiftResolver } from "./shiftResolver";
 import { overtimePeriodRange, calculatePeriodOvertime } from "./overtimeCalc";
 import { buildPeriodDateKeys } from "./pdksCalc";
 import { addWorkDate, buildPdksWorkDateResolver, hasFlexiblePdksShift, pdksWorkDayRange, groupPdksWorkDays } from "./pdksWorkDay";
-import { withPdksDeviceAvailability, pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
+import { setPdksHistoryReadings, withPdksDeviceAvailability, pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import { trDayRangeISO, trDateKey } from "./trDate";
 import { isPdksIncludedReading } from "./pdksSource";
 import { filterPdksReadings } from "./pdksSource";
@@ -58,6 +59,7 @@ export type MonthlyPayrollSheet = Awaited<ReturnType<typeof loadPayrollPeriod>> 
 export async function getMonthlyPayrollSheet(
   ctx: QueryCtx & { user: Doc<"users"> }, args: PdksPayrollQueryArgs, helpers: PayrollHelpers,
 ): Promise<MonthlyPayrollSheet> {
+  ctx = withPdksReadBudget(ctx);
   if (!Number.isInteger(args.year) || args.year < 1000 || args.year > 9999 || !Number.isInteger(args.month) || args.month < 1 || args.month > 12) {
     throw new Error("Geçerli bir yıl ve ay seçin");
   }
@@ -88,8 +90,10 @@ export async function loadPayrollPeriod(
   ctx: QueryCtx & { user: Doc<"users"> },
   args: { projectId: Id<"projects">; startDate: string; endDate: string; companyId?: Id<"companies"> },
   helpers: PayrollHelpers = reportHelpers,
-  preloaded: { employees?: Doc<"employees">[]; shiftResolver?: ShiftResolver; readings?: PayrollReadings; availableDates?: readonly string[]; snapshotAt?: number } = {},
+  preloaded: { employees?: Doc<"employees">[]; shiftResolver?: ShiftResolver; readings?: PayrollReadings; availableDates?: readonly string[]; snapshotAt?: number; batch?: PdksBatchScope } = {},
 ) {
+  ctx = withPdksReadBudget(ctx);
+  if (preloaded.batch?.preloadedReadings && preloaded.batch.readingEndISO) setPdksHistoryReadings(ctx, preloaded.batch.preloadedReadings, preloaded.batch.readingEndISO);
   const { scopedPdksShift, flexiblePreviousReadings } = helpers;
   const allowedProjectIds = await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
   const { startDate, endDate } = args;
@@ -100,53 +104,39 @@ export async function loadPayrollPeriod(
 
   const cachedReadings = preloaded.readings;
   const useCachedReadings = cachedReadings && cachedReadings.startISO <= startISO && cachedReadings.endISO >= endISO;
-  let readings;
-  let employees: Doc<"employees">[];
-  if (allowedProjectIds.length > 0) {
-    const [readingResults, empResults] = await Promise.all([
-      useCachedReadings ? Promise.resolve([cachedReadings.readings.filter(reading =>
-        reading.projectId !== undefined && allowedProjectIds.includes(reading.projectId) && reading.accessTime >= startISO && reading.accessTime <= endISO)]) : Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project_access_time", q => q.eq("projectId", pid).gte("accessTime", startISO).lte("accessTime", endISO))
-            .collect()
-        )
-      ),
-      preloaded.employees ? Promise.resolve([preloaded.employees]) : Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("employees")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .collect()
-        )
-      ),
-    ]);
-    readings = readingResults.flat();
-    employees = empResults.flat();
-  } else {
-    return { days: [], rows: [] };
+  let readings: Doc<"cardReadings">[] = [];
+  let employees: Doc<"employees">[] = [];
+  const budget = pdksReadBudget();
+  if (!allowedProjectIds.length) return { days: [], rows: [] };
+  if (preloaded.batch) {
+    employees = [...preloaded.batch.employees];
+    readings = await readPdksBatchReadings(ctx, preloaded.batch, startISO, endISO);
+  } else for (const pid of allowedProjectIds) {
+    readings.push(...(useCachedReadings ? cachedReadings.readings.filter(reading =>
+      reading.projectId === pid && reading.accessTime >= startISO && reading.accessTime <= endISO)
+      : await readBoundedPdks(ctx.db.query("cardReadings")
+        .withIndex("by_project_access_time", q => q.eq("projectId", pid).gte("accessTime", startISO).lte("accessTime", endISO)), budget)));
+    employees.push(...(preloaded.employees ? preloaded.employees.filter(employee => employee.projectId === pid)
+      : await readBoundedPdks(ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", pid)), budget)));
   }
 
   employees = employees.filter(employee => employee.isVisitor !== true && employedDuring(employee, startDate, endDate)
     && (!args.companyId || employee.companyId === args.companyId));
   const payrollBoundaryShiftResolver = preloaded.shiftResolver ?? await buildBoundedShiftResolver(ctx, employees, { start: addWorkDate(overtimeRange.startDate, -1), end: addWorkDate(overtimeRange.endDate, 1) });
-  const payrollHasFlexible = [...payrollBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") && hasFlexiblePdksShift(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
+  const payrollHasFlexible = preloaded.batch?.forceFlexible || [...payrollBoundaryShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") && hasFlexiblePdksShift(employees, (id, date) => scopedPdksShift(payrollBoundaryShiftResolver.resolve(id, date), args.projectId), overtimeRange.startDate, overtimeRange.endDate);
   if (payrollHasFlexible) {
     const previousRange = trDayRangeISO(addWorkDate(overtimeRange.startDate, -1), addWorkDate(overtimeRange.startDate, -1));
     const previous = cachedReadings && cachedReadings.startISO <= previousRange.startISO && cachedReadings.endISO >= previousRange.endISO
       ? cachedReadings.readings.filter(reading => reading.projectId !== undefined && allowedProjectIds.includes(reading.projectId)
         && reading.accessTime >= previousRange.startISO && reading.accessTime <= previousRange.endISO)
-      : await flexiblePreviousReadings(ctx, overtimeRange.startDate, allowedProjectIds);
+      : preloaded.batch ? await readPdksBatchReadings(ctx, preloaded.batch, previousRange.startISO, previousRange.endISO) : await flexiblePreviousReadings(ctx, overtimeRange.startDate, allowedProjectIds);
     readings = [...previous, ...readings];
   }
   // Scope before reading: another project's records must never consume this limit.
   // The same bounded employee records feed both flexible boundaries and payroll cells.
   const manualStart = payrollHasFlexible ? addWorkDate(overtimeRange.startDate, -1) : overtimeRange.startDate;
   const manualEnd = payrollHasFlexible ? addWorkDate(overtimeRange.endDate, 1) : overtimeRange.endDate;
-  const recordLists = await Promise.all(employees.map(employee => ctx.db.query("pdksRecords")
-    .withIndex("by_employee_date", q => q.eq("employeeId", employee._id).gte("date", manualStart).lte("date", manualEnd)).take(1001)));
-  if (recordLists.some(records => records.length > 1000)) throw new Error("Manuel kayıt sınırı aşıldı; tarih aralığını daraltın");
+  const recordLists = await readPdksManualRecords(ctx, employees, manualStart, manualEnd, budget);
   const manualByEmpDate = new Map(recordLists.flat()
     .filter(record => record.manualEntry && record.projectId === args.projectId)
     .map(record => [`${record.employeeId}__${record.date}`, record]));
@@ -164,14 +154,15 @@ export async function loadPayrollPeriod(
 
   const days = buildPeriodDateKeys(startDate, endDate);
 
-  const approvedLeaves = (await Promise.all(employees.map(emp => ctx.db.query("leaves")
-    .withIndex("by_employee_start", q => q.eq("employeeId", emp._id).lte("startDate", endDate)).collect())))
-    .flat().filter(l => l.status === "approved" && l.endDate >= startDate);
 
   const payrollEmployeesById = new Map(employees.map(e => [String(e._id), e]));
   const payrollEmployeeReadings = buildPdksEmployeeReadingMap({ employees, readings });
   const payrollWorkDate = [...payrollShiftResolver.shifts.values()].some(shift => shift.scheduleType === "flexible") ? buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId), { readings, manualEntryFor: (id, date) => manualByEmpDate.get(`${id}__${date}`)?.entryTime }, (reading, date) => policies(reading.projectId, date), (id, date) => scopedPdksShift(payrollShiftResolver.resolveLast(id, date), args.projectId)) : payrollBoundaryWorkDate;
   const payrollAvailableDates = pdksAvailableDatesByProject(readings, payrollWorkDate);
+  preloaded.batch?.onAvailability?.([...(payrollAvailableDates.get(args.projectId) ?? [])], !!payrollHasFlexible, employees.map(employee => employee._id));
+  if (preloaded.batch?.availabilityOnly) return { days, rows: [] };
+  const approvedLeaves = await readPdksLeaves(ctx, employees, startDate, endDate, budget);
+  if (preloaded.batch?.availableDates) payrollAvailableDates.set(args.projectId, new Set(preloaded.batch.availableDates));
   if (preloaded.availableDates) payrollAvailableDates.set(args.projectId, new Set(preloaded.availableDates));
   await Promise.all([...new Set(employees.map(employee => employee.projectId))].map(async projectId => {
     payrollAvailableDates.set(projectId, await withPdksDeviceAvailability(ctx, projectId, payrollAvailableDates.get(projectId) ?? new Set(), policies, overtimeRange.endDate));

@@ -1,3 +1,4 @@
+import { pdksEpoch } from "@/lib/pdksInvalidation";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { getFunctionName, type FunctionReference } from "convex/server";
@@ -118,7 +119,9 @@ describe("panel karar gönderimi", () => {
     state.approve.mockReset(); state.reject.mockReset(); state.success.mockClear();
     render();
     expect(state.submit).toBeDefined();
+    const epoch = pdksEpoch();
     await state.submit?.({ preventDefault: vi.fn() });
+    expect(pdksEpoch()).toBe(epoch + (approve ? 1 : 0));
     expect(approve ? state.approve : state.reject).toHaveBeenCalledWith({ id: "request-1", note: "Karar gerekçesi" });
     expect(state.success).toHaveBeenCalledWith(approve ? "Talep onaylandı" : "Talep reddedildi");
     state.decision = null;

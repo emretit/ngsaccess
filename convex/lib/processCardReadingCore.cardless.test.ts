@@ -17,7 +17,7 @@ const unknownReading: Doc<"cardReadings"> = {
   _id: "reading" as Id<"cardReadings">, _creationTime: 0, projectId, cardNo: "", accessTime: "2026-11-01T01:00:00Z", accessStatus: "izin_verildi", direction: "exit", hikCurrentVerifyMode: "card",
 };
 const emptyHistory = { db: { query: () => {
-  const chain = { withIndex: () => chain, order: () => chain, take: async () => [] };
+  const chain = { withIndex: () => chain, order: () => chain, async *[Symbol.asyncIterator]() {}, take: async () => [] };
   return chain;
 } } } as unknown as QueryCtx;
 
@@ -88,7 +88,7 @@ describe("empty cards never identify people", () => {
     const shifts: ShiftResolver = { shifts: new Map([[shift._id, shift]]), resolve: () => shift, resolveLast: () => shift,
       resolvePlan: () => ({ kind: "shifts", source: "employee", calendar: "plan", origin: "weekly", shifts: [shift] }) };
     const ctx = { db: { query: () => {
-      const chain = { withIndex: () => chain, order: () => chain, take: async () => [], collect: async () => [], first: async () => null };
+      const chain = { withIndex: () => chain, order: () => chain, async *[Symbol.asyncIterator]() {}, take: async () => [], collect: async () => [], first: async () => null };
       return chain;
     } } } as unknown as QueryCtx;
     const options = { preloadedEmployees: people, shiftResolver: shifts,

@@ -1,3 +1,4 @@
+import { pdksReadBudget, readBoundedPdks, withPdksReadBudget } from "./lib/pdksTableQuery";
 import { scheduleModeValidator, validateShiftSchedule } from "./lib/shiftSchedule";
 import { departmentChain } from "./lib/shiftResolver";
 import { shiftPlanValidator, planShiftIds, validPlanDate, validateShiftPlan } from "./lib/shiftPlan";
@@ -107,6 +108,7 @@ export const listAssignments = authedQuery({
     includePlans: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    ctx = withPdksReadBudget(ctx);
     const projectIds = await resolveProjectScope(ctx, args.projectId);
     if (args.employeeIds && args.employeeIds.length > BULK_ASSIGN_LIMIT) throw new ConvexError("En fazla 100 çalışan seçin");
     if ((args.rangeStart === undefined) !== (args.rangeEnd === undefined)) throw new ConvexError("Görünür aralığın başlangıç ve bitişini birlikte verin");
@@ -116,10 +118,14 @@ export const listAssignments = authedQuery({
       (!args.employeeIds || args.employeeIds.includes(item.employeeId)) &&
       (!args.shiftId || item.shiftId === args.shiftId || planShiftIds(item.plan).includes(args.shiftId));
     if (args.rangeStart === undefined || args.rangeEnd === undefined) {
-      // Compatibility: callers without a range still receive their full project series.
-      const results = await Promise.all(projectIds.map(projectId => ctx.db.query("shiftAssignments")
-        .withIndex("by_project", q => q.eq("projectId", projectId)).collect()));
-      return results.flat().filter(matches);
+      // Legacy consumers may omit dates; fail explicitly instead of silently returning a partial history.
+      const budget = pdksReadBudget();
+      const rows: Doc<"shiftAssignments">[] = [];
+      for (const projectId of projectIds) {
+        rows.push(...await readBoundedPdks(ctx.db.query("shiftAssignments")
+          .withIndex("by_project", q => q.eq("projectId", projectId)), budget));
+      }
+      return rows.filter(matches);
     }
     validateAssignRange({ startDate: args.rangeStart, endDate: args.rangeEnd });
     const { rangeStart, rangeEnd } = args;

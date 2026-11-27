@@ -1,7 +1,7 @@
+import { usePdksTableSnapshot as useBatchedTable, usePdksPayrollSnapshot } from "@/hooks/usePdksSnapshot";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { useConvex, useQuery } from 'convex/react';
-import type { FunctionArgs, FunctionReturnType } from 'convex/server';
+import { useMemo, useReducer, useState } from 'react';
+import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { LoadMoreFooter } from '@/components/shared/LoadMoreFooter';
@@ -22,45 +22,29 @@ export interface ReportResultsProps {
 function meta(props: ReportResultsProps): Omit<ReportExportMeta, 'columns'> {
   return { from: props.from, to: props.to, projectName: props.projectName };
 }
-type PdksTableArgs = FunctionArgs<typeof api.cardReadings.getPdksTableData>;
-type PdksTableData = FunctionReturnType<typeof api.cardReadings.getPdksTableData>;
-/** Month-long punch reports are fetched once per filter set (the parent remounts on every filter or
- * "Yeniden yükle"): a live subscription would resend the whole month after every new reading. */
-function usePdksTableSnapshot(args: PdksTableArgs, enabled: boolean): PdksTableData | undefined {
-  const convex = useConvex();
-  const argsRef = useRef(args);
-  const [state, setState] = useState<{ data?: PdksTableData; error?: unknown }>({});
-  useEffect(() => {
-    if (!enabled) return;
-    let alive = true;
-    convex.query(api.cardReadings.getPdksTableData, argsRef.current).then(
-      data => { if (alive) setState({ data }); },
-      (error: unknown) => { if (alive) setState({ error }); },
-    );
-    return () => { alive = false; };
-  }, [convex, enabled]);
-  if (state.error !== undefined) throw state.error;
-  return state.data;
-}
 function DailyResults(props: ReportResultsProps) {
   const args = dailyReportArgs(props, props.definition);
   const { can } = usePermissions();
   const enabled = can("reports.view") && !!props.projectId;
-  const snapshot = props.definition.rowsMode === 'personMonth';
-  const live = useQuery(api.cardReadings.getPdksTableData, !enabled || snapshot ? 'skip' : args);
-  const once = usePdksTableSnapshot(args, enabled && snapshot);
-  const data = snapshot ? once : live;
+  const snapshot = true;
+  const once = useBatchedTable(enabled && snapshot ? args : "skip");
+  const data = once.data;
   const rows = useMemo(() => props.definition.rowsMode === 'personMonth' ? buildPersonMonthRows(data ?? []) : dailyRowsForReport(data ?? [], props.definition.slug, props.violationsOnly), [data, props.definition.rowsMode, props.definition.slug, props.violationsOnly]);
   const days = useMemo(() => [...new Set((data ?? []).flatMap(row => row.days.map(cell => cell.date)))].sort(), [data]);
+  if (once.error) return <div role="alert"><p>{once.error}</p><button type="button" onClick={once.refresh}>Yeniden dene</button></div>;
   return <ReportPage days={days} projectId={props.projectId} onClear={props.onClear} definition={props.definition} rows={rows} loading={data === undefined} meta={meta(props)}>
-    {snapshot && <p className="text-xs text-muted-foreground">Rapor açıldığı andaki verileri gösterir; yeni okutmalar için “Yeniden yükle”. Kalabalık projelerde departman seçerek raporu küçültün.</p>}
+    {snapshot && <button type="button" onClick={once.refresh}>Verileri yenile</button>}
+    {snapshot && <p className="text-xs text-muted-foreground">Rapor açıldığı andaki verileri gösterir; yeni okutmalar için “Verileri yenile”.</p>}
   </ReportPage>;
 }
 function MonthlyResults(props: ReportResultsProps) {
   const { can } = usePermissions();
-  const sheet = useQuery(api.cardReadings.getMonthlyPayrollSheet, can("reports.view") && props.projectId ? monthlyReportArgs(props) : "skip");
+  const snapshot = usePdksPayrollSnapshot(can("reports.view") && props.projectId ? monthlyReportArgs(props) : "skip");
+  const sheet = snapshot.data;
   const rows = useMemo(() => sheet ? monthlyRowsForReport(sheet, props.definition.monthlyRows, props.person, props.departmentName) : [], [sheet, props.definition.monthlyRows, props.departmentName, props.person]);
+  if (snapshot.error) return <div role="alert"><p>{snapshot.error}</p><button type="button" onClick={snapshot.refresh}>Yeniden dene</button></div>;
   return <ReportPage projectId={props.projectId} onClear={props.onClear} definition={props.definition} rows={rows} days={sheet?.days} loading={sheet === undefined} meta={meta(props)}>
+    <button type="button" onClick={snapshot.refresh}>Verileri yenile</button>
     {props.definition.monthlyDays === 'code' && <p className="text-xs text-muted-foreground">Kodlar: N normal · DV devamsız · İZN izinli · HT hafta tatili · RT resmî tatil · — henüz gelmedi / veri yok.</p>}
   </ReportPage>;
 }

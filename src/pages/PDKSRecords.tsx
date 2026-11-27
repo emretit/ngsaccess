@@ -89,6 +89,7 @@ function PDKSContent({
                 <Button variant="outline">İşlemler</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={view.refresh} disabled={isLoading}>Verileri yenile</DropdownMenuItem>
                 {exportMenu}
                 {canApprove && projectId && <CorrectionRequestsEntry projectId={projectId} onSelect={() => setCorrectionsOpen(true)} />}
                 {canManage && <DropdownMenuItem onClick={() => setImport(true)}>İçe aktar</DropdownMenuItem>}

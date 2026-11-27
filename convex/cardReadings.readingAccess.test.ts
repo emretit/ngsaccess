@@ -36,7 +36,7 @@ async function fixture(role: ProjectRole, permissions?: Permission[], superAdmin
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 const reports = [
-  { name: "annual balance", run: (f: Fixture) => f.caller.query(api.dashboard.getAnnualOvertimeBalance, { projectId: f.projectId, year: 2026 }) },
+  { name: "annual balance", run: (f: Fixture) => f.caller.action(api.dashboard.getAnnualOvertimeBalance, { projectId: f.projectId, year: 2026 }) },
   { name: "repeat late", run: (f: Fixture) => f.caller.query(api.dashboard.getRepeatLateOffenders, { projectId: f.projectId }) },
   { name: "break violations", run: (f: Fixture) => f.caller.query(api.dashboard.getBreakViolations, { projectId: f.projectId, date }) },
   { name: "activity", run: (f: Fixture) => f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId }) },

@@ -70,21 +70,59 @@ export function pdksAvailableDateKeys(readings: readonly Doc<"cardReadings">[], 
   return new Set(readings.map(workDate));
 }
 
+const knownHistory = new WeakMap<object, { byEmployee: Map<string, Doc<"cardReadings">[]>; endISO: string }>();
+/** Complete report-range inputs can answer the historical probe after one indexed minimum. */
+export function setPdksHistoryReadings(ctx: Pick<QueryCtx, "db">, rows: readonly Doc<"cardReadings">[], endISO: string) {
+  const byEmployee = new Map<string, Doc<"cardReadings">[]>();
+  for (const reading of rows) {
+    if (!reading.employeeId) continue;
+    const group = byEmployee.get(reading.employeeId) ?? [];
+    group.push(reading);
+    byEmployee.set(reading.employeeId, group);
+  }
+  for (const group of byEmployee.values()) group.sort((a, b) => a.accessTime.localeCompare(b.accessTime) || a._creationTime - b._creationTime);
+  knownHistory.set(ctx.db, { byEmployee, endISO });
+}
+
 /** Scan at most 20 indexed candidates; if all are excluded, use the selected period.
  * Unproven earlier history stays noData instead of manufacturing absences. */
 export async function pdksFirstRecordDate(ctx: QueryCtx, employee: Doc<"employees">, readings: readonly Doc<"cardReadings">[], manualDates: readonly string[] = [], workDay: (reading: Doc<"cardReadings">) => string = reading => trDateKey(reading.accessTime), policies?: PdksProjectPolicies): Promise<string | null> {
-  const candidates = await ctx.db.query("cardReadings")
-    .withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", employee._id))
-    .order("asc").take(20);
-  // At most 20 historical dates, each with one predecessor lookup and bounded targets.
+  // Once a granted date is known, a later calendar day cannot resolve earlier
+  // than it: PDKS attributes a reading to its calendar date or the preceding day.
+  // Preserve the 20-candidate fallback when early records are rejected/excluded.
   const historical = new Map<string, PdksPolicyResolver>();
   const historyStart = policies?.historyStart(employee.projectId);
-  if (historyStart) {
-    const dates = [...new Set(candidates.map(workDay).filter(date => date < historyStart))];
-    await Promise.all(dates.map(async date => historical.set(date, await loadPdksRulePolicy(ctx, employee.projectId, date, date))));
-  }
   const policyFor = (reading: Doc<"cardReadings">) => historical.get(workDay(reading))?.(workDay(reading)) ?? policies?.(reading.projectId, workDay(reading));
-  const eligibleCandidates = candidates.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r)));
+  const query = () => ctx.db.query("cardReadings")
+    .withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", employee._id)).order("asc");
+  const inspect = async (source: AsyncIterable<Doc<"cardReadings">> | readonly Doc<"cardReadings">[]) => {
+    const eligible: Doc<"cardReadings">[] = [];
+    let firstGrantedDate: string | undefined;
+    let inspected = 0;
+    for await (const reading of source) {
+      if (firstGrantedDate && trDateKey(reading.accessTime) > firstGrantedDate) break;
+      const date = workDay(reading);
+      if (historyStart && date < historyStart && !historical.has(date)) historical.set(date, await loadPdksRulePolicy(ctx, employee.projectId, date, date));
+      if (isPdksIncludedReading(reading, employee.projectId, policyFor(reading))) {
+        eligible.push(reading);
+        if (reading.accessStatus === "izin_verildi" && (!firstGrantedDate || date < firstGrantedDate)) firstGrantedDate = date;
+      }
+      if (++inspected === 20) break;
+    }
+    return { eligible, firstGrantedDate };
+  };
+  let result: Awaited<ReturnType<typeof inspect>> | undefined;
+  const known = knownHistory.get(ctx.db), cached = known?.byEmployee.get(employee._id);
+  if (known && cached?.length) {
+    const first = await query().first();
+    if (first && cached[0]?._id === first._id) {
+      const values = cached.slice(0, 20);
+      const candidate = await inspect(values);
+      if (values.length === 20 || candidate.firstGrantedDate && trDateKey(known.endISO) > candidate.firstGrantedDate) result = candidate;
+    }
+  }
+  result ??= await inspect(query());
+  const eligibleCandidates = result.eligible;
   const employeeCard = cardKey(employee.cardNumber);
   const periodReadings = readings.filter(r => isPdksIncludedReading(r, employee.projectId, policyFor(r))).filter(r => r.employeeId === employee._id || (!r.employeeId && employeeCard !== undefined && r.cardNo === employee.cardNumber));
   const allowed = [...eligibleCandidates, ...periodReadings].filter(r => r.accessStatus === "izin_verildi");

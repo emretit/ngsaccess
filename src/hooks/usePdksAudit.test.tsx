@@ -6,6 +6,7 @@ import { usePdksFilterParams } from "./usePdksFilterParams";
 import type { FilterValues } from "@/components/pdks/dashboard/PDKSFilterBar";
 const calls = vi.hoisted(() => [] as unknown[]);
 vi.mock("convex/react", () => ({ useQuery: (_reference: unknown, args: unknown) => { calls.push(args); return []; } }));
+vi.mock("@/hooks/usePdksSnapshot", () => ({ usePdksTableSnapshot: (args: unknown) => { calls.push(args); return { data: [], refresh: vi.fn() }; } }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "p", loading: false }) }));
 const defaults: FilterValues = { reportType: "daily", statusFilter: "all", person: "", dateRange: { from: undefined, to: undefined } };
 function Probe() {

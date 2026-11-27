@@ -1,8 +1,9 @@
+import { loadAnnualOvertime } from "@/lib/pdksAnnual";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { notify } from "@/lib/notify";
 import { readableDate } from "../lib/presentation";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useConvex } from "convex/react";
 import { AlertTriangle, Clock, Coffee, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,11 +32,17 @@ export function PDKSSmartPresets({
 }: PDKSSmartPresetsProps) {
   const { can } = usePermissions();
   const convex = useConvex();
+  const controller = useRef<AbortController | null>(null);
+  const anchorYear = anchorDate.getFullYear();
   const { projectId, activeProject } = useActiveProject();
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  useEffect(() => () => { controller.current?.abort(); }, [projectId, anchorYear]);
 
   const runPreset = async (key: SmartPresetSelection["key"], label: string) => {
     if (loadingKey || !projectId || !can("reports.view")) return;
+    controller.current?.abort();
+    const current = new AbortController();
+    controller.current = current;
     setLoadingKey(key);
     try {
       let employeeIds: Id<"employees">[] = [];
@@ -47,12 +54,11 @@ export function PDKSSmartPresets({
         });
         employeeIds = rows.map((r) => r.employeeId);
       } else if (key === "annual-overtime-near") {
-        const rows = await convex.query(
-          api.dashboard.getAnnualOvertimeBalance,
-          {
+        const rows = await loadAnnualOvertime(
+          convex, {
             projectId,
-            year: anchorDate.getFullYear(),
-          },
+            year: anchorYear,
+          }, current.signal,
         );
         employeeIds = rows
           .filter((r) => r.utilizationPct >= 80)
@@ -64,6 +70,7 @@ export function PDKSSmartPresets({
         });
         employeeIds = rows.map((r) => r.employeeId);
       }
+      if (current.signal.aborted) return;
       onChange({
         key,
         label,
@@ -72,9 +79,9 @@ export function PDKSSmartPresets({
           key === "break-violation" ? toLocalDateString(anchorDate) : undefined,
       });
     } catch (error) {
-      notify.error("Uyarı listesi yüklenemedi", error);
+      if (!current.signal.aborted) notify.error("Uyarı listesi yüklenemedi", error);
     } finally {
-      setLoadingKey(null);
+      if (controller.current === current) setLoadingKey(null);
     }
   };
 

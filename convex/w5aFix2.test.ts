@@ -3,12 +3,12 @@
 import { convexTest } from "convex-test";
 import { expect, it, vi } from "vitest";
 import schema from "./schema";
-import { getAnnualOvertimeBalance } from "./dashboard";
+import { annualOvertimePart } from "./dashboard";
 import { loadRuleReportDays } from "./lib/reportAttendance";
 import type { QueryCtx } from "./_generated/server";
 const modules = import.meta.glob("./**/*.ts");
 
-it("W5-A fix2: yıllık 20002 okuma tek yüklenir, ek sorgular yalnız sınır günleridir ve bakiye aynı kalır", async () => {
+it("W5-A fix2: yıllık referans aralığı bounded iterator ile tek yüklenir, ek sorgular yalnız sınır günleridir ve bakiye aynı kalır", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2027-01-02T12:00:00Z"));
   try {
@@ -24,8 +24,8 @@ it("W5-A fix2: yıllık 20002 okuma tek yüklenir, ek sorgular yalnız sınır g
       return { projectId, userId, sessionId };
     });
     const caller = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
-    const handler = getAnnualOvertimeBalance as unknown as { _handler: (ctx: QueryCtx, args: { projectId: typeof ids.projectId; year: number }) => Promise<unknown> };
-    const args = { projectId: ids.projectId, year: 2026 };
+    const handler = annualOvertimePart as unknown as { _handler: (ctx: QueryCtx, args: { projectId: typeof ids.projectId; year: number; startDate: string; endDate: string }) => Promise<unknown> };
+    const args = { projectId: ids.projectId, year: 2026, startDate: "2026-01-01", endDate: "2026-12-31" };
     const baseline = await caller.run(ctx => handler._handler(ctx, args));
     const queries: unknown[][] = [];
     const result = await caller.run(async ctx => {
@@ -40,11 +40,6 @@ it("W5-A fix2: yıllık 20002 okuma tek yüklenir, ek sorgular yalnız sınır g
               values[1] = (builder: object) => Reflect.apply(callback, undefined, [trace(builder, calls)]);
             }
             const result: unknown = Reflect.apply(value, obj, values);
-            // Parametric fixture: expand only the existing annual collect beyond the old 20k cap.
-            if (key === "collect") return Promise.resolve(result).then((rows: unknown) => {
-              if (!Array.isArray(rows) || rows.length !== 2) return rows;
-              return Array.from({ length: 20002 }, (_, index) => rows[index % 2]);
-            });
             return result !== null && typeof result === "object" && ["withIndex", "eq", "gte", "lte", "gt", "lt", "order", "filter"].includes(String(key)) ? trace(result, calls) : result;
           };
         } });
@@ -63,8 +58,8 @@ it("W5-A fix2: yıllık 20002 okuma tek yüklenir, ek sorgular yalnız sınır g
     expect(result).toEqual(baseline);
     const annual = queries.filter(calls => JSON.stringify(calls).includes("2025-12-31T21:00:00.000Z") && JSON.stringify(calls).includes("2026-12-31T20:59:59.999Z"));
     expect(annual).toHaveLength(1);
-    expect(annual[0]).toContainEqual(["collect"]);
-    expect(queries.filter(calls => calls.some(call => Array.isArray(call) && call[0] === "take" && call[1] === 20001))).toHaveLength(1);
+    expect(annual[0]?.some(call => Array.isArray(call) && call[0] === "Symbol(Symbol.asyncIterator)")).toBe(true);
+    expect(queries.filter(calls => calls.some(call => Array.isArray(call) && call[0] === "Symbol(Symbol.asyncIterator)"))).toHaveLength(4);
     expect(queries.some(calls => JSON.stringify(calls).includes('"lte","accessTime","2025-12-31T20:59:59.999Z"'))).toBe(true);
     expect(queries.some(calls => JSON.stringify(calls).includes('"gte","accessTime","2026-12-31T21:00:00.000Z"'))).toBe(true);
     // The adapter produces exactly the same work-day rows with preloaded data.

@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useRef, useState, type ChangeEvent } from "react";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAction } from "convex/react";
@@ -79,7 +80,9 @@ function ImportForm({ onOpenChange }: Props) {
     lock.current = true;
     setPending(true);
     try {
-      setResult(await importAction({ csvText, note: reason, projectId: requireProject() }));
+      const imported = await importAction({ csvText, note: reason, projectId: requireProject() });
+      setResult(imported);
+      if (imported.inserted > 0 || imported.updated > 0) invalidatePdksSnapshots();
     } catch (error) {
       setServerError(errorMessage(error));
     } finally {

@@ -26,6 +26,7 @@ export function PdksRecordsResults({ view }: { view: PdksRecordsView }) {
     startDate,
     endDate,
   } = view;
+  if (view.error) return <div role="alert"><p>{view.error}</p><button type="button" onClick={view.refresh}>Yeniden dene</button></div>;
   const emptyState = (
     <EmptyState
       title={

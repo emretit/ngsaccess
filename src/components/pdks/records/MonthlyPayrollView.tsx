@@ -1,8 +1,8 @@
+import { usePdksPayrollSnapshot } from "@/hooks/usePdksSnapshot";
 import { Button } from "@/components/ui/button";
 import { useQuery, usePaginatedQuery } from "convex/react";
 import { makeFunctionReference, type ApiFromModules, type FunctionArgs, type FunctionReturnType } from "convex/server";
 import type * as periods from "../../../../convex/payrollPeriods";
-import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { PayrollPeriodPanel } from "./PayrollPeriodPanel";
 import { TableStateRow } from "@/components/shared/TableStateRow";
@@ -20,10 +20,12 @@ export function MonthlyPayrollView({ projectId, period, visibleEmployeeIds, onCe
   const current = useQuery(getPeriod, { projectId, period });
   const closed = current?.status === "closed";
   const frozen = usePaginatedQuery(getRows, closed && current.snapshotReady ? { projectId, period } : "skip", { initialNumItems: 25 });
-  const sheet = useQuery(api.cardReadings.getMonthlyPayrollSheet, current === undefined || closed ? "skip" : { projectId, year, month });
+  const snapshot = usePdksPayrollSnapshot(current === undefined || closed ? "skip" : { projectId, year, month });
+  const sheet = snapshot.data;
   const days = sheet?.days ?? Array.from({ length: new Date(Date.UTC(year, month, 0)).getUTCDate() }, (_, i) => `${period}-${String(i + 1).padStart(2, "0")}`);
   const rows = (closed ? frozen.results : sheet?.rows)?.filter(row => !visibleEmployeeIds || visibleEmployeeIds.has(row.employeeId)) ?? [];
   return <div className="space-y-4">
+    {!closed && <div className="text-xs"><Button variant="outline" onClick={snapshot.refresh}>Verileri yenile</Button><p>Hesap açıldığı andaki verileri gösterir.</p>{snapshot.error && <p role="alert">{snapshot.error}</p>}</div>}
     <PayrollPeriodPanel projectId={projectId} period={period} />
     <Table framed scrollLabel="Aylık bordro"><TableHeader><TableRow>
       <TableHead>Personel</TableHead>{days.map(day => <TableHead key={day}>{day.slice(-2)}</TableHead>)}<TableHead>Toplam dakika</TableHead>

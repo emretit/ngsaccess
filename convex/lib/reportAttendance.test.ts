@@ -78,7 +78,7 @@ it("biyometrik okuma zamanlanmış raporda devam üretir ve bir kez süzülür",
   const ctx = (readings: Doc<"cardReadings">[]) => ({ db: {
     query: (table: string) => {
       const rows = table === "employees" ? [emp] : table === "cardReadings" ? readings : table === "shifts" ? [{ _id: "s", projectId, name: "Plan", startTime: "09:00", endTime: "18:00" }] : table === "shiftAssignments" ? [{ employeeId: emp._id, shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", updatedAt: "" }] : [];
-      const chain = { withIndex: () => chain, order: () => chain, take: async () => rows, collect: async () => rows, first: async () => null };
+      const chain = { withIndex: () => chain, order: () => chain, async *[Symbol.asyncIterator]() { yield* rows; }, take: async () => rows, collect: async () => rows, first: async () => null };
       return chain;
     },
   } }) as unknown as QueryCtx;
@@ -241,7 +241,7 @@ it("ay ortasında ayrılan personeli raporda tutar ve son gününden sonra devam
   const ctx = { db: {
     query: (table: string) => {
       const rows = table === "employees" ? [emp] : table === "shifts" ? [{ _id: "s", projectId, name: "Plan", startTime: "09:00", endTime: "18:00" }] : table === "shiftAssignments" ? [{ employeeId: emp._id, shiftId: "s", startDate: "2026-01-01", endDate: "2026-12-31", updatedAt: "" }] : [];
-      const chain = { withIndex: () => chain, order: () => chain, take: async () => rows, collect: async () => rows, first: async () => null };
+      const chain = { withIndex: () => chain, order: () => chain, async *[Symbol.asyncIterator]() { yield* rows; }, take: async () => rows, collect: async () => rows, first: async () => null };
       return chain;
     },
   } } as unknown as QueryCtx;

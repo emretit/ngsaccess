@@ -1,7 +1,6 @@
+import { useAnnualOvertime } from "@/hooks/useAnnualOvertime";
 import { usePermissions } from "@/hooks/usePermissions";
 import { todayInTurkey } from "@/lib/date";
-import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { formatDuration } from "../lib/presentation";
@@ -12,10 +11,10 @@ export function PDKSOvertimeAlert({
 }) {
   const { can } = usePermissions();
   const { projectId, activeProject } = useActiveProject();
-  const balance = useQuery(
-    api.dashboard.getAnnualOvertimeBalance,
-    projectId && can("reports.view") ? { projectId, year } : "skip",
-  );
+  const enabled = can("reports.view");
+  const snapshot = useAnnualOvertime(projectId && enabled ? { projectId, year } : "skip");
+  const balance = snapshot.data;
+  if (snapshot.error && enabled) return <div role="alert"><p>{snapshot.error}</p><button type="button" onClick={snapshot.refresh}>Yeniden dene</button></div>;
   if (!can("reports.view")) return null;
   if (!projectId) return <p className="text-sm">Bir proje seçin.</p>;
   if (balance === undefined)
@@ -28,6 +27,7 @@ export function PDKSOvertimeAlert({
   const warnings = balance.filter((item) => item.utilizationPct >= 80);
   return (
     <section className="space-y-2 border-y py-4">
+      <button type="button" className="text-xs underline" onClick={snapshot.refresh}>Yenile</button>
       <h3 className="text-sm font-medium">Yıllık fazla mesai uyarıları</h3>
       <p className="text-xs text-muted-foreground">
         {year} yılı · {activeProject?.name} · Kişi ve organizasyon filtreleri

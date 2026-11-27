@@ -5,6 +5,7 @@ import { MonthlyPayrollView } from "./MonthlyPayrollView";
 
 const state = vi.hoisted(() => ({ role: "super_admin" }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ role: state.role }) }));
+vi.mock("@/hooks/usePdksSnapshot", () => ({ usePdksPayrollSnapshot: () => ({ data: undefined, error: undefined, refresh: vi.fn() }) }));
 vi.mock("convex/react", () => ({
   useQuery: () => ({ status: "closed", snapshotReady: false, snapshotError: "Bordro sabitleme tamamlanamadı. Kapanışı tekrar deneyin veya süper admin dönemi yeniden açsın." }),
   useMutation: () => vi.fn(),

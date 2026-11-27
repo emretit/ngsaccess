@@ -1,7 +1,6 @@
+import { usePdksTableSnapshot } from "@/hooks/usePdksSnapshot";
 import { usePermissions } from "@/hooks/usePermissions";
 import { pdksToday } from "@/components/pdks/lib/calendar";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import {
   startOfWeek,
@@ -99,10 +98,8 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
     };
   };
 
-  const tableData = useQuery(
-    api.cardReadings.getPdksTableData,
-    !projectLoading && projectId && canRead ? { ...getQueryArgs(projectId), projectId } : "skip",
-  );
+  const snapshot = usePdksTableSnapshot(!projectLoading && projectId && canRead ? { ...getQueryArgs(projectId), projectId } : "skip");
+  const tableData = snapshot.data;
 
   const dateRangeLabel = () => {
     const range = filters?.dateRange;
@@ -125,6 +122,7 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
   const endDate = "endDate" in args ? args.endDate : args.date;
 
   return {
+    error: snapshot.error, refresh: snapshot.refresh,
     tableData: tableData ?? [],
     allRecords: tableData ?? [],
     tableRecords: filterPdksRows(tableData ?? [], filters?.statusFilter),

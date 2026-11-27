@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { FormFeedback } from "@/components/shared/FormFeedback";
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
@@ -79,6 +80,7 @@ function ManualForm({
         exitTime: exit || undefined,
         note: note.trim(),
       });
+      invalidatePdksSnapshots();
       notify.success("Manuel kayıt güncellendi");
       onClose();
     } catch (error) {

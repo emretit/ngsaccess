@@ -112,3 +112,13 @@ describe('PDKS preferences and catalog', () => {
     expect(readPDKSPreferences()).toEqual(defaultPDKSPreferences());
   });
 });
+
+it('exports every one of 1,000 PDKS people to Excel and multipage PDF', async () => {
+  const records = Array.from({ length: 1000 }, (_, index) => ({ ...record, id: String(index), employeeId: String(index), name: `Person ${String(index).padStart(4, '0')}` }));
+  await exportToExcel(records);
+  expect(mocks.excelRows).toHaveLength(1001);
+  expect(mocks.excelRows.at(-1)?.[0]).toBe('Person 0999');
+  await exportToPdf(records);
+  expect(mocks.pdfText.filter(text => /^Person \d{4}$/.test(text))).toHaveLength(1000);
+  expect(mocks.pdfText).toContain('Person 0999');
+});
