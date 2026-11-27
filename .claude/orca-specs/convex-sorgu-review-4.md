@@ -147,3 +147,54 @@ Koşulan testler: `pdksLiveDependencies`, `pdksLiveAvailability`, `pdksBatches`,
 
 - `employees.by_project` taraması `for await` ile sınırsız yapılıyor (`:198`). Yalnız okuma bütçesi koruyor. `todayRoster` ise `readBoundedPdks` kullanıyor. İkisi aynı aralığı okuduğu için tutarlı, ama hata mesajları farklı.
 - Erken dönüş (`return [today]`, `:201`) uygun okuma bulununca okunan aralığı orada bitiriyor. Gün içinde bir kez uygun okuma bulunduktan sonra sonraki yazımlar sorguyu çok daha az tetikliyor.
+
+---
+
+## 6. tur — 5-D1 düzeltmesi (salt okuma, 2026-11-27)
+
+**Sonuç:**
+- 5-D1 kapandı: canlı tablo artık 4.090 sorgu sınırına çarpıp kalıcı hataya düşmüyor.
+- Eleme kuralı aktif kişiyi ve bugün çıkış yapan ziyaretçiyi atlamıyor.
+- **Engel yok. 2 küçük Düzeltilmeli var:**
+  - "Bilinmiyor" sonucu arayüzde hiç gösterilmiyor.
+  - Pasife alınıp işten ayrılış tarihi girilmemiş eski çalışanlar elenmiyor.
+
+Koşulan testler: `pdksLiveAvailability`, `pdksLiveDependencies`, `usePdksSnapshot.live`, `pdksBatches` → **4 dosya, 24/24 geçti**.
+
+### Kontroller
+
+| Soru | Cevap | Kanıt |
+|---|---|---|
+| Aktif kişi yanlışlıkla atlanıyor mu? | **Hayır** | Roster'daki kişiler bu taramaya zaten girmiyor (`convex/pdksBatches.ts:200`). Bugün aktif ziyaretçi de roster'da, çünkü `employedOn` ziyaretçiyi `isActive` ile değerlendiriyor (`convex/lib/employment.ts:10`). |
+| Bugün çıkan ziyaretçi atlanıyor mu? | **Hayır** | Ziyaretçiyi pasife çeken üç yolun hepsi `updatedAt`'i ISO (`Z`) biçiminde yazıyor: manuel çıkış (`convex/visitors.ts:628-631`), süre dolunca cron (`:667-669`), mobil çıkış (`convex/mobileVisitors.ts:139`). `trDateKey` TR saatine (+3) çeviriyor. Gece yarısı sınırı test ediliyor: `20:59:59Z` (TR önceki gün) eleniyor, `21:00:00Z` (TR bugün) kalıyor (`convex/pdksLiveAvailability.test.ts:92-108,111-119`). `updatedAt` olmayan ziyaretçi de kalıyor (`:118`), yani güvenli tarafta. Sonradan gelen bir yazım (ör. `releaseCard`) `updatedAt`'i yeniler; bu da kişiyi elemez, yalnız tutar. |
+| İki gün kuralı | **Doğru** | `employmentEndDate < today−2` eleniyor. Bitişi `today−2` olan kişi kalıyor (`:114`). Tarih karşılaştırması metin olarak YYYY-AA-GG ile yapılıyor; saat dilimi sorunu yok. |
+| Sınır aşılırsa ne oluyor? | Aday > 4.000 ise **`null`** (hata değil) | Kontrol `pdksBatches.ts:208`. Test: 4.100 pasif ziyaretçiyle sonuç `null`; aynı ziyaretçiler dünden güncellenmişse eleniyor ve sonuç `[]` (`pdksLiveAvailability.test.ts:80-90`). |
+| `readBoundedPdks` sınırı aşılırsa? | **Tablo yine hata veriyor** | Çalışan taraması 31.000 satır / 15 MB bütçesini aşarsa `PDKS_READ_BUDGET` atıyor. Hook `unknownResult` hatasını doğrudan tablo hatası yapıyor (`src/hooks/usePdksLiveTable.ts:76`). Ama aynı tarama `todayRoster`'da da var ve orada önce patlar. Bu yüzden 6. tur yeni bir risk eklemiyor. Pratikte ~10.000+ kişi kaydında (çalışan + ziyaretçi, ~1,5 KB/kayıt) görülür. |
+
+### Düzeltilmeli
+
+**6-D1. "Bilinmiyor" sonucu kullanıcıya görünmüyor; nadir bir durumda yanlış "Veri yok" gösteriyor.**
+
+1. `availabilityUnknown` hook'tan dönüyor (`usePdksLiveTable.ts:79`), ama `src` içinde onu okuyan hiçbir bileşen yok (grep: yalnız test).
+2. Hook `null`'ı boş liste gibi işliyor (`dates = new Set(unknownDates ?? [])`).
+3. Etkisi şu koşulların hepsi birlikteyse ortaya çıkıyor:
+   - roster'dan kimse bugün okutmamış,
+   - projede gateway Hikvision cihaz yok (o cihaz varsa gün zaten "takip ediliyor" sayılıyor),
+   - bugün yalnız roster dışı biri okutmuş,
+   - aday sayısı 4.000'i aşmış.
+4. Bu durumda gün "veri yok" sayılıyor ve vardiyalı herkes "Devamsız" yerine **"Veri yok"** görünüyor (`convex/lib/pdksTable.ts:89`). Kullanıcıya bunun bir belirsizlik olduğu söylenmiyor.
+5. Çok nadir, ama sessiz.
+6. Öneri: `PDKSRecords` (ve `ReportResults`) canlı etiketinin yanına "Bilinmeyen kart taraması sınırı aşıldı; devamsızlık kesin değil" notu ekle. İstenirse "Verileri yenile" ile snapshot yoluna geçilebilir.
+
+**6-D2. Pasife alınmış ama ayrılış tarihi girilmemiş eski çalışanlar elenmiyor.**
+
+1. Çalışan formundan pasife alma (`convex/employees.ts:550`) ve `closeAccess` (`convex/employeeTermination.ts:39`) yalnız `deactivatedAt` yazıyor, `employmentEndDate` yazmıyor.
+2. Eleme kuralı yalnız `employmentEndDate`'e bakıyor (`pdksBatches.ts:201`). Bu kişiler yıllar sonra da aday kalıyor.
+3. Ziyaretçilere göre çok daha yavaş birikiyorlar. Ama "işten çıkarma" yerine "pasife al" kullanan bir müşteride aday sayısı zamanla 4.000'e yaklaşabilir; o noktada 6-D1'deki sessiz durum başlar.
+4. Öneri: aynı iki gün kuralını `employmentEndDate ?? deactivatedAt` üzerinden uygula. `employedOn` da bu iki alanı aynı sırayla kullanıyor (`employment.ts:11-12`).
+
+### Not
+
+- **Onaylı sınırlamanın genişlemesi.** Yeni kural, ayrılalı 2 günden fazla olan eski çalışanın ve dün çıkış yapmış ziyaretçinin **bugünkü** okumasını da canlı göstergeden çıkarıyor. Örnek: kartı iptal edilmemiş biri hâlâ okutuyor, ya da cihaz senkronu gecikmiş. Bu, cihazın geç gönderdiği eski tarihli okumalardan farklı bir durum.
+- Bu okumaların etkisi küçük: yalnız roster'dan kimsenin okutmadığı ve Hik takibi olmayan günlerde "Devamsız" yerine "Veri yok" gösterir. Snapshot ve bordro değişmiyor (test `:92-108`). Yorumdaki "late device events" ifadesi bu durumu da kapsayacak şekilde genişletilmeli (`pdksBatches.ts:196-197`).
+- **Karışık diff.** `git diff HEAD` içinde `src/components/shifts/definitions/AddShiftDialog.tsx` de var (form düzeni). Bu dosya PDKS işiyle ilgisiz; commit ayrılırken pathspec'e dikkat edilmeli.

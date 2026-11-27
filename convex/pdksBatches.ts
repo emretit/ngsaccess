@@ -192,11 +192,20 @@ export const todayAvailability = authedQuery({
     for await (const reading of ctx.db.query("cardReadings").withIndex("by_project_employee_time", q => q.eq("projectId", projectId).eq("employeeId", undefined).gte("accessTime", startISO).lte("accessTime", endISO))) {
       if (eligible(reading)) return [today];
     }
-    // Only extant project employees outside the roster contribute linked unknowns.
-    // Deleted/moved employee IDs intentionally do not contribute to this live hint;
-    // snapshot/payroll still use their complete source range independently.
-    for await (const employee of ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId))) {
-      if (ids.has(employee._id)) continue;
+    // This live hint excludes deleted/moved IDs and stale departed employees/visitors.
+    // Late device events for those people remain in snapshot/payroll source ranges.
+    const employees = await readBoundedPdks(ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)), pdksReadBudget());
+    const recentEndDate = addWorkDate(today, -2);
+    const candidates = employees.filter(employee => {
+      if (ids.has(employee._id)) return false;
+      if (employee.isVisitor !== true && employee.employmentEndDate && employee.employmentEndDate < recentEndDate) return false;
+      const updatedAt = employee.updatedAt;
+      if (employee.isVisitor && employee.isActive === false && updatedAt && Number.isFinite(Date.parse(updatedAt)) && trDateKey(updatedAt) < today) return false;
+      return true;
+    });
+    // null means unknown, not a failed table: retain headroom below 4,096 DB calls.
+    if (candidates.length > 4000) return null;
+    for (const employee of candidates) {
       for await (const reading of ctx.db.query("cardReadings").withIndex("by_project_employee_time", q => q.eq("projectId", projectId).eq("employeeId", employee._id).gte("accessTime", startISO).lte("accessTime", endISO))) {
         if (eligible(reading)) return [today];
       }

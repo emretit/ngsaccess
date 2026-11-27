@@ -17,7 +17,7 @@ export function usePdksLiveTable(args: TableArgs | "skip") {
   const date = args === "skip" ? "" : args.startDate ?? args.date ?? trTodayKey();
   const rosterResult = (useQueries(args === "skip" ? {} : { roster: { query: pdksBatchRefs.todayRoster, args: { projectId: args.projectId, date } } }) as Record<string, Roster | Error | undefined>).roster;
   const roster = rosterResult instanceof Error ? undefined : rosterResult;
-  const unknownResult = (useQueries(args === "skip" || !roster ? {} : { dates: { query: pdksBatchRefs.todayAvailability, args: { projectId: args.projectId, date, roster } } }) as Record<string, string[] | Error | undefined>).dates;
+  const unknownResult = (useQueries(args === "skip" || !roster ? {} : { dates: { query: pdksBatchRefs.todayAvailability, args: { projectId: args.projectId, date, roster } } }) as Record<string, FunctionReturnType<typeof pdksBatchRefs.todayAvailability> | Error | undefined>).dates;
   const unknownDates = unknownResult instanceof Error ? undefined : unknownResult;
   const deviceResult = (useQueries(args === "skip" ? {} : { devices: { query: pdksBatchRefs.todayDeviceAvailability, args: { projectId: args.projectId } } }) as Record<string, FunctionReturnType<typeof pdksBatchRefs.todayDeviceAvailability> | Error | undefined>).devices;
   const deviceAvailability = deviceResult instanceof Error ? undefined : deviceResult;
@@ -76,6 +76,6 @@ export function usePdksLiveTable(args: TableArgs | "skip") {
   const error = [rosterResult, unknownResult, deviceResult].find((value): value is Error => value instanceof Error)
     ?? failures.find(failure => !isPdksBudgetError(failure)) ?? groups.flatMap(group => group.length === 1 ? [discovery[groupKey(group)], results[groupKey(group)]] : []).find((value): value is Error => value instanceof Error);
   const completedGroups = Object.values(results).filter(result => result && !(result instanceof Error)).length;
-  return { data, error: error ? pdksErrorMessage(error) : undefined, updatedAt, refresh: invalidatePdksSnapshots,
+  return { data, error: error ? pdksErrorMessage(error) : undefined, updatedAt, refresh: invalidatePdksSnapshots, availabilityUnknown: unknownResult === null,
     progress: `${completedGroups}/${groups.length} grup` };
 }

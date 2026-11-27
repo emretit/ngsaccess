@@ -76,3 +76,45 @@ it.each(["deleted", "moved"])("%s employee's same-day reading stops contributing
   expect(tableAfter.find(row => row.id === ids.currentId)?.days[0].status).toBe("absent");
   expect(payrollAfter.rows.find(row => row.employeeId === ids.currentId)).toEqual(payrollBefore.rows.find(row => row.employeeId === ids.currentId));
 });
+
+it.each([false, true])("4,100 inactive visitors, updated today=%s: prune stale candidates or return unknown without failing", async updatedToday => {
+  const { t, user, ids, roster } = await fixture();
+  await t.run(async ctx => {
+    for (let i = 0; i < 4100; i++) await ctx.db.insert("employees", {
+      projectId: ids.projectId, firstName: `Visitor ${i}`, lastName: "Departed", email: `visitor${i}@local.test`, cardNumber: `v${i}`,
+      isVisitor: true, isActive: false, updatedAt: updatedToday ? `${date}T08:00:00Z` : "2026-11-26T08:00:00Z",
+    });
+  });
+  expect(await user.query(pdksBatchRefs.todayRoster, { projectId: ids.projectId, date })).toEqual(roster);
+  expect(await user.query(pdksBatchRefs.todayAvailability, { projectId: ids.projectId, date, roster })).toEqual(updatedToday ? null : []);
+}, 30_000);
+
+it.each(["former employee", "departed visitor"])("late device events for a stale %s affect snapshot/payroll sources, not the live hint", async kind => {
+  const { t, user, ids, roster } = await fixture();
+  const readingId = await t.run(ctx => ctx.db.insert("cardReadings", { projectId: ids.projectId, employeeId: ids.formerId, cardNo: "former", accessTime: `${date}T08:00:00Z`, accessStatus: "izin_verildi", direction: "entry" }));
+  const client = convexTestClient(user);
+  const args = { projectId: ids.projectId, date, viewMode: "matrix" as const };
+  const tableBefore = await loadPdksTable(client, args);
+  const payrollBefore = await loadPdksPayroll(client, { projectId: ids.projectId, year: 2026, month: 11 });
+  expect(await user.query(pdksBatchRefs.todayAvailability, { projectId: ids.projectId, date, roster })).toEqual([date]);
+  await t.run(ctx => ctx.db.patch(ids.formerId, kind === "former employee"
+    ? { employmentEndDate: "2026-11-24" }
+    : { isVisitor: true, updatedAt: "2026-11-26T20:59:59Z" }));
+  expect(await user.query(pdksBatchRefs.todayAvailability, { projectId: ids.projectId, date, roster })).toEqual([]);
+  const source = await user.query(pdksBatchRefs.dates, { request: { kind: "table", args }, roster, cursor: null });
+  expect(source.readings.some(reading => reading._id === readingId && reading.unassignedDate === date)).toBe(true);
+  expect(await loadPdksTable(client, args)).toEqual(tableBefore);
+  const payrollAfter = await loadPdksPayroll(client, { projectId: ids.projectId, year: 2026, month: 11 });
+  expect(payrollAfter.rows.find(row => row.employeeId === ids.currentId)).toEqual(payrollBefore.rows.find(row => row.employeeId === ids.currentId));
+});
+
+it("keeps the two-day employment boundary, today's TR visitor update, and undated visitors eligible", async () => {
+  const { t, user, ids, roster } = await fixture();
+  await t.run(ctx => ctx.db.insert("cardReadings", { projectId: ids.projectId, employeeId: ids.formerId, cardNo: "former", accessTime: `${date}T08:00:00Z`, accessStatus: "izin_verildi", direction: "entry" }));
+  await t.run(ctx => ctx.db.patch(ids.formerId, { employmentEndDate: "2026-11-25" }));
+  expect(await user.query(pdksBatchRefs.todayAvailability, { projectId: ids.projectId, date, roster })).toEqual([date]);
+  await t.run(ctx => ctx.db.patch(ids.formerId, { isVisitor: true, updatedAt: "2026-11-26T21:00:00Z" }));
+  expect(await user.query(pdksBatchRefs.todayAvailability, { projectId: ids.projectId, date, roster })).toEqual([date]);
+  await t.run(ctx => ctx.db.patch(ids.formerId, { updatedAt: undefined }));
+  expect(await user.query(pdksBatchRefs.todayAvailability, { projectId: ids.projectId, date, roster })).toEqual([date]);
+});
