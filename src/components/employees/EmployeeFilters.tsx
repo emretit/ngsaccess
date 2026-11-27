@@ -6,7 +6,7 @@ interface Props {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   status: string;
-  statusCounts: { all: number; active: number; inactive: number; terminated?: number };
+  statusCounts: { all: number; active: number; inactive: number; terminated?: number } | null;
   onStatusChange: (value: string) => void;
   sort: string;
   onSortChange: (value: string) => void;
@@ -15,6 +15,8 @@ interface Props {
   actions?: ReactNode;
 }
 export function EmployeeFilters(p: Props) {
+  const count = (key: "all" | "active" | "inactive" | "terminated") => p.statusCounts === null ? "—" : p.statusCounts[key] ?? 0;
+  const countHint = p.statusCounts === null ? "2000 kayıt üzerindeki projelerde okuma maliyetini sınırlamak için durum sayıları hesaplanmaz." : undefined;
   const localCount = Number(Boolean(p.searchQuery.trim())) + Number(p.status !== "all");
   const activeCount = localCount + Number(p.hasFilters && localCount === 0);
   return <div className="max-md:[&_input]:min-h-11 max-md:[&_button]:min-h-11 max-md:[&_[role=combobox]]:min-h-11">
@@ -22,12 +24,12 @@ export function EmployeeFilters(p: Props) {
     <CollapsibleFilters activeCount={activeCount} desktopDisplay="contents" buttonClassName="min-h-11">
     <div className="grid gap-3 md:contents">
     <FilterField label="Personel durumu" htmlFor="employee-status"><Select value={p.status} onValueChange={p.onStatusChange}>
-      <SelectTrigger id="employee-status" className="w-full min-w-0"><SelectValue /></SelectTrigger>
+      <SelectTrigger id="employee-status" title={countHint} className="w-full min-w-0"><SelectValue /></SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">Tüm durumlar ({p.statusCounts.all})</SelectItem>
-        <SelectItem value="active">Aktif ({p.statusCounts.active})</SelectItem>
-        <SelectItem value="inactive">Pasif ({p.statusCounts.inactive})</SelectItem>
-        <SelectItem value="terminated">Ayrılanlar ({p.statusCounts.terminated ?? 0})</SelectItem>
+        <SelectItem value="all" title={countHint}>Tüm durumlar ({count("all")})</SelectItem>
+        <SelectItem value="active" title={countHint}>Aktif ({count("active")})</SelectItem>
+        <SelectItem value="inactive" title={countHint}>Pasif ({count("inactive")})</SelectItem>
+        <SelectItem value="terminated" title={countHint}>Ayrılanlar ({count("terminated")})</SelectItem>
       </SelectContent>
     </Select></FilterField>
     <div className="min-[760px]:hidden w-full min-w-0">

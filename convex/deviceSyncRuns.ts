@@ -1,3 +1,4 @@
+import { hikPersonIdentity } from "./lib/hikPersonIdentity";
 import { requirePermission } from "./lib/permissions";
 import type { HikSnapshot } from "./lib/peopleHikSnapshot";
 import { hikSnapshotValidator } from "./lib/peopleHikSnapshot";
@@ -468,7 +469,7 @@ export async function createRuleDiffRun(ctx: MutationCtx, args: {
     // Offline/inactive devices still retain a durable deletion job, even when the run skips dispatch.
     if (reason && hikDeletions?.length) await ctx.scheduler.runAfter(0, internal.deviceSyncRuns.deleteOfflineHikBatch, {
       device: { _id: device._id, name: device.name, projectId: device.projectId, brand: device.brand, hikDevIndex: device.hikDevIndex, hikTransport: device.hikTransport, hikDoorCount: device.hikDoorCount }, projectId: args.projectId, runId,
-      entries: hikDeletions.map(entry => ({ employeeId: entry.employeeId, cardNumber: entry.snapshot.cardNumber })),
+      entries: hikDeletions.map(entry => ({ employeeId: entry.employeeId, cardNumber: entry.snapshot.cardNumber, employeeNo: entry.snapshot.employeeNo ?? entry.snapshot.cardNumber })),
     });
     if (!reason) await ctx.scheduler.runAfter(0, internal.deviceSyncRuns.executeRuleDiffTarget, {
       targetId, ruleId: args.ruleId,
@@ -476,7 +477,7 @@ export async function createRuleDiffRun(ctx: MutationCtx, args: {
       syncMembers: plan.syncMembers, removed: plan.removed,
       syncRule: plan.syncRule, reconcileRoster: plan.reconcileRoster,
       wasRuleTarget: args.beforeDeviceIds.includes(device._id),
-      hikDeletions: hikDeletions?.map(entry => ({ employeeId: entry.employeeId, cardNumber: entry.snapshot.cardNumber })),
+      hikDeletions: hikDeletions?.map(entry => ({ employeeId: entry.employeeId, cardNumber: entry.snapshot.cardNumber, employeeNo: entry.snapshot.employeeNo ?? entry.snapshot.cardNumber })),
     });
   }
   await ctx.scheduler.runAfter(RUN_TIMEOUT_MS, internal.deviceSyncRuns.expireRun, { runId });
@@ -488,7 +489,7 @@ export async function createRuleDiffRun(ctx: MutationCtx, args: {
 
 /** Keep the canonical door-leg protection when revoking IDE users. */
 export const deleteOfflineHikBatch = internalAction({
-  args: { device: hikSnapshotValidator.fields.devices.element, projectId: v.id("projects"), runId: v.id("deviceSyncRuns"), entries: v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string() })) },
+  args: { device: hikSnapshotValidator.fields.devices.element, projectId: v.id("projects"), runId: v.id("deviceSyncRuns"), entries: v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string(), employeeNo: v.optional(v.string()) })) },
   handler: async (ctx, args): Promise<void> => {
     // Commit the continuation before processing any entry; failed entries cannot lose it.
     if (args.entries.length > 25) await ctx.scheduler.runAfter(0, internal.deviceSyncRuns.deleteOfflineHikBatch, { ...args, entries: args.entries.slice(25) });
@@ -496,12 +497,12 @@ export const deleteOfflineHikBatch = internalAction({
       try {
         await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
           employeeId: entry.employeeId, runId: args.runId,
-          snapshot: { projectId: args.projectId, cardNumber: entry.cardNumber, devices: [args.device] },
+          snapshot: { projectId: args.projectId, cardNumber: entry.cardNumber, employeeNo: entry.employeeNo ?? entry.cardNumber, devices: [args.device] },
         });
       } catch {
         await ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
           deviceId: args.device._id, projectId: args.projectId, operation: "deletePerson",
-          payload: { employeeId: entry.employeeId, employeeNo: entry.cardNumber, cardNumber: entry.cardNumber },
+          payload: { employeeId: entry.employeeId, employeeNo: entry.employeeNo ?? entry.cardNumber, cardNumber: entry.cardNumber },
           lastError: "Geri alma girdisi işlenemedi; cihazda kalmış olabilir",
         });
       }
@@ -534,7 +535,7 @@ export const executeRuleDiffTarget = internalAction({
     targetId: v.id("deviceSyncRunTargets"), ruleId: v.id("accessRules"),
     syncMembers: v.array(v.id("employees")), removed: v.array(v.id("employees")),
     syncRule: v.boolean(), reconcileRoster: v.boolean(), wasRuleTarget: v.boolean(),
-    hikDeletions: v.optional(v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string() }))),
+    hikDeletions: v.optional(v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string(), employeeNo: v.optional(v.string()) }))),
   },
   handler: async (ctx, args): Promise<void> => {
     const loaded: { target: Doc<"deviceSyncRunTargets">; run: Doc<"deviceSyncRuns">; device: Doc<"devices"> } | null =
@@ -571,7 +572,7 @@ export const executeRuleDiffTarget = internalAction({
         checkTimeout(); worked = true;
         const result = await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
           employeeId: deletion.employeeId, ...context, allowedProjectIds: [run.projectId],
-          snapshot: { cardNumber: deletion.cardNumber, projectId: run.projectId, devices: [{
+          snapshot: { cardNumber: deletion.cardNumber, employeeNo: deletion.employeeNo ?? deletion.cardNumber, projectId: run.projectId, devices: [{
             _id: device._id, name: device.name, brand: device.brand, projectId: device.projectId,
             hikDevIndex: device.hikDevIndex, hikTransport: device.hikTransport, hikDoorCount: device.hikDoorCount,
           }] },
@@ -589,7 +590,7 @@ export const executeRuleDiffTarget = internalAction({
         try {
           const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId });
           if (!data || data.employee.projectId !== run.projectId) throw new ConvexError("Çalışan bulunamadı veya proje değişti");
-          if (!usesPhysicalCredential(data.employee)) continue;
+          if (!usesPhysicalCredential(data.employee) || (device.brand === "hikvision" && !hikPersonIdentity(data.employee))) continue;
           const hasAccess = data.deviceRules.some(dr => dr.device._id === device._id);
           if (hasAccess && (device.brand !== "hikvision" || data.employee.isActive !== false)) {
             worked = true;
@@ -613,7 +614,7 @@ export const executeRuleDiffTarget = internalAction({
               // Snapshot retains the former target after its membership has been removed.
               const result = await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
                 employeeId, ...context, allowedProjectIds: [run.projectId],
-                snapshot: { cardNumber: data.employee.cardNumber, projectId: run.projectId, devices: [{
+                snapshot: { cardNumber: data.employee.cardNumber, employeeNo: hikPersonIdentity(data.employee), projectId: run.projectId, devices: [{
                   _id: device._id, name: device.name, brand: device.brand, projectId: device.projectId,
                   hikDevIndex: device.hikDevIndex, hikTransport: device.hikTransport, hikDoorCount: device.hikDoorCount,
                 }] },
@@ -699,7 +700,7 @@ export const executeGrantTarget = internalAction({
           });
           if (result.failed || !(result.removed + result.queued + (result.superseded ?? 0))) failures.push(result.errors.join("; ") || "Hik eski kimliği silinemedi");
         }
-        if (!data) continue;
+        if (!data || (device.brand === "hikvision" && !hikPersonIdentity(data.employee))) continue;
         const context = { employeeId, runId: run._id, targetDeviceIds: [device._id] };
         if (data.deviceRules.some(dr => dr.device._id === device._id) && data.employee.isActive !== false) {
           if (device.brand === "ide_smart") {
@@ -713,7 +714,7 @@ export const executeGrantTarget = internalAction({
           const result = await ctx.runAction(internal.actions.ideGatewayDevice.deleteIdeUserFromPanels, { employeeId, runId: run._id, projectId: run.projectId, deviceIds: [device._id], cardNumber: data.employee.cardNumber });
           if (!result.ok || !result.queued) failures.push("IDE kişisi silinemedi");
         } else {
-          const result = await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { ...context, allowedProjectIds: [run.projectId], snapshot: { cardNumber: data.employee.cardNumber, projectId: run.projectId, devices: [{ _id: device._id, name: device.name, projectId: device.projectId, brand: device.brand, hikDevIndex: device.hikDevIndex, hikTransport: device.hikTransport, hikDoorCount: device.hikDoorCount }] } });
+          const result = await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { ...context, allowedProjectIds: [run.projectId], snapshot: { cardNumber: data.employee.cardNumber, employeeNo: hikPersonIdentity(data.employee), projectId: run.projectId, devices: [{ _id: device._id, name: device.name, projectId: device.projectId, brand: device.brand, hikDevIndex: device.hikDevIndex, hikTransport: device.hikTransport, hikDoorCount: device.hikDoorCount }] } });
           if (result.failed || !(result.removed + result.queued + (result.superseded ?? 0))) failures.push(result.errors.join("; ") || "Hik kişisi silinemedi");
         }
       }

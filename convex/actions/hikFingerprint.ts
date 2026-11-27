@@ -1,5 +1,6 @@
 "use node";
 
+import { hikPersonIdentity } from "../lib/hikPersonIdentity";
 import { ConvexError, v } from "convex/values";
 import { internalAction } from "../_generated/server";
 import { api, internal } from "../_generated/api";
@@ -34,6 +35,8 @@ export const enrollFingerprintOnDevice = authedAction({
     if (!Number.isInteger(args.fingerNo) || args.fingerNo < 1 || args.fingerNo > 10) throw new ConvexError("Parmak numarası 1–10 arasında tam sayı olmalıdır.");
     const target: { employee: Doc<"employees">; device: Doc<"devices"> } = await ctx.runQuery(internal.fingerprintEnrollment.getTargetInternal, { employeeId: args.employeeId, deviceId: args.deviceId, userId: ctx.user._id });
     await ctx.runQuery(internal.privacyBiometric.assertBiometricDeviceAllowed, { deviceId: args.deviceId });
+    const employeeNo = hikPersonIdentity(target.employee);
+    if (!employeeNo) return null;
     const devIndex = target.device.hikDevIndex;
     if (!devIndex) throw new ConvexError("Cihaz gateway bağlantısı bulunamadı.");
     await assertTemplateKey();
@@ -48,15 +51,15 @@ export const enrollFingerprintOnDevice = authedAction({
       if (!capture.ok || !capture.fingerData) throw new ConvexError(safeDeviceError(capture.error));
       // Recheck consent, module, project, group and card after the sensor wait.
       const current: { employee: Doc<"employees">; device: Doc<"devices"> } = await ctx.runQuery(internal.fingerprintEnrollment.getTargetInternal, { employeeId: args.employeeId, deviceId: args.deviceId, userId: ctx.user._id });
-      if (current.employee.cardNumber.trim() !== target.employee.cardNumber.trim() || !(await ctx.runQuery(internal.fingerprintEnrollment.getAttempt, attempt))) throw new ConvexError("Parmak izi kaydı iptal edildi veya kart numarası değişti.");
+      if (hikPersonIdentity(current.employee) !== employeeNo || !(await ctx.runQuery(internal.fingerprintEnrollment.getAttempt, attempt))) throw new ConvexError("Parmak izi kaydı iptal edildi veya kart numarası değişti.");
       // Plaintext stays in action memory only.
       downloaded = true; // A failed/timeout response may still have reached the device.
-      const result = await addFingerprintToDevice(devIndex, { employeeNo: target.employee.cardNumber.trim(), fingerPrintID: args.fingerNo, fingerData: capture.fingerData }).catch(() => { throw new ConvexError(safeDeviceError()); });
+      const result = await addFingerprintToDevice(devIndex, { employeeNo, fingerPrintID: args.fingerNo, fingerData: capture.fingerData }).catch(() => { throw new ConvexError(safeDeviceError()); });
       if (!result.ok) throw new ConvexError(safeDeviceError(result.error));
-      await ctx.runMutation(internal.fingerprintEnrollment.upsert, { ...attempt, enrolledBy: ctx.user._id, expectedCardNumber: target.employee.cardNumber });
+      await ctx.runMutation(internal.fingerprintEnrollment.upsert, { ...attempt, enrolledBy: ctx.user._id, expectedCardNumber: employeeNo });
       sourceSaved = true;
       const encrypted = await encryptTemplate(capture.fingerData, `${args.employeeId}:${args.fingerNo}`);
-      await ctx.runMutation(internal.employeeFingerprints.upsertEncrypted, { employeeId: args.employeeId, fingerNo: args.fingerNo, sourceDeviceId: args.deviceId, enrolledBy: ctx.user._id, expectedCardNumber: target.employee.cardNumber, ...encrypted });
+      await ctx.runMutation(internal.employeeFingerprints.upsertEncrypted, { employeeId: args.employeeId, fingerNo: args.fingerNo, sourceDeviceId: args.deviceId, enrolledBy: ctx.user._id, expectedCardNumber: employeeNo, ...encrypted });
       capture.fingerData = undefined;
       await ctx.scheduler.runAfter(0, internal.actions.hikFingerprint.pushFingerprintToDevices, { employeeId: args.employeeId, fingerNo: args.fingerNo, excludeDeviceId: args.deviceId });
     } catch (error) {
@@ -67,7 +70,7 @@ export const enrollFingerprintOnDevice = authedAction({
       let cleanupFailed = false;
       if (downloaded) {
         try {
-          const cleanup = await deleteFingerprintFromDevice(devIndex, target.employee.cardNumber.trim(), args.fingerNo);
+          const cleanup = await deleteFingerprintFromDevice(devIndex, employeeNo, args.fingerNo);
           cleanupFailed = !cleanup.ok;
         } catch { cleanupFailed = true; }
       }
@@ -94,7 +97,9 @@ export const removeFingerprintFromDevice = authedAction({
     await ctx.runMutation(api.fingerprintEnrollment.removeFingerprint, { employeeId: row.employeeId, fingerNo: row.fingerNo });
     try {
       // Privacy removal remains available after consent revocation or module shutdown.
-      const result = await deleteFingerprintFromDevice(device.hikDevIndex, row.deletionEmployeeNo ?? employee.cardNumber.trim(), row.fingerNo);
+      const employeeNo = row.deletionEmployeeNo?.trim() || row.enrolledEmployeeNo?.trim() || hikPersonIdentity(employee);
+      if (!employeeNo) return null;
+      const result = await deleteFingerprintFromDevice(device.hikDevIndex, employeeNo, row.fingerNo);
       if (!result.ok) throw new ConvexError(safeDeviceError(result.error));
       await ctx.runMutation(internal.fingerprintEnrollment.remove, args);
     } catch {
@@ -168,17 +173,18 @@ export const pushFingerprintToDevices = internalAction({
         try {
           const target: { employee: Doc<"employees">; device: Doc<"devices"> } | null = await ctx.runQuery(internal.fingerprintEnrollment.getPushTarget, { employeeId: args.employeeId, deviceId });
           if (!target?.device.hikDevIndex || !template.enrolledBy) { allOk = false; continue; }
-          const reserved: { current: true } | { enrollmentId: Id<"deviceFingerprintEnrollments">; attemptId: string } | null = await ctx.runMutation(internal.fingerprintEnrollment.beginPush, { employeeId: args.employeeId, deviceId, fingerNo: template.fingerPrintID, templateId: template._id, addedAt: template.addedAt, expectedCardNumber: target.employee.cardNumber, force: args.force });
+          employeeNo = hikPersonIdentity(target.employee);
+          if (!employeeNo) continue;
+          const reserved: { current: true } | { enrollmentId: Id<"deviceFingerprintEnrollments">; attemptId: string } | null = await ctx.runMutation(internal.fingerprintEnrollment.beginPush, { employeeId: args.employeeId, deviceId, fingerNo: template.fingerPrintID, templateId: template._id, addedAt: template.addedAt, expectedCardNumber: employeeNo, force: args.force });
           if (reserved && "current" in reserved) continue;
           if (!reserved) { allOk = false; continue; }
           reservation = reserved;
-          employeeNo = target.employee.cardNumber.trim();
           let plain: string | undefined = await decryptTemplate(template, `${args.employeeId}:${template.fingerPrintID}`);
           try {
             const result = await addFingerprintToDevice(target.device.hikDevIndex, { employeeNo, fingerPrintID: template.fingerPrintID, fingerData: plain });
             if (!result.ok) throw new Error();
           } finally { plain = undefined; }
-          await ctx.runMutation(internal.fingerprintEnrollment.recordPush, { employeeId: args.employeeId, deviceId, fingerNo: template.fingerPrintID, templateId: template._id, addedAt: template.addedAt, expectedCardNumber: target.employee.cardNumber, enrolledBy: template.enrolledBy, attemptId: reservation.attemptId });
+          await ctx.runMutation(internal.fingerprintEnrollment.recordPush, { employeeId: args.employeeId, deviceId, fingerNo: template.fingerPrintID, templateId: template._id, addedAt: template.addedAt, expectedCardNumber: employeeNo, enrolledBy: template.enrolledBy, attemptId: reservation.attemptId });
           ok = true;
         } catch { /* Never expose gateway errors or template contents. */ }
         if (!ok) {

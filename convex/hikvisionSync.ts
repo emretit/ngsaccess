@@ -1,9 +1,10 @@
+import { hikPersonIdentity } from "./lib/hikPersonIdentity";
 import { asKeyPart } from "./lib/hikKeyPart";
 import { employeeTransfer, isTransferAddition, transferBlocksAddition, TRANSFER_INVALID_OPERATION, transferOperationFailed, deletionMatchesTransfer } from "./lib/transferGuard";
 import { requirePermission, getProjectIdsWithPermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { internal } from "./_generated/api";
-import { snapshotEmployeeHikDevices, resolveRuleDeviceTargets, hasWritableHikCredential } from "./lib/peopleHikSnapshot";
+import { snapshotEmployeeHikDevices, resolveRuleDeviceTargets, hasWritableHikCredential, hikIdentityReassigned, type HikSnapshotReadCache } from "./lib/peopleHikSnapshot";
 import { upsertGrantStatus, grantStatusForOperation } from "./lib/grantStatus";
 import { mobileOperationId, mobileQueueAllowed, settleMobileHikOperation } from "./lib/mobileAccess";
 import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } from "./lib/biometricGate";
@@ -84,20 +85,21 @@ export const getEmployeeDeliveryState = internalQuery({
   args: { employeeId: v.id("employees") },
   handler: async (ctx, { employeeId }) => {
     const employee = await ctx.db.get(employeeId);
-    return employee ? { isActive: employee.isActive, terminationType: employee.terminationType, projectId: employee.projectId, cardNumber: employee.cardNumber } : null;
+    return employee ? { isActive: employee.isActive, terminationType: employee.terminationType, projectId: employee.projectId, cardNumber: employee.cardNumber, hikEmployeeNo: employee.hikEmployeeNo } : null;
   },
 });
 
 export const getEmployeesWithDevices = internalQuery({
-  args: { employeeIds: v.array(v.id("employees")) },
+  args: { employeeIds: v.array(v.id("employees")), skipUnusedSnapshot: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     if (args.employeeIds.length > 20) throw new Error("Çalışan toplu okuma sınırı aşıldı");
     const scopes: RuleScopeCache = new Map();
-    return await Promise.all(args.employeeIds.map(id => employeeWithDevices(ctx, id, scopes)));
+    const snapshotTargets: HikSnapshotReadCache["ruleTargets"] = new Map();
+    return await Promise.all(args.employeeIds.map(id => employeeWithDevices(ctx, id, scopes, snapshotTargets, args.skipUnusedSnapshot)));
   },
 });
 
-async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, scopes: RuleScopeCache = new Map()) {
+async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, scopes: RuleScopeCache = new Map(), snapshotTargets: HikSnapshotReadCache["ruleTargets"] = new Map(), skipUnusedSnapshot = false) {
   const employee = await ctx.db.get(employeeId);
   if (!employee) return null;
 
@@ -159,7 +161,10 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
 
   const hasFingerprintTemplates = (await ctx.db.query("employeeFingerprints").withIndex("by_employee", q => q.eq("employeeId", employeeId)).first()) !== null;
   return {
-    previousDevices: (await snapshotEmployeeHikDevices(ctx, employee)).devices,
+    // Bulk sync consumes historical targets only for inactive or targetless people.
+    // Manual deletion queries keep the full snapshot through the default path.
+    previousDevices: skipUnusedSnapshot && employee.isActive !== false && deviceRules.length > 0 ? []
+      : (await snapshotEmployeeHikDevices(ctx, employee, { memberships: groupMemberships, ruleTargets: snapshotTargets })).devices,
     hasFingerprintTemplates,
     employee: {
       _id: employee._id,
@@ -167,6 +172,7 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
       lastName: employee.lastName,
       cardNumber: employee.cardNumber,
       hikCardless: employee.hikCardless,
+      hikEmployeeNo: employee.hikEmployeeNo,
       visitorCredential: employee.visitorCredential,
       projectId: employee.projectId,
       isActive: employee.isActive,
@@ -411,20 +417,31 @@ export const recordSyncFailure = internalMutation({
 
 /** Persist identity before network I/O; even a crashed action remains retryable. */
 export const beginPersonDeletion = internalMutation({
-  args: { deviceId: v.id("devices"), employeeId: v.id("employees"), projectId: v.id("projects"), cardNumber: v.string(), runId: v.optional(v.id("deviceSyncRuns")) },
+  args: { deviceId: v.id("devices"), employeeId: v.id("employees"), projectId: v.id("projects"), cardNumber: v.string(), employeeNo: v.optional(v.string()), runId: v.optional(v.id("deviceSyncRuns")) },
   handler: beginPersonDeletionInTransaction,
 });
+
+/** A deferred card cleanup must not remove a credential since assigned to someone else. */
+export const physicalCardReassigned = internalQuery({
+  args: { employeeId: v.id("employees"), cardNumber: v.string(), deviceId: v.id("devices") },
+  handler: async (ctx, args): Promise<boolean> => {
+    const device = await ctx.db.get(args.deviceId);
+    const employee = await ctx.db.get(args.employeeId);
+    if (!device || !employee || device.brand !== "hikvision" || device.projectId !== employee.projectId) return true;
+    return hikIdentityReassigned(ctx, args.cardNumber, device.projectId, args.employeeId);
+  },
+});
 export async function beginPersonDeletionInTransaction(ctx: MutationCtx, args: {
-  deviceId: Id<"devices">; employeeId: Id<"employees">; projectId: Id<"projects">; cardNumber: string; runId?: Id<"deviceSyncRuns">; transferId?: Id<"accessTransfers">;
+  deviceId: Id<"devices">; employeeId: Id<"employees">; projectId: Id<"projects">; cardNumber: string; employeeNo?: string; runId?: Id<"deviceSyncRuns">; transferId?: Id<"accessTransfers">;
 }): Promise<Id<"hikPendingOperations">> {
     const device = await ctx.db.get(args.deviceId);
     if (!device || device.projectId !== args.projectId || device.brand !== "hikvision") throw new Error("Silme hedefi proje dışında");
     const id = await ctx.db.insert("hikPendingOperations", {
       deviceId: args.deviceId, projectId: args.projectId, runId: args.runId, operation: "deletePerson",
-      payload: { employeeId: args.employeeId, employeeNo: args.cardNumber, cardNumber: args.cardNumber, ...(args.transferId ? { transferId: args.transferId } : {}) },
+      payload: { employeeId: args.employeeId, employeeNo: args.employeeNo ?? args.cardNumber, cardNumber: args.cardNumber, ...(args.transferId ? { transferId: args.transferId } : {}) },
       status: "failed", attemptCount: 0, createdAt: Date.now(), lastError: "Silme onayı bekleniyor — cihazda kalmış olabilir",
     });
-    await grantStatusForOperation(ctx, { ...args, _id: id, operation: "deletePerson", payload: { employeeId: args.employeeId, cardNumber: args.cardNumber } }, "pending");
+    await grantStatusForOperation(ctx, { ...args, _id: id, operation: "deletePerson", payload: { employeeId: args.employeeId, employeeNo: args.employeeNo ?? args.cardNumber, cardNumber: args.cardNumber } }, "pending");
     return id;
 }
 
@@ -623,7 +640,7 @@ export const claimLocalBridgeOperations = internalMutation({
         continue;
       }
       const cardNumber = deletionIdentity(op);
-      if (isPersonDeletion(op) && cardNumber && await protectCurrentCredential(ctx, op.deviceId, cardNumber)) {
+      if (isPersonDeletion(op) && cardNumber && await protectCurrentCredential(ctx, op.deviceId, cardNumber, asRecord(op.payload).cardOnly === true ? undefined : ctx.db.normalizeId("employees", String(asRecord(op.payload).employeeId ?? "")) ?? undefined)) {
         await supersedeDeletion(ctx, op._id);
         continue;
       }
@@ -916,6 +933,8 @@ export const listRetryCandidates = internalMutation({
               ? {
                   terminationType: employee.terminationType,
                   cardNumber: employee.cardNumber,
+                  hikEmployeeNo: employee.hikEmployeeNo,
+                  hikCardless: employee.hikCardless,
                   firstName: employee.firstName,
                   lastName: employee.lastName,
                   accessStartsAt: employee.accessStartsAt,
@@ -1153,7 +1172,7 @@ export const retrySyncIssue = authedMutation({
     const unresolved = isPersonDeletion(op) ? deletionUnresolvableReason(op, device) : undefined;
     if (unresolved) return { queued: false, reason: unresolved };
     const cardNumber = deletionIdentity(op);
-    if (isPersonDeletion(op) && cardNumber && await protectCurrentCredential(ctx, op.deviceId, cardNumber)) {
+    if (isPersonDeletion(op) && cardNumber && await protectCurrentCredential(ctx, op.deviceId, cardNumber, asRecord(op.payload).cardOnly === true ? undefined : ctx.db.normalizeId("employees", String(asRecord(op.payload).employeeId ?? "")) ?? undefined)) {
       await supersedeDeletion(ctx, op._id);
       return { queued: false };
     }
@@ -1212,24 +1231,31 @@ async function supersedeDeletion(ctx: MutationCtx, id: Id<"hikPendingOperations"
   await ctx.db.patch(id, { status: "done", completedAt: Date.now(), lastError: SUPERSEDED_DELETION });
 }
 
-async function supersedeDeletions(ctx: MutationCtx, deviceId: Id<"devices">, cardNumber: string) {
+async function supersedeDeletions(ctx: MutationCtx, deviceId: Id<"devices">, cardNumber: string, failedSnapshot?: readonly Doc<"hikPendingOperations">[]) {
   // Pending/processing rows are checked individually at claim/dispatch, not on every add ack.
-  const rows = await ctx.db.query("hikPendingOperations").withIndex("by_device_status", q => q.eq("deviceId", deviceId).eq("status", "failed")).take(4096);
+  const rows = failedSnapshot ?? await ctx.db.query("hikPendingOperations").withIndex("by_device_status", q => q.eq("deviceId", deviceId).eq("status", "failed")).take(4096);
   for (const op of rows) if (isPersonDeletion(op) && deletionIdentity(op) === cardNumber) {
     // Supersession is not a device deletion acknowledgement: never mark a grant removed.
     await supersedeDeletion(ctx, op._id);
   }
 }
 
-async function protectCurrentCredential(ctx: MutationCtx, deviceId: Id<"devices">, cardNumber: string) {
+async function protectCurrentCredential(ctx: MutationCtx, deviceId: Id<"devices">, cardNumber: string, deletingEmployeeId?: Id<"employees">, failedSnapshot?: readonly Doc<"hikPendingOperations">[]) {
   const device = await ctx.db.get(deviceId);
   if (!device) return false;
-  const employees = await ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", cardNumber)).take(101);
+  if (!cardNumber.trim()) return true;
+  const source = deletingEmployeeId ? await ctx.db.get(deletingEmployeeId) : null;
+  if (source?.hikEmployeeNo && hikPersonIdentity(source) !== cardNumber) return true;
+  const cardOwners = await ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", cardNumber)).take(101);
+  const personOwners = await ctx.db.query("employees").withIndex("by_project_hikEmployeeNo", q => q.eq("projectId", device.projectId).eq("hikEmployeeNo", cardNumber)).take(101);
+  const employees = [...new Map([...cardOwners.filter(employee => hikPersonIdentity(employee) === cardNumber), ...personOwners.filter(employee => hikPersonIdentity(employee) === cardNumber)].map(employee => [employee._id, employee])).values()];
   if (employees.length > 100) throw new Error("Kart sahibi sınırı aşıldı");
   for (const employee of employees) {
+    // Even an inactive unrelated person must never be deleted by another person's stale job.
+    if (employee.projectId === device.projectId && deletingEmployeeId && employee._id !== deletingEmployeeId) return true;
     if (employee.projectId !== device.projectId || employee.isActive === false) continue;
     if (await hasWritableHikCredential(ctx, employee, device)) {
-      await supersedeDeletions(ctx, deviceId, cardNumber);
+      await supersedeDeletions(ctx, deviceId, cardNumber, failedSnapshot);
       return true;
     }
   }
@@ -1237,8 +1263,8 @@ async function protectCurrentCredential(ctx: MutationCtx, deviceId: Id<"devices"
 }
 
 export const protectPersonDeletion = internalMutation({
-  args: { deviceId: v.id("devices"), cardNumber: v.string() },
-  handler: (ctx, args) => protectCurrentCredential(ctx, args.deviceId, args.cardNumber),
+  args: { deviceId: v.id("devices"), cardNumber: v.string(), employeeId: v.optional(v.id("employees")) },
+  handler: (ctx, args) => protectCurrentCredential(ctx, args.deviceId, args.cardNumber, args.employeeId),
 });
 export const protectQueuedDeletion = internalMutation({
   args: { id: v.id("hikPendingOperations") },
@@ -1246,7 +1272,8 @@ export const protectQueuedDeletion = internalMutation({
     const op = await ctx.db.get(args.id);
     if (!op || op.status === "done" || op.dismissedAt !== undefined) return true;
     const cardNumber = deletionIdentity(op);
-    const protectedCredential = isPersonDeletion(op) && cardNumber !== undefined && await protectCurrentCredential(ctx, op.deviceId, cardNumber);
+    const owner = asRecord(op.payload).cardOnly === true ? undefined : ctx.db.normalizeId("employees", String(asRecord(op.payload).employeeId ?? "")) ?? undefined;
+    const protectedCredential = isPersonDeletion(op) && cardNumber !== undefined && await protectCurrentCredential(ctx, op.deviceId, cardNumber, owner);
     if (protectedCredential) await supersedeDeletion(ctx, op._id);
     return protectedCredential;
   },
@@ -1266,6 +1293,27 @@ export const supersedePersonDeletions = internalMutation({
   handler: (ctx, args) => supersedeCurrentCredentialDeletions(ctx, args.deviceId, args.cardNumber),
 });
 
+/** Recheck after each bounded HTTP batch; an in-flight revocation still wins. */
+export const supersedePersonDeletionsBatch = internalMutation({
+  args: { deviceId: v.id("devices"), cardNumbers: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    if (args.cardNumbers.length > 20) throw new Error("Addition cleanup batch exceeds 20");
+    const requested = new Set(args.cardNumbers);
+    const failed = await ctx.db.query("hikPendingOperations").withIndex("by_device_status", q => q.eq("deviceId", args.deviceId).eq("status", "failed")).take(4096);
+    const matching = new Map<string, Doc<"hikPendingOperations">[]>();
+    for (const op of failed) {
+      const identity = deletionIdentity(op);
+      if (!isPersonDeletion(op) || !identity || !requested.has(identity)) continue;
+      const rows = matching.get(identity) ?? [];
+      rows.push(op);
+      matching.set(identity, rows);
+    }
+    // Reuse this transaction's frozen failed range; owner checks must never
+    // rescan thousands of operations for each of the twenty identities.
+    for (const [identity, rows] of matching) await protectCurrentCredential(ctx, args.deviceId, identity, undefined, rows);
+  },
+});
+
 /** Only durable, project-scoped deletion identities may outlive a person record. */
 export async function pendingPersonDeletions(ctx: Pick<QueryCtx, "db">, args: { projectId: Id<"projects">; employeeId: Id<"employees">; deviceId: Id<"devices"> }) {
   const rows = (await Promise.all((["failed", "pending", "processing"] as const).map(status =>
@@ -1276,6 +1324,7 @@ export async function pendingPersonDeletions(ctx: Pick<QueryCtx, "db">, args: { 
     const payload = asRecord(row.payload);
     const cardNumber = payload.employeeNo ?? payload.cardNumber;
     return row.dismissedAt === undefined && row.projectId === args.projectId && payload.employeeId === args.employeeId &&
+      payload.cardOnly !== true &&
       ["deletePerson", "deleteCard"].includes(row.operation) && typeof cardNumber === "string" && cardNumber.trim()
       ? [{ id: row._id, cardNumber }] : [];
   });
@@ -1289,22 +1338,23 @@ export const getPendingPersonDeletions = internalQuery({
 export const beginGatewayGrants = internalMutation({
   args: { employeeId: v.optional(v.id("employees")), deviceIds: v.optional(v.array(v.id("devices"))),
     pairs: v.optional(v.array(v.object({ employeeId: v.id("employees"), deviceId: v.id("devices") }))) },
-  handler: async (ctx, args): Promise<{ employeeId: Id<"employees">; deviceId: Id<"devices">; generation: number }[]> => {
+  handler: async (ctx, args): Promise<{ employeeId: Id<"employees">; deviceId: Id<"devices">; generation: number; grantId: Id<"accessGrantStatus"> }[]> => {
     const employeeId = args.employeeId;
     const pairs = args.pairs ?? (employeeId ? (args.deviceIds ?? []).map(deviceId => ({ employeeId, deviceId })) : []);
     if (pairs.length > 500) throw new Error("Gateway grant batch exceeds 500");
-    const generations: { employeeId: Id<"employees">; deviceId: Id<"devices">; generation: number }[] = [];
+    const generations: { employeeId: Id<"employees">; deviceId: Id<"devices">; generation: number; grantId: Id<"accessGrantStatus"> }[] = [];
     const seen = new Set<string>();
+    // Only transaction-local device snapshots are shared across this batch.
+    const devices = new Map<Id<"devices">, Doc<"devices"> | null>();
     for (const { employeeId, deviceId } of pairs) {
       const key = `${employeeId}:${deviceId}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const device = await ctx.db.get(deviceId);
+      if (!devices.has(deviceId)) devices.set(deviceId, await ctx.db.get(deviceId));
+      const device = devices.get(deviceId);
       if (!device?.projectId) continue;
-      const previous = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employeeId).eq("deviceId", deviceId)).unique();
-      await upsertGrantStatus(ctx, { projectId: device.projectId, employeeId, deviceId, state: "pending", ruleIds: previous?.ruleIds ?? [] }, { gatewayReservation: true });
-      const row = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", employeeId).eq("deviceId", deviceId)).unique();
-      if (row) generations.push({ employeeId, deviceId, generation: row.syncGeneration ?? 0 });
+      const written = await upsertGrantStatus(ctx, { projectId: device.projectId, employeeId, deviceId, state: "pending" }, { gatewayReservation: true, deviceSnapshot: device });
+      if (written?.generation !== undefined && written.grantId) generations.push({ employeeId, deviceId, generation: written.generation, grantId: written.grantId });
     }
     return generations;
   },
@@ -1314,6 +1364,7 @@ export const finishGatewayGrants = internalMutation({
   args: { results: v.array(v.object({ projectId: v.id("projects"), employeeId: v.id("employees"), deviceId: v.id("devices"),
     state: v.union(v.literal("pending"), v.literal("effective"), v.literal("failed"), v.literal("removed")),
     expectedGeneration: v.optional(v.number()), ruleIds: v.optional(v.array(v.id("accessRules"))),
+    expectedGrantId: v.optional(v.id("accessGrantStatus")),
     lastError: v.optional(v.string()), lastRunId: v.optional(v.id("deviceSyncRuns")), lastOperationId: v.optional(v.string()) })) },
   handler: async (ctx, args): Promise<void> => {
     if (args.results.length > 500) throw new Error("Gateway grant batch exceeds 500");
@@ -1321,7 +1372,7 @@ export const finishGatewayGrants = internalMutation({
     for (const result of args.results) {
       if (result.expectedGeneration === undefined) continue;
       const outcome = await upsertGrantStatus(ctx, result);
-      if (!outcome) continue;
+      if (!outcome?.reconcile) continue;
       const { employeeId, deviceId, projectId } = outcome.reconcile;
       const group = reconciliations.get(employeeId) ?? { devices: new Set<Id<"devices">>(), projects: new Set<Id<"projects">>() };
       group.devices.add(deviceId);

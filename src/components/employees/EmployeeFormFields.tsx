@@ -21,6 +21,7 @@ interface Option {
 interface Props {
   canViewPay?: boolean;
   isVisitor?: boolean;
+  accessExpiresAtInstant?: string;
   formData: EmployeeFormData;
   setFormData: (data: EmployeeFormData) => void;
   companies: Option[];
@@ -48,6 +49,7 @@ export default function EmployeeFormFields({
   formData,
   canViewPay = false,
   isVisitor = false,
+  accessExpiresAtInstant,
   setFormData,
   companies,
   departments,
@@ -86,7 +88,8 @@ export default function EmployeeFormFields({
       | "cardNumber"
       | "tcNo"
       | "payrollCode"
-      | "accessStartsAt",
+      | "accessStartsAt"
+      | "accessExpiresAt",
     label: string,
     type = "text",
     hint?: string,
@@ -282,6 +285,8 @@ export default function EmployeeFormFields({
             </ul>
           ))}
           {!isVisitor && input("accessStartsAt", "Erişim başlangıcı", "date", "Bu tarihten önce kart, QR ve mobil erişim reddedilir.")}
+          {!isVisitor && input("accessExpiresAt", "Erişim bitişi", "date", "Cihazdan alınan bitiş de burada gösterilir. Bu gün dahil geçerlidir; boşsa bağımsız bitiş sınırı yoktur.")}
+          {!isVisitor && accessExpiresAtInstant && Number.isFinite(Date.parse(accessExpiresAtInstant)) && <p className="text-xs text-muted-foreground">Kayıtlı bitiş: {new Date(accessExpiresAtInstant).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })} (Türkiye saati)</p>}
           {select("accessRuleId", isEditing ? "Ek erişim kuralı" : "Erişim kuralı ekle", accessRules)}
           <p className="text-xs text-muted-foreground">
             {isEditing ? (

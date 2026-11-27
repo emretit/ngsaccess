@@ -1,13 +1,13 @@
 const HEADERS = [
   "Ad*", "Soyad*", "E-posta", "T.C. Kimlik No", "Sicil/Bordro Kodu",
-  "Kart No*", "Departman", "Pozisyon", "Firma", "Aktif (Evet/Hayır)",
+  "Kart No", "Departman", "Pozisyon", "Firma", "Aktif (Evet/Hayır)",
 ] as const;
 
 export async function createEmployeeImportTemplate() {
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Kişiler");
-  sheet.addRow(["Açıklama: Örnek satırı silip kişileri başlıkların altına ekleyin. Ad, soyad ve kart numarası zorunludur; e-posta isteğe bağlıdır."]);
+  sheet.addRow(["Açıklama: Örnek satırı silip kişileri başlıkların altına ekleyin. Ad ve soyad zorunludur; e-posta ve kart numarası isteğe bağlıdır. Kartı boş kişiler için sonradan Toplu kart atama kullanın."]);
   sheet.addRow([...HEADERS]);
   sheet.addRow(["Ayşe", "Yılmaz", "ayse@example.com", "", "", "AYSE-001", "İnsan Kaynakları", "Uzman", "Örnek A.Ş.", "Evet"]);
   sheet.getRow(1).font = { italic: true, color: { argb: "FF666666" } };

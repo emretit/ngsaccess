@@ -100,7 +100,8 @@ export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: 
       {stage === "done" && <div className="space-y-4">
         <p>{results.filter((result) => result.status === "created" && result.message === "Kişi oluşturuldu").length} kişi oluşturuldu · {duplicateCount} yinelenen · {errorResults.length} hatalı{wasCancelled ? " · İptal edildi" : ""}</p>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        {!canResync && <p role="status">Kişiler cihazlara otomatik gönderilecek</p>}
+        {!canResync && <p role="status">Kartlı kişiler cihazlara otomatik gönderilecek</p>}
+        <p>Kartı boş kişilere Kişiler listesindeki Toplu kart atama ile sonradan kart verebilirsiniz.</p>
         {syncMessage && <p role="status" className="text-sm">{syncMessage}</p>}
         <div className="flex flex-wrap justify-end gap-2">{errorResults.length > 0 && <Button variant="outline" onClick={() => void downloadImportErrors(results)}>Hatalı satırları indir</Button>}{canResync && <Button variant="outline" onClick={() => { if (!can("devices.manage")) return; void startProjectResync({ projectId }).then(() => { setSyncMessage("Cihazlara gönderim başlatıldı."); }).catch((cause: unknown) => setSyncMessage(cause instanceof Error ? cause.message : "Cihazlara gönderim başlatılamadı.")); }}>Cihazlara gönder</Button>}<Button onClick={() => setOpen(false)}>Kapat</Button></div>
       </div>}

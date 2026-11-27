@@ -124,7 +124,7 @@ function context(rows: Doc<"cardReadings">[] = [reading()]) {
     const record = Object.values(tables).flat().find(row => row._id === id);
     if (record) Object.assign(record, updates);
   });
-  const runAfter = vi.fn(async () => "scheduled");
+  const runAfter = vi.fn(async (_delay: number, _reference: Parameters<typeof getFunctionName>[0], _args: Record<string, unknown>) => "scheduled");
   const db = {
     query, patch,
     normalizeId: (_table: string, id: string) => id === "invalid" ? null : id,
@@ -177,8 +177,14 @@ describe("public handlers through real auth wrappers", () => {
     f.tables.groupMembers = [{ projectId, employeeId, groupId: "rule" }];
     f.tables.groupDevices = [{ projectId, groupId: "rule", deviceId }];
     expect(await invoke(assignCardFromReading, f.ctx, { readingId, employeeId, expectedCurrentCard: "old" })).toMatchObject({ syncStatus: "pending" });
-    expect(f.runAfter).toHaveBeenNthCalledWith(1, 0, expect.anything(), { cardNumber: "old", deviceIds: [deviceId], projectId });
-    expect(f.runAfter).toHaveBeenCalledTimes(3);
+    // N3 cleanup is employee-targeted even without an IDE roster mirror.
+    // Compare plain function names so a failing assertion never formats Convex proxies.
+    const scheduled = f.runAfter.mock.calls.map(([delay, reference, args]) => ({ delay, name: getFunctionName(reference), args }));
+    expect(scheduled).toEqual([
+      { delay: 0, name: "actions/ideGatewayDevice:deleteIdeUserFromPanels", args: { employeeId, cardNumber: "old", deviceIds: [deviceId], projectId } },
+      { delay: 0, name: "actions/hikvisionSync:deleteEmployeeFromDevicesInternal", args: expect.objectContaining({ employeeId, syncAfter: true, snapshot: expect.objectContaining({ cardNumber: "old", employeeNo: "old" }) }) },
+      { delay: 0, name: "actions/ideGatewayDevice:syncEmployeeToIdePanels", args: { employeeId } },
+    ]);
   });
   it.each(["stale", "duplicate", "foreign", "biometric", "matched", "missing"])("%s fails before any write or sync", async kind => {
     const f = context();

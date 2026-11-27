@@ -1,3 +1,4 @@
+import { insertEmployee, patchEmployee } from "./lib/employeeListFields";
 import { hasReadingPermission, VISITOR_READING_PERMISSIONS } from "./lib/readingAccess";
 import { getUserPermissions, requirePermission } from "./lib/permissions";
 import { validateVisitorPresetCard } from "./lib/mobileVisitors";
@@ -400,7 +401,7 @@ export const create = authedMutation({
         const other = await findDuplicateEmployee(ctx, "cardNumber", cardNumber, dupCard._id);
         if (other) throw new Error(cardConflictMessage(cardNumber, other, DUPLICATE_MESSAGES.cardNumber));
         await scheduleVisitorCardRemoval(ctx, dupCard);
-        await ctx.db.patch(dupCard._id, {
+        await patchEmployee(ctx, dupCard._id, {
           cardNumber: `IADE:${cardNumber}:${dupCard._id}`,
           updatedAt: new Date().toISOString(),
         });
@@ -421,7 +422,7 @@ export const create = authedMutation({
 
     const isActive = args.isActive ?? true;
     const now = new Date().toISOString();
-    const id = await ctx.db.insert("employees", {
+    const id = await insertEmployee(ctx, {
       projectId: args.projectId,
       firstName: args.firstName.trim(),
       lastName: args.lastName.trim(),
@@ -564,7 +565,7 @@ export const update = authedMutation({
       patch.isActive = args.isActive;
       patch.visitorStatus = args.isActive ? "checkedIn" : "checkedOut";
     }
-    await ctx.db.patch(args.visitorId, patch);
+    await patchEmployee(ctx, args.visitorId, patch);
     if (assigningPreset) {
       await upsertGroupMembership(ctx, args.visitorId, assignedRuleId, visitor.projectId);
     }
@@ -614,7 +615,7 @@ export const checkOut = authedMutation({
     if (visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
     if (visitor.isActive === false) return args.visitorId;
     await scheduleVisitorCardRemoval(ctx, visitor);
-    await ctx.db.patch(args.visitorId, {
+    await patchEmployee(ctx, args.visitorId, {
       isActive: false,
       visitorStatus: "checkedOut",
       updatedAt: new Date().toISOString(),
@@ -636,7 +637,7 @@ export const releaseCard = authedMutation({
     }
     if (visitor.cardNumber.startsWith("IADE:")) return args.visitorId; // zaten serbest
     await scheduleVisitorCardRemoval(ctx, visitor);
-    await ctx.db.patch(args.visitorId, {
+    await patchEmployee(ctx, args.visitorId, {
       cardNumber: `IADE:${visitor.cardNumber}:${args.visitorId}`,
       updatedAt: new Date().toISOString(),
     });
@@ -662,7 +663,7 @@ export const expireVisitorAccess = internalMutation({
     const expired = batch.page.filter(visitor => visitorTime(visitor.accessExpiresAt) <= nowMs);
     for (const vz of expired) {
       await scheduleVisitorCardRemoval(ctx, vz);
-      await ctx.db.patch(vz._id, {
+      await patchEmployee(ctx, vz._id, {
         isActive: false,
         visitorStatus: "expired",
         updatedAt: now,

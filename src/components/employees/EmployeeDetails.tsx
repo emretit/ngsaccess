@@ -19,6 +19,7 @@ import { api } from "../../../convex/_generated/api";
 import { EmployeeRecentReadings } from "./EmployeeRecentReadings";
 import { EmployeeFingerprintCard } from "./EmployeeFingerprintCard";
 import { EmployeeFaceCard } from "./faces/EmployeeFaceCard";
+import { EmployeeDeliveryCard } from "./details/EmployeeDeliveryCard";
 export default function EmployeeDetails({
   employee,
   renderEditForm,
@@ -35,10 +36,8 @@ export default function EmployeeDetails({
   const { projectId } = useActiveProjectScope();
   const { can } = usePermissions();
   const canManage = can("employees.manage");
-  const employees = useQuery(api.employees.list, projectId ? { projectId } : "skip");
   const record = useQuery(api.employees.getById, employee ? { employeeId: employee._id } : "skip");
-  const listed = employee ? employees?.find(item => item._id === employee._id) : undefined;
-  const gone = !!employee && (record === null || (employees !== undefined && !listed));
+  const gone = !!employee && record === null;
   useEffect(() => {
     if (gone) onGone?.();
   }, [gone, onGone]);
@@ -54,13 +53,14 @@ export default function EmployeeDetails({
       </div>
     );
   }
-  const current = listed ?? employee;
+  const current = record ?? employee;
   const items: [string, string | null | undefined][] = [
     ["E-posta", current.email],
     ["Departman", current.departments?.name],
     ["Pozisyon", current.positions?.name],
     ["Kart no", current.cardNumber],
     ["Bordro kodu", current.payrollCode],
+    ["Erişim bitişi", current.accessExpiresAt && Number.isFinite(Date.parse(current.accessExpiresAt)) ? new Date(current.accessExpiresAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }) : null],
     ["TC kimlik no", current.tcNo ? `•••••••${current.tcNo.slice(-4)}` : null],
     ["Eski vardiya notu", current.shift],
   ];
@@ -104,12 +104,14 @@ export default function EmployeeDetails({
           <EmployeeAccessSection employeeId={employee._id} />
         </EmployeeActivityBoundary>
       )}
-      {/* Cihaz senkron sorunları Kişiler sayfasındaki senkron uyarıları bandında; drawer'da tekrarlanmaz. */}
+      <EmployeeActivityBoundary employeeId={employee._id} projectId={projectId} title="Cihaz teslim durumu" description="Cihaz teslim durumu yüklenemedi.">
+        <EmployeeDeliveryCard key={employee._id} employeeId={employee._id} />
+      </EmployeeActivityBoundary>
       <EmployeeActivityBoundary employeeId={employee._id} projectId={projectId} title="Parmak izi" description="Parmak izi kayıtları yüklenemedi.">
         <EmployeeFingerprintCard key={employee._id} employeeId={employee._id} />
       </EmployeeActivityBoundary>
       <EmployeeActivityBoundary employeeId={employee._id} projectId={projectId} title="Yüz" description="Yüz kayıtları yüklenemedi.">
-        <EmployeeFaceCard key={employee._id} employeeId={employee._id} cardNumber={employee.cardNumber} />
+        <EmployeeFaceCard key={employee._id} employeeId={employee._id} cardNumber={current.cardNumber} />
       </EmployeeActivityBoundary>
       {/* Düzenleme ekranı yalnız kişi bilgisi + biyometri; geçişler Canlı İzleme geçmişinde. */}
       {!editing && (

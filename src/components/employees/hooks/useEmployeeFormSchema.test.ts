@@ -1,6 +1,19 @@
 import { expect, it } from "vitest";
 import { employeeFormSchema, employeeFormSchemaFor } from "./useEmployeeFormSchema";
 const required = { firstName: "Ada", lastName: "Test", email: "ada@example.test", cardNumber: "123" };
+it.each(["A B", "Ç-1", "1".repeat(21), "x".repeat(129)])("D8 allows an unchanged legacy card %s while validating a changed credential", cardNumber => {
+  expect(employeeFormSchemaFor(cardNumber).safeParse({ ...required, firstName: "Yeni", cardNumber }).success).toBe(true);
+  expect(employeeFormSchemaFor(cardNumber).safeParse({ ...required, cardNumber: "BAD CARD" }).success).toBe(false);
+  expect(employeeFormSchemaFor(cardNumber).safeParse({ ...required, cardNumber: "" }).success).toBe(false);
+});
+it("validates independent end dates and rejects an end before the start", () => {
+  expect(employeeFormSchema.safeParse({ ...required, accessExpiresAt: "2026-12-01" }).success).toBe(true);
+  expect(employeeFormSchema.safeParse({ ...required, accessExpiresAt: "2026-02-30" }).success).toBe(false);
+  expect(employeeFormSchema.safeParse({ ...required, accessStartsAt: "2026-12-01", accessExpiresAt: "2026-11-30" }).success).toBe(false);
+});
+it.each(["A B", "a".repeat(129), "1".repeat(21)])("uses the shared physical card rules for %s", cardNumber => {
+  expect(employeeFormSchema.safeParse({ ...required, cardNumber }).success).toBe(false);
+});
 it.each(["", "  "])("existing card cannot be cleared to %j", cardNumber => {
   const result = employeeFormSchemaFor("00123").safeParse({ ...required, cardNumber });
   expect(result.success).toBe(false);

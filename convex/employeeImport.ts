@@ -1,3 +1,4 @@
+import { insertEmployee, patchEmployee } from "./lib/employeeListFields";
 import { reconcileEmployeeDepartmentRules } from "./lib/departmentAccess";
 import { recordDepartmentChange } from "./lib/employeeDepartmentHistory";
 import { internal } from "./_generated/api";
@@ -11,6 +12,8 @@ import type { Id } from "./_generated/dataModel";
 import { scheduleEmployeeCardChange } from "./lib/employeeCardChange";
 import { cardConflictMessage, cardNumericKey, findDuplicateCard, NUMERIC_CARD_CONFLICT } from "./lib/cardIdentity";
 import { normalizeEmployeeEmail } from "./lib/employeeEmail";
+import { canSyncEmployeeToDevices } from "./lib/employeeUx";
+import { cardNumberError } from "./lib/cardNumberRules";
 
 const rowValidator = v.object({
   rowNumber: v.number(), firstName: v.string(), lastName: v.string(), email: v.string(),
@@ -94,7 +97,7 @@ export const importChunk = authedMutation({
       if (duplicateMessage) { results.push({ rowNumber: row.rowNumber, status: "skippedDuplicate", message: duplicateMessage }); continue; }
       if (args.dryRun) { results.push({ rowNumber: row.rowNumber, status: "created", message: "İçe aktarmaya hazır" }); continue; }
       const now = new Date().toISOString();
-      const employeeId = await ctx.db.insert("employees", {
+      const employeeId = await insertEmployee(ctx, {
         projectId: args.projectId, firstName: row.firstName.trim(), lastName: row.lastName.trim(), email,
         tcNo: row.tcNo?.trim() || undefined, payrollCode: row.payrollCode?.trim() || undefined, cardNumber: row.cardNumber.trim(),
         departmentId: department?._id,
@@ -104,8 +107,10 @@ export const importChunk = authedMutation({
       });
       await recordDepartmentChange(ctx, employeeId);
       await reconcileEmployeeDepartmentRules(ctx, employeeId);
-      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
-      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
+      if (canSyncEmployeeToDevices(row)) {
+        await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+        await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
+      }
       results.push({ rowNumber: row.rowNumber, status: "created", message: "Kişi oluşturuldu" });
     }
     if (!args.dryRun) {
@@ -143,8 +148,9 @@ export const assignCards = authedMutation({
         message: "Ziyaretçi kayıtları Ziyaretçiler ekranından yönetilir.",
       });
       if (employee.projectId) projectIds.add(employee.projectId);
-      if (!cardNumber || cardNumber.length > 128 || !/^[\w-]+$/.test(cardNumber)) {
-        results.push({ employeeId: assignment.employeeId, status: "error", message: "Kart numarası biçimi geçersiz" });
+      const cardError = cardNumberError(cardNumber);
+      if (cardError) {
+        results.push({ employeeId: assignment.employeeId, status: "error", message: !cardNumber ? "Kart numarası biçimi geçersiz" : cardError });
         continue;
       }
       const conflict = await findDuplicateCard(ctx, cardNumber, employee._id);
@@ -154,7 +160,7 @@ export const assignCards = authedMutation({
       }
       const previousCardNumber = employee.cardNumber;
       const cardChanged = previousCardNumber !== cardNumber;
-      await ctx.db.patch(employee._id, { cardNumber, updatedAt: new Date().toISOString() });
+      await patchEmployee(ctx, employee._id, { cardNumber, updatedAt: new Date().toISOString() });
       if (cardChanged) await scheduleEmployeeCardChange(ctx, employee._id, employee.projectId, previousCardNumber);
       results.push({ employeeId: assignment.employeeId, status: "assigned", message: "Kart atandı" });
     }

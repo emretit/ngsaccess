@@ -622,6 +622,14 @@ describe("W4.2a audit regressions", () => {
     expect(await status(ids.hikId)).toMatchObject({ ruleIds: [ids.ruleId] });
     expect(await status(alias.deviceId)).toMatchObject({ ruleIds: [alias.ruleId], state: "effective" });
   });
+  it("rule sync reserves and confirms cardless imported Hik identities", async () => {
+    const { t, ids, status } = await fixture();
+    await t.run(ctx => ctx.db.patch(ids.employeeId, { cardNumber: "", hikEmployeeNo: "7", hikCardless: true }));
+    await t.action(internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: ids.ruleId, targetDeviceIds: [ids.hikId] });
+    expect(wire.send).toHaveBeenCalledWith("index", expect.objectContaining({ employeeNo: "7" }));
+    expect(wire.card).not.toHaveBeenCalled();
+    expect(await status(ids.hikId)).toMatchObject({ state: "effective", syncGeneration: 2, ruleIds: [ids.ruleId] });
+  });
   it("1200 gateway pairs deliver HTTP and write three bounded grant batches", async () => {
     const { t, ids } = await fixture();
     await t.run(async ctx => {
@@ -640,6 +648,10 @@ describe("W4.2a audit regressions", () => {
     expect(begins.every(([, args]) => Array.isArray(args.pairs) && args.pairs.length <= 500)).toBe(true);
     const batches = mutationCalls.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:finishGatewayGrants");
     expect(batches.map(([, args]) => Array.isArray(args.results) ? args.results.length : 0)).toEqual([500, 500, 200]);
+    const cleanups = mutationCalls.mock.calls.filter(([ref]) => getFunctionName(ref) === "hikvisionSync:supersedePersonDeletionsBatch");
+    expect(cleanups).toHaveLength(60);
+    expect(cleanups.every(([, args]) => Array.isArray(args.cardNumbers) && args.cardNumbers.length <= 20)).toBe(true);
+    expect(mutationCalls.mock.calls.some(([ref]) => getFunctionName(ref) === "hikvisionSync:supersedePersonDeletions")).toBe(false);
   }, 30000);
 });
 

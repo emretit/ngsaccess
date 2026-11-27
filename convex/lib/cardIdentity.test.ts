@@ -8,6 +8,16 @@ import { cardConflictMessage, cardNumericKey, findDuplicateCard, NUMERIC_CARD_CO
 const modules = import.meta.glob("../**/*.ts");
 
 describe("decimal card identity", () => {
+  it.each(["", "456"])("reserves imported person IDs across projects after physical card assignment (%j)", async cardNumber => {
+    const t = convexTest(schema, modules);
+    await t.run(async ctx => {
+      const projectId = await ctx.db.insert("projects", { name: "Imported" });
+      const employeeId = await ctx.db.insert("employees", { projectId, firstName: "Imported", lastName: "Person", email: "", cardNumber, hikEmployeeNo: "0005" });
+      expect((await findDuplicateCard(ctx, "5"))?._id).toBe(employeeId);
+      expect((await findDuplicateCard(ctx, "0005"))?._id).toBe(employeeId);
+      expect(await findDuplicateCard(ctx, "5", employeeId)).toBeNull();
+    });
+  });
   it.each([["00123", "123"], ["123", "123"], ["000", "0"], ["0", "0"], ["9007199254740991", "9007199254740991"],
     ["00ABC123", null], ["1e3", null], ["0x10", null], ["-1", null], ["", null], [" 123", null]] as const)("normalizes %s", (card, key) => {
     expect(cardNumericKey(card)).toBe(key);

@@ -1,3 +1,4 @@
+import { patchEmployee } from "./employeeListFields";
 import { ConvexError, v } from "convex/values";
 import { internalMutation } from "../_generated/server";
 import { internal } from "../_generated/api";
@@ -78,7 +79,7 @@ async function clearHostedVisitorsPage(ctx: MutationCtx, employeeId: Id<"employe
     .withIndex("by_host_mobile_visitor_request", q => q.eq("hostEmployeeId", employeeId))
     .take(CASCADE_BATCH_SIZE);
   for (const visitor of visitors) {
-    await ctx.db.patch(visitor._id, {
+    await patchEmployee(ctx, visitor._id, {
       hostEmployeeId: undefined,
       ...(visitor.isVisitor === true ? { email: "", visitorPhone: undefined } : {}),
     });

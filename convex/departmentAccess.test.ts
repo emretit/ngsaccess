@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { reconcileEmployeeDepartmentRules } from "./lib/departmentAccess";
 
 const modules = import.meta.glob("./**/*.ts");
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-11T10:00:00Z")); });
@@ -40,6 +41,27 @@ async function fixture() {
 }
 
 describe("dynamic department access", () => {
+  it.each([
+    { cardNumber: "", hikCardless: false, hikEmployeeNo: undefined },
+    { cardNumber: "123", hikCardless: true, hikEmployeeNo: undefined },
+    { cardNumber: "", hikCardless: true, hikEmployeeNo: "123" },
+  ])("preserves inherited access while scheduling only device identities: %j", async identity => {
+    const f = await fixture();
+    const ruleId = await f.rule(f.ids.a);
+    const employeeId = await f.t.run(async ctx => {
+      const id = await ctx.db.insert("employees", {
+        projectId: f.ids.projectId, departmentId: f.ids.a, firstName: "Ada", lastName: "Test", email: "",
+        ...identity, isActive: true,
+      });
+      await reconcileEmployeeDepartmentRules(ctx, id);
+      return id;
+    });
+    expect(await f.members(ruleId)).toMatchObject([{ employeeId, source: "department" }]);
+    const jobs = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+    const personJobs = jobs.filter(job => job.args.some(arg => typeof arg === "object" && arg !== null && "employeeId" in arg && arg.employeeId === employeeId));
+    if (identity.hikCardless) expect(personJobs.map(job => job.name)).toContain("actions/hikvisionSync:syncEmployeeToDevicesInternal");
+    else expect(personJobs).toEqual([]);
+  });
   it("keeps an empty department selection and enrolls future people on create", async () => {
     const f = await fixture();
     const ruleId = await f.rule(f.ids.a);

@@ -29,6 +29,7 @@ async function fixture() {
     return { projectId, foreignProjectId, adminId, adminSession, readerId, readerSession, bothId, noneId };
   });
   return {
+    t,
     ids,
     admin: t.withIdentity({ subject: `${ids.adminId}|${ids.adminSession}` }),
     reader: t.withIdentity({ subject: `${ids.readerId}|${ids.readerSession}` }),
@@ -36,18 +37,29 @@ async function fixture() {
 }
 
 describe("employeeBiometrics.summary", () => {
+  it("F11 reads only visible people, including fingerprints beyond the old 5000-row cutoff", async () => {
+    const { t, ids, admin } = await fixture();
+    const target = await t.run(async ctx => {
+      for (let i = 0; i < 5001; i++) await ctx.db.insert("employeeFingerprints", { projectId: ids.projectId, employeeId: ids.noneId, fingerPrintID: 1, encData: "enc", iv: "iv", keyVersion: "v1", addedAt: 1 });
+      const employeeId = await ctx.db.insert("employees", { projectId: ids.projectId, firstName: "Son", lastName: "Kişi", email: "", cardNumber: "" });
+      await ctx.db.insert("employeeFingerprints", { projectId: ids.projectId, employeeId, fingerPrintID: 9, encData: "enc", iv: "iv", keyVersion: "v1", addedAt: 1 });
+      return employeeId;
+    });
+    expect(await admin.query(api.employeeBiometrics.summary, { projectId: ids.projectId, employeeIds: [target] })).toEqual([{ employeeId: target, face: false, fingerNos: [9] }]);
+    expect(await admin.query(api.employeeBiometrics.summary, { projectId: ids.projectId, employeeIds: [] })).toEqual([]);
+  });
   it("yöneticiye proje içi yüz + parmak numaralarını döner, şablon dönmez", async () => {
     const { ids, admin } = await fixture();
-    const rows = await admin.query(api.employeeBiometrics.summary, { projectId: ids.projectId });
+    const rows = await admin.query(api.employeeBiometrics.summary, { projectId: ids.projectId, employeeIds: [ids.bothId, ids.noneId] });
     expect(rows).toEqual([{ employeeId: ids.bothId, face: true, fingerNos: [1, 2] }]);
     expect(JSON.stringify(rows)).not.toContain("enc");
   });
   it("yönetici olmayana boş liste döner", async () => {
     const { ids, reader } = await fixture();
-    expect(await reader.query(api.employeeBiometrics.summary, { projectId: ids.projectId })).toEqual([]);
+    expect(await reader.query(api.employeeBiometrics.summary, { projectId: ids.projectId, employeeIds: [ids.bothId, ids.noneId] })).toEqual([]);
   });
   it("erişimi olmayan projeyi reddeder", async () => {
     const { ids, admin } = await fixture();
-    await expect(admin.query(api.employeeBiometrics.summary, { projectId: ids.foreignProjectId })).rejects.toThrow();
+    await expect(admin.query(api.employeeBiometrics.summary, { projectId: ids.foreignProjectId, employeeIds: [ids.bothId] })).rejects.toThrow();
   });
 });

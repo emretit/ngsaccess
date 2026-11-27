@@ -503,7 +503,12 @@ export const getMonthlyPayrollSheet = authedQuery({
 // taşındı — saf ikili golden testlerle donduruldu.
 
 /** Kart adaylarını cihazın projesine göre seç; projesiz cihazın legacy davranışını koru. */
-async function findDeviceCardEmployee(ctx: MutationCtx, cardNo: string, projectId?: Id<"projects">) {
+async function findDeviceCardEmployee(ctx: MutationCtx, cardNo: string, projectId?: Id<"projects">, employeeNo?: string) {
+  if (employeeNo?.trim() && projectId) {
+    const people = await ctx.db.query("employees").withIndex("by_project_hikEmployeeNo", q => q.eq("projectId", projectId).eq("hikEmployeeNo", employeeNo.trim())).take(2);
+    if (people.length > 1) return null;
+    if (people[0]) return people[0];
+  }
   if (!cardNo.trim()) return null;
   const candidates = await ctx.db.query("employees")
     .withIndex("by_card", q => q.eq("cardNumber", cardNo))
@@ -528,6 +533,7 @@ export const processCardReading = internalMutation({
     rawBody: v.optional(v.string()),
     hikDevIndex: v.optional(v.string()),
     hikEhomeID: v.optional(v.string()),
+    hikEmployeeNo: v.optional(v.string()),
     hikMajorEventType: v.optional(v.number()),
     hikSubEventType: v.optional(v.number()),
     hikCurrentVerifyMode: v.optional(v.string()),
@@ -857,7 +863,7 @@ export const backfillHikEventRow = internalMutation({
       : inferDenialReason(args.event.minor);
 
     // Canlı olaylarla aynı cihaz-projesi eşleştirmesini kullan.
-    const employee = await findDeviceCardEmployee(ctx, cardNo, device.projectId);
+    const employee = await findDeviceCardEmployee(ctx, cardNo, device.projectId, args.event.employeeNoString);
     const projectId = device.projectId ?? employee?.projectId;
 
     const employeeName = employee

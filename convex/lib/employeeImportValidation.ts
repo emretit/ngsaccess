@@ -1,3 +1,5 @@
+import { cardNumberError } from "./cardNumberRules";
+
 export type EmployeeImportRow = {
   rowNumber: number;
   firstName: string;
@@ -24,7 +26,8 @@ export function validateEmployeeImportRow(row: EmployeeImportRow): string[] {
   if (!row.lastName.trim()) errors.push("Soyad zorunludur");
   // E-posta isteğe bağlı (personel formuyla aynı); doluysa biçim denetlenir.
   if (row.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) errors.push("E-posta geçersiz");
-  if (!row.cardNumber.trim() || row.cardNumber.length > 128) errors.push("Geçerli kart numarası zorunludur");
+  const cardError = cardNumberError(row.cardNumber, { allowEmpty: true });
+  if (cardError) errors.push(cardError);
   if (row.tcNo && !isValidTurkishIdentityNumber(row.tcNo)) errors.push("T.C. Kimlik No geçersiz");
   return errors;
 }

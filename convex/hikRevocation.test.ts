@@ -51,6 +51,31 @@ async function fixture(transport: "gateway" | "localBridge" = "gateway") {
 }
 
 describe("Hik revocation lifecycle", () => {
+  it.each(["", "456"])("deletes the imported person identity from a durable snapshot, independent of the physical card %j", async cardNumber => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.ids.employeeId, { cardNumber, hikEmployeeNo: "7" }));
+    const snapshot = await f.snapshot();
+    expect(snapshot).toMatchObject({ cardNumber, employeeNo: "7" });
+    await f.t.run(async ctx => { await ctx.db.delete(f.ids.memberId); await ctx.db.patch(f.ids.employeeId, { isActive: false, cardNumber: "changed-again" }); });
+    const result = await f.t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: f.ids.employeeId, snapshot });
+    expect(result.removed).toBe(1);
+    expect(wire.remove).toHaveBeenCalledExactlyOnceWith("local-index", "7");
+  });
+  it.each([false, true])("never deletes a stale physical-card person ID, even when its device owner is unknown (knownOwner=%s)", async knownOwner => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      await ctx.db.patch(f.ids.employeeId, { cardNumber: "456", hikEmployeeNo: "7", isActive: false });
+      if (knownOwner) await ctx.db.insert("employees", { projectId: f.ids.projectId, firstName: "Other", lastName: "Person", email: "", cardNumber: "456", isActive: false });
+    });
+    const snapshot = { ...await f.snapshot(), employeeNo: "456" };
+    const result = await f.t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: f.ids.employeeId, snapshot });
+    expect(result.superseded).toBe(1);
+    expect(wire.remove).not.toHaveBeenCalled();
+    const staleId = await f.t.run(ctx => ctx.db.insert("hikPendingOperations", { deviceId: f.ids.deviceId, projectId: f.ids.projectId, operation: "deletePerson", status: "failed", attemptCount: 0, createdAt: Date.now(), payload: { employeeId: f.ids.employeeId, employeeNo: "456", cardNumber: "456" } }));
+    await f.t.action(internal.actions.hikQueueWorker.processHikQueue, {});
+    expect(await f.t.run(ctx => ctx.db.get(staleId))).toMatchObject({ status: "done" });
+    expect(wire.remove).not.toHaveBeenCalled();
+  });
   it.each(["gateway", "localBridge"] as const)("%s: card rotation captures old door-only identity before syncing the new one", async transport => {
     const f = await fixture(transport);
     await f.t.run(async ctx => {
@@ -183,7 +208,7 @@ describe("Hik revocation lifecycle", () => {
     await f.t.run(ctx => ctx.db.patch(f.ids.employeeId, { isActive: false }));
     const snapshot = await f.snapshot();
     expect(await f.t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: f.ids.employeeId, snapshot })).toMatchObject({ removed: 0, queued: 1 });
-    await f.t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: f.ids.employeeId, snapshot: { ...snapshot, cardNumber: "OLDER" } });
+    await f.t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: f.ids.employeeId, snapshot: { ...snapshot, cardNumber: "OLDER", employeeNo: "OLDER" } });
     expect((await f.operations()).filter(op => op.operation === "deleteCard")).toHaveLength(2);
     const grant = await f.t.run(ctx => ctx.db.query("accessGrantStatus").first());
     expect(grant?.state).toBe("pending");
@@ -208,7 +233,7 @@ describe("Hik revocation lifecycle", () => {
     const f = await fixture();
     wire.remove.mockResolvedValue({ ok: false, error: "offline" });
     const snapshot = await f.snapshot();
-    await f.t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: f.ids.employeeId, snapshot: { ...snapshot, cardNumber: "OLDER" } });
+    await f.t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: f.ids.employeeId, snapshot: { ...snapshot, cardNumber: "OLDER", employeeNo: "OLDER" } });
     wire.remove.mockResolvedValue({ ok: true });
     await f.t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: f.ids.employeeId, snapshot });
     expect((await f.operations()).filter(op => op.status === "failed")).toEqual([expect.objectContaining({ payload: expect.objectContaining({ cardNumber: "OLDER" }) })]);
@@ -405,7 +430,8 @@ describe("Hik revocation fix regressions", () => {
     if (kind === "offlineDevice") expect(jobs.filter(job => job.name.includes("deleteOfflineHikBatch"))).toHaveLength(1);
     await f.drain();
     expect(wire.remove).toHaveBeenCalledTimes(kind === "member" ? 1 : 500);
-  }, 30000);
+  // The in-memory index implementation scans 500 fixtures for both identity namespaces.
+  }, 120000);
 });
 
 describe("Hik revocation fix 2 regressions", () => {
@@ -499,7 +525,7 @@ describe("Hik revocation fix 2 regressions", () => {
     const f = await fixture();
     const snapshot = await f.snapshot();
     await f.t.run(ctx => ctx.db.delete(f.ids.memberId));
-    const entries = Array.from({ length: 30 }, (_, index) => ({ employeeId: f.ids.employeeId, cardNumber: `FROZEN-${index}` }));
+    const entries = Array.from({ length: 30 }, (_, index) => ({ employeeId: f.ids.employeeId, cardNumber: `FROZEN-${index}`, ...(index === 0 ? { employeeNo: "IMPORTED-0" } : {}) }));
     let calls = 0;
     const handler = (accessRules.reconcileHikRemovalBatch as unknown as { _handler: (ctx: MutationCtx, args: FunctionArgs<typeof internal.accessRules.reconcileHikRemovalBatch>) => Promise<void> })._handler;
     await f.t.run(async ctx => handler({ ...ctx, runMutation: new Proxy(ctx.runMutation, { apply(target, thisArg, args) {
@@ -511,7 +537,7 @@ describe("Hik revocation fix 2 regressions", () => {
     expect(continuation?.args).toEqual([{ projectId: snapshot.projectId, devices: snapshot.devices, entries: entries.slice(25) }]);
     await f.drain();
     expect(wire.remove).toHaveBeenCalledTimes(29);
-    expect((await f.operations()).filter(op => op.status === "failed")).toEqual([expect.objectContaining({ payload: expect.objectContaining({ employeeNo: "FROZEN-0" }) })]);
+    expect((await f.operations()).filter(op => op.status === "failed")).toEqual([expect.objectContaining({ payload: expect.objectContaining({ employeeNo: "IMPORTED-0" }) })]);
     const before = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
     await f.t.mutation(internal.accessRules.reconcileHikRemovalBatch, { projectId: snapshot.projectId, devices: snapshot.devices, entries: [] });
     expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toHaveLength(before.length);
@@ -597,7 +623,7 @@ describe("Hik revocation fix 2 regressions", () => {
     expect(deletions.every(op => op?.status === "failed" && op.dismissedAt === undefined)).toBe(true);
   }, 30000);
 
-  it.each(["ack", "additionCleanup"] as const)("%s reads the access graph only for a matching failed deletion", async path => {
+  it.each(["ack", "additionCleanup", "batchCleanup"] as const)("%s reads the access graph only for a matching failed deletion", async path => {
     const f = await fixture("localBridge");
     let graphQueries = 0;
     const run = async () => f.t.run(async ctx => {
@@ -611,6 +637,10 @@ describe("Hik revocation fix 2 regressions", () => {
       if (path === "additionCleanup") {
         const handler = (hikvisionSync.supersedePersonDeletions as unknown as { _handler: (ctx: MutationCtx, args: FunctionArgs<typeof internal.hikvisionSync.supersedePersonDeletions>) => Promise<unknown> })._handler;
         return handler({ ...ctx, db }, { deviceId: f.ids.deviceId, cardNumber: "OLD" });
+      }
+      if (path === "batchCleanup") {
+        const handler = (hikvisionSync.supersedePersonDeletionsBatch as unknown as { _handler: (ctx: MutationCtx, args: FunctionArgs<typeof internal.hikvisionSync.supersedePersonDeletionsBatch>) => Promise<unknown> })._handler;
+        return handler({ ...ctx, db }, { deviceId: f.ids.deviceId, cardNumbers: ["OLD", "MISSING"] });
       }
       const opId = await ctx.db.insert("hikPendingOperations", { deviceId: f.ids.deviceId, projectId: f.ids.projectId, operation: "addPerson", status: "processing", attemptCount: 1, createdAt: Date.now(), payload: { employeeId: f.ids.employeeId, employeeNo: "OLD" } });
       const handler = (hikvisionSync.ackLocalBridgeOperation as unknown as { _handler: (ctx: MutationCtx, args: FunctionArgs<typeof internal.hikvisionSync.ackLocalBridgeOperation>) => Promise<unknown> })._handler;
@@ -633,6 +663,68 @@ describe("Hik revocation fix 2 regressions", () => {
 });
 
 
+it("batch cleanup reads 1500 failed operations once for twenty current identities", async () => {
+  const f = await fixture();
+  const identities = Array.from({ length: 20 }, (_, index) => `CURRENT-${index}`);
+  await f.t.run(async ctx => {
+    const employees = [f.ids.employeeId];
+    await ctx.db.patch(f.ids.employeeId, { cardNumber: identities[0] });
+    for (let index = 1; index < 20; index++) {
+      const employeeId = await ctx.db.insert("employees", { projectId: f.ids.projectId, firstName: "Current", lastName: String(index), email: "", cardNumber: identities[index], isActive: true });
+      employees.push(employeeId);
+      await ctx.db.insert("groupMembers", { projectId: f.ids.projectId, groupId: f.ids.ruleId, employeeId, createdAt: "" });
+    }
+    for (let index = 0; index < 1500; index++) await ctx.db.insert("hikPendingOperations", {
+      deviceId: f.ids.deviceId, projectId: f.ids.projectId, operation: "deletePerson", status: "failed", attemptCount: 1, createdAt: Date.now(),
+      payload: { employeeNo: identities[index] ?? `UNRELATED-${index}`, ...(index < 20 ? { employeeId: employees[index] } : {}) },
+    });
+  });
+  let failedQueries = 0;
+  let readDocuments = 0;
+  const trackQuery = (query: object): object => new Proxy(query, { get(target, key, receiver) {
+    const value: unknown = Reflect.get(target, key, receiver);
+    if (typeof value !== "function") return value;
+    return (...args: unknown[]) => {
+      const result: unknown = Reflect.apply(value, target, args);
+      if (key === "take" || key === "unique" || key === "first") return Promise.resolve(result).then(rows => {
+        readDocuments += Array.isArray(rows) ? rows.length : rows ? 1 : 0;
+        return rows;
+      });
+      return result && typeof result === "object" ? trackQuery(result) : result;
+    };
+  } });
+  const handler = (hikvisionSync.supersedePersonDeletionsBatch as unknown as { _handler: (ctx: MutationCtx, args: FunctionArgs<typeof internal.hikvisionSync.supersedePersonDeletionsBatch>) => Promise<void> })._handler;
+  await f.t.run(async ctx => {
+    const db = new Proxy(ctx.db, { get(target, key, receiver) {
+      const value: unknown = Reflect.get(target, key, receiver);
+      if ((key === "query" || key === "get") && typeof value === "function") return (...args: unknown[]) => {
+        const result: unknown = Reflect.apply(value, target, args);
+        if (key === "get") return Promise.resolve(result).then(row => { if (row) readDocuments++; return row; });
+        if (args[0] === "hikPendingOperations") failedQueries++;
+        return result && typeof result === "object" ? trackQuery(result) : result;
+      };
+      return value;
+    } });
+    await handler({ ...ctx, db }, { deviceId: f.ids.deviceId, cardNumbers: identities });
+  });
+  expect(failedQueries).toBe(1);
+  expect(readDocuments).toBeGreaterThanOrEqual(1500);
+  expect(readDocuments).toBeLessThan(2500);
+  const operations = await f.t.run(ctx => ctx.db.query("hikPendingOperations").take(1501));
+  expect(operations.filter(op => op.status === "done")).toHaveLength(20);
+  expect(operations.filter(op => op.status === "failed")).toHaveLength(1480);
+}, 30000);
+
+it("batch addition cleanup retains a failed removal after access was revoked", async () => {
+  const f = await fixture();
+  const deletion = await f.t.run(async ctx => {
+    await ctx.db.patch(f.ids.employeeId, { isActive: false });
+    return ctx.db.insert("hikPendingOperations", { deviceId: f.ids.deviceId, projectId: f.ids.projectId, operation: "deletePerson", status: "failed", attemptCount: 1, createdAt: Date.now(), payload: { employeeId: f.ids.employeeId, employeeNo: "OLD" } });
+  });
+  await f.t.mutation(internal.hikvisionSync.supersedePersonDeletionsBatch, { deviceId: f.ids.deviceId, cardNumbers: ["OLD"] });
+  expect(await f.t.run(ctx => ctx.db.get(deletion))).toMatchObject({ status: "failed" });
+});
+
 it("a stale effective transfer result still enqueues source deletion", async () => {
   const f = await fixture("localBridge");
   const reserved = await f.t.mutation(internal.hikvisionSync.beginGatewayGrants, { employeeId: f.ids.employeeId, deviceIds: [f.ids.deviceId] });
@@ -650,4 +742,32 @@ it("a stale effective transfer result still enqueues source deletion", async () 
   expect((await f.operations()).some(op => op.operation === "deleteCard" && op.status === "pending" && (op.payload as { transferId?: string }).transferId === transferId)).toBe(true);
   expect((await f.t.run(ctx => ctx.db.get(transferId)))?.status).toBe("revoking");
   expect((await f.t.run(ctx => ctx.db.query("accessGrantStatus").first()))?.state).not.toBe("effective");
+});
+
+it.each(["remove", "inactive"] as const)("E2b: %s of a 26-member imported rule removes person IDs, including cardless people", async kind => {
+  const f = await fixture();
+  await f.t.run(async ctx => {
+    await ctx.db.patch(f.ids.employeeId, { cardNumber: "", hikEmployeeNo: "7" });
+    for (let i = 1; i < 26; i++) {
+      const employeeId = await ctx.db.insert("employees", { projectId: f.ids.projectId, firstName: "Imported", lastName: String(i), email: "", cardNumber: i % 2 ? `CARD-${i}` : "", hikEmployeeNo: `PERSON-${i}`, isActive: true });
+      await ctx.db.insert("groupMembers", { projectId: f.ids.projectId, groupId: f.ids.ruleId, employeeId, createdAt: "" });
+    }
+  });
+  if (kind === "remove") await f.admin.mutation(api.accessRules.remove, { ruleId: f.ids.ruleId });
+  else await f.admin.mutation(api.accessRules.update, { ruleId: f.ids.ruleId, isActive: false });
+  const batch = (await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).find(job => job.name.includes("reconcileHikRemovalBatch"));
+  expect(batch?.args).toMatchObject([{ entries: expect.arrayContaining([expect.objectContaining({ employeeNo: "7", cardNumber: "" })]) }]);
+  await f.drain();
+  expect(wire.remove).toHaveBeenCalledTimes(26);
+  expect(wire.remove).toHaveBeenCalledWith("local-index", "7");
+  expect(wire.remove).toHaveBeenCalledWith("local-index", "PERSON-1");
+  for (let i = 1; i < 26; i++) expect(wire.remove).toHaveBeenCalledWith("local-index", `PERSON-${i}`);
+});
+it.each(["cardNumber", "hikEmployeeNo"] as const)("D11: card cleanup ignores foreign %s and protects local numeric aliases", async field => {
+  const f = await fixture();
+  const otherId = await f.t.run(ctx => ctx.db.insert("employees", { projectId: f.ids.otherProjectId, firstName: "Other", lastName: "", email: "", cardNumber: field === "cardNumber" ? "000456" : "OTHER", ...(field === "hikEmployeeNo" ? { hikEmployeeNo: "000456" } : {}) }));
+  const args = { employeeId: f.ids.employeeId, cardNumber: "456", deviceId: f.ids.deviceId };
+  expect(await f.t.query(internal.hikvisionSync.physicalCardReassigned, args)).toBe(false);
+  await f.t.run(ctx => ctx.db.patch(otherId, { projectId: f.ids.projectId }));
+  expect(await f.t.query(internal.hikvisionSync.physicalCardReassigned, args)).toBe(true);
 });

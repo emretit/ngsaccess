@@ -119,6 +119,7 @@ onImported: (result: DeviceImportResult) => void;
   const [confirmation, setConfirmation] = useState<"import" | null>(
     null,
   );
+  const [pageCursor, setPageCursor] = useState<DeviceImportPreview["nextCursor"]>();
   const disabled = !connected || busy !== null;
   const newRows = selectablePersons(preview);
   const hasFingerprints = transfersFingerprints(
@@ -129,19 +130,20 @@ onImported: (result: DeviceImportResult) => void;
   const importSelection = personImportSelection(preview, selected);
   const selectedNos = importSelection.employeeNos;
 
-  async function readPreview() {
-    const result = await previewPersons({ deviceId: device._id });
+  async function readPreview(cursor?: DeviceImportPreview["nextCursor"]) {
+    const result = await previewPersons({ deviceId: device._id, ...(cursor ? { cursor } : {}) });
+    setPageCursor(cursor);
     setPreview(result);
     setSelected(defaultPersonSelection(result));
     setGrantFullDeviceAccess(false);
   }
-  async function showPreview() {
+  async function showPreview(cursor?: DeviceImportPreview["nextCursor"]) {
     if (disabled || running.current) return;
     running.current = true;
     onPendingChange(true);
     setBusy("preview");
     try {
-      await readPreview();
+      await readPreview(cursor);
     } catch (error) {
       notify.error("Cihaz okunamadı", errorMessage(error));
     } finally {
@@ -160,10 +162,14 @@ onImported: (result: DeviceImportResult) => void;
       const result = await importPersons({
         deviceId: device._id,
         ...importSelection,
+        ...(pageCursor ? { cursor: pageCursor } : {}),
         grantFullDeviceAccess: canManageAccess && grantFullDeviceAccess,
       });
       setConfirmation(null);
-      onImported(result);
+      if (preview?.nextCursor) {
+        setSelected([]);
+        notify.success("Sayfa aktarıldı", importResultText(result, device.name ?? "Cihaz"));
+      } else onImported(result);
       return true;
     } catch (error) {
       notify.error("Aktarım tamamlanamadı", errorMessage(error));
@@ -182,7 +188,7 @@ onImported: (result: DeviceImportResult) => void;
     {!connected && <p role="status" className="text-sm text-warning">Cihaz çevrimdışı — aktarım yapılamaz</p>}
         <div className="min-w-0 space-y-3">
           <h5 className="text-sm font-medium">Kişileri aktar</h5>
-          <Button variant="outline" disabled={disabled} onClick={showPreview}>
+          <Button variant="outline" disabled={disabled} onClick={() => showPreview()}>
             Cihazdaki kişileri göster
           </Button>
           {busy === "preview" && (
@@ -196,14 +202,14 @@ onImported: (result: DeviceImportResult) => void;
           {preview && (
             <>
               <p className="text-sm">
-                Cihazda {preview.totals.persons} kişi, {preview.totals.cards}{" "}
-                kart.
+                Cihazda {preview.totals.persons} kişi; bu sayfada {preview.rows.length} kişi ve {preview.totals.cards} kart.
               </p>
-              {preview.truncated && (
+              {preview.nextCursor && (
                 <p role="status" className="text-sm text-warning">
-                  İlk 1000 kişi gösteriliyor.
+                  Kişiler 10 kişilik sayfalarla gösterilir. Bu sayfayı aktardıktan sonra devam edebilirsiniz.
                 </p>
               )}
+              {preview.nextCursor && <Button variant="outline" disabled={disabled} onClick={() => showPreview(preview.nextCursor)}>Sonraki sayfa — devam et</Button>}
               <Table
                 framed
                 resizeKey="device-person-import"

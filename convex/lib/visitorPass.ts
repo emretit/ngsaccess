@@ -4,6 +4,7 @@ import { resolveDirection } from "./cardReadingProcess";
 import { visitorTime } from "./visitorStatus";
 import { scheduleVisitorCardRemoval } from "../visitors";
 import { isVirtualReader } from "./virtualReader";
+import { findDuplicateCard } from "./cardIdentity";
 
 export const VISITOR_TOKEN_PATTERN = /^NGSV1\.[A-Za-z0-9_-]{22}$/;
 export const PIN_PATTERN = /^\d{6}$/;
@@ -31,7 +32,7 @@ export async function generateVisitorCard(ctx: MutationCtx): Promise<string> {
     const value = crypto.getRandomValues(new Uint32Array(1))[0];
     if (!value) continue;
     const card = String(value);
-    if (!await ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", card)).first()) return card;
+    if (!await findDuplicateCard(ctx, card)) return card;
   }
   throw new Error("Sanal kart numarası üretilemedi; yeniden deneyin");
 }

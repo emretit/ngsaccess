@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { hikPersonIdentity } from "./lib/hikPersonIdentity";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
@@ -8,7 +9,7 @@ import { requirePermission } from "./lib/permissions";
 import { assertBiometricAllowed } from "./lib/biometricGate";
 import { employeeDevices } from "./fingerprintEnrollment";
 import { writeAudit } from "./lib/audit";
-import { findDuplicateCard } from "./lib/cardIdentity";
+import { hikIdentityReassigned } from "./lib/peopleHikSnapshot";
 
 /**
  * Çalışana ait yüz fotoğraf kaydı (tek kişi = tek yüz). Convex storage'a yüklenir,
@@ -48,7 +49,7 @@ async function authorize(ctx: QueryCtx & { user: Doc<"users"> }, employeeId: Id<
   await requirePermission(ctx, ctx.user, employee.projectId, "biometrics.manage");
   if (adding) {
     await assertBiometricAllowed(ctx, employee.projectId);
-    if (employee.isActive !== true || !employee.cardNumber.trim() || employee.terminationType === "transfer") throw new ConvexError("Yüz kaydı için kişi aktif ve kart numarası kayıtlı olmalıdır.");
+    if (employee.isActive !== true || !hikPersonIdentity(employee) || employee.terminationType === "transfer") throw new ConvexError("Yüz kaydı için kişi aktif ve kart numarası kayıtlı olmalıdır.");
   }
   return employee;
 }
@@ -79,7 +80,7 @@ export const listForEmployee = authedQuery({
       const stale = row && (row.status === "pending" || row.status === "processing") && !inFlight(row);
       return { _id: deviceId, name: device.name, target: targets.some(item => item._id === deviceId), status: stale || (current && row.dismissedAt !== undefined) ? "failed" : current ? row.status : "unknown", operation: row?.operation ?? null, error: stale ? "İşlem zaman aşımına uğradı; yeniden deneyin." : current ? row.lastError ?? (row.dismissedAt !== undefined ? "İşlem kapatıldı; cihaz teslimi doğrulanmadı." : null) : null };
     }));
-    return { registered: !!face, addedAt: face?.addedAt ?? null, active: employee.isActive === true && !!employee.cardNumber.trim() && employee.terminationType !== "transfer", devices: devices.filter((device): device is NonNullable<typeof device> => device !== null), busy: rows.some(row => targets.some(device => device._id === row.deviceId) && inFlight(row)) };
+    return { registered: !!face, addedAt: face?.addedAt ?? null, active: employee.isActive === true && !!hikPersonIdentity(employee) && employee.terminationType !== "transfer", devices: devices.filter((device): device is NonNullable<typeof device> => device !== null), busy: rows.some(row => targets.some(device => device._id === row.deviceId) && inFlight(row)) };
   },
 });
 
@@ -131,10 +132,10 @@ async function queueDelivery(ctx: MutationCtx, employee: Doc<"employees">, remov
     const device = await ctx.db.get(deviceId);
     if (!device || device.projectId !== employee.projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway" || !device.hikDevIndex) continue;
     const historical = rows.filter(row => row.deviceId === deviceId);
-    const identities = removing ? new Set([employee.cardNumber.trim(), ...historical.map(row => payloadOf(row).employeeNo).filter((value): value is string => typeof value === "string" && value.length > 0)]) : new Set([employee.cardNumber.trim()]);
+    const identities = removing ? new Set([hikPersonIdentity(employee), ...historical.map(row => payloadOf(row).employeeNo).filter((value): value is string => typeof value === "string" && value.length > 0)]) : new Set([hikPersonIdentity(employee)]);
     for (const employeeNo of identities) {
-      if (!employeeNo) continue;
-      if (removing && await findDuplicateCard(ctx, employeeNo, employee._id)) continue;
+      if (!employeeNo?.trim()) continue;
+      if (removing && await hikIdentityReassigned(ctx, employeeNo, device.projectId, employee._id)) continue;
       const previous = historical.find(row => payloadOf(row).employeeNo === employeeNo);
       const faceStorageId: unknown = storageId ?? (previous ? payloadOf(previous).faceStorageId : undefined);
       operationIds.push(await ctx.db.insert("hikPendingOperations", { employeeId: employee._id, deviceId, projectId: employee.projectId, operation: removing ? "deleteFace" : "addFace", payload: { employeeId: employee._id, employeeNo, replacing, ...(typeof faceStorageId === "string" ? { faceStorageId } : {}) }, status: "pending", attemptCount: 0, createdAt: Date.now() }));
@@ -201,10 +202,10 @@ export const startDelivery = internalMutation({
       const device = await ctx.db.get(row.deviceId);
       const removing = row.operation === "deleteFace";
       try {
-        if (!device?.hikDevIndex || device.projectId !== row.projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway" || typeof payload.employeeNo !== "string") throw new Error("Cihaz veya silme kimliği doğrulanamadı.");
-        if (removing && await findDuplicateCard(ctx, payload.employeeNo, args.employeeId)) throw new Error("Eski kart kimliği başka kişiye ait; yüz silinmedi.");
+        if (!device?.hikDevIndex || device.projectId !== row.projectId || device.brand !== "hikvision" || device.hikTransport !== "gateway" || typeof payload.employeeNo !== "string" || !payload.employeeNo.trim()) throw new Error("Cihaz veya silme kimliği doğrulanamadı.");
+        if (removing && await hikIdentityReassigned(ctx, payload.employeeNo, device.projectId, args.employeeId)) throw new Error("Eski kart kimliği başka kişiye ait; yüz silinmedi.");
         if (!removing) {
-          if (!employee || !face || employee.isActive !== true || employee.terminationType === "transfer" || face.pictureStorageId !== payload.faceStorageId || employee.cardNumber.trim() !== payload.employeeNo || !devices.some(item => item._id === device._id)) throw new Error("Kişi, yüz kaydı veya erişim kapsamı değişti.");
+          if (!employee || !face || employee.isActive !== true || employee.terminationType === "transfer" || face.pictureStorageId !== payload.faceStorageId || hikPersonIdentity(employee) !== payload.employeeNo || !devices.some(item => item._id === device._id)) throw new Error("Kişi, yüz kaydı veya erişim kapsamı değişti.");
           await assertBiometricAllowed(ctx, employee.projectId);
           await assertBiometricAllowed(ctx, device.projectId);
         }

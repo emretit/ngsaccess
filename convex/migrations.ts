@@ -1,3 +1,4 @@
+import { patchEmployee } from "./lib/employeeListFields";
 import { storedWorkingDays, type WeekdayName } from "./lib/workingDays";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
@@ -146,7 +147,7 @@ export const normalizeEmployeeEmails = internalMutation({
         continue;
       }
       if (employee.email !== (email ?? "")) {
-        await ctx.db.patch(employee._id, { email: email ?? "" });
+        await patchEmployee(ctx, employee._id, { email: email ?? "" });
         updated++;
       }
       const auth = await ctx.db.query("employeeAuth").withIndex("by_employee", q => q.eq("employeeId", employee._id)).first();

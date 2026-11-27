@@ -26,8 +26,8 @@ describe("08-O4/D9 CSV kapsamı", () => {
   });
   it("eşleştirme sorgusu izin kontrolünden sonra yalnız aktif proje indexini okur", async () => {
     const authorize = vi.spyOn(scope, "resolveProjectScope").mockResolvedValue([]);
-    const eq = vi.fn();
-    const chain = { withIndex: (_name: string, callback: (q: { eq: typeof eq }) => unknown) => { callback({ eq }); return chain; }, collect: async () => [] };
+    const eq = vi.fn().mockImplementation(() => ({ eq }));
+    const chain = { withIndex: (_name: string, callback: (q: { eq: typeof eq }) => unknown) => { callback({ eq }); return chain; }, take: async () => [] };
     const ctx = { user: { _id: "admin", role: "super_admin" }, db: { query: () => chain } } as unknown as QueryCtx;
     expect(await call(listLightForImport, ctx, { projectId: "active" })).toEqual([]);
     expect(authorize).toHaveBeenCalledWith(ctx, "active");

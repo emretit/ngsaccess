@@ -8,7 +8,7 @@ export function cardNumericKey(card: string): string | null {
   return /^[0-9]+$/.test(card) ? card.replace(/^0+/, "") || "0" : null;
 }
 
-/** Existing by_card index only: exact card, canonical decimal, then padded forms up to 20 digits. */
+/** Physical cards and imported Hik person IDs share the device identity namespace. */
 export async function findDuplicateCard(
   ctx: Pick<QueryCtx, "db">,
   card: string,
@@ -20,14 +20,15 @@ export async function findDuplicateCard(
     for (let length = key.length; length <= 20; length++) variants.add(key.padStart(length, "0"));
   }
   for (const variant of variants) {
-    const matches = ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", variant));
-    for await (const employee of matches) {
+    const matches = await ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", variant)).take(2);
+    const personMatches = await ctx.db.query("employees").withIndex("by_hikEmployeeNo", q => q.eq("hikEmployeeNo", variant)).take(2);
+    for (const employee of [...matches, ...personMatches]) {
       if (employee._id !== excludeId) return employee;
     }
   }
   return null;
 }
 
-export function cardConflictMessage(card: string, duplicate: Pick<Doc<"employees">, "cardNumber">, exactMessage: string): string {
-  return duplicate.cardNumber === card ? exactMessage : NUMERIC_CARD_CONFLICT;
+export function cardConflictMessage(card: string, duplicate: Pick<Doc<"employees">, "cardNumber" | "hikEmployeeNo">, exactMessage: string): string {
+  return duplicate.cardNumber === card || duplicate.hikEmployeeNo === card ? exactMessage : NUMERIC_CARD_CONFLICT;
 }

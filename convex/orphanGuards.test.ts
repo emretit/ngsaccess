@@ -210,12 +210,11 @@ describe("deleted relations remain removable", () => {
           await handler(operation.fn)(f.ctx, operation.args);
           expect(f.remove).toHaveBeenCalledWith("target");
           for (const id of ["member-link", "device-link", "door-link"]) expect(f.remove).toHaveBeenCalledWith(id);
-          if (missing === "employee") expect(reconcileRemovedEmployeeHik).not.toHaveBeenCalled();
-          else expect(reconcileRemovedEmployeeHik).toHaveBeenCalledWith(f.ctx, "employee", expect.objectContaining({ devices: [] }));
+          // This fixture has no Hik employee number or card, so no device identity is captured.
+          expect(reconcileRemovedEmployeeHik).not.toHaveBeenCalled();
           // No Hik target survives these IDE/deleted-device fixtures; do not fabricate a delete.
           expect(f.schedule).not.toHaveBeenCalled();
-          if (missing === "employee" && operation.name === "accessRules.remove") expect(reconcileRemovedEmployeeIde).not.toHaveBeenCalled();
-          else expect(reconcileRemovedEmployeeIde).toHaveBeenCalled();
+          expect(reconcileRemovedEmployeeIde).not.toHaveBeenCalled();
         });
       }
     }

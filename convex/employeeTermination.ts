@@ -1,3 +1,4 @@
+import { insertEmployee, patchEmployee } from "./lib/employeeListFields";
 import { reconcileEmployeeDepartmentRules } from "./lib/departmentAccess";
 import { recordDepartmentChange } from "./lib/employeeDepartmentHistory";
 import { requirePermission } from "./lib/permissions";
@@ -34,7 +35,7 @@ async function accessibleEmployee(ctx: MutationCtx & { user: Doc<"users"> }, emp
 export async function closeAccess(ctx: MutationCtx, employee: Doc<"employees">, now: string, transferDevices?: Doc<"devices">[], transferId?: Id<"accessTransfers">) {
   // Panelleri aktif erişim grafından, pasife çekmeden önce çöz.
   const deviceIds = await resolveEmployeeIdeDeviceIds(ctx, employee._id, employee.projectId);
-  await ctx.db.patch(employee._id, { isActive: false, deactivatedAt: trTodayKey(), updatedAt: now });
+  await patchEmployee(ctx, employee._id, { isActive: false, deactivatedAt: trTodayKey(), updatedAt: now });
   await revokeEmployeeSessions(ctx, employee._id);
   await scheduleFingerprintPurge(ctx, employee._id, employee.cardNumber, { deleteTemplates: true });
   if (transferDevices && transferId) {
@@ -84,7 +85,7 @@ export const terminate = authedMutation({
     const now = new Date().toISOString();
     const { employeeId, ...details } = args;
     const updates = { ...details, terminatedAt: now, terminatedBy: ctx.user._id, updatedAt: now };
-    await ctx.db.patch(employeeId, updates);
+    await patchEmployee(ctx, employeeId, updates);
     if (args.employmentEndDate < today) {
       await closeAccess(ctx, employee, now);
     } else {
@@ -104,7 +105,7 @@ export const reinstate = authedMutation({
     await assertNoEmployeeTransfer(ctx, employeeId);
     if (employee.terminationType === "transfer") transferError("TRANSFER_REINSTATE_FORBIDDEN", "Başka projeye taşınmış kişi geri alınamaz. Aktif taşıma varsa taşıma ekranından iptal edin.");
     if (!employee.employmentEndDate) throw new ConvexError("Bu kişi işten ayrılmamış.");
-    await ctx.db.patch(employeeId, {
+    await patchEmployee(ctx, employeeId, {
       employmentEndDate: undefined, terminationType: undefined, terminationReason: undefined,
       sgkExitCode: undefined, terminatedAt: undefined, terminatedBy: undefined,
       isActive: true, deactivatedAt: undefined, updatedAt: new Date().toISOString(),
@@ -188,7 +189,7 @@ export const startTransfer = authedMutation({
     for (const device of devices.values()) if (deviceConnection(device, Date.now()) !== "online") transferError("TRANSFER_DEVICE_OFFLINE", `Taşıma başlatılamadı. ${device.name} cihazını çevrimiçi yapın.`);
     await invalidateTransferAdditions(ctx, employee, [...devices.values()]);
     const now = new Date().toISOString();
-    const targetEmployeeId = await ctx.db.insert("employees", {
+    const targetEmployeeId = await insertEmployee(ctx, {
       projectId: args.targetProjectId, firstName: employee.firstName, lastName: employee.lastName,
       email: normalizeEmployeeEmail(employee.email) ?? "", tcNo: employee.tcNo, payrollCode: employee.payrollCode,
       photoUrl: employee.photoUrl, photoStorageId: employee.photoStorageId, notes: employee.notes,
@@ -207,7 +208,7 @@ export const startTransfer = authedMutation({
       if (device.brand !== "hikvision" && device.brand !== "ide_smart") continue;
       await ctx.db.insert("accessTransferTargets", { transferId, employeeId: employee._id, deviceId: device._id, brand: device.brand, state: "pending", updatedAt: Date.now() });
     }
-    await ctx.db.patch(employee._id, { isActive: false, employmentEndDate: trTodayKey(), terminationType: "transfer", terminatedAt: now, terminatedBy: ctx.user._id, transferredToEmployeeId: targetEmployeeId, updatedAt: now });
+    await patchEmployee(ctx, employee._id, { isActive: false, employmentEndDate: trTodayKey(), terminationType: "transfer", terminatedAt: now, terminatedBy: ctx.user._id, transferredToEmployeeId: targetEmployeeId, updatedAt: now });
     await closeAccess(ctx, employee, now, [...devices.values()], transferId);
     for (const member of memberships) await ctx.db.delete(member._id);
     for (const table of ["employeeSessions", "employeeAuth"] as const) {
@@ -242,8 +243,8 @@ async function finishTransfer(ctx: MutationCtx, transferId: Id<"accessTransfers"
   }
   await ctx.db.patch(transferId, { status: "provisioning" });
   const now = new Date().toISOString();
-  await ctx.db.patch(source._id, { cardNumber: "", transferredCardNumber: transfer.cardNumber, updatedAt: now });
-  await ctx.db.patch(target._id, { cardNumber: transfer.cardNumber, departmentId: transfer.targetPlan.departmentId, companyId, updatedAt: now });
+  await patchEmployee(ctx, source._id, { cardNumber: "", transferredCardNumber: transfer.cardNumber, updatedAt: now });
+  await patchEmployee(ctx, target._id, { cardNumber: transfer.cardNumber, departmentId: transfer.targetPlan.departmentId, companyId, updatedAt: now });
   await recordDepartmentChange(ctx, target._id);
   await reconcileEmployeeDepartmentRules(ctx, target._id);
   for (const ruleId of transfer.targetPlan.accessRuleIds) await upsertGroupMembership(ctx, target._id, ruleId, transfer.targetProjectId);
@@ -279,7 +280,7 @@ export const cancelTransfer = authedMutation({
         for (const op of ops) if (op.opType === "deleteUser" && operationPayload(op.payload).employeeId === source._id) await ctx.db.patch(op._id, { status: "acked", ackedAt: Date.now(), lastError: "Taşıma iptal edildi" });
       }
     }
-    await ctx.db.patch(source._id, { employmentEndDate: undefined, terminationType: undefined, terminationReason: undefined, sgkExitCode: undefined, terminatedAt: undefined, terminatedBy: undefined, transferredToEmployeeId: undefined, isActive: true, deactivatedAt: undefined, updatedAt: new Date().toISOString() });
+    await patchEmployee(ctx, source._id, { employmentEndDate: undefined, terminationType: undefined, terminationReason: undefined, sgkExitCode: undefined, terminatedAt: undefined, terminatedBy: undefined, transferredToEmployeeId: undefined, isActive: true, deactivatedAt: undefined, updatedAt: new Date().toISOString() });
     for (const ruleId of transfer.sourceAccessRuleIds) {
       const rule = await ctx.db.get(ruleId);
       if (rule?.projectId === source.projectId) await upsertGroupMembership(ctx, source._id, ruleId, source.projectId);

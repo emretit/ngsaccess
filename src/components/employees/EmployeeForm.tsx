@@ -235,6 +235,7 @@ export default function EmployeeForm({
             <EmployeeFormFields
               canViewPay={can("pay.view")}
               isVisitor={employee?.isVisitor}
+              accessExpiresAtInstant={currentEmployee?.accessExpiresAt}
               autoFocusFirstName={autoFocusFirstName}
               isEditing={!!employee}
               originalDepartmentId={employee?.departmentId ?? null}

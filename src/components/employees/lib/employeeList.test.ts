@@ -5,6 +5,7 @@ import {
   clampPage,
   filterAndSortEmployees,
   safeSearchParam,
+  employeeDepartmentScope,
 } from "./employeeList";
 const person = (name: string, extra: Partial<Employee> = {}): Employee => ({
   _id: name as Id<"employees">,
@@ -14,6 +15,15 @@ const person = (name: string, extra: Partial<Employee> = {}): Employee => ({
   cardNumber: "001",
   isActive: true,
   ...extra,
+});
+
+it("includes recursive descendants only when selected, tolerating cycles", () => {
+  const departments = [{ _id: "parent" }, { _id: "child", parentId: "parent" }, { _id: "grandchild", parentId: "child" }, { _id: "other" }];
+  expect(employeeDepartmentScope("parent", false, departments)).toEqual(["parent"]);
+  expect(employeeDepartmentScope("parent", true, departments)).toEqual(["parent", "child", "grandchild"]);
+  const rows = [person("A", { departmentId: "parent" as Id<"departments"> }), person("B", { departmentId: "grandchild" as Id<"departments"> }), person("C")];
+  expect(filterAndSortEmployees(rows, "", "parent", "all", "name:asc", { departmentIds: employeeDepartmentScope("parent", true, departments) }).map(row => row.firstName)).toEqual(["A", "B"]);
+  expect(employeeDepartmentScope("parent", true, [{ _id: "parent", parentId: "child" }, { _id: "child", parentId: "parent" }])).toEqual(["parent", "child"]);
 });
 describe("personel liste sözleşmesi", () => {
   it("Türkçe arama ve bordro; TC aranmaz", () => {

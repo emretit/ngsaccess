@@ -229,6 +229,20 @@ beforeEach(() => {
   });
 });
 
+it("loads the next page only on explicit continuation and imports using that page's cursor", async () => {
+  seedPreview();
+  const cursor = { position: 10, searchID: "page-search" };
+  mocks.states[2] = { ...preview, nextCursor: cursor };
+  mocks.preview.mockResolvedValue({ ...preview, rows: [{ ...preview.rows[0], employeeNo: "11" }], totals: { persons: 11, cards: 0 } });
+  render();
+  expect(mocks.preview).not.toHaveBeenCalled();
+  await mocks.buttons.get("Sonraki sayfa — devam et")?.();
+  expect(mocks.preview).toHaveBeenCalledExactlyOnceWith({ deviceId: "device", cursor });
+  render();
+  await confirm("import");
+  expect(mocks.importPersons).toHaveBeenCalledWith({ deviceId: "device", employeeNos: ["11"], cursor, grantFullDeviceAccess: false });
+});
+
 it("biyometri yetkisi yokken not gösterir ve parmak izsiz aktarır", async () => {
   seedPreview();
   mocks.permissions = ["devices.manage", "employees.manage"];
@@ -271,14 +285,14 @@ it("yeni kişi yokken tablo ve açıklama kalır; elle eşleştir ve kısaltma u
   seedPreview([]);
   mocks.states[2] = {
     ...preview,
-    truncated: true,
+    nextCursor: { position: 10, searchID: "page-search" },
     rows: [{ ...preview.rows[0], status: "manual", reason: "Kart no farklı" }],
   };
   const html = render();
   expect(html).toContain("Cihazdaki kişiler");
   expect(html).toContain("Aktarılacak kişi veya yeni parmak izi yok.");
   expect(html).toContain("Elle eşleştir");
-  expect(html).toContain("İlk 1000 kişi gösteriliyor.");
+  expect(html).toContain("Kişiler 10 kişilik sayfalarla gösterilir.");
   expect(html).not.toContain(
     "Seçilen kişilerin parmak izleri de cihazdan aktarılır.",
   );

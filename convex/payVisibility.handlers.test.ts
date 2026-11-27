@@ -62,6 +62,7 @@ function fixture(role: typeof roles[number], overrides: Doc<"employees">[] = emp
     const chain = {
       withIndex: (_name: string, configure: (range: typeof index) => unknown) => { configure(index); return chain; },
       filter: () => chain, order: () => chain,
+      async *[Symbol.asyncIterator]() { yield* rows; },
       take: async (limit: number) => rows.slice(0, limit), collect: async () => [...rows], first: async () => rows[0] ?? null, unique: async () => rows[0] ?? null,
     };
     return chain;
@@ -85,6 +86,13 @@ describe.each(roles)("%s public pay responses", (role) => {
       expect(row.hourlyRate).toBe(visible ? employees[i].hourlyRate : null);
       expect(row.monthlySalary).toBe(visible ? employees[i].monthlySalary : null);
     });
+  });
+  it("never exposes private list indexing fields through list or person detail", async () => {
+    const privateFields = { deviceSyncUpdatedAt: 123, listVersion: 2, listOrgSignature: "internal", listSearch: "private", listKeys: { nameAsc: "key", emailAsc: "key", cardAsc: "key", companyAsc: "key", departmentAsc: "key", positionAsc: "key", statusAsc: "key" } };
+    const ctx = fixture(role, employees.map(employee => ({ ...employee, ...privateFields })));
+    const listed = await invoke<FunctionReturnType<typeof api.employees.list>>(employeesList, ctx, { projectId });
+    const person = await invoke<FunctionReturnType<typeof api.employees.getById>>(getById, ctx, { employeeId: employees[0]._id });
+    for (const row of [...listed, person]) for (const field of Object.keys(privateFields)) expect(row).not.toHaveProperty(field);
   });
   it("employees.getById masks both fields and preserves project/orphan access", async () => {
     const ctx = fixture(role);

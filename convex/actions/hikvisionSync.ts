@@ -4,6 +4,8 @@ import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 import { authedAction } from "../lib/customFunctions";
+import { hikPersonIdentity } from "../lib/hikPersonIdentity";
+import { hikSnapshotValidator } from "../lib/peopleHikSnapshot";
 import {
   makeProjectGuard,
   bridgeDedupeKey,
@@ -16,7 +18,28 @@ import type { Id } from "../_generated/dataModel";
 import {
   addFaceToDevice,
   deleteFaceFromDevice,
+  deleteCardFromDevice,
 } from "../lib/hikGateway";
+
+/** Replacing an imported person's physical card never deletes their person record. */
+export const deleteEmployeeCardOnlyInternal = internalAction({
+  args: { employeeId: v.id("employees"), cardNumber: v.string(), snapshot: hikSnapshotValidator },
+  handler: async (ctx, args) => {
+    const employee = await ctx.runQuery(internal.devices.getEmployeeByIdInternal, { employeeId: args.employeeId });
+    if (!employee || employee.cardNumber === args.cardNumber) return;
+    for (const device of args.snapshot.devices) {
+      const reassigned: boolean = await ctx.runQuery(internal.hikvisionSync.physicalCardReassigned, { employeeId: args.employeeId, cardNumber: args.cardNumber, deviceId: device._id });
+      if (reassigned) continue;
+      const result = device.hikTransport === "gateway" && device.hikDevIndex
+        ? await deleteCardFromDevice(device.hikDevIndex, args.cardNumber)
+        : { ok: false, error: "Bu bağlantıda kişiyi koruyarak kart kaldırma desteklenmiyor" };
+      if (!result.ok) await ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
+        deviceId: device._id, projectId: args.snapshot.projectId, operation: "deleteCard",
+        lastError: result.error ?? "Eski kart kaldırılamadı", payload: { employeeId: args.employeeId, cardNumber: args.cardNumber, cardOnly: true },
+      });
+    }
+  },
+});
 
 /**
  * Çalışanı erişim gruplarındaki tüm cihazlara senkronize eder.
@@ -75,17 +98,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
     syncAfter: v.optional(v.boolean()),
     runId: v.optional(v.id("deviceSyncRuns")),
     targetDeviceIds: v.optional(v.array(v.id("devices"))),
-    snapshot: v.optional(v.object({
-      cardNumber: v.string(),
-      projectId: v.optional(v.id("projects")),
-      devices: v.array(v.object({
-        _id: v.id("devices"), name: v.string(),
-        brand: v.optional(v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart"))),
-        projectId: v.optional(v.id("projects")), hikDevIndex: v.optional(v.string()),
-        hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
-        hikDoorCount: v.optional(v.number()),
-      })),
-    })),
+    snapshot: v.optional(hikSnapshotValidator),
     allowedProjectIds: v.optional(v.array(v.id("projects"))),
   },
   handler: async (
@@ -99,7 +112,9 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
     } : await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
-    if (!data?.employee.cardNumber) {
+    if (!data) return { removed: 0, queued: 0, failed: 0, errors: [] };
+    const employeeNo = args.snapshot ? hikPersonIdentity({ hikEmployeeNo: args.snapshot.employeeNo, cardNumber: args.snapshot.cardNumber }) : hikPersonIdentity(data.employee);
+    if (!employeeNo) {
       return { removed: 0, queued: 0, failed: 0, errors: [] };
     }
     if (!isAllowed(data.employee.projectId)) {
@@ -126,7 +141,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
     const results = await Promise.all(
       targets.map(async (t) => {
         try {
-          const r = await removeScopedPerson(ctx, t.device, args.employeeId, data.employee.cardNumber, args.runId);
+          const r = await removeScopedPerson(ctx, t.device, args.employeeId, employeeNo, args.runId, data.employee.cardNumber);
           return { ...r, target: t };
         } catch {
           return { ok: false, error: "Silme hedefi işlenemedi; cihazda kalmış olabilir", target: t };
@@ -156,7 +171,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
           projectId: r.target.device.projectId,
           operation: "deletePerson",
           lastError: errMsg,
-          payload: { employeeId: args.employeeId, employeeNo: data.employee.cardNumber, cardNumber: data.employee.cardNumber },
+          payload: { employeeId: args.employeeId, employeeNo, cardNumber: data.employee.cardNumber },
         }),
       );
     }
@@ -262,7 +277,9 @@ export const deleteEmployeeFingerprintFromDevicesInternal = internalAction({
   ): Promise<{ removed: number; failed: number; errors: string[] }> => {
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: args.employeeId });
     if (!data || !makeProjectGuard(args.allowedProjectIds)(data.employee.projectId)) return { removed: 0, failed: 0, errors: [] };
-    await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: args.employeeId, employeeNo: data.employee.cardNumber, fingerNo: args.fingerPrintID });
+    const employeeNo = hikPersonIdentity(data.employee);
+    if (!employeeNo) return { removed: 0, failed: 0, errors: [] };
+    await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: args.employeeId, employeeNo, fingerNo: args.fingerPrintID });
     return { removed: 0, failed: 0, errors: [] };
   },
 });

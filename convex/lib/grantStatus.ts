@@ -1,4 +1,5 @@
 import { effectiveSchedule, toIdePermissionSegments } from "./accessSchedule";
+import { hikPersonIdentity } from "./hikPersonIdentity";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -102,14 +103,21 @@ export async function departmentGrantCandidates(
 
 export type GrantResult = {
   projectId: Id<"projects">; employeeId: Id<"employees">; deviceId: Id<"devices">;
-  expectedGeneration?: number; state: GrantState; ruleIds?: Id<"accessRules">[]; lastError?: string; lastRunId?: Id<"deviceSyncRuns">; lastOperationId?: string;
+  expectedGeneration?: number; expectedGrantId?: Id<"accessGrantStatus">; state: GrantState; ruleIds?: Id<"accessRules">[]; lastError?: string; lastRunId?: Id<"deviceSyncRuns">; lastOperationId?: string;
 };
 /** Runs inside the caller's existing transaction; never deletes history. */
 export async function upsertGrantStatus(ctx: MutationCtx, args: GrantResult,
-  options?: { gatewayReservation?: boolean },
-): Promise<{ reconcile: { employeeId: Id<"employees">; deviceId: Id<"devices">; projectId: Id<"projects"> } } | undefined> {
-  const { expectedGeneration, ...fields } = args;
-  const current = await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId)).unique();
+  options?: { gatewayReservation?: boolean; deviceSnapshot?: Doc<"devices"> },
+): Promise<{ generation?: number; grantId?: Id<"accessGrantStatus">; reconcile?: { employeeId: Id<"employees">; deviceId: Id<"devices">; projectId: Id<"projects"> } } | undefined> {
+  const { expectedGeneration, expectedGrantId, ...fields } = args;
+  const current = expectedGrantId ? await ctx.db.get(expectedGrantId)
+    : await ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId)).unique();
+  if (current && (current.employeeId !== args.employeeId || current.deviceId !== args.deviceId)) {
+    await writeAudit(ctx, { user: null, projectId: args.projectId, action: "update", targetTable: "accessGrantStatus", targetId: current._id,
+      newValue: { employeeId: args.employeeId, deviceId: args.deviceId, reason: "grant_target_mismatch" },
+      note: "Grant rezervasyonu hedefle uyuşmuyor; satır atlandı" });
+    return;
+  }
   const transferSource = args.state === "effective" || args.state === "removed" ? await ctx.db.get(args.employeeId) : null;
   const sourceRun = await sourceTransfer(ctx, transferSource);
   if (args.state === "effective") {
@@ -156,12 +164,15 @@ export async function upsertGrantStatus(ctx: MutationCtx, args: GrantResult,
       if (!operation || !deletionMatchesTransfer(operation, transfer)) return;
     }
   }
-  const [employee, device, existing] = await Promise.all([
-    args.state === "effective" || args.state === "removed" ? Promise.resolve(transferSource) : ctx.db.get(args.employeeId), ctx.db.get(args.deviceId),
-    ctx.db.query("accessGrantStatus").withIndex("by_employee_device", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId)).unique(),
+  // The current grant is transaction-local and already read above. Re-reading
+  // it per phase made large gateway batches scan the same index six times/pair.
+  const existing = current;
+  const [employee, device] = await Promise.all([
+    args.state === "effective" || args.state === "removed" ? Promise.resolve(transferSource) : ctx.db.get(args.employeeId),
+    options?.deviceSnapshot ? Promise.resolve(options.deviceSnapshot) : ctx.db.get(args.deviceId),
   ]);
-  if (!device || device.projectId !== args.projectId || (employee && employee.projectId !== args.projectId)) return;
-  const ruleIds = args.ruleIds ?? (args.state === "pending" && employee
+  if (!device || device._id !== args.deviceId || device.projectId !== args.projectId || (employee && employee.projectId !== args.projectId)) return;
+  const ruleIds = args.ruleIds ?? (options?.gatewayReservation ? existing?.ruleIds ?? [] : args.state === "pending" && employee
     ? (await employeeGrantGraph(ctx, employee)).get(args.deviceId)?.ruleIds ?? []
     : existing?.ruleIds ?? []);
   const now = Date.now();
@@ -170,9 +181,10 @@ export async function upsertGrantStatus(ctx: MutationCtx, args: GrantResult,
   const value = { ...fields, reconciliationScheduled, syncGeneration: (existing?.syncGeneration ?? 0) + 1, ruleIds: [...new Set(ruleIds)], departmentId: employee ? employee.departmentId : existing?.departmentId,
     lastError: args.state === "failed" ? (args.lastError ?? "Cihaz işlemi başarısız").slice(0, 2000) : undefined,
     appliedAt: args.state === "effective" ? now : existing?.appliedAt, updatedAt: now };
+  const grantId = existing?._id ?? await ctx.db.insert("accessGrantStatus", value);
   if (existing) await ctx.db.patch(existing._id, value);
-  else await ctx.db.insert("accessGrantStatus", value);
   if (args.state === "removed") await updateTransferTarget(ctx, args.employeeId, args.deviceId, "confirmed");
+  return { generation: value.syncGeneration, grantId };
 }
 
 /** Old operations without employeeId are intentionally ignored. No extra function call. */
@@ -187,7 +199,7 @@ export async function grantStatusForOperation(ctx: MutationCtx, op: {
   const deletion = op.opType === "deleteUser" || op.operation === "deletePerson" || op.operation === "deleteCard";
   if (deletion) {
     const employee = await ctx.db.get(employeeId);
-    const credential = payload.ideUserId ?? payload.cardNumber ?? payload.employeeNo;
+    const credential = op.operation === "deletePerson" ? payload.employeeNo ?? payload.cardNumber : payload.ideUserId ?? payload.cardNumber ?? payload.employeeNo;
     // A returned visitor card retains the operation's old identity and owner.
     // A genuinely new card must still be protected from delayed old-card cleanup.
     const returnedSuffix = `:${employeeId}`;
@@ -195,7 +207,7 @@ export async function grantStatusForOperation(ctx: MutationCtx, op: {
     const ownedCard = employee?.isVisitor && cardNumber?.startsWith("IADE:") && cardNumber.endsWith(returnedSuffix)
       ? cardNumber.slice(5, -returnedSuffix.length) : cardNumber;
     const currentCredential = typeof payload.ideUserId === "number"
-      ? Number(ownedCard) : ownedCard;
+      ? Number(ownedCard) : op.operation === "deletePerson" ? hikPersonIdentity({ hikEmployeeNo: employee?.hikEmployeeNo, cardNumber: ownedCard }) : ownedCard;
     if (employee && credential !== undefined && String(credential) !== String(currentCredential)) return;
   }
   const transfer = deletion && state === "removed" ? await sourceTransfer(ctx, await ctx.db.get(employeeId)) : null;

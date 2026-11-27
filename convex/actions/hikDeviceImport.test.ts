@@ -7,7 +7,13 @@ import schema from "../schema";
 import { decryptTemplate } from "../lib/fingerprintCrypto";
 const wire = vi.hoisted(() => ({ persons: vi.fn(), cards: vi.fn(), fingers: vi.fn(), templates: vi.fn(), push: vi.fn() }));
 vi.mock("../lib/gateway/persons", async original => ({ ...await original<typeof import("../lib/gateway/persons")>(), searchPersonOnDevice: wire.persons }));
-vi.mock("../lib/gateway/cards", () => ({ readImportCardsPage: wire.cards }));
+vi.mock("../lib/gateway/core", async original => ({
+  ...await original<typeof import("../lib/gateway/core")>(),
+  gatewayApiCall: async (_path: string, _method: string, body: { CardInfoSearchCond: { EmployeeNoList: { employeeNo: string }[] } }) => {
+    const data = await wire.cards(body.CardInfoSearchCond.EmployeeNoList[0]?.employeeNo);
+    return { status: 200, data: { CardInfoSearch: { CardInfo: data.cards, totalMatches: data.total ?? data.cards.length, numOfMatches: data.cards.length } } };
+  },
+}));
 vi.mock("../lib/gateway/biometrics", async original => ({ ...await original<typeof import("../lib/gateway/biometrics")>(), searchFingerprintsOnDevice: wire.fingers, readFingerprintTemplates: wire.templates, addFingerprintToDevice: wire.push }));
 const modules = { ...Object.fromEntries(Object.entries(import.meta.glob("../**/*.ts")).map(([key, value]) => [key.replace(/^\.\.\//, "./"), value])), ...Object.fromEntries(Object.entries(import.meta.glob("./*.ts")).map(([key, value]) => [key.replace(/^\.\//, "./actions/"), value])) };
 async function fixture() {
@@ -34,6 +40,15 @@ beforeEach(() => {
   wire.push.mockResolvedValue({ ok: true });
 });
 describe("Hik device import", () => {
+  it("limits each full-access rule sync to the people created in that page", async () => {
+    const f = await fixture();
+    for (const employeeNo of ["10", "11"]) await f.t.mutation(internal.hikDeviceImport.createPersons, { deviceId: f.deviceId, userId: f.userId, grantFullDeviceAccess: true, persons: [{ employeeNo, name: "Imported Person", cards: [], fingerCount: 0, valid: { enable: false } }] });
+    const jobs = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+    expect(jobs).toHaveLength(2);
+    const people = await f.t.run(ctx => ctx.db.query("employees").collect());
+    expect(jobs[0].args).toMatchObject([{ targetEmployeeIds: [people[0]._id] }]);
+    expect(jobs[1].args).toMatchObject([{ targetEmployeeIds: [people[1]._id] }]);
+  });
   it("previews metadata only, with no database writes or template reads", async () => {
     const f = await fixture();
     const preview = await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId });
@@ -51,7 +66,7 @@ describe("Hik device import", () => {
     const employees = await f.t.run(ctx => ctx.db.query("employees").collect());
     expect(employees).toHaveLength(1);
     const employee = employees[0];
-    expect(employee).toMatchObject({ firstName: "Okan", lastName: "ISMAN", email: "", cardNumber: "1", hikCardless: true, isActive: true, projectId: f.projectId });
+    expect(employee).toMatchObject({ firstName: "Okan", lastName: "ISMAN", email: "", cardNumber: "", hikEmployeeNo: "1", hikCardless: true, isActive: true, projectId: f.projectId });
     const templates = await f.t.query(internal.employeeFingerprints.listInternal, { employeeId: employee._id });
     expect(templates).toHaveLength(1);
     expect(JSON.stringify(templates)).not.toContain("sensitive-template");
@@ -93,7 +108,8 @@ it("users with device/person management but no biometric management import peopl
     if (membership) await ctx.db.patch(membership._id, { role: "technician" });
     await ctx.db.insert("projectRolePermissions", { projectId: f.projectId, role: "technician", permissions: ["devices.manage", "employees.manage"], updatedAt: Date.now(), updatedBy: f.userId });
   });
-  expect(await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, { deviceId: f.deviceId, employeeNos: ["1"] })).toMatchObject({ created: 1, fingerprintsStored: 0, fingerprintsSkipped: 1 });
+  expect(await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, { deviceId: f.deviceId, employeeNos: ["1"] })).toMatchObject({ created: 1, fingerprintsStored: 0, fingerprintsSkipped: 0 });
+  expect(wire.fingers).not.toHaveBeenCalled();
   expect(wire.templates).not.toHaveBeenCalled();
 });
 
@@ -110,17 +126,19 @@ it("one person's template failure does not stop the remaining people or their fi
   warn.mockRestore();
 });
 
-it("drains person and card pages of 30 and truncates only after the first 1000 people", async () => {
+it("reads at most ten people per call and resumes at its cursor without rescanning", async () => {
   const { readDevicePersons } = await import("./hikDeviceImport");
-  wire.cards.mockImplementation(async (_index: string, position: number) => ({ cards: position ? [{ employeeNo: "31", cardNo: "31" }] : [], total: 1, hasMore: position === 0, nextPosition: position + 30 }));
-  wire.persons.mockImplementation(async (_index: string, options: { searchResultPosition: number; maxResults: number }) => ({ ok: true, total: 1001, persons: Array.from({ length: Math.min(30, 1001 - options.searchResultPosition) }, (_, index) => ({ employeeNo: String(options.searchResultPosition + index + 1), name: "Person" })), nextPosition: options.searchResultPosition + 30 }));
-  const data = await readDevicePersons("ANKA001");
-  expect(data.persons).toHaveLength(1000);
-  expect(data).toMatchObject({ totals: { persons: 1001, cards: 1 }, truncated: true });
-  expect(data.persons[30]).toMatchObject({ employeeNo: "31", cards: ["31"] });
-  expect(wire.persons).toHaveBeenCalledTimes(34);
-  expect(wire.cards).toHaveBeenCalledTimes(2);
-  expect(wire.persons.mock.calls.every(call => call[1].maxResults === 30)).toBe(true);
+  wire.persons.mockImplementation(async (_index: string, options: { searchResultPosition: number; maxResults: number }) => ({ ok: true, total: 1001, persons: Array.from({ length: options.maxResults }, (_, index) => ({ employeeNo: String(options.searchResultPosition + index + 1), name: "Person" })), nextPosition: options.searchResultPosition + options.maxResults }));
+  const first = await readDevicePersons("ANKA001");
+  expect(first.persons).toHaveLength(10);
+  expect(first.nextCursor).toMatchObject({ position: 10 });
+  expect(wire.persons).toHaveBeenCalledTimes(1);
+  expect(wire.cards).toHaveBeenCalledTimes(10);
+  const second = await readDevicePersons("ANKA001", undefined, first.nextCursor);
+  expect(second.persons[0].employeeNo).toBe("11");
+  expect(wire.persons).toHaveBeenCalledTimes(2);
+  expect(wire.persons.mock.calls.every(call => call[1].maxResults === 10)).toBe(true);
+  expect(wire.persons.mock.calls[1][1].searchID).toBe(wire.persons.mock.calls[0][1].searchID);
 });
 
 it("transfers matched person's missing encrypted template and preserves rows on retry", async () => {
@@ -255,4 +273,55 @@ it("new active people store templates without creating access or scheduling deli
   expect(await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect())).toEqual([]);
   expect(await f.t.run(ctx => ctx.db.query("accessRules").collect())).toEqual([]);
   expect(await f.t.run(ctx => ctx.db.query("groupMembers").collect())).toEqual([]);
+});
+
+it("imports ANKA001's four cardless people and eight fingerprints in one bounded page", async () => {
+  const f = await fixture();
+  wire.persons.mockResolvedValue({ ok: true, total: 4, nextPosition: 4, persons: ["Okan ISMAN", "Cinar ZONGUR", "Bengu AYDIN", "Mustafa Bingeloglu"].map((name, index) => ({ employeeNo: String(index + 1), name, Valid: { enable: false } })) });
+  wire.fingers.mockResolvedValue({ ok: true, fingerprints: [{ fingerPrintID: "6" }, { fingerPrintID: "7" }], hasMore: false });
+  wire.templates.mockResolvedValue([6, 7].map(fingerPrintID => ({ fingerPrintID, fingerData: "sensitive-template" })));
+  expect(await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, { deviceId: f.deviceId, employeeNos: ["1", "2", "3", "4"] })).toMatchObject({ created: 4, fingerprintsStored: 8, fingerprintsSkipped: 0 });
+  const people = await f.t.run(ctx => ctx.db.query("employees").collect());
+  expect(people.map(person => person.hikEmployeeNo)).toEqual(["1", "2", "3", "4"]);
+  expect(people.every(person => person.cardNumber === "" && person.hikCardless)).toBe(true);
+  expect(wire.persons).toHaveBeenCalledTimes(1);
+  expect(wire.cards).toHaveBeenCalledTimes(4);
+  expect(wire.templates).toHaveBeenCalledTimes(4);
+});
+
+it("metadata failure preserves the person preview and never leaks a template", async () => {
+  const f = await fixture();
+  wire.fingers.mockRejectedValue(new Error("metadata unavailable"));
+  const result = await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId });
+  expect(result.rows).toHaveLength(1);
+  expect(wire.templates).not.toHaveBeenCalled();
+});
+
+it("respects existing fingerprint slots before the batched write", async () => {
+  const f = await fixture();
+  await f.t.run(async ctx => {
+    const employeeId = await ctx.db.insert("employees", { projectId: f.projectId, firstName: "Ada", lastName: "Test", email: "", cardNumber: "1", isActive: true });
+    for (const fingerPrintID of [1, 2, 3, 4]) await ctx.db.insert("employeeFingerprints", { employeeId, projectId: f.projectId, fingerPrintID, encData: "e", iv: "i", keyVersion: "v1", addedAt: 1 });
+  });
+  wire.templates.mockResolvedValue([6, 7].map(fingerPrintID => ({ fingerPrintID, fingerData: "sensitive-template" })));
+  expect(await f.caller.action(api.actions.hikDeviceImport.importDevicePersons, { deviceId: f.deviceId, employeeNos: ["1"] })).toMatchObject({ matched: 1, fingerprintsStored: 1, fingerprintsSkipped: 1 });
+  expect(await f.t.run(ctx => ctx.db.query("employeeFingerprints").collect())).toHaveLength(5);
+});
+
+it("shows a manual matching warning for people with more than two cards", async () => {
+  const f = await fixture();
+  wire.cards.mockResolvedValue({ cards: ["1", "2", "3"].map(cardNo => ({ employeeNo: "1", cardNo })), total: 100 });
+  const result = await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId });
+  expect(result.rows[0]).toMatchObject({ status: "manual", reason: expect.stringContaining("elle eşleştirilmeli") });
+  expect(wire.cards).toHaveBeenCalledTimes(1);
+});
+
+it("applies the shared physical card limit to device imports without constraining cardless person IDs", async () => {
+  const f = await fixture();
+  const employeeNo = "1".repeat(21);
+  wire.persons.mockResolvedValue({ ok: true, total: 1, nextPosition: 1, persons: [{ employeeNo, name: "Ada Test" }] });
+  wire.cards.mockResolvedValue({ cards: [{ employeeNo, cardNo: employeeNo }], total: 1 });
+  expect((await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId })).rows[0]).toMatchObject({ status: "manual", reason: expect.stringContaining("20 hane") });
+  wire.cards.mockResolvedValue({ cards: [], total: 0 });
+  expect((await f.caller.action(api.actions.hikDeviceImport.previewDeviceImport, { deviceId: f.deviceId })).rows[0]).toMatchObject({ status: "new" });
 });

@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { resolveEmployeeIdeDeviceIds, reconcileRemovedEmployeeIde } from "./accessGraph";
 import { snapshotEmployeeHikDevices, reconcileRemovedEmployeeHik } from "./peopleHikSnapshot";
+import { canSyncEmployeeToDevices } from "./employeeUx";
 
 export const departmentSelectionValidator = v.object({ departmentId: v.id("departments"), includeChildren: v.boolean() });
 export type DepartmentSelection = Infer<typeof departmentSelectionValidator>;
@@ -84,7 +85,9 @@ export async function reconcileEmployeeDepartmentRules(ctx: MutationCtx, employe
     if (groupMembers.length >= MAX_MEMBERS) throw new ConvexError(`Kural kişi sınırı aşıldı (${MAX_MEMBERS})`);
     await ctx.db.insert("groupMembers", { projectId, groupId, employeeId, source: "department", createdAt: now });
   }
-  await reconcileRemovedEmployeeHik(ctx, employeeId, hik);
-  await reconcileRemovedEmployeeIde(ctx, { employeeId, projectId, candidatePanels: ide });
-  await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+  if (canSyncEmployeeToDevices(employee, employee.hikEmployeeNo)) {
+    await reconcileRemovedEmployeeHik(ctx, employeeId, hik);
+    await reconcileRemovedEmployeeIde(ctx, { employeeId, projectId, candidatePanels: ide });
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+  }
 }

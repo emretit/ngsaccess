@@ -1,3 +1,4 @@
+import { insertEmployee } from "./lib/employeeListFields";
 /**
  * Tek seferlik seed: Kart okuyucu testi için cihaz + çalışan + erişim grubu.
  * Convex Dashboard → Functions → seedCardReaderTest.run → Run (args: {}) ile çalıştır.
@@ -49,7 +50,7 @@ export const run = internalMutation({
       .first();
     let employeeId = existingEmployee?._id;
     if (!employeeId) {
-      employeeId = await ctx.db.insert("employees", {
+      employeeId = await insertEmployee(ctx, {
         projectId,
         firstName: "Test",
         lastName: "Kullanıcı",

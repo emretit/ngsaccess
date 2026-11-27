@@ -13,7 +13,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import type { FunctionArgs } from "convex/server";
 
 type UpdateArgs = FunctionArgs<typeof api.employees.update>;
-const DIFFABLE = ["projectId", "firstName", "lastName", "email", "tcNo", "cardNumber", "payrollCode", "companyId", "departmentId", "positionId", "shiftId", "shift", "notes", "isActive", "hourlyRate", "monthlySalary", "accessStartsAt"] as const satisfies readonly (keyof EmployeeFormData & keyof UpdateArgs)[];
+const DIFFABLE = ["projectId", "firstName", "lastName", "email", "tcNo", "cardNumber", "payrollCode", "companyId", "departmentId", "positionId", "shiftId", "shift", "notes", "isActive", "hourlyRate", "monthlySalary", "accessStartsAt", "accessExpiresAt"] as const satisfies readonly (keyof EmployeeFormData & keyof UpdateArgs)[];
 
 /**
  * Düzenlemede yalnız kullanıcının taslakta değiştirdiği alanlar gönderilir: form açıkken başka yerde
@@ -55,9 +55,6 @@ export const useEmployeeFormSubmit = (
   const sendSetupEmail = useAction(
     api.actions.sendEmail.sendEmployeeSetupEmail,
   );
-  const syncToDevices = useAction(
-    api.actions.hikvisionSync.syncEmployeeToDevices,
-  );
 
   // Form gönderildiği anda employee._id'yi snapshot al — sheet kapanırken
   // parent state temizlenirse closure'daki employee null olabilir.
@@ -76,6 +73,7 @@ export const useEmployeeFormSubmit = (
 
       const sharedPayload = {
         ...(!employee?.isVisitor ? { accessStartsAt: parsed.data.accessStartsAt ? new Date(`${parsed.data.accessStartsAt}T00:00:00+03:00`).toISOString() : null } : {}),
+        ...(!employee?.isVisitor ? { accessExpiresAt: parsed.data.accessExpiresAt ? new Date(`${parsed.data.accessExpiresAt}T23:59:59.999+03:00`).toISOString() : null } : {}),
         firstName: parsed.data.firstName.trim(),
         lastName: parsed.data.lastName.trim(),
         email: parsed.data.email.trim().toLowerCase(),
@@ -155,18 +153,7 @@ export const useEmployeeFormSubmit = (
         append("Kişi kartsız kaydedildi. Kişi listesinden Toplu kart ata ile kart atayabilirsiniz.");
         return;
       }
-      if (!can("accessRules.manage")) return;
-      try {
-        const result = await syncToDevices({ employeeId: savedId });
-        append(
-          `Cihaz gönderimi: ${result.synced} başarılı, ${result.failed} başarısız. Cihaz teslimi henüz doğrulanmadı.`,
-        );
-        for (const error of result.errors) append(errorMessage(error));
-      } catch (error: unknown) {
-        append(
-          `Cihaz gönderimi tamamlanamadı: ${errorMessage(error)}`,
-        );
-      }
+      append("Gerekli cihaz gönderimleri sunucuda kuyruğa alındı. Teslim durumunu cihaz senkron sorunlarından izleyebilirsiniz.");
     },
     { error: "Personel kaydedilemedi" },
   );

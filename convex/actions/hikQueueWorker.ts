@@ -1,5 +1,6 @@
 "use node";
 
+import { hikPersonIdentity } from "../lib/hikPersonIdentity";
 import { accessEndsAtMs } from "../lib/accessEnd";
 import { ConvexError, v } from "convex/values";
 import { hikBackfillContinuationFields } from "../lib/gateway/backfillState";
@@ -147,11 +148,12 @@ async function executeOperation(
     case "updatePerson": {
       if (payload.rightsOnly === true) return await ctx.runAction(internal.actions.hikvisionSync.syncDoorRightsOperation, { operationId: c._id, retrying: true });
       const employee = c.employee;
-      if (!employee?.cardNumber) return { ok: false, error: "Çalışan veya kart numarası yok" };
+      const employeeNo = employee ? hikPersonIdentity(employee) : undefined;
+      if (!employee || !employeeNo) return { ok: false, error: "Çalışan veya cihaz kişi kimliği yok" };
       const planTemplateNo = payload.planTemplateNo;
       if (typeof planTemplateNo !== "number") return await retryPersonFromRules(ctx, c, payload.employeeId);
       const result = await upsertPersonToDevice(devIndex, {
-        employeeNo: employee.cardNumber,
+        employeeNo,
         name: `${employee.firstName} ${employee.lastName}`,
         planTemplateNo,
         doorCount: c.device.hikDoorCount,
@@ -172,9 +174,11 @@ async function executeOperation(
     }
     case "addCard": {
       const employee = c.employee;
-      if (!employee?.cardNumber) return { ok: false, error: "Çalışan veya kart numarası yok" };
+      const employeeNo = employee ? hikPersonIdentity(employee) : undefined;
+      if (!employeeNo || !employee?.cardNumber) return { ok: false, error: "Çalışan veya kart numarası yok" };
+      if (employee.hikCardless === true) return { ok: true };
       const r = await addCardToDevice(devIndex, {
-        employeeNo: employee.cardNumber,
+        employeeNo,
         cardNo: employee.cardNumber,
         cardType: "normalCard",
       });
@@ -189,7 +193,7 @@ async function executeOperation(
       return await deleteCardFromDevice(devIndex, cardNo);
     }
     case "deleteFace": {
-      const employeeNo = payload.employeeNo ?? payload.cardNumber ?? c.employee?.cardNumber;
+      const employeeNo = payload.employeeNo ?? payload.cardNumber ?? (c.employee ? hikPersonIdentity(c.employee) : undefined);
       if (typeof employeeNo !== "string" || !employeeNo.trim()) return { ok: false, error: "Çalışan veya kart numarası yok" };
       return await deleteFaceFromDevice(devIndex, employeeNo);
     }
@@ -203,7 +207,7 @@ async function executeOperation(
       return await ctx.runAction(internal.actions.hikFingerprint.pushFingerprintToDevices, { employeeId: employeeId as Id<"employees">, fingerNo, deviceIds: [c.device._id], retrying: true });
     }
     case "deleteFingerprint": {
-      const employeeNo = c.employee?.cardNumber;
+      const employeeNo = c.employee ? hikPersonIdentity(c.employee) : undefined;
       const fingerPrintID = payload.fingerPrintID as number | undefined;
       if (!employeeNo) return { ok: false, error: "Çalışan veya kart numarası yok" };
       return await deleteFingerprintFromDevice(devIndex, employeeNo, fingerPrintID);

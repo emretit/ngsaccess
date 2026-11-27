@@ -5,7 +5,7 @@ import type { Doc } from "../../../../convex/_generated/dataModel";
 
 // Ortak Employee sözleşmesini değiştirmeden schema alanlarını koru.
 export type EmploymentEmployee = Employee & Pick<Doc<"employees">,
-  "employmentEndDate" | "terminationType" | "terminationReason" | "sgkExitCode" | "isVisitor">;
+  "employmentEndDate" | "terminationType" | "terminationReason" | "sgkExitCode" | "isVisitor" | "accessExpiresAt">;
 
 export const terminationLabels = {
   resignation: "İstifa", employerTermination: "İşveren feshi", retirement: "Emeklilik",

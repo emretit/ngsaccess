@@ -1,3 +1,4 @@
+import { hikPersonIdentity } from "./hikPersonIdentity";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
@@ -13,12 +14,12 @@ import { beginPersonDeletionInTransaction, enqueueLocalBridgeOperationInTransact
 /** Snapshot graph, applied grants, pending deletions, and roster-only IDE cards.
  * Every read has a project/identity index and fails closed at its explicit budget. */
 export async function snapshotTransferDevices(ctx: ReadCtx, employee: Doc<"employees">): Promise<Doc<"devices">[]> {
-  if (!employee.cardNumber || !employee.projectId) return [];
+  if (!hikPersonIdentity(employee) || !employee.projectId) return [];
   const projectId = employee.projectId;
   const devices = new Map<Id<"devices">, Doc<"devices">>();
   const add = async (id: Id<"devices">) => {
     const device = await ctx.db.get(id);
-    if (device && device.projectId === employee.projectId && (device.brand === "hikvision" || device.brand === "ide_smart")) devices.set(id, device);
+    if (device && device.projectId === employee.projectId && (device.brand === "hikvision" || device.brand === "ide_smart" && !!employee.cardNumber?.trim())) devices.set(id, device);
   };
   const hik = await snapshotEmployeeHikDevices(ctx, employee);
   for (const device of hik.devices) await add(device._id);
@@ -101,15 +102,17 @@ export async function transferPreflightData(ctx: ReadCtx, user: Doc<"users">, em
 
 /** Persist every deletion in the start transaction; a scheduled action is not proof of a job. */
 export async function enqueueTransferDeletion(ctx: MutationCtx, employee: Doc<"employees">, device: Doc<"devices">, transferId: Id<"accessTransfers">): Promise<void> {
-  if (!employee.cardNumber || !employee.projectId || device.projectId !== employee.projectId) transferError("TRANSFER_IDENTITY_CHANGED", "Silme kimliği veya cihazın projesi değişti. Taşımayı yeniden başlatın.");
+  const employeeNo = hikPersonIdentity(employee);
+  if (!employeeNo) return;
+  if (!employee.projectId || device.projectId !== employee.projectId) transferError("TRANSFER_IDENTITY_CHANGED", "Silme kimliği veya cihazın projesi değişti. Taşımayı yeniden başlatın.");
   if (device.brand === "ide_smart") {
     const ideUserId = Number(employee.cardNumber);
     if (!Number.isSafeInteger(ideUserId) || ideUserId < 1) transferError("TRANSFER_INVALID_IDE_CARD", "IDE panelindeki kart numarası geçersiz. Kart bilgisini düzeltin.");
     await enqueueIdeOpInTransaction(ctx, { deviceId: device._id, projectId: employee.projectId, opType: "deleteUser", payload: { transferId, employeeId: employee._id, ideUserId }, maxAttempts: 50, forceNew: true });
   } else if (device.brand === "hikvision" && device.hikTransport === "localBridge") {
-    await enqueueLocalBridgeOperationInTransaction(ctx, { deviceId: device._id, projectId: employee.projectId, operation: "deleteCard", forceNew: true, payload: { transferId, employeeId: employee._id, employeeNo: employee.cardNumber, cardNumber: employee.cardNumber } });
+    await enqueueLocalBridgeOperationInTransaction(ctx, { deviceId: device._id, projectId: employee.projectId, operation: "deleteCard", forceNew: true, payload: { transferId, employeeId: employee._id, employeeNo, cardNumber: employee.cardNumber } });
   } else if (device.brand === "hikvision") {
-    const id: Id<"hikPendingOperations"> = await beginPersonDeletionInTransaction(ctx, { deviceId: device._id, projectId: employee.projectId, employeeId: employee._id, cardNumber: employee.cardNumber, transferId });
+    const id: Id<"hikPendingOperations"> = await beginPersonDeletionInTransaction(ctx, { deviceId: device._id, projectId: employee.projectId, employeeId: employee._id, cardNumber: employee.cardNumber, employeeNo, transferId });
     await ctx.scheduler.runAfter(0, internal.actions.hikQueueWorker.processHikOperation, { issueId: id });
   }
 }

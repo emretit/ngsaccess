@@ -17,6 +17,7 @@ export interface EmployeeFormData {
   cardNumber: string;
   payrollCode: string;
   accessStartsAt?: string;
+  accessExpiresAt?: string;
   companyId: Id<"companies"> | null;
   departmentId: Id<"departments"> | null;
   positionId: Id<"positions"> | null;
@@ -32,7 +33,7 @@ export interface EmployeeFormData {
   projectId?: Id<"projects">;
 }
 
-export function employeeFormValues(employee?: Employee | null, projectId?: Id<"projects">): EmployeeFormData {
+export function employeeFormValues(employee?: (Employee & { accessExpiresAt?: string }) | null, projectId?: Id<"projects">): EmployeeFormData {
   return {
     firstName: employee?.firstName || "",
     lastName: employee?.lastName || "",
@@ -41,6 +42,7 @@ export function employeeFormValues(employee?: Employee | null, projectId?: Id<"p
     cardNumber: employee?.cardNumber || "",
     payrollCode: employee?.payrollCode || "",
     accessStartsAt: employee?.accessStartsAt ? new Date(Date.parse(employee.accessStartsAt) + 3 * 3600000).toISOString().slice(0, 10) : "",
+    accessExpiresAt: employee?.accessExpiresAt ? new Date(Date.parse(employee.accessExpiresAt) + 3 * 3600000).toISOString().slice(0, 10) : "",
     companyId: employee?.companyId ?? null,
     departmentId: employee?.departmentId ?? null,
     positionId: employee?.positionId ?? null,

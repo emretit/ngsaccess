@@ -31,7 +31,8 @@ it.each([false, true])("K-10: import result offers manual resync only with devic
     expect(state.resync).toHaveBeenCalledTimes(1);
   } else {
     expect(html).not.toContain(">Cihazlara gönder<");
-    expect(html).toContain("Kişiler cihazlara otomatik gönderilecek");
+    expect(html).toContain("Kartlı kişiler cihazlara otomatik gönderilecek");
+    expect(html).toContain("Toplu kart atama");
     state.clicks.get("Kapat")?.();
     expect(close).toHaveBeenCalledWith(false);
   }

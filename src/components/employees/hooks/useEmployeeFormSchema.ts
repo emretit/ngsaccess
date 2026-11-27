@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { isValidTurkishIdentityNumber } from "../../../../convex/lib/employeeImportValidation";
 import { cardKey, TC_NO_INVALID_MESSAGE } from "../../../../convex/lib/employeeUx";
+import { cardNumberError } from "../../../../convex/lib/cardNumberRules";
 
 const EMAIL_SCHEMA = z.email();
 
-export const employeeFormSchema = z
+const employeeFormBase = z
   .object({
     firstName: z.string().trim().min(1, "Ad alanı zorunludur"),
     lastName: z.string().trim().min(1, "Soyad alanı zorunludur"),
@@ -30,8 +31,14 @@ export const employeeFormSchema = z
       Number.isFinite(Date.parse(value)) &&
       new Date(value).toISOString().slice(0, 10) === value
     ), "Geçerli bir erişim başlangıcı tarihi girin"),
+    accessExpiresAt: z.string().optional().refine(value => !value || (
+      /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value
+    ), "Geçerli bir erişim bitişi tarihi girin"),
   })
   .superRefine((data, ctx) => {
+    if (data.accessStartsAt && data.accessExpiresAt && data.accessExpiresAt < data.accessStartsAt) {
+      ctx.addIssue({ code: "custom", message: "Erişim bitişi başlangıçtan önce olamaz", path: ["accessExpiresAt"] });
+    }
     if (data.tcNo && data.tcNo.trim()) {
       const trimmed = data.tcNo.trim();
       if (!isValidTurkishIdentityNumber(trimmed)) {
@@ -44,11 +51,20 @@ export const employeeFormSchema = z
     }
   });
 
+function withCardValidation(existingCardNumber?: string) {
+  return employeeFormBase.superRefine((data, ctx) => {
+    // Imported credentials must not lock unrelated profile edits.
+    if (existingCardNumber !== undefined && data.cardNumber === existingCardNumber.trim()) return;
+    const message = cardNumberError(data.cardNumber, { allowEmpty: true });
+    if (message) ctx.addIssue({ code: "custom", message, path: ["cardNumber"] });
+  });
+}
+export const employeeFormSchema = withCardValidation();
 export type EmployeeFormSchemaInput = z.infer<typeof employeeFormSchema>;
 
 /** A card may be assigned later, but an existing credential cannot be removed here. */
 export function employeeFormSchemaFor(existingCardNumber?: string) {
-  return employeeFormSchema.refine(
+  return withCardValidation(existingCardNumber).refine(
     data => !existingCardNumber || !cardKey(existingCardNumber) || cardKey(data.cardNumber) !== undefined,
     { message: "Kart numarası zorunludur", path: ["cardNumber"] },
   );

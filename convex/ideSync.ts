@@ -17,6 +17,28 @@ import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scanIdeSync, assertSyncScope } from "./lib/syncStatusScope";
 import { canRetrySync, syncDismissPatch } from "./lib/syncStatusLogic";
+import { internal } from "./_generated/api";
+
+/** Invalid credentials are visible IDE failures and never bridge-ready payloads. */
+export const recordEmployeeCardFailures = internalMutation({
+  args: { employeeId: v.id("employees"), deviceIds: v.array(v.id("devices")), lastError: v.string(), runId: v.optional(v.id("deviceSyncRuns")) },
+  handler: async (ctx, args) => {
+    if (args.deviceIds.length > 100) throw new Error("IDE hata hedef sınırı aşıldı");
+    const employee = await ctx.db.get(args.employeeId);
+    if (!employee) return;
+    for (const deviceId of new Set(args.deviceIds)) {
+      const device = await ctx.db.get(deviceId);
+      if (!device || device.brand !== "ide_smart" || device.projectId !== employee.projectId) continue;
+      const idempotencyKey = `${deviceId}:invalidCard:${args.employeeId}`;
+      const previous = await ctx.db.query("idePendingOperations").withIndex("by_idempotency", q => q.eq("idempotencyKey", idempotencyKey)).order("desc").first();
+      const value = { deviceId, projectId: employee.projectId, runId: args.runId, opType: "upsertUser" as const,
+        payload: { employeeId: args.employeeId, errorCode: "card_invalid" }, status: "failed" as const,
+        lastError: args.lastError, idempotencyKey, attempts: 0, createdAt: Date.now() };
+      if (previous) await ctx.db.patch(previous._id, { ...value, dismissedAt: undefined, dismissedBy: undefined });
+      else await ctx.db.insert("idePendingOperations", value);
+    }
+  },
+});
 
 /**
  * Delete op'unun "kayıt zaten yok" yanıtı (idempotent). Yalnız markAck'in delete dalında
@@ -322,6 +344,10 @@ export async function enqueueIdeOpInTransaction(ctx: MutationCtx, args: {
       }
     }
     const lastError = doorError ? "Kapı aktüatörü çözülemedi; kuralın kapı seçimini ve ioId değerlerini düzeltin" : undefined;
+    if (!doorError && args.opType === "upsertUser" && typeof payload.employeeId === "string") {
+      const validationFailure = await ctx.db.query("idePendingOperations").withIndex("by_idempotency", q => q.eq("idempotencyKey", `${args.deviceId}:invalidCard:${payload.employeeId}`)).order("desc").first();
+      if (validationFailure?.status === "failed") await ctx.db.patch(validationFailure._id, { status: "acked", ackedAt: Date.now(), lastError: undefined, dismissedAt: undefined, responseMessage: "Kart doğrulandı; güncel kayıt IDE kuyruğuna alındı" });
+    }
     if (doorError) payload = { ...payload, errorCode: "door_io_unresolved" };
     const idempotencyKey = `${args.deviceId}:${args.opType}:${targetKey(args.opType, payload)}${args.runId ? `:${args.runId}` : ""}`;
     const now = Date.now();
@@ -970,6 +996,12 @@ export const retrySyncIssue = authedMutation({
     await requirePermission(ctx, ctx.user, op.projectId ?? device?.projectId, "devices.manage");
     if (op.opType === "openDoor" || mobileOperationId(op.payload) !== undefined) return { queued: false };
     const payload: unknown = op.payload;
+    if (payload && typeof payload === "object" && (payload as Record<string, unknown>).errorCode === "card_invalid") {
+      const employeeId = ctx.db.normalizeId("employees", String((payload as Record<string, unknown>).employeeId));
+      if (!employeeId) throw new Error("Kişi bulunamadı");
+      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId, targetDeviceIds: [op.deviceId] });
+      return { queued: true };
+    }
     if (payload && typeof payload === "object" && (payload as Record<string, unknown>).errorCode === "door_io_unresolved") {
       throw new Error("Kapı aktüatörünü düzeltip kuralı yeniden gönderin");
     }

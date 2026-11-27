@@ -12,6 +12,14 @@ describe("employee import validation", () => {
   it("detects file duplicates across identifiers", () => {
     expect(findDuplicateImportRows([valid, { ...valid, rowNumber: 3, email: "ADA@example.com", cardNumber: "A-2" }]).get(3)).toContain("E-posta");
   });
+  it("allows blank cards without treating them as duplicate identities", () => {
+    const rows = ["", "  "].map((cardNumber, index) => ({ ...valid, rowNumber: index + 2, tcNo: undefined, email: "", cardNumber }));
+    expect(rows.map(validateEmployeeImportRow)).toEqual([[], []]);
+    expect(findDuplicateImportRows(rows).size).toBe(0);
+  });
+  it.each(["A B", "A!", "a".repeat(129), "1".repeat(21)])("uses the shared card format rules for %s", cardNumber => {
+    expect(validateEmployeeImportRow({ ...valid, cardNumber })).toHaveLength(1);
+  });
   it("normalizes Turkish dotted and dotless I consistently", () => {
     expect(normalizeEmployeeImportName(" İŞ  Güvenliği ")).toBe(normalizeEmployeeImportName("iş güvenliği"));
   });

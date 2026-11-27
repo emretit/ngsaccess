@@ -1,3 +1,4 @@
+import { insertEmployee, patchEmployee } from "./lib/employeeListFields";
 import { v } from "convex/values";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
@@ -102,7 +103,7 @@ export const create = employeeAuthedMutation({
     if ((notice.version && (!args.noticeReviewed || notice.version !== args.noticeVersion)) ||
         (!notice.version && args.noticeVersion)) throw visitorError("VISITOR_NOTICE_CHANGED");
     const now = new Date().toISOString();
-    const id = await ctx.db.insert("employees", {
+    const id = await insertEmployee(ctx, {
       ...data, projectId, hostEmployeeId: ctx.employee._id, isVisitor: true,
       isActive: false, visitorStatus: "preRegistered", cardNumber: `PRE:${crypto.randomUUID()}`,
       email: `preregistered-${crypto.randomUUID()}@ngsaccess.local`,
@@ -121,7 +122,7 @@ export const update = employeeAuthedMutation({
     const visitor = await ownInvitation(ctx, ctx.employee, args.visitorId);
     if (!editableInvitation(visitor)) throw visitorError("VISITOR_LOCKED");
     const { visitorPhone, notes, ...requiredData } = normalizedInvitation(args);
-    await ctx.db.patch(visitor._id, { ...requiredData,
+    await patchEmployee(ctx, visitor._id, { ...requiredData,
       ...(args.visitorPhone !== undefined ? { visitorPhone } : {}),
       ...(args.notes !== undefined ? { notes } : {}), updatedAt: new Date().toISOString() });
     return { id: visitor._id };
@@ -135,7 +136,7 @@ export const cancel = employeeAuthedMutation({
     if (visitor.visitorStatus === "checkedOut" && visitor.isActive === false) return { status: "cancelled" as const };
     // Hosts cannot revoke operator-assigned cards or impersonate physical exits.
     if (!editableInvitation(visitor)) return { status: "operatorRequired" as const };
-    await ctx.db.patch(visitor._id, { isActive: false, visitorStatus: "checkedOut", updatedAt: new Date().toISOString() });
+    await patchEmployee(ctx, visitor._id, { isActive: false, visitorStatus: "checkedOut", updatedAt: new Date().toISOString() });
     return { status: "cancelled" as const };
   },
 });

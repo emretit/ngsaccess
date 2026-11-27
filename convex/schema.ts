@@ -133,6 +133,15 @@ export default defineSchema({
     tcNo: v.optional(v.string()),
     cardNumber: v.string(),
     hikCardless: v.optional(v.boolean()),
+    hikEmployeeNo: v.optional(v.string()),
+    deviceSyncUpdatedAt: v.optional(v.number()),
+    listVersion: v.optional(v.number()),
+    listOrgSignature: v.optional(v.string()),
+    listSearch: v.optional(v.string()),
+    listKeys: v.optional(v.object({
+      nameAsc: v.string(), emailAsc: v.string(), companyAsc: v.string(), departmentAsc: v.string(),
+      positionAsc: v.string(), cardAsc: v.string(), statusAsc: v.string(),
+    })),
     payrollCode: v.optional(v.string()),
     departmentId: v.optional(v.id("departments")),
     companyId: v.optional(v.id("companies")),
@@ -191,6 +200,15 @@ export default defineSchema({
   })
     .index("by_active_employment_end", ["isActive", "employmentEndDate"])
     .index("by_project", ["projectId"])
+    .index("by_project_hikEmployeeNo", ["projectId", "hikEmployeeNo"])
+    .index("by_hikEmployeeNo", ["hikEmployeeNo"])
+    .index("by_project_nameAsc", ["projectId", "listKeys.nameAsc"])
+    .index("by_project_emailAsc", ["projectId", "listKeys.emailAsc"])
+    .index("by_project_companyAsc", ["projectId", "listKeys.companyAsc"])
+    .index("by_project_departmentAsc", ["projectId", "listKeys.departmentAsc"])
+    .index("by_project_positionAsc", ["projectId", "listKeys.positionAsc"])
+    .index("by_project_cardAsc", ["projectId", "listKeys.cardAsc"])
+    .index("by_project_statusAsc", ["projectId", "listKeys.statusAsc"])
     .index("by_email", ["email"])
     .index("by_card", ["cardNumber"])
     .index("by_tc", ["tcNo"])

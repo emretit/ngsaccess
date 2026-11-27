@@ -9,6 +9,8 @@ import { authedAction } from "../lib/customFunctions";
 import { isProjectAllowed } from "../lib/auth";
 import type { Id } from "../_generated/dataModel";
 import { buildIdePermissionRecord, capPermissionNos, ideUserAccessWindow, outOfRangeIoIds } from "../ideSync";
+import { cardNumberError } from "../lib/cardNumberRules";
+import { cardKey } from "../lib/employeeUx";
 
 /** Audit only executed commands; never persist gateway payloads or card lists. */
 async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; error?: string; operationId?: string }>(
@@ -125,21 +127,42 @@ export const syncEmployeeToIdePanels = internalAction({
     });
     if (!data) return { ok: false, queued: 0, skipped: [], opIds: [], error: "Çalışan bulunamadı" };
     if (data.employee.visitorCredential === "pass") return { ok: true, queued: 0, skipped: [], opIds: [] };
+    if (!cardKey(data.employee.cardNumber)) return { ok: true, queued: 0, skipped: [], opIds: [] };
 
     // IDE paneline bağlı (kural×cihaz) çiftleri. Hiç yoksa sessiz no-op: Hikvision-only
     // kurulumda her employee mutation'ı boşa IDE push tetiklemesin.
     const ideRules = data.deviceRules.filter((dr) => dr.device.brand === "ide_smart" && (!args.targetDeviceIds || args.targetDeviceIds.includes(dr.device._id)));
     if (ideRules.length === 0) return { ok: true, queued: 0, skipped: [], opIds: [] };
 
+    // Older imports may already have an IDE user under the placeholder card.
+    // Revoke it on every sync, including deactivation and validity changes.
+    if (data.employee.hikCardless === true) {
+      let queued = 0;
+      for (const deviceId of new Set(ideRules.map(({ device }) => device._id))) {
+        if (await ctx.runMutation(internal.accessRules.enqueueIdeUserRemoval, {
+          employeeId: args.employeeId, cardNumber: data.employee.cardNumber,
+          deviceId, projectId: data.employee.projectId, runId: args.runId,
+        })) queued++;
+      }
+      return { ok: true, queued, skipped: [], opIds: [] };
+    }
+
     // Kart no doğrulaması yalnızca gerçekten IDE paneli VARSA anlamlı.
     const cardNo = Number(data.employee.cardNumber);
-    if (!Number.isSafeInteger(cardNo) || cardNo < 1) {
+    const cardError = cardNumberError(data.employee.cardNumber, { deviceBrand: "ide_smart" });
+    if (cardError) {
+      // Scheduler return values are invisible to the person form. Persist the
+      // rejection through the existing issue banner before returning.
+      const deviceIds = [...new Set(ideRules.map(({ device }) => device._id))];
+      await ctx.runMutation(internal.ideSync.recordEmployeeCardFailures, {
+        employeeId: args.employeeId, deviceIds, lastError: cardError, runId: args.runId,
+      });
       return {
         ok: false,
         queued: 0,
         skipped: [],
         opIds: [],
-        error: `Kart numarası IDE için sayısal olmalı (${data.employee.cardNumber})`,
+        error: cardError,
       };
     }
     const status: 0 | 1 = data.employee.isActive === false ? 0 : 1;

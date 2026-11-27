@@ -61,3 +61,11 @@ it("sends an epoch only when its date changed, including a deliberate clear", ()
   expect(onlyChangedFields({ employeeId, accessStartsAt: "2026-10-31T21:00:00.000Z" }, baseline, JSON.stringify(baseline))).toEqual({ employeeId });
   expect(onlyChangedFields({ employeeId, accessStartsAt: null }, { ...baseline, accessStartsAt: "" }, JSON.stringify(baseline))).toEqual({ employeeId, accessStartsAt: null });
 });
+
+it("preserves an imported end instant until the end date is actually edited", () => {
+  const employee = { _id: employeeId, firstName: "Ada", lastName: "Test", email: "", cardNumber: "", accessExpiresAt: "2026-12-01T22:30:00Z" };
+  const initial = employeeFormValues(employee);
+  expect(initial.accessExpiresAt).toBe("2026-12-02");
+  expect(onlyChangedFields({ employeeId, accessExpiresAt: "2026-12-02T20:59:59.999Z" }, initial, JSON.stringify(initial))).toEqual({ employeeId });
+  expect(onlyChangedFields({ employeeId, accessExpiresAt: null }, { ...initial, accessExpiresAt: "" }, JSON.stringify(initial))).toEqual({ employeeId, accessExpiresAt: null });
+});

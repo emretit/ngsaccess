@@ -13,7 +13,7 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { assertSameProject, validatePay, validateEmployeeText, employeeDependentTables, assertEmployeeBulkDeleteLimit, canSyncEmployeeToDevices } from "./lib/employeeUx";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { ConvexError, v } from "convex/values";
+import { ConvexError, v, type ObjectType } from "convex/values";
 import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -25,6 +25,13 @@ import { revokeEmployeeSessions, writeEmployeePassword } from "./lib/employeeAut
 import { visitorSensitiveFields } from "./lib/visitorStatus";
 import { cardConflictMessage, findDuplicateCard } from "./lib/cardIdentity";
 import { assertNoEmployeeTransfer } from "./lib/transferGuard";
+import { cardNumberError } from "./lib/cardNumberRules";
+import { paginationOptsValidator } from "convex/server";
+import { loadEmployeeOrganizations, patchEmployee, insertEmployee, publicEmployee } from "./lib/employeeListFields";
+import { employeeSortFields, EMPLOYEE_LIST_VERSION } from "./lib/employeeListShared";
+import { employeeDepartmentScope, filterAndSortEmployees } from "./lib/employeeListShared";
+
+import { employeeListReady, employeeRowsForCounts, readIndexedEmployeePage } from "./lib/employeeListPage";
 
 import { normalizeEmployeeEmail } from "./lib/employeeEmail";
 export { normalizeEmployeeEmail };
@@ -36,6 +43,17 @@ function assertEmployeeRecord(emp: Doc<"employees">) {
   });
 }
 
+/** Deployment preparation only: caller must explicitly authorize execution; never auto-scheduled. */
+export const backfillListFields = internalMutation({
+  args: { projectId: v.id("projects"), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", args.projectId))
+      .paginate({ ...args.paginationOpts, numItems: Math.min(100, Math.max(1, args.paginationOpts.numItems)), maximumRowsRead: 100 });
+    for (const emp of page.page) await patchEmployee(ctx, emp._id, {}, true);
+    return { isDone: page.isDone, continueCursor: page.continueCursor, updated: page.page.length };
+  },
+});
+
 /** Employee form dates are stored at the inclusive start of their Turkey calendar day. */
 export function normalizeEmployeeAccessStart(value: string | null | undefined): string | undefined {
   if (value == null) return undefined;
@@ -43,6 +61,15 @@ export function normalizeEmployeeAccessStart(value: string | null | undefined): 
   if (!iso) throw new Error("Erişim başlangıcı geçerli bir ISO tarih olmalıdır");
   const day = trDateKey(iso);
   return trDayRangeISO(day, day).startISO;
+}
+
+/** Keep the exact imported/device instant; employee date inputs submit the inclusive TR end of day. */
+export function normalizeEmployeeAccessEnd(value: string | null | undefined, start?: string): string | undefined {
+  if (value == null) return undefined;
+  const iso = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? toUtcISO(value) : undefined;
+  if (!iso) throw new Error("Erişim bitişi geçerli bir ISO tarih olmalıdır");
+  if (start && Date.parse(iso) < Date.parse(start)) throw new Error("Erişim bitişi başlangıçtan önce olamaz");
+  return iso;
 }
 
 type DuplicateField = "cardNumber" | "email" | "tcNo";
@@ -54,9 +81,9 @@ export async function findDuplicateEmployee(
   excludeId?: Id<"employees">
 ): Promise<Doc<"employees"> | null> {
   if (field === "cardNumber") return findDuplicateCard(ctx, value, excludeId);
-  const normalizedValue = field === "email" ? normalizeEmployeeEmail(value) ?? "" : value;
+  const normalizedValue = field === "email" ? normalizeEmployeeEmail(value) ?? "" : value.trim();
   if (!normalizedValue) return null;
-  const candidates = field === "email" ? [...new Set([normalizedValue, value.trim()])] : [value];
+  const candidates = field === "email" ? [...new Set([normalizedValue, value.trim()])] : [normalizedValue];
   for (const candidate of candidates) {
     const matches = ctx.db.query("employees")
       .withIndex(field === "email" ? "by_email" : "by_tc", q => q.eq(field, candidate));
@@ -105,11 +132,8 @@ export async function upsertGroupMembership(
   return true;
 }
 
-export const list = authedQuery({
-  args: {
-    projectId: v.optional(v.id("projects")),
-  },
-  handler: async (ctx, args) => {
+type EmployeeQueryCtx = QueryCtx & { user: Doc<"users"> };
+async function legacyEmployeeList(ctx: EmployeeQueryCtx, args: { projectId?: Id<"projects"> }) {
     await resolveProjectScope(ctx, args.projectId);
     const allowed = await getProjectIdsWithPermission(ctx, ctx.user, "employees.view");
     const projectIds = args.projectId ? allowed.filter(id => id === args.projectId) : allowed;
@@ -139,7 +163,7 @@ export const list = authedQuery({
         const companyId = emp.companyId ?? department?.companyId;
         const company = companyId ? await ctx.db.get(companyId) : null;
         return {
-          ...emp,
+          ...publicEmployee(emp),
           terminationReason: permissions?.canManage ? emp.terminationReason : undefined,
           sgkExitCode: permissions?.canManage ? emp.sgkExitCode : undefined,
           terminatedBy: permissions?.canManage ? emp.terminatedBy : undefined,
@@ -157,6 +181,110 @@ export const list = authedQuery({
         };
       })
     );
+}
+
+export const list = authedQuery({
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: legacyEmployeeList,
+});
+
+/** Counts read only IDs/status documents, never per-person organization/biometric joins. */
+export const listSummary = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    await requirePermission(ctx, ctx.user, args.projectId, "employees.view");
+    const [rows, ready] = await Promise.all([employeeRowsForCounts(ctx, args.projectId), employeeListReady(ctx, args.projectId)]);
+    const employees = rows;
+    return {
+      modeToken: `${ready ? "indexed" : "legacy"}:${EMPLOYEE_LIST_VERSION}`,
+      counts: rows.length > 2000 ? null : {
+        all: employees.length, active: employees.filter(row => row.isActive).length,
+        inactive: employees.filter(row => !row.isActive && !row.employmentEndDate).length,
+        terminated: employees.filter(row => row.employmentEndDate).length,
+      },
+    };
+  },
+});
+
+const listPageFilters = {
+    projectId: v.id("projects"),
+    search: v.optional(v.string()), department: v.optional(v.string()), company: v.optional(v.string()),
+    position: v.optional(v.string()), status: v.optional(v.string()), sort: v.optional(v.string()),
+    includeChildren: v.optional(v.boolean()),
+    modeToken: v.optional(v.string()),
+};
+const listPageArgs = { ...listPageFilters, paginationOpts: paginationOptsValidator };
+type ListPageArgs = ObjectType<typeof listPageArgs>;
+function cachedOrganization<T extends { projectId?: Id<"projects"> }>(cache: Map<string, Promise<T | null>>, id: string, projectId: Id<"projects">, load: () => Promise<T | null>) {
+  let pending = cache.get(id);
+  if (!pending) cache.set(id, pending = load().then(row => row?.projectId === projectId ? row : null));
+  return pending;
+}
+async function readEmployeePage(ctx: EmployeeQueryCtx, args: ListPageArgs): Promise<EmployeePageResult> {
+    await resolveProjectScope(ctx, args.projectId);
+    await requirePermission(ctx, ctx.user, args.projectId, "employees.view");
+    const org = await loadEmployeeOrganizations(ctx, args.projectId);
+    const legacy = !await employeeListReady(ctx, args.projectId);
+    if (!Number.isSafeInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1) throw new Error("Sayfa boyutu pozitif bir tam sayı olmalıdır");
+    const size = Math.min(100, args.paginationOpts.numItems);
+    const [requestedField, requestedDirection] = (args.sort ?? "name:asc").split(":");
+    const field = employeeSortFields.find(value => value === requestedField) ?? "name";
+    const direction = requestedDirection === "desc" ? "desc" : "asc";
+    const sort = `${field}:${direction}`;
+    const departmentIds = employeeDepartmentScope(args.department ?? "", args.includeChildren ?? false, [...org.departments.values()]);
+    const filters = { ...args, departmentIds };
+    if (legacy) {
+      // Existing unversioned records retain the old behavior until an approved backfill.
+      const rows = filterAndSortEmployees(await legacyEmployeeList(ctx, args), args.search ?? "", args.department ?? "", args.status ?? "all", sort, filters);
+      const cursor = args.paginationOpts.cursor;
+      const offset = cursor?.startsWith("legacy:") ? Number(cursor.slice(7)) : 0;
+      if (!Number.isSafeInteger(offset) || offset < 0) throw new Error("Geçersiz liste imleci");
+      return { page: rows.slice(offset, offset + size), isDone: offset + size >= rows.length, continueCursor: `legacy:${offset + size}`, legacy: true, total: rows.length };
+    }
+    const organizations = field === "department" ? [...org.departments.values()] : field === "company" ? [...org.companies.values()] : field === "position" ? [...org.positions.values()] : undefined;
+    if (!org.complete && (organizations || args.includeChildren)) throw new Error("Organizasyon listesi 1000 kayıt okuma sınırını aşıyor");
+    const cursor = args.paginationOpts.cursor?.startsWith("legacy:") ? null : args.paginationOpts.cursor;
+    const result = await readIndexedEmployeePage(ctx, args.projectId, field, direction, cursor, size, filters, organizations);
+    const [canManage, canSeePay] = await Promise.all([
+      hasPermission(ctx, ctx.user, args.projectId, "employees.manage"), canSeePayInProject(ctx, ctx.user, args.projectId),
+    ]);
+    const departments = new Map<string, Promise<Doc<"departments"> | null>>();
+    const companies = new Map<string, Promise<Doc<"companies"> | null>>();
+    const positions = new Map<string, Promise<Doc<"positions"> | null>>();
+    const page = await Promise.all(result.page.map(async emp => {
+      const departmentId = emp.departmentId;
+      const positionId = emp.positionId;
+      const department = departmentId ? org.departments.get(departmentId) ?? await cachedOrganization(departments, departmentId, args.projectId, () => ctx.db.get(departmentId)) : undefined;
+      const companyId = emp.companyId ?? department?.companyId;
+      const company = companyId ? org.companies.get(companyId) ?? await cachedOrganization(companies, companyId, args.projectId, () => ctx.db.get(companyId)) : undefined;
+      const position = positionId ? org.positions.get(positionId) ?? await cachedOrganization(positions, positionId, args.projectId, () => ctx.db.get(positionId)) : undefined;
+      return {
+        ...publicEmployee(emp), terminationReason: canManage ? emp.terminationReason : undefined,
+        sgkExitCode: canManage ? emp.sgkExitCode : undefined, terminatedBy: canManage ? emp.terminatedBy : undefined,
+        hourlyRate: maskPay(emp.hourlyRate, canSeePay), monthlySalary: maskPay(emp.monthlySalary, canSeePay),
+        departments: department ? { _id: department._id, name: department.name } : null,
+        companies: company ? { _id: company._id, name: company.name } : null,
+        positions: position ? { _id: position._id, name: position.name } : null,
+      };
+    }));
+    return { ...result, page, legacy: false, total: null };
+}
+export const listPage = authedQuery({ args: listPageArgs, handler: readEmployeePage });
+
+type EmployeePageResult = {
+  page: Awaited<ReturnType<typeof legacyEmployeeList>>;
+  isDone: boolean; continueCursor: string; legacy: boolean; total: number | null;
+};
+/** One subscribed window: changing rows cannot create gaps between accumulated reverse-order chunks. */
+export const listPageWindow = authedQuery({
+  args: { ...listPageFilters, paginationOpts: paginationOptsValidator, pageSize: v.number(), startCursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, args): Promise<{ page: EmployeePageResult[]; isDone: boolean; continueCursor: string }> => {
+    const { paginationOpts: _paginationOpts, pageSize, startCursor, ...filters } = args;
+    const result: EmployeePageResult = await readEmployeePage(ctx, {
+      ...filters, paginationOpts: { cursor: startCursor, numItems: pageSize },
+    });
+    return { page: [result], isDone: true, continueCursor: "" };
   },
 });
 
@@ -165,7 +293,8 @@ export const listLightForImport = authedQuery({
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
     await requirePermission(ctx, ctx.user, args.projectId, "employees.manage");
-    const employees = await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", args.projectId)).collect();
+    const employees = await employeeRowsForCounts(ctx, args.projectId);
+    if (employees.length > 2000) throw new Error("Personel eşleştirmesi 2000 kayıt okuma sınırını aşıyor");
     return employees
       .filter((e) => e.isVisitor !== true)
       .map((e) => ({
@@ -198,9 +327,20 @@ export const getById = authedQuery({
     if (emp.isVisitor === true && !canManageVisitor) return null;
     await requirePermission(ctx, ctx.user, emp.projectId, "employees.view");
     const visitorFields = emp.isVisitor === true ? visitorSensitiveFields(emp, canManageVisitor) : undefined;
+    const [department, position] = await Promise.all([
+      emp.departmentId ? ctx.db.get(emp.departmentId) : null,
+      emp.positionId ? ctx.db.get(emp.positionId) : null,
+    ]);
+    const companyId = emp.companyId ?? department?.companyId;
+    const company = companyId ? await ctx.db.get(companyId) : null;
     return {
-      ...emp,
+      ...publicEmployee(emp),
       ...visitorFields,
+      ...(emp.projectId ? {
+        departments: department ? { _id: department._id, name: department.name } : null,
+        positions: position ? { _id: position._id, name: position.name } : null,
+        companies: company ? { _id: company._id, name: company.name } : null,
+      } : {}),
       tcNo: visitorFields?.tcNo ?? emp.tcNo,
       terminationReason: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminationReason : undefined,
       sgkExitCode: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.sgkExitCode : undefined,
@@ -228,6 +368,7 @@ export const create = authedMutation({
     photoUrl: v.optional(v.string()),
     photoStorageId: v.optional(v.id("_storage")),
     accessStartsAt: v.optional(v.union(v.string(), v.null())),
+    accessExpiresAt: v.optional(v.union(v.string(), v.null())),
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.string()),
     shift: v.optional(v.string()),
@@ -246,6 +387,9 @@ export const create = authedMutation({
     }
 
     args.cardNumber = args.cardNumber.trim();
+    args.tcNo = args.tcNo?.trim() || undefined;
+    const cardError = cardNumberError(args.cardNumber, { allowEmpty: true });
+    if (cardError) throw new Error(cardError);
     validateEmployeeText(args, { allowCardless: true });
     for (const field of ["cardNumber", "email", "tcNo"] as const) {
       const value = field === "email" ? normalizeEmployeeEmail(args.email) : args[field];
@@ -260,12 +404,13 @@ export const create = authedMutation({
     const companyId = await employeeCompanyForDepartment(ctx, args.departmentId, args.companyId, args.companyId !== undefined);
     validatePay(args.hourlyRate, args.monthlySalary);
     const now = new Date().toISOString();
-    const id = await ctx.db.insert("employees", {
+    const id = await insertEmployee(ctx, {
       ...args,
       companyId,
       email: normalizeEmployeeEmail(args.email) ?? "",
       ...photo,
       accessStartsAt: normalizeEmployeeAccessStart(args.accessStartsAt),
+      accessExpiresAt: normalizeEmployeeAccessEnd(args.accessExpiresAt, normalizeEmployeeAccessStart(args.accessStartsAt)),
       isActive: args.isActive ?? true,
       createdAt: now,
       updatedAt: now,
@@ -311,6 +456,7 @@ export const update = authedMutation({
     photoUrl: v.optional(v.union(v.null(), v.string())),
     photoStorageId: v.optional(v.union(v.null(), v.id("_storage"))),
     accessStartsAt: v.optional(v.union(v.string(), v.null())),
+    accessExpiresAt: v.optional(v.union(v.string(), v.null())),
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.union(v.null(), v.string())),
     shift: v.optional(v.union(v.null(), v.string())),
@@ -341,6 +487,10 @@ export const update = authedMutation({
     const accessStartsAt = updates.accessStartsAt === undefined ? emp.accessStartsAt : normalizeEmployeeAccessStart(updates.accessStartsAt);
     const accessStartChanged = accessStartsAt !== emp.accessStartsAt;
     if (updates.accessStartsAt !== undefined) updates.accessStartsAt = accessStartsAt ?? null;
+    const accessExpiresAt = updates.accessExpiresAt === undefined ? emp.accessExpiresAt : normalizeEmployeeAccessEnd(updates.accessExpiresAt, accessStartsAt);
+    if (updates.accessExpiresAt !== undefined || updates.accessStartsAt !== undefined) normalizeEmployeeAccessEnd(accessExpiresAt, accessStartsAt);
+    const accessEndChanged = accessExpiresAt !== emp.accessExpiresAt;
+    if (updates.accessExpiresAt !== undefined) updates.accessExpiresAt = accessExpiresAt ?? null;
     if (updates.hourlyRate !== undefined || updates.monthlySalary !== undefined) {
       await requirePermission(ctx, ctx.user, emp.projectId, "pay.view");
       if (updates.projectId !== undefined) await requirePermission(ctx, ctx.user, updates.projectId, "pay.view");
@@ -359,6 +509,11 @@ export const update = authedMutation({
 
     if (updates.email !== undefined) updates.email = normalizeEmployeeEmail(updates.email) ?? "";
     if (updates.cardNumber !== undefined) updates.cardNumber = updates.cardNumber.trim();
+    if (updates.tcNo !== undefined) updates.tcNo = updates.tcNo?.trim() || null;
+    if (updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber) {
+      const cardError = cardNumberError(updates.cardNumber, { allowEmpty: !emp.cardNumber.trim() });
+      if (cardError) throw new Error(cardError);
+    }
     // Yalnız değişen metinler denetlenir: aktarılmış/eski kayıtların dokunulmayan alanı başka düzenlemeyi engellemez.
     const changedText = <K extends "firstName" | "lastName" | "email" | "tcNo" | "cardNumber">(key: K) =>
       updates[key] !== emp[key] ? updates[key] : undefined;
@@ -393,7 +548,7 @@ export const update = authedMutation({
     const reactivating = emp.isActive === false && updates.isActive === true;
     const activityDates = deactivating ? { deactivatedAt: trTodayKey() }
       : reactivating ? { deactivatedAt: undefined } : {};
-    await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, ...activityDates, updatedAt: new Date().toISOString() });
+    await patchEmployee(ctx, employeeId, { ...toPatch(updates), ...photo, ...activityDates, updatedAt: new Date().toISOString() });
     if (deactivating) await revokeEmployeeSessions(ctx, employeeId);
     if (updates.departmentId !== undefined || updates.companyId !== undefined) await recordDepartmentChange(ctx, employeeId, emp);
     if (emp.photoStorageId && (updates.photoStorageId !== undefined || updates.photoUrl === null)) {
@@ -412,6 +567,11 @@ export const update = authedMutation({
       user: ctx.user, projectId: emp.projectId, action: "update", targetTable: "employees",
       targetId: employeeId, oldValue: { accessStartsAt: emp.accessStartsAt ?? null },
       newValue: { accessStartsAt: accessStartsAt ?? null }, note: "Erişim başlangıcı",
+    });
+    if (accessEndChanged) await writeAudit(ctx, {
+      user: ctx.user, projectId: emp.projectId, action: "update", targetTable: "employees",
+      targetId: employeeId, oldValue: { accessExpiresAt: emp.accessExpiresAt ?? null },
+      newValue: { accessExpiresAt: accessExpiresAt ?? null }, note: "Erişim bitişi",
     });
     const groupMemberAdded = await upsertGroupMembership(
       ctx,
@@ -433,10 +593,13 @@ export const update = authedMutation({
     // Kart no değiştiyse ESKİ kartı IDE panellerinden sök (yoksa orphan kalır → eski
     // kart hâlâ kapı açar). Paneller groupMembers'tan çözülür (kart değişiminden bağımsız);
     // eski değer (emp.cardNumber) ile, yeni kartı yazacak sync'ten ÖNCE enqueue edilir.
-    // Eski kart temizliği yetki kaldırması değildir: employeeId taşımaz.
+    // Eski kart kimliği grant korumasıyla doğrulanır; yeni karta ait teslim durumu korunur.
     if (cardChanged) await scheduleEmployeeCardChange(ctx, employeeId, emp.projectId, emp.cardNumber, previousHikSnapshot);
 
-    if (!cardChanged && canSyncEmployeeToDevices({ cardNumber: updates.cardNumber ?? emp.cardNumber }) && (activeChanged || groupMemberAdded || accessStartChanged)) {
+    const profileChanged = (["firstName", "lastName"] as const).some(key => updates[key] !== undefined && updates[key] !== emp[key]) ||
+      (updates.photoStorageId !== undefined && updates.photoStorageId !== emp.photoStorageId) ||
+      (updates.photoUrl !== undefined && updates.photoUrl !== emp.photoUrl);
+    if (!cardChanged && canSyncEmployeeToDevices({ cardNumber: updates.cardNumber ?? emp.cardNumber }, emp.hikEmployeeNo) && (activeChanged || groupMemberAdded || accessStartChanged || accessEndChanged || profileChanged)) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId,
       });
@@ -551,7 +714,8 @@ export const bulkUpdateDepartment = authedMutation({
     }
     for (const emp of employees) {
       if (emp) {
-        await ctx.db.patch(emp._id, { departmentId: dept._id, updatedAt: new Date().toISOString() });
+        const companyId = await employeeCompanyForDepartment(ctx, dept._id, emp.companyId, false);
+        await patchEmployee(ctx, emp._id, { departmentId: dept._id, companyId, updatedAt: new Date().toISOString() });
         await recordDepartmentChange(ctx, emp._id, emp);
         await reconcileEmployeeDepartmentRules(ctx, emp._id);
       }
@@ -626,7 +790,7 @@ export const setProjectId = internalMutation({
   },
   handler: async (ctx, args) => {
     await assertNoEmployeeTransfer(ctx, args.employeeId);
-    await ctx.db.patch(args.employeeId, {
+    await patchEmployee(ctx, args.employeeId, {
       projectId: args.projectId,
       updatedAt: new Date().toISOString(),
     });

@@ -1,3 +1,4 @@
+import { patchEmployee } from "./employeeListFields";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { ConvexError } from "convex/values";
@@ -9,7 +10,7 @@ export type DepartmentHistoryRow = Pick<Doc<"employeeDepartmentHistory">, "emplo
 /** The baseline preserves legacy calculations; it does not claim to reconstruct past moves. */
 export async function seedDepartmentHistory(ctx: MutationCtx, employee: Doc<"employees">, previous: DepartmentSnapshot = employee): Promise<void> {
   if (!employee.projectId || employee.isVisitor) return;
-  if ((previous.departmentId || employee.departmentId) && !employee.hasDepartmentHistory) await ctx.db.patch(employee._id, { hasDepartmentHistory: true });
+  if ((previous.departmentId || employee.departmentId) && !employee.hasDepartmentHistory) await patchEmployee(ctx, employee._id, { hasDepartmentHistory: true });
   const [existing] = await ctx.db.query("employeeDepartmentHistory").withIndex("by_employee_validFrom", q => q.eq("employeeId", employee._id)).take(1);
   if (!existing) await ctx.db.insert("employeeDepartmentHistory", {
     projectId: employee.projectId, employeeId: employee._id, departmentId: previous.departmentId, companyId: previous.companyId,
@@ -22,7 +23,7 @@ export async function recordDepartmentChange(ctx: MutationCtx, employeeId: Id<"e
   if (!employee?.projectId || employee.isVisitor) return;
   if (previous && previous.departmentId === employee.departmentId && previous.companyId === employee.companyId) return;
   if (previous) await seedDepartmentHistory(ctx, employee, previous);
-  else if (employee.departmentId && !employee.hasDepartmentHistory) await ctx.db.patch(employee._id, { hasDepartmentHistory: true });
+  else if (employee.departmentId && !employee.hasDepartmentHistory) await patchEmployee(ctx, employee._id, { hasDepartmentHistory: true });
   const validFrom = trTodayKey();
   const existing = await ctx.db.query("employeeDepartmentHistory").withIndex("by_employee_validFrom", q => q.eq("employeeId", employeeId).eq("validFrom", validFrom)).unique();
   const fields = { departmentId: employee.departmentId, companyId: employee.companyId };

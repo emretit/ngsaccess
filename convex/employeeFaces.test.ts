@@ -14,7 +14,7 @@ vi.mock("./lib/audit", () => ({ writeAudit: guards.audit }));
 
 type Row = Record<string, unknown>;
 function fixture() {
-  const employee = { _id: "employee", projectId: "project", cardNumber: "123", isActive: true };
+  const employee = { _id: "employee", firstName: "Ada", lastName: "Test", email: "", projectId: "project", cardNumber: "123", isActive: true };
   const device = { _id: "device", projectId: "project", name: "Panel", brand: "hikvision", hikTransport: "gateway", hikDevIndex: "dev" };
   const tables: Record<string, Row[]> = { employees: [employee], devices: [device], users: [{ _id: "user" }], employeeFaces: [], hikPendingOperations: [] };
   const ranges: string[] = [];
@@ -30,7 +30,7 @@ function fixture() {
       },
       get: vi.fn(async (id: string) => Object.values(tables).flat().find(row => row._id === id) ?? null),
       insert: vi.fn(async (table: string, value: Row) => { const id = `${table}-${tables[table]?.length ?? 0}`; (tables[table] ??= []).push({ ...value, _id: id, _creationTime: Date.now() }); return id; }),
-      patch: vi.fn(async (id: string, value: Row) => { for (const table of Object.keys(tables)) tables[table] = tables[table].map(row => row._id === id ? { ...row, ...value } : row); }),
+      patch: vi.fn(async (id: string, value: Row) => { for (const table of Object.keys(tables)) tables[table] = tables[table].map(row => row._id === id ? table === "employees" ? Object.assign(row, value) : { ...row, ...value } : row); }),
       delete: vi.fn(async (id: string) => { for (const table of Object.keys(tables)) tables[table] = tables[table].filter(row => row._id !== id); }),
     },
     storage: { delete: vi.fn(), store: vi.fn(async () => "stored") },
@@ -47,6 +47,16 @@ const saveArgs = { employeeId: "employee", storageId: "new", userId: "user" };
 beforeEach(() => vi.resetAllMocks());
 
 describe("yüz kayıt yetkisi ve saklama", () => {
+  it("preserves imported identity when the physical card is empty or changes before face delivery", async () => {
+    const f = fixture();
+    Object.assign(f.employee, { cardNumber: "", hikEmployeeNo: "device-person" });
+    await invoke(faces.saveStoredPhoto, f.ctx, saveArgs);
+    expect(f.tables.employees[0].deviceSyncUpdatedAt).toBeUndefined();
+    expect(f.tables.hikPendingOperations[0]).toMatchObject({ payload: { employeeNo: "device-person" } });
+    f.employee.cardNumber = "456";
+    const targets = await invoke<unknown[]>(faces.startDelivery, f.ctx, { employeeId: "employee", operationIds: ["hikPendingOperations-0"] });
+    expect(targets).toMatchObject([{ employeeNo: "device-person" }]);
+  });
   it.each(["missing", "granted", "revoked", "grantedAgain"])("internal storage sorgusu eski rıza kayıtlarından bağımsızdır: %s", async state => {
     const f = fixture();
     f.tables.employeeFaces.push({ _id: "face", employeeId: "employee", pictureStorageId: "file", projectId: "project" });
@@ -162,7 +172,7 @@ describe("yüz kayıt yetkisi ve saklama", () => {
   });
   it("D4: başka kişiye devredilmiş geçmiş kartın yüzünü silmez (sayısal alias dahil)", async () => {
     const f = fixture();
-    f.tables.employees.push({ _id: "other", cardNumber: "000456" });
+    f.tables.employees.push({ _id: "other", projectId: "project", cardNumber: "000456" });
     f.tables.hikPendingOperations.push({ _id: "old", employeeId: "employee", projectId: "project", deviceId: "device", operation: "addFace", status: "done", createdAt: 1, payload: { employeeId: "employee", employeeNo: "456" } });
     await invoke(faces.remove, f.ctx, { employeeId: "employee" });
     const deletions = f.tables.hikPendingOperations.filter(row => row.operation === "deleteFace");
@@ -170,7 +180,7 @@ describe("yüz kayıt yetkisi ve saklama", () => {
   });
   it("D4: kart kuyruklandıktan sonra başka kişiye verilirse cihaz silmesi başlamaz", async () => {
     const f = fixture(); await invoke(faces.remove, f.ctx, { employeeId: "employee" });
-    f.tables.employees.push({ _id: "other", cardNumber: "123" });
+    f.tables.employees.push({ _id: "other", projectId: "project", cardNumber: "123" });
     expect(await invoke(faces.startDelivery, f.ctx, { employeeId: "employee", operationIds: ["hikPendingOperations-0"] })).toEqual([]);
     expect(f.tables.hikPendingOperations[0].status).toBe("failed");
   });
@@ -205,3 +215,11 @@ describe("yüz kayıt yetkisi ve saklama", () => {
     expect(f.tables.hikPendingOperations[0].status).toBe("processing");
   });
 });
+
+  it.each(["cardNumber", "hikEmployeeNo"])("D11: foreign project %s does not block planning or executing face removal", async field => {
+    const f = fixture();
+    f.tables.employees.push({ _id: "foreign", projectId: "elsewhere", [field]: "123" });
+    await invoke(faces.remove, f.ctx, { employeeId: "employee" });
+    expect(f.tables.hikPendingOperations.filter(row => row.operation === "deleteFace")).toHaveLength(1);
+    expect(await invoke(faces.startDelivery, f.ctx, { employeeId: "employee", operationIds: ["hikPendingOperations-0"] })).toMatchObject([{ employeeNo: "123" }]);
+  });

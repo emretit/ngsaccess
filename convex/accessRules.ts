@@ -113,7 +113,7 @@ export const enqueueIdeUserRemoval = internalMutation({
       for (const employee of people) candidates.set(employee._id, employee);
     }
     for (const employee of candidates.values()) {
-      if (employee.projectId !== panel.projectId || employee.isActive === false) continue;
+      if (employee.projectId !== panel.projectId || employee.isActive === false || employee.hikCardless === true) continue;
       const remaining = await resolveEmployeeIdeDeviceIds(ctx, employee._id, panel.projectId);
       if (remaining.includes(panel._id)) return false;
     }
@@ -136,11 +136,11 @@ async function reconcileRuleSnapshots(ctx: MutationCtx, snapshots: Map<Id<"emplo
   if (snapshots.size > HIK_RECONCILE_BATCH) {
     // Identities and old targets are frozen in the original transaction. No relationship
     // needs to survive deletion, and later edits are checked by each batch and action.
-    const groups = new Map<string, { projectId: HikSnapshot["projectId"]; devices: HikSnapshot["devices"]; entries: { employeeId: Id<"employees">; cardNumber: string }[] }>();
+    const groups = new Map<string, { projectId: HikSnapshot["projectId"]; devices: HikSnapshot["devices"]; entries: { employeeId: Id<"employees">; cardNumber: string; employeeNo?: string }[] }>();
     for (const [employeeId, snapshot] of snapshots) {
       const key = JSON.stringify([snapshot.projectId, snapshot.devices]);
       const group = groups.get(key) ?? { projectId: snapshot.projectId, devices: snapshot.devices, entries: [] };
-      group.entries.push({ employeeId, cardNumber: snapshot.cardNumber });
+      group.entries.push({ employeeId, cardNumber: snapshot.cardNumber, employeeNo: snapshot.employeeNo });
       groups.set(key, group);
     }
     for (const group of groups.values()) await ctx.scheduler.runAfter(0, internal.accessRules.reconcileHikRemovalBatch, { ...group, idePanels });
@@ -163,7 +163,7 @@ export const reconcileHikRemovalEntry = internalMutation({
 export const reconcileHikRemovalBatch = internalMutation({
   args: {
     projectId: hikSnapshotValidator.fields.projectId, devices: hikSnapshotValidator.fields.devices,
-    entries: v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string() })),
+    entries: v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string(), employeeNo: v.optional(v.string()) })),
     idePanels: v.optional(v.array(v.id("devices"))),
   },
   handler: async (ctx, args) => {
@@ -172,12 +172,12 @@ export const reconcileHikRemovalBatch = internalMutation({
       try {
         // Nested mutations isolate each entry's writes (including scheduled jobs).
         await ctx.runMutation(internal.accessRules.reconcileHikRemovalEntry, {
-          employeeId: entry.employeeId, snapshot: { projectId: args.projectId, devices: args.devices, cardNumber: entry.cardNumber }, idePanels: args.idePanels,
+          employeeId: entry.employeeId, snapshot: { projectId: args.projectId, devices: args.devices, cardNumber: entry.cardNumber, employeeNo: entry.employeeNo }, idePanels: args.idePanels,
         });
       } catch {
         for (const device of args.devices) await ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
           deviceId: device._id, projectId: args.projectId, operation: "deletePerson",
-          payload: { employeeId: entry.employeeId, employeeNo: entry.cardNumber, cardNumber: entry.cardNumber },
+          payload: { employeeId: entry.employeeId, employeeNo: entry.employeeNo ?? entry.cardNumber, cardNumber: entry.cardNumber },
           lastError: "Geri alma girdisi işlenemedi; cihazda kalmış olabilir",
         });
       }

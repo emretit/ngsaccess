@@ -84,7 +84,7 @@ export default function EmployeeTable({
   );
   const biometricRows = useQuery(
     api.employeeBiometrics.summary,
-    can("biometrics.manage") && projectId ? { projectId } : "skip",
+    can("biometrics.manage") && projectId ? { projectId, employeeIds: employees.map(employee => employee._id) } : "skip",
   );
   const biometricsByEmployee = useMemo(
     () => new Map((biometricRows ?? []).map((row) => [row.employeeId, row])),

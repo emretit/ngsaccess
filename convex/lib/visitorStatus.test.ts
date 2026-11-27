@@ -100,7 +100,7 @@ it("expiry cron includes legacy TR and UTC records at the same instant without e
       { _id: "iso", isVisitor: true, isActive: true, accessExpiresAt: "2026-10-17T07:00:00.000Z" },
       { _id: "future", isVisitor: true, isActive: true, accessExpiresAt: "2026-10-17T08:00:00.000Z" },
       { _id: "invalid", isVisitor: true, isActive: true, accessExpiresAt: "bad" },
-    ];
+    ].map(row => ({ ...row, firstName: "Visitor", lastName: "Test", email: "", cardNumber: "" }));
     let upperBound = "";
     const query = (table: string) => {
       const bounds = { eq: () => bounds, lte: (_field: string, value: string) => { upperBound = value; return bounds; } };
@@ -114,7 +114,7 @@ it("expiry cron includes legacy TR and UTC records at the same instant without e
     const patch = vi.fn();
     const runAfter = vi.fn();
     const handler = (expireVisitorAccess as unknown as { _handler: (ctx: MutationCtx, args: object) => Promise<{ expired: number }> })._handler;
-    expect(await handler({ db: { query, patch }, scheduler: { runAfter } } as unknown as MutationCtx, {})).toEqual({ expired: 2 });
+    expect(await handler({ db: { query, patch, get: async (id: string) => rows.find(row => row._id === id) ?? null }, scheduler: { runAfter } } as unknown as MutationCtx, {})).toEqual({ expired: 2 });
     expect(upperBound).toBe("2026-10-17T10:00:00.000Z");
     expect(patch.mock.calls.map(([id]) => id)).toEqual(["legacy", "iso"]);
     // Mock'ta Hik cihazı da IDE paneli de yok → silme planlanmaz (boş snapshot için action çağrısı yok, F2-C NOT 4).

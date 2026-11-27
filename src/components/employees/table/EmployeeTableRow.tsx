@@ -83,6 +83,7 @@ export function EmployeeTableRow({
               {employee.firstName} {employee.lastName}
             </button>
             {!employee.cardNumber.trim() && <Badge variant="outline" className="text-xs">Kartsız</Badge>}
+            {employee.accessExpiresAt && Number.isFinite(Date.parse(employee.accessExpiresAt)) && <p className="text-xs text-muted-foreground" title={new Date(employee.accessExpiresAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}>Erişim bitişi: {new Date(employee.accessExpiresAt).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}</p>}
             <p className="truncate text-xs text-muted-foreground min-[760px]:hidden">
               {[
                 showDepartment && (employee.departments?.name ?? "Atanmamış"),

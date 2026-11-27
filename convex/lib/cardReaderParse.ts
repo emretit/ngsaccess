@@ -49,6 +49,8 @@ export type CardReaderParseResult = {
   hikEventState?: string;
   /** Cihazın ehome/device ID'si (gateway register ederken atadığımız değer). */
   hikEhomeID?: string;
+  /** Hik person identity; physical card numbers remain independent. */
+  hikEmployeeNo?: string;
   // IDE Smart panel event alanları (docs/ide-smart §6.3 access log)
   // GERÇEK event şekli (canlı yakalandı 2026-05-29):
   //   { payload:{ result, time, user_id, actuator }, transaction:{ type:"access_event", src-id:<UUID> } }
@@ -401,6 +403,8 @@ export function parseCardReaderBody(
         deviceIp: deviceIp || undefined,
         bodyForLog: body,
         ...hikFields,
+        ...(getFirstString(payload as Record<string, unknown>, ["employeeNoString", "employeeNo"])
+          ? { hikEmployeeNo: getFirstString(payload as Record<string, unknown>, ["employeeNoString", "employeeNo"]) } : {}),
       };
     } catch (error) {
       if (error instanceof HttpInputError) throw error;
@@ -427,6 +431,7 @@ export function parseCardReaderBody(
       deviceIp,
       bodyForLog: { _raw: raw.slice(0, 500), _format: "xml/multipart" },
       hikDevIndex: str("devIndex"),
+      ...((str("employeeNoString") ?? str("employeeNo")) ? { hikEmployeeNo: str("employeeNoString") ?? str("employeeNo") } : {}),
       hikMajorEventType: num("majorEventType"),
       hikSubEventType: num("subEventType"),
       hikCurrentVerifyMode: str("currentVerifyMode"),

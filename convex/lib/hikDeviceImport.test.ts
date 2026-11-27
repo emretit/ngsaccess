@@ -4,6 +4,11 @@ import { classifyImportPerson, importedValidity, splitDevicePersonName, selectIm
 import { hikWallClockToUtcISO, toUtcISO } from "./trDate";
 const projectId = "p" as Id<"projects">;
 const person = { employeeNo: "1", name: "Okan ISMAN", cards: [], fingerCount: 1 };
+it("N4/N6: physical card fallback cannot match a different preserved Hik person", () => {
+  const employee = { _id: "e" as Id<"employees">, projectId, cardNumber: "456", hikEmployeeNo: "9" };
+  expect(classifyImportPerson({ ...person, employeeNo: "456" }, projectId, [employee]).status).toBe("conflict");
+  expect(classifyImportPerson({ ...person, employeeNo: "9" }, projectId, [employee])).toMatchObject({ status: "matched", matchedEmployeeId: employee._id });
+});
 it("preserves UTC/local validity, expires old people, and fails closed on missing or invalid dates", () => {
   const now = Date.parse("2026-11-03T12:00:00Z");
   expect(importedValidity({ enable: true, timeType: "UTC", beginTime: "2026-01-01T09:00:00", endTime: "2027-01-01T18:00:00" }, now)).toEqual({ isActive: true, accessStartsAt: "2026-01-01T09:00:00.000Z", accessExpiresAt: "2027-01-01T18:00:00.000Z" });

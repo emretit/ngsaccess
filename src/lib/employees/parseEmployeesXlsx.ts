@@ -7,7 +7,7 @@ export const EMPLOYEE_IMPORT_MAX_ROWS = 1000;
 const HEADER_FIELDS: Record<string, keyof Omit<EmployeeImportRow, "rowNumber">> = {
   ad: "firstName", soyad: "lastName", email: "email", eposta: "email",
   tc: "tcNo", tckimlikno: "tcNo", sicilbordrokodu: "payrollCode", bordrokodu: "payrollCode", sicilkodu: "payrollCode",
-  kartno: "cardNumber", departman: "department", pozisyon: "position", firma: "company", aktif: "isActive",
+  kartno: "cardNumber", departman: "department", pozisyon: "position", firma: "company", aktif: "isActive", aktifevethayir: "isActive",
 };
 
 export function normalizeEmployeeHeader(value: string) {
@@ -64,6 +64,7 @@ export async function parseEmployeesXlsx(file: File): Promise<ParsedEmployeeFile
 
   const rows: EmployeeImportRow[] = [];
   const issues: EmployeeImportIssue[] = [];
+  const recognizedColumns = new Set(columns.map(column => column.index));
   let dataRowCount = 0;
   const seen = { tcNo: new Set<string>(), email: new Set<string>(), cardNumber: new Set<string>() };
   for (let rowNumber = headerRowNumber + 1; rowNumber <= sheet.rowCount; rowNumber += 1) {
@@ -71,6 +72,12 @@ export async function parseEmployeesXlsx(file: File): Promise<ParsedEmployeeFile
     if (isBlankRow(row)) continue;
     dataRowCount += 1;
     if (dataRowCount > EMPLOYEE_IMPORT_MAX_ROWS) throw new Error("Dosyada en fazla 1000 kişi satırı bulunabilir.");
+    for (let index = 1; index <= sheet.columnCount; index += 1) {
+      if (!recognizedColumns.has(index) && cellText(row.getCell(index))) {
+        const header = cellText(sheet.getRow(headerRowNumber).getCell(index)) || String(index);
+        issues.push({ rowNumber, message: `Tanınmayan sütun: ${header}. Başlığı şablonla eşleştirin.` });
+      }
+    }
     const values: Partial<Record<keyof Omit<EmployeeImportRow, "rowNumber">, string>> = {};
     for (const column of columns) values[column.field] = cellText(row.getCell(column.index));
     const result: EmployeeImportRow = {

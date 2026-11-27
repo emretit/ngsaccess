@@ -1,4 +1,5 @@
 import { requirePermission } from "./lib/permissions";
+import { hikPersonIdentity } from "./lib/hikPersonIdentity";
 import { snapshotProbeSupported } from "./lib/capabilitySnapshot";
 import { scheduleFingerprintPurge } from "./lib/employeeCardChange";
 import { ConvexError, v } from "convex/values";
@@ -56,12 +57,13 @@ export async function enrollmentTarget(ctx: QueryCtx, employeeId: Id<"employees"
   const device = await ctx.db.get(deviceId);
   if (!employee || !device) throw new ConvexError("Kişi veya cihaz bulunamadı.");
   if (employee.isActive !== true) throw new ConvexError("Pasif kişiye parmak izi kaydedilemez.");
-  if (!employee.cardNumber?.trim()) throw new ConvexError("Önce kişinin kart numarasını kaydedin ve cihazla senkronize edin.");
+  const employeeNo = hikPersonIdentity(employee);
+  if (!employeeNo) throw new ConvexError("Önce kişinin kart numarasını kaydedin ve cihazla senkronize edin.");
   if (!(await employeeDevices(ctx, employee)).some(item => item._id === deviceId)) throw new ConvexError("Cihaz kişinin aktif erişim kapsamında değil veya Hik gateway bağlantısı yok.");
   if (fingerprintCapability(device.hikCapabilitiesSnapshot) === false) throw new ConvexError("Bu cihaz parmak izi kaydını desteklemiyor");
   await assertBiometricAllowed(ctx, employee.projectId);
   await assertBiometricAllowed(ctx, device.projectId);
-  return { employee, device };
+  return { employee, employeeNo, device };
 }
 
 export const listForEmployee = authedQuery({
@@ -113,7 +115,8 @@ export const getTargetInternal = internalQuery({
       if (device.brand !== "hikvision" || device.hikTransport !== "gateway" || !device.hikDevIndex) throw new ConvexError("Cihazın Hik gateway bağlantısı yok.");
       return { employee, device };
     }
-    return enrollmentTarget(ctx, args.employeeId, args.deviceId);
+    const target = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
+    return { employee: target.employee, device: target.device };
   },
 });
 
@@ -178,10 +181,10 @@ export const upsert = internalMutation({
   args: { ...targetArgs, attemptId: v.string(), enrolledBy: v.id("users"), expectedCardNumber: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { employee } = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
+    const { employeeNo } = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
     const row = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee_device_finger", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId).eq("fingerNo", args.fingerNo)).unique();
-    if (!row || row.attemptId !== args.attemptId || row.cancelRequested || (row.pendingUntil ?? 0) <= Date.now() || employee.cardNumber.trim() !== args.expectedCardNumber.trim()) throw new ConvexError("Kayıt iptal edildi veya kişi bilgileri değişti; yeniden deneyin.");
-    await ctx.db.patch(row._id, { enrolledAt: new Date().toISOString(), enrolledEmployeeNo: employee.cardNumber.trim(), enrolledBy: args.enrolledBy, attemptId: undefined, pendingUntil: undefined, cancelRequested: undefined });
+    if (!row || row.attemptId !== args.attemptId || row.cancelRequested || (row.pendingUntil ?? 0) <= Date.now() || employeeNo !== args.expectedCardNumber.trim()) throw new ConvexError("Kayıt iptal edildi veya kişi bilgileri değişti; yeniden deneyin.");
+    await ctx.db.patch(row._id, { enrolledAt: new Date().toISOString(), enrolledEmployeeNo: employeeNo, enrolledBy: args.enrolledBy, attemptId: undefined, pendingUntil: undefined, cancelRequested: undefined });
     await resolveFingerprintFailures(ctx, args.employeeId, args.deviceId, args.fingerNo);
     return null;
   },
@@ -251,8 +254,8 @@ export const getPushTarget = internalQuery({
       const pending = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_device_pendingUntil", q => q.eq("deviceId", args.deviceId).gt("pendingUntil", Date.now())).first();
       if (pending) return null;
       const rows = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee_device_finger", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId)).collect();
-      if (rows.some(row => row.deviceId === args.deviceId && row.deletionEmployeeNo === target.employee.cardNumber.trim())) return null;
-      return target;
+      if (rows.some(row => row.deviceId === args.deviceId && row.deletionEmployeeNo === target.employeeNo)) return null;
+      return { employee: target.employee, device: target.device };
     } catch { return null; }
   },
 });
@@ -261,14 +264,14 @@ export const recordPush = internalMutation({
   args: { employeeId: v.id("employees"), deviceId: v.id("devices"), fingerNo: v.number(), templateId: v.id("employeeFingerprints"), addedAt: v.number(), expectedCardNumber: v.string(), attemptId: v.string(), enrolledBy: v.optional(v.id("users")) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { employee } = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
+    const { employee, employeeNo } = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
     const template = await ctx.db.get(args.templateId);
-    if (!template || template.employeeId !== args.employeeId || template.fingerPrintID !== args.fingerNo || template.addedAt !== args.addedAt || employee.cardNumber.trim() !== args.expectedCardNumber.trim()) throw new ConvexError("Kayıt değişti.");
+    if (!template || template.employeeId !== args.employeeId || template.fingerPrintID !== args.fingerNo || template.addedAt !== args.addedAt || employeeNo !== args.expectedCardNumber.trim()) throw new ConvexError("Kayıt değişti.");
     const row = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee_device_finger", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId).eq("fingerNo", args.fingerNo)).unique();
     if (!row || row.attemptId !== args.attemptId || row.cancelRequested || (row.deletionEmployeeNo !== undefined && row.deletionEmployeeNo !== args.expectedCardNumber.trim())) throw new ConvexError("Cihazda işlem sürüyor.");
     const enrolledBy = template.enrolledBy;
     if (!enrolledBy) throw new ConvexError("Kayıt sahibi bulunamadı.");
-    const value = { employeeId: args.employeeId, projectId: employee.projectId, deviceId: args.deviceId, fingerNo: args.fingerNo, enrolledAt: new Date().toISOString(), enrolledEmployeeNo: employee.cardNumber.trim(), enrolledBy, deletionEmployeeNo: undefined, deletionRequestedAt: undefined, attemptId: undefined, pendingUntil: undefined, cancelRequested: undefined };
+    const value = { employeeId: args.employeeId, projectId: employee.projectId, deviceId: args.deviceId, fingerNo: args.fingerNo, enrolledAt: new Date().toISOString(), enrolledEmployeeNo: employeeNo, enrolledBy, deletionEmployeeNo: undefined, deletionRequestedAt: undefined, attemptId: undefined, pendingUntil: undefined, cancelRequested: undefined };
     await ctx.db.patch(row._id, value);
     await resolveFingerprintFailures(ctx, args.employeeId, args.deviceId, args.fingerNo);
     return null;
@@ -283,7 +286,7 @@ export const removeFingerprint = authedMutation({
     const employee = await requireEmployeeAccess(ctx, args.employeeId);
     await requirePermission(ctx, ctx.user, employee.projectId, "biometrics.manage");
     const rows = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee", q => q.eq("employeeId", args.employeeId)).collect();
-    await scheduleFingerprintPurge(ctx, args.employeeId, employee.cardNumber, { deleteTemplates: true, fingerNo: args.fingerNo });
+    await scheduleFingerprintPurge(ctx, args.employeeId, hikPersonIdentity(employee), { deleteTemplates: true, fingerNo: args.fingerNo });
     const deviceCount = new Set(rows.filter(row => row.fingerNo === args.fingerNo).map(row => row.deviceId)).size;
     await writeAudit(ctx, { user: ctx.user, projectId: employee.projectId, action: "delete", targetTable: "employees", targetId: args.employeeId, oldValue: { employeeId: args.employeeId }, note: `Parmak izi silindi; parmak no: ${args.fingerNo}; cihaz sayısı: ${deviceCount}` });
     return null;
@@ -296,15 +299,15 @@ export const beginPush = internalMutation({
   args: { ...targetArgs, templateId: v.id("employeeFingerprints"), addedAt: v.number(), expectedCardNumber: v.string(), force: v.optional(v.boolean()) },
   returns: v.union(v.object({ current: v.literal(true) }), v.object({ enrollmentId: v.id("deviceFingerprintEnrollments"), attemptId: v.string() }), v.null()),
   handler: async (ctx, args) => {
-    const { employee } = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
+    const { employee, employeeNo } = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
     const template = await ctx.db.get(args.templateId);
-    if (!template || template.employeeId !== args.employeeId || template.fingerPrintID !== args.fingerNo || template.addedAt !== args.addedAt || !template.enrolledBy || employee.cardNumber.trim() !== args.expectedCardNumber.trim()) return null;
+    if (!template || template.employeeId !== args.employeeId || template.fingerPrintID !== args.fingerNo || template.addedAt !== args.addedAt || !template.enrolledBy || employeeNo !== args.expectedCardNumber.trim()) return null;
     const pending = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_device_pendingUntil", q => q.eq("deviceId", args.deviceId).gt("pendingUntil", Date.now())).first();
     if (pending) return null;
     const row = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee_device_finger", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId).eq("fingerNo", args.fingerNo)).unique();
     if (row?.deletionEmployeeNo !== undefined) return null;
-    if (!args.force && row?.enrolledEmployeeNo === employee.cardNumber.trim() && Date.parse(row.enrolledAt) >= template.addedAt) return { current: true as const };
-    const state = { attemptId: crypto.randomUUID(), pendingUntil: Date.now() + 180_000, cancelRequested: false, deletionEmployeeNo: employee.cardNumber.trim(), deletionRequestedAt: Date.now() };
+    if (!args.force && row?.enrolledEmployeeNo === employeeNo && Date.parse(row.enrolledAt) >= template.addedAt) return { current: true as const };
+    const state = { attemptId: crypto.randomUUID(), pendingUntil: Date.now() + 180_000, cancelRequested: false, deletionEmployeeNo: employeeNo, deletionRequestedAt: Date.now() };
     const enrollmentId = row ? row._id : await ctx.db.insert("deviceFingerprintEnrollments", { employeeId: args.employeeId, deviceId: args.deviceId, projectId: employee.projectId, fingerNo: args.fingerNo, enrolledAt: "", enrolledBy: template.enrolledBy, ...state });
     if (row) await ctx.db.patch(row._id, state);
     return { enrollmentId, attemptId: state.attemptId };

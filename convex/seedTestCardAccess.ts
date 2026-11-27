@@ -1,3 +1,4 @@
+import { insertEmployee, patchEmployee } from "./lib/employeeListFields";
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -48,7 +49,7 @@ export const setupCardAndDevice = internalMutation({
       .first();
     let employeeCreated = false;
     if (!employee) {
-      const empId = await ctx.db.insert("employees", {
+      const empId = await insertEmployee(ctx, {
         projectId,
         firstName: args.employeeFirstName ?? "Test",
         lastName: args.employeeLastName ?? "Çalışan",
@@ -62,7 +63,7 @@ export const setupCardAndDevice = internalMutation({
       employee = await ctx.db.get(empId);
       employeeCreated = true;
     } else if (!employee.isActive) {
-      await ctx.db.patch(employee._id, { isActive: true, updatedAt: now });
+      await patchEmployee(ctx, employee._id, { isActive: true, updatedAt: now });
     }
 
     const ruleNameFinal = args.ruleName ?? "Test Erişim Kuralı (24/7)";

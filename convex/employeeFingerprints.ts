@@ -19,9 +19,9 @@ export const upsertEncrypted = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     validateFingerNo(args.fingerNo);
-    const { employee } = await enrollmentTarget(ctx, args.employeeId, args.sourceDeviceId);
+    const { employee, employeeNo } = await enrollmentTarget(ctx, args.employeeId, args.sourceDeviceId);
     const source = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee_device_finger", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.sourceDeviceId).eq("fingerNo", args.fingerNo)).unique();
-    if (employee.cardNumber.trim() !== args.expectedCardNumber.trim() || !source?.enrolledAt || source.deletionEmployeeNo !== undefined) throw new ConvexError("Kişi bilgileri değişti.");
+    if (employeeNo !== args.expectedCardNumber.trim() || !source?.enrolledAt || source.deletionEmployeeNo !== undefined) throw new ConvexError("Kişi bilgileri değişti.");
     const existing = await ctx.db.query("employeeFingerprints").withIndex("by_employee_fingerprint", q => q.eq("employeeId", args.employeeId).eq("fingerPrintID", args.fingerNo)).unique();
     const value = { employeeId: args.employeeId, projectId: employee.projectId, fingerPrintID: args.fingerNo, encData: args.encData, iv: args.iv, keyVersion: args.keyVersion, sourceDeviceId: args.sourceDeviceId, enrolledBy: args.enrolledBy, addedAt: Date.now() };
     // A recaptured slot replaces the template: old deliveries are no longer coverage.

@@ -52,11 +52,47 @@ describe("employee Excel helpers", () => {
     expect(headers).toContain("Aktif (Evet/Hayır)".toLocaleLowerCase("tr-TR"));
     expect(headers).toContain("E-posta".toLocaleLowerCase("tr-TR"));
     expect(headers).not.toContain("E-posta*".toLocaleLowerCase("tr-TR"));
-    expect(headers).toContain("Kart No*".toLocaleLowerCase("tr-TR"));
+    expect(headers).toContain("Kart No".toLocaleLowerCase("tr-TR"));
+    expect(headers).not.toContain("Kart No*".toLocaleLowerCase("tr-TR"));
     expect(sheet?.getRow(3).getCell(6).text).toBe("AYSE-001");
     const parsed = await parseEmployeesXlsx(await asFile(workbook));
     expect(parsed.rows).toMatchObject([{ firstName: "Ayşe", email: "ayse@example.com", cardNumber: "AYSE-001" }]);
     expect(headers).not.toContain("maaş");
+  });
+
+  it("preserves Hayır from the actual template and reports invalid active values", async () => {
+    const workbook = await createEmployeeImportTemplate();
+    const sheet = workbook.worksheets[0];
+    if (!sheet) throw new Error("Missing template worksheet");
+    sheet.getRow(3).getCell(10).value = "Hayır";
+    const parsed = await parseEmployeesXlsx(await asFile(workbook));
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.rows[0]?.isActive).toBe(false);
+    sheet.getRow(3).getCell(10).value = "belirsiz";
+    expect((await parseEmployeesXlsx(await asFile(workbook))).issues).toMatchObject([{ rowNumber: 3, message: expect.stringContaining("Evet veya Hayır") }]);
+  });
+
+  it("reports populated unknown columns instead of silently losing their values", async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Kişiler");
+    sheet.addRow(["Ad", "Soyad", "Aktiff"]);
+    sheet.addRow(["Ada", "Yılmaz", "Hayır"]);
+    const parsed = await parseEmployeesXlsx(await asFile(workbook));
+    expect(parsed.issues).toEqual([{ rowNumber: 2, message: "Tanınmayan sütun: Aktiff. Başlığı şablonla eşleştirin." }]);
+  });
+
+  it.each([false, true])("round-trips exported cardless people and active status, includeTcNo=%s", async includeTcNo => {
+    const employees: Employee[] = [false, true].map((isActive, index) => ({
+      _id: `employees:${index}` as Employee["_id"], firstName: "Ada", lastName: String(index),
+      email: "", cardNumber: "", isActive, ...(includeTcNo && index === 0 ? { tcNo: "10000000146" } : {}),
+    }));
+    const workbook = await createEmployeesExportWorkbook(employees, includeTcNo);
+    const parsed = await parseEmployeesXlsx(await asFile(workbook));
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.rows.map(({ isActive, cardNumber }) => ({ isActive, cardNumber }))).toEqual([
+      { isActive: false, cardNumber: "" }, { isActive: true, cardNumber: "" },
+    ]);
+    expect(parsed.rows[0]?.tcNo).toBe(includeTcNo ? "10000000146" : undefined);
   });
 
   it("exports no salary columns and uses Istanbul calendar date", async () => {

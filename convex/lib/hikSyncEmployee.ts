@@ -6,6 +6,7 @@ import { gatewayApiCallChecked } from "./gateway/core";
 import { accessEndsAtMs } from "./accessEnd";
 import { toUtcISO } from "./trDate";
 import { cardKey } from "./employeeUx";
+import { hikPersonIdentity } from "./hikPersonIdentity";
 
 
 import type { GrantResult } from "./grantStatus";
@@ -93,19 +94,20 @@ type SharedSync = {
   successes: Map<Id<"devices">, Id<"employees">[]>;
   grantResults: GrantResult[];
   reservations: GrantResult[];
+  deletionCleanup: Map<Id<"devices">, Set<string>>;
 };
 
-export async function removeScopedPerson(ctx: ActionCtx, device: HikDeviceRef, employeeId: Id<"employees">, cardNumber: string, runId?: Id<"deviceSyncRuns">): Promise<{ ok: boolean; error?: string; queued?: boolean; tracked?: boolean; superseded?: boolean }> {
-  if (await ctx.runMutation(internal.hikvisionSync.protectPersonDeletion, { deviceId: device._id, cardNumber })) return { ok: true, superseded: true };
+export async function removeScopedPerson(ctx: ActionCtx, device: HikDeviceRef, employeeId: Id<"employees">, employeeNo: string, runId?: Id<"deviceSyncRuns">, cardNumber = employeeNo): Promise<{ ok: boolean; error?: string; queued?: boolean; tracked?: boolean; superseded?: boolean }> {
+  if (await ctx.runMutation(internal.hikvisionSync.protectPersonDeletion, { deviceId: device._id, cardNumber: employeeNo, employeeId })) return { ok: true, superseded: true };
   if (isLocalBridgeDevice(device)) {
-    await enqueueLocalBridgeOp(ctx, device, "deleteCard", { employeeId, employeeNo: cardNumber, cardNumber }, runId);
+    await enqueueLocalBridgeOp(ctx, device, "deleteCard", { employeeId, employeeNo, cardNumber }, runId);
     return { ok: true, queued: true };
   }
   if (!device.projectId) return { ok: false, error: "Cihaz projesi bulunamadı" };
-  const id = await ctx.runMutation(internal.hikvisionSync.beginPersonDeletion, { deviceId: device._id, projectId: device.projectId, employeeId, cardNumber, runId });
+  const id = await ctx.runMutation(internal.hikvisionSync.beginPersonDeletion, { deviceId: device._id, projectId: device.projectId, employeeId, cardNumber, employeeNo, runId });
   let result: { ok: boolean; error?: string };
   try {
-    result = device.hikDevIndex ? await deletePersonFromDevice(device.hikDevIndex, cardNumber) : { ok: false, error: "gateway'e kayıtlı değil" };
+    result = device.hikDevIndex ? await deletePersonFromDevice(device.hikDevIndex, employeeNo) : { ok: false, error: "gateway'e kayıtlı değil" };
   } catch { result = { ok: false, error: "Cihaz silme isteği tamamlanamadı" }; }
   if (result.ok) await ctx.runMutation(internal.hikvisionSync.markOpDone, { id });
   else await ctx.runMutation(internal.hikvisionSync.markOpRetried, { id, lastError: result.error ?? "Cihaz silme onayı alınamadı" });
@@ -129,7 +131,8 @@ export async function syncEmployeeDevices(
     employeeId: args.employeeId,
   });
 
-  if (!data?.employee.cardNumber) {
+  const employeeNo = data ? hikPersonIdentity(data.employee) : undefined;
+  if (!data || !employeeNo) {
     return { synced: 0, failed: 0, errors: [] };
   }
   // Phase 1 visitor passes are cloud-only, including rule-wide resyncs.
@@ -141,7 +144,7 @@ export async function syncEmployeeDevices(
   if (data.deviceRules.length === 0 && data.previousDevices.length > 0) {
     const result = await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
       employeeId: args.employeeId, runId: args.runId, targetDeviceIds: args.targetDeviceIds, allowedProjectIds: args.allowedProjectIds,
-      snapshot: { cardNumber: data.employee.cardNumber, projectId: data.employee.projectId, devices: data.previousDevices },
+      snapshot: { cardNumber: data.employee.cardNumber, employeeNo, projectId: data.employee.projectId, devices: data.previousDevices },
     });
     return { synced: result.removed, failed: result.failed, errors: result.errors };
   }
@@ -178,9 +181,10 @@ export async function syncEmployeeDevices(
       deviceIds: [...new Set(hikRules.filter(({ device }) => !isLocalBridgeDevice(device) && isAllowed(device.projectId)).map(({ device }) => device._id))],
     })).flatMap(row => {
       const projectId = hikRules.find(({ device }) => device._id === row.deviceId)?.device.projectId;
-      return projectId ? [{ projectId, employeeId: args.employeeId, deviceId: row.deviceId, expectedGeneration: row.generation, state: "pending" as const }] : [];
+      return projectId ? [{ projectId, employeeId: args.employeeId, deviceId: row.deviceId, expectedGeneration: row.generation, expectedGrantId: row.grantId, state: "pending" as const }] : [];
     });
   const generations = new Map(reserved.map(row => [row.deviceId, row.expectedGeneration]));
+  const grantIds = new Map(reserved.map(row => [row.deviceId, row.expectedGrantId]));
   try {
     for (const { device, rule, doorNos } of hikRules) {
       if (!isAllowed(device.projectId)) {
@@ -250,7 +254,7 @@ export async function syncEmployeeDevices(
         if (warnings.length && doorPlans.length) deviceWarnings.set(t.device._id, warnings.join("; "));
         const multipleBridgePlans = isLocalBridgeDevice(t.device) && new Set(doorPlans.flatMap(p => p.planTemplateNos)).size !== 1;
         if (!doorPlans.length || multipleBridgePlans) {
-          const deletion = await removeScopedPerson(ctx, t.device, args.employeeId, employee.cardNumber, args.runId);
+          const deletion = await removeScopedPerson(ctx, t.device, args.employeeId, employeeNo, args.runId, employee.cardNumber);
           const reason = !doorPlans.length
             ? "Kapsanan kapı yok"
             : "Windows köprüsü kapı başına çoklu planı henüz desteklemiyor";
@@ -286,7 +290,7 @@ export async function syncEmployeeDevices(
         }
         if (isLocalBridgeDevice(t.device)) {
           await enqueueLocalBridgeOp(ctx, t.device, "addPerson", {
-            ruleIds: t.rules.map(entry => entry.rule._id), employeeId: args.employeeId, employeeNo: employee.cardNumber,
+            ruleIds: t.rules.map(entry => entry.rule._id), employeeId: args.employeeId, employeeNo,
             cardNumber: employee.cardNumber, name: `${employee.firstName} ${employee.lastName}`,
             planTemplateNo: doorPlans[0]?.planTemplateNos[0], doorCount: doorCountFor(t.device),
             doorRights: doorPlans.map(p => p.doorNo),
@@ -302,7 +306,7 @@ export async function syncEmployeeDevices(
           return { skipped: true as const, ok: false as const, device: t.device, operation: "addPerson" as const };
         }
         const personResult = await upsertPersonToDevice(t.device.hikDevIndex, {
-          employeeNo: employee.cardNumber,
+          employeeNo,
           name: `${employee.firstName} ${employee.lastName}`,
           doorPlans,
           ...validity,
@@ -315,14 +319,18 @@ export async function syncEmployeeDevices(
             error: `${t.device.name} (person): ${personResult.error ?? "?"}`,
           };
         }
-        const cardResult: { ok: boolean; alreadyExists?: boolean; error?: string } = employee.hikCardless === true ? { ok: true } : await addCardToDevice(t.device.hikDevIndex, {
-          employeeNo: employee.cardNumber,
+        const cardResult: { ok: boolean; alreadyExists?: boolean; error?: string } = !cardKey(employee.cardNumber) || employee.hikCardless === true ? { ok: true } : await addCardToDevice(t.device.hikDevIndex, {
+          employeeNo,
           cardNo: employee.cardNumber,
           cardType: "normalCard",
         });
         if (cardResult.ok || cardResult.alreadyExists) {
-          try {
-            await ctx.runMutation(internal.hikvisionSync.supersedePersonDeletions, { deviceId: t.device._id, cardNumber: employee.cardNumber });
+          if (prepared) {
+            const identities = prepared.shared.deletionCleanup.get(t.device._id) ?? new Set<string>();
+            identities.add(employeeNo);
+            prepared.shared.deletionCleanup.set(t.device._id, identities);
+          } else try {
+            await ctx.runMutation(internal.hikvisionSync.supersedePersonDeletions, { deviceId: t.device._id, cardNumber: employeeNo });
           } catch { /* Claim/cron still protect deletions; cleanup must not block card delivery. */ }
         }
         // alreadyExists hata değil (idempotent); diğer hata varsa warn.
@@ -374,7 +382,7 @@ export async function syncEmployeeDevices(
           projectId: r.device.projectId,
           operation: r.operation,
           lastError: r.error,
-          payload: { employeeId: args.employeeId, ...(r.operation === "deletePerson" ? { cardNumber: employee.cardNumber, employeeNo: employee.cardNumber } : {}) },
+          payload: { employeeId: args.employeeId, ...(r.operation === "deletePerson" ? { cardNumber: employee.cardNumber, employeeNo } : {}) },
         }),
       );
     }
@@ -394,6 +402,7 @@ export async function syncEmployeeDevices(
       if (!result || ("skipped" in result && result.skipped) || isLocalBridgeDevice(device) || !device.projectId || !isAllowed(device.projectId)) return [];
       return [{ projectId: device.projectId, employeeId: args.employeeId, deviceId: device._id,
         expectedGeneration: generations.get(device._id),
+        expectedGrantId: grantIds.get(device._id),
         state: result.grantRemoved ? "removed" as const : result.ok && !result.grantError ? "effective" as const : "failed" as const,
         ruleIds: rulesByDevice.get(device._id) ?? [],
         lastRunId: args.runId, lastError: result.grantRemoved ? undefined : result.grantError ?? (result.ok ? undefined : result.error) }];
@@ -579,7 +588,7 @@ export async function syncWeekPlanDevices(
 
   // Recompute every employee's complete rule union; never overwrite with only
   // the rule whose week plan happened to change.
-  const shared: SharedSync = { plans: new Map(), numbers: new Map(), successes: new Map(), grantResults: [], reservations: [] };
+  const shared: SharedSync = { plans: new Map(), numbers: new Map(), successes: new Map(), grantResults: [], reservations: [], deletionCleanup: new Map() };
   for (const result of planResults) {
     shared.plans.set(`${bridgeDedupeKey(result.device)}:${rule._id}`, Promise.resolve(result));
   }
@@ -589,8 +598,8 @@ export async function syncWeekPlanDevices(
   try {
     for (let offset = 0; offset < targets.length; offset += 20) {
       const batch = targets.slice(offset, offset + 20);
-      const employeeData = await ctx.runQuery(internal.hikvisionSync.getEmployeesWithDevices, { employeeIds: batch.map(emp => emp._id) });
-      const pairs = employeeData.flatMap(data => !data?.employee.cardNumber || data.employee.isActive === false || data.employee.visitorCredential === "pass" ? []
+      const employeeData = await ctx.runQuery(internal.hikvisionSync.getEmployeesWithDevices, { employeeIds: batch.map(emp => emp._id), skipUnusedSnapshot: true });
+      const pairs = employeeData.flatMap(data => !data || !hikPersonIdentity(data.employee) || data.employee.isActive === false || data.employee.visitorCredential === "pass" ? []
         : [...new Map(data.deviceRules.filter(({ device }) => device.brand === "hikvision" && !isLocalBridgeDevice(device) &&
             isAllowed(device.projectId) && allowedDevices.some(target => target._id === device._id))
           .map(({ device }) => [device._id, { employeeId: data.employee._id, deviceId: device._id, projectId: device.projectId }])).values()]);
@@ -602,7 +611,7 @@ export async function syncWeekPlanDevices(
         for (const row of generations) {
           const projectId = chunk.find(pair => pair.employeeId === row.employeeId && pair.deviceId === row.deviceId)?.projectId;
           if (projectId) shared.reservations.push({ projectId, employeeId: row.employeeId, deviceId: row.deviceId,
-            expectedGeneration: row.generation, state: "pending" });
+            expectedGeneration: row.generation, expectedGrantId: row.grantId, state: "pending" });
         }
       }
       const results = await Promise.all(batch.map((emp, index) => syncEmployeeDevices(ctx, {
@@ -614,6 +623,13 @@ export async function syncWeekPlanDevices(
         failed += result.failed;
         errors.push(...result.errors);
       }
+      // Keep post-add revocation checks fresh without one mutation per person.
+      for (const [deviceId, identities] of shared.deletionCleanup) {
+        try {
+          await ctx.runMutation(internal.hikvisionSync.supersedePersonDeletionsBatch, { deviceId, cardNumbers: [...identities] });
+        } catch { /* Claim/cron retain the same deletion protection if cleanup fails. */ }
+      }
+      shared.deletionCleanup.clear();
     }
     await Promise.all(Array.from(shared.successes, ([deviceId, employeeIds]) =>
       ctx.runMutation(internal.hikvisionSync.resolveTargetFailures, {
@@ -646,7 +662,8 @@ export async function syncEmployeeDoorRights(
   const { device } = args;
   const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: args.employeeId });
   if (!data || data.employee.projectId !== device.projectId || data.employee.cardNumber !== args.cardNumber) return { ok: false, error: "Kişinin kartı veya projesi değişti; kapı yetkisi doğrulanamadı" };
-  if (data.employee.visitorCredential === "pass") return { ok: true };
+  const employeeNo = hikPersonIdentity(data.employee);
+  if (!employeeNo || data.employee.visitorCredential === "pass") return { ok: true };
   // The bridge consumer does not implement an empty-rights update. Keep a visible
   // retryable failure instead of falling back to deleting the person or granting all doors.
   if (isLocalBridgeDevice(device)) return { ok: false, error: "Bu cihaz bağlantısında kişiyi koruyan kapı yetkisi güncellemesi desteklenmiyor" };
@@ -668,17 +685,17 @@ export async function syncEmployeeDoorRights(
   if (!current || current.terminationType === "transfer" || current.projectId !== device.projectId || current.cardNumber !== args.cardNumber || current.isActive !== data.employee.isActive) return { ok: false, error: "Kişi bilgileri gönderim sırasında değişti" };
   if (!doorPlans.length) {
     const result = await gatewayApiCallChecked("/ISAPI/AccessControl/UserInfo/SetUp", "PUT", {
-      UserInfo: { employeeNo: args.cardNumber, doorRight: "", RightPlan: [] },
+      UserInfo: { employeeNo, doorRight: "", RightPlan: [] },
     }, device.hikDevIndex);
     return { ...result, removed: result.ok };
   }
   const validity = employeeAccessWindow(data.employee, Date.now());
   const result = await upsertPersonToDevice(device.hikDevIndex, {
-    employeeNo: args.cardNumber, name: `${data.employee.firstName} ${data.employee.lastName}`, doorPlans,
+    employeeNo, name: `${data.employee.firstName} ${data.employee.lastName}`, doorPlans,
     ...validity,
   });
   if (!result.ok) return result;
-  if (data.employee.hikCardless === true) return { ok: true };
-  const card = await addCardToDevice(device.hikDevIndex, { employeeNo: args.cardNumber, cardNo: args.cardNumber });
+  if (!cardKey(data.employee.cardNumber) || data.employee.hikCardless === true) return { ok: true };
+  const card = await addCardToDevice(device.hikDevIndex, { employeeNo, cardNo: args.cardNumber });
   return { ok: card.ok || card.alreadyExists === true, error: card.error };
 }

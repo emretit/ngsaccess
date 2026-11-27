@@ -23,6 +23,7 @@ export const AUDIT_TARGET_LABELS: Record<string, string> = {
   overtimeRates: "Mesai oranı",
   employees: "Çalışan",
   accessTransfers: "Proje taşıması",
+  accessGrantStatus: "Cihaz erişim teslimi",
   employeeAuth: "Çalışan mobil hesabı",
   employeeConsents: "Çalışan izni / Ziyaretçi onayı",
   deviceEvents: "Cihaz olayı / Alarm",

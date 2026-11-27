@@ -18,6 +18,7 @@ export interface ProcessCardReadingArgs {
   rawBody?: string;
   hikDevIndex?: string;
   hikEhomeID?: string;
+  hikEmployeeNo?: string;
   hikMajorEventType?: number;
   hikSubEventType?: number;
   hikCurrentVerifyMode?: string;
@@ -40,6 +41,7 @@ type FindDeviceCardEmployee = (
   ctx: MutationCtx,
   cardNo: string,
   projectId?: Id<"projects">,
+  employeeNo?: string,
 ) => Promise<Doc<"employees"> | null>;
 
 type ReadingState = {
@@ -83,8 +85,12 @@ export async function processCardReadingCore(
   } as const;
 
   const state: ReadingState = { accessTime, projectForRow, hikFields,
-    findDeviceCardEmployee: (context, cardNo, projectId) => cardKey(cardNo)
-      ? findDeviceCardEmployee(context, cardNo, projectId) : Promise.resolve(null),
+    findDeviceCardEmployee: (context, cardNo, projectId) => {
+      if (!cardKey(cardNo) && !args.hikEmployeeNo?.trim()) return Promise.resolve(null);
+      return args.hikEmployeeNo
+        ? findDeviceCardEmployee(context, cardNo, projectId, args.hikEmployeeNo)
+        : findDeviceCardEmployee(context, cardNo, projectId);
+    },
   };
   const device = await resolveReadingDevice(ctx, args);
 

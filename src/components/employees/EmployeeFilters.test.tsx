@@ -14,7 +14,7 @@ it("02-D2/D3: uses shared comboboxes and restricts sorting dropdown to mobile", 
 vi.mock("@/components/ui/select", async original => ({
   ...await original<typeof import("@/components/ui/select")>(),
   SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  SelectItem: ({ children }: { children: ReactNode }) => <div role="option">{children}</div>,
+  SelectItem: ({ children, title }: { children: ReactNode; title?: string }) => <div role="option" title={title}>{children}</div>,
 }));
 it("shows FIELD labels, all statuses and a visible clear action even with zero counts", () => {
   const html = renderToStaticMarkup(<EmployeeFilters searchQuery="eşleşmeyen" onSearchChange={() => {}} status="all" statusCounts={{ all: 0, active: 0, inactive: 0 }} onStatusChange={() => {}} sort="name:asc" onSortChange={() => {}} onClear={() => {}} hasFilters={false} />);
@@ -23,6 +23,13 @@ it("shows FIELD labels, all statuses and a visible clear action even with zero c
   expect(html).toContain("Tüm durumlar (0)");
   expect(html).toContain("Filtreleri temizle");
   expect(html).not.toContain("button:last-of-type");
+});
+
+it("keeps large-project unknown counts distinct from zero and explains the read limit", () => {
+  const html = renderToStaticMarkup(<EmployeeFilters searchQuery="" onSearchChange={() => {}} status="all" statusCounts={null} onStatusChange={() => {}} sort="name:asc" onSortChange={() => {}} onClear={() => {}} hasFilters={false} />);
+  expect(html).toContain("Tüm durumlar (—)");
+  expect(html).toContain("2000 kayıt");
+  expect(html).not.toContain("Tüm durumlar (0)");
 });
 
 it("keeps search and clear outside the collapsed mobile panel and shows active count", () => {

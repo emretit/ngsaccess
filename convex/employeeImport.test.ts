@@ -7,6 +7,9 @@ import type { MutationCtx } from "./_generated/server";
 import * as employeeImport from "./employeeImport";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { EmployeeImportRow } from "./lib/employeeImportValidation";
+import { createEmployeeImportTemplate } from "../src/lib/employees/importTemplate";
+import { createEmployeesExportWorkbook } from "../src/lib/employees/exportEmployeesXlsx";
+import { parseEmployeesXlsx } from "../src/lib/employees/parseEmployeesXlsx";
 
 const row = (overrides: Partial<EmployeeImportRow> = {}): EmployeeImportRow => ({
   rowNumber: 2, firstName: "Ada", lastName: "Yılmaz", email: "ada@example.com", cardNumber: "A-1", ...overrides,
@@ -74,6 +77,47 @@ async function fixture(role: Doc<"users">["role"] = "project_admin") {
 }
 
 describe("importChunk", () => {
+  it("preserves inactive status through template, parser, preview and committed import", async () => {
+    const f = await fixture();
+    const workbook = await createEmployeeImportTemplate();
+    const sheet = workbook.worksheets[0];
+    if (!sheet) throw new Error("Missing template worksheet");
+    for (const index of [7, 8, 9]) sheet.getRow(3).getCell(index).value = "";
+    sheet.getRow(3).getCell(10).value = "Hayır";
+    const parsed = await parseEmployeesXlsx(new File([await workbook.xlsx.writeBuffer()], "template.xlsx"));
+    expect(parsed.issues).toEqual([]);
+    for (const dryRun of [true, false]) {
+      expect(await f.actor.mutation(api.employeeImport.importChunk, { projectId: f.projectId, rows: parsed.rows, dryRun })).toMatchObject([{ status: "created" }]);
+      expect((await f.snapshot()).employees).toHaveLength(dryRun ? 0 : 1);
+    }
+    expect((await f.snapshot()).employees[0]?.isActive).toBe(false);
+  });
+
+  it("imports exported cardless people with their status and skips device jobs even with inherited access", async () => {
+    const f = await fixture();
+    await f.employee(f.projectId, { cardNumber: "", email: "" });
+    await f.t.run(async ctx => {
+      const departmentId = await ctx.db.insert("departments", { projectId: f.projectId, name: "İK" });
+      const groupId = await ctx.db.insert("accessRules", { projectId: f.projectId, name: "Miras", targetType: "individual", days: [] });
+      await ctx.db.insert("groupDepartments", { projectId: f.projectId, groupId, departmentId, includeChildren: true });
+    });
+    const workbook = await createEmployeesExportWorkbook([false, true].map((isActive, index) => ({
+      _id: `employees:${index}` as Id<"employees">, firstName: "Ada", lastName: String(index), email: "", cardNumber: "",
+      isActive, departments: { _id: "departments:1" as Id<"departments">, name: "İK" },
+    })));
+    const parsed = await parseEmployeesXlsx(new File([await workbook.xlsx.writeBuffer()], "export.xlsx"));
+    expect(parsed.issues).toEqual([]);
+    parsed.rows[1].cardNumber = "  ";
+    const args = { projectId: f.projectId, rows: parsed.rows, dryRun: true };
+    expect(await f.actor.mutation(api.employeeImport.importChunk, args)).toMatchObject([{ status: "created" }, { status: "created" }]);
+    expect((await f.snapshot()).employees).toHaveLength(1);
+    expect(await f.actor.mutation(api.employeeImport.importChunk, { ...args, dryRun: false })).toMatchObject([{ status: "created" }, { status: "created" }]);
+    const snapshot = await f.snapshot();
+    expect(snapshot.employees.slice(1)).toMatchObject([{ cardNumber: "", isActive: false }, { cardNumber: "", isActive: true }]);
+    expect(snapshot.scheduled).toEqual([]);
+    const members = await f.t.run(ctx => ctx.db.query("groupMembers").take(10));
+    expect(members).toMatchObject([{ employeeId: snapshot.employees[2]?._id, source: "department" }]);
+  });
   it("dryRun validates without writing employees, audits or device sync jobs", async () => {
     const f = await fixture();
     expect(await f.actor.mutation(api.employeeImport.importChunk, { projectId: f.projectId, rows: [row()], dryRun: true })).toMatchObject([{ status: "created" }]);

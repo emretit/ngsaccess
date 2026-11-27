@@ -1,3 +1,4 @@
+import { patchEmployee } from "./lib/employeeListFields";
 import { requirePermission } from "./lib/permissions";
 import { reconcileDepartmentProject } from "./departmentAccess";
 import { recordDepartmentChange } from "./lib/employeeDepartmentHistory";
@@ -151,7 +152,7 @@ export const setCompany = authedMutation({
       if (moved > COMPANY_MOVE_LIMIT) throw new ConvexError(`Tek seferde en fazla ${COMPANY_MOVE_LIMIT} kişi taşınabilir`);
       for (const employee of employees) {
         if (employee.companyId !== companyId) {
-          await ctx.db.patch(employee._id, { companyId, updatedAt: now });
+          await patchEmployee(ctx, employee._id, { companyId, updatedAt: now });
           await recordDepartmentChange(ctx, employee._id, employee);
         }
       }

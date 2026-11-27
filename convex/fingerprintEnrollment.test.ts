@@ -27,6 +27,15 @@ async function fixture(role: "project_admin" | "project_user" = "project_admin")
 }
 
 describe("cihazda parmak izi metadata ve izinler", () => {
+  it("uses the preserved imported person identity for cardless enrollment and later card assignments", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.employeeId, { cardNumber: "", hikEmployeeNo: "device-person", hikCardless: true }));
+    const attemptId = await f.caller.mutation(api.fingerprintEnrollment.beginEnrollment, f.target);
+    await f.t.run(ctx => ctx.db.patch(f.employeeId, { cardNumber: "456", hikCardless: false }));
+    await f.t.mutation(internal.fingerprintEnrollment.upsert, { ...f.target, attemptId, enrolledBy: f.userId, expectedCardNumber: "device-person" });
+    const rows = await f.t.run(ctx => ctx.db.query("deviceFingerprintEnrollments").collect());
+    expect(rows[0].enrolledEmployeeNo).toBe("device-person");
+  });
   it("tüm kayıtlı query/mutation dönüş validatorları açıkça tanımlıdır", () => {
     const registered = Object.values(functions).filter((value): value is typeof value & { exportReturns: () => string } => typeof value === "function" && "exportReturns" in value);
     expect(registered.length).toBeGreaterThanOrEqual(11);
@@ -181,11 +190,14 @@ describe("encrypted central templates", () => {
   it("removal erases central template and queues devices with module off", async () => {
     const f = await fixture();
     await store(f);
+    expect((await f.t.run(ctx => ctx.db.get(f.employeeId)))?.deviceSyncUpdatedAt).toBeUndefined();
+    await f.t.run(ctx => ctx.db.patch(f.employeeId, { deviceSyncUpdatedAt: 1 }));
     await f.t.run(async ctx => {
       const settings = await ctx.db.query("projectPrivacySettings").first();
       if (settings) await ctx.db.patch(settings._id, { biometricEnabled: false });
     });
     await f.caller.mutation(api.fingerprintEnrollment.removeFingerprint, { employeeId: f.employeeId, fingerNo: 2 });
+    expect((await f.t.run(ctx => ctx.db.get(f.employeeId)))?.deviceSyncUpdatedAt).toBe(1);
     expect(await f.t.run(ctx => ctx.db.query("employeeFingerprints").collect())).toHaveLength(0);
     expect((await f.t.run(ctx => ctx.db.query("deviceFingerprintEnrollments").first()))?.deletionEmployeeNo).toBe("123");
     expect((await f.caller.query(api.fingerprintEnrollment.listForEmployee, { employeeId: f.employeeId })).templates[0].deviceIds).toEqual([]);

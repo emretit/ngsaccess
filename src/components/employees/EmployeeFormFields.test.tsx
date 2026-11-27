@@ -7,6 +7,16 @@ const permission = vi.hoisted(() => ({ accessRules: true }));
 vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => permission.accessRules }) }));
 afterEach(() => { permission.accessRules = true; });
 const formData: EmployeeFormData = { firstName: "", lastName: "", email: "", tcNo: "", cardNumber: "", payrollCode: "", companyId: null, departmentId: null, positionId: null, accessRuleId: null, shift: null, shiftId: null, photoUrl: null, notes: "", isActive: true, hourlyRate: null, monthlySalary: null };
+it("shows employee expiry and the imported instant, leaving visitor expiry UI unchanged", () => {
+  const props = { formData: { ...formData, accessExpiresAt: "2026-12-02" }, setFormData: () => {}, companies: [], departments: [], accessRules: [], positions: [], accessExpiresAtInstant: "2026-12-01T22:30:00Z" };
+  const employee = renderToStaticMarkup(<EmployeeFormFields {...props} />);
+  expect(employee).toContain("employee-accessExpiresAt");
+  expect(employee).toContain("Kayıtlı bitiş:");
+  expect(employee).toContain("01:30:00");
+  const visitor = renderToStaticMarkup(<EmployeeFormFields {...props} isVisitor />);
+  expect(visitor).not.toContain("employee-accessExpiresAt");
+  expect(visitor).not.toContain("Kayıtlı bitiş:");
+});
 function render(autoFocusFirstName: boolean) { return renderToStaticMarkup(<EmployeeFormFields formData={formData} setFormData={() => {}} companies={[]} departments={[]} accessRules={[]} positions={[]} autoFocusFirstName={autoFocusFirstName} />); }
 it("kartsız kayda izin verir ve sonradan toplu kart atama yolunu açıklar", () => {
   const html = render(false);
