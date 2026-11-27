@@ -7,8 +7,11 @@ import schema from "./schema";
 import { adminPaginationOptions, adminSearch, ADMIN_COUNT_LIMIT, projectName } from "./lib/adminLists";
 import { projectDeletionCounts, projectDeletionImpact, projectDeletionCleanupQuery } from "./lib/adminGuards";
 import { ConvexError, v } from "convex/values";
-import { projectDeletionBlockers, projectDeletionCleanupTables, projectDeletionError } from "./lib/adminGuards";
-import { query } from "./_generated/server";
+import { projectDeletionBlockers, projectDeletionCleanupTables, projectDeletionDeferredTables, projectDeletionError } from "./lib/adminGuards";
+import { query, type MutationCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { authedMutation, authedQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
 
@@ -106,6 +109,32 @@ export const update = superAdminMutation({
   },
 });
 
+/** Bounded numerical cleanup: old hours/days can exceed the atomic PII limit.
+ * Restarting from each project index's beginning is idempotent after retries. */
+async function cleanupDashboardSummaryBatch(ctx: MutationCtx, projectId: Id<"projects">): Promise<void> {
+  let remaining = 200;
+  for (const table of projectDeletionDeferredTables) {
+    const rows = await projectDeletionCleanupQuery(ctx, table, projectId).take(remaining);
+    for (const row of rows) await ctx.db.delete(row._id);
+    remaining -= rows.length;
+    if (remaining === 0) {
+      await ctx.scheduler.runAfter(0, internal.projects.cleanupDashboardSummaries, { projectId });
+      return;
+    }
+  }
+}
+
+export const cleanupDashboardSummaries = internalMutation({
+  args: { projectId: v.id("projects") },
+  returns: v.null(),
+  handler: async (ctx, { projectId }): Promise<null> => {
+    // Never let a delayed or manually invoked cleanup remove a live project's state.
+    if (await ctx.db.get(projectId)) return null;
+    await cleanupDashboardSummaryBatch(ctx, projectId);
+    return null;
+  },
+});
+
 export const remove = authedMutation({
   args: { id: v.id("projects") },
   returns: v.id("projects"),
@@ -119,6 +148,7 @@ export const remove = authedMutation({
     if (deletionError) throw new ConvexError(deletionError);
 
     for (const table of projectDeletionCleanupTables) {
+      if (projectDeletionDeferredTables.some(deferred => deferred === table)) continue;
       // Her tablo sınırlı okunur; limit aşımında tüm işlem geri alınır.
       const rows = await projectDeletionCleanupQuery(ctx, table, args.id).take(501);
       if (rows.length > 500) throw new ConvexError("Proje temizleme sınırı aşıldı; önce bağlı kayıtları azaltın veya projeyi pasife alın");
@@ -126,6 +156,8 @@ export const remove = authedMutation({
     }
     // auditLog geçmişi korunur.
     await ctx.db.delete(args.id);
+    // PII tables above stay atomic; only numerical state may continue in later batches.
+    await cleanupDashboardSummaryBatch(ctx, args.id);
     return args.id;
   },
 });

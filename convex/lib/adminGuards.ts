@@ -64,6 +64,12 @@ export const projectDeletionMatrix = [
   { table: "attendanceCorrections", index: "by_project_status", label: "puantaj düzeltmesi", policy: "block" },
   { table: "requestAttachments", index: "scan", label: "talep belgesi", policy: "block" },
   { table: "deviceFingerprintEnrollments", index: "scan", label: "cihaz parmak izi kaydı", policy: "block" },
+  // Derived evidence contains personal data and must leave with its project.
+  { table: "dashboardCounts", index: "by_projectId_and_kind", label: "Ana sayfa sayaçları", policy: "delete", cleanup: "scheduled" },
+  { table: "dashboardDays", index: "by_projectId_and_date", label: "Ana sayfa günleri", policy: "delete", cleanup: "scheduled" },
+  { table: "dashboardHours", index: "by_projectId_and_date_and_hour", label: "Ana sayfa saatleri", policy: "delete", cleanup: "scheduled" },
+  { table: "dashboardEvidence", index: "by_projectId_and_date_and_hour_and_part", label: "Ana sayfa kanıtları", policy: "delete" },
+  { table: "dashboardReadingFeed", index: "by_projectId_and_accessTime_and_readingCreationTime_and_readingId", label: "Ana sayfa canlı akışı", policy: "delete" },
   { table: "userProjects", index: "by_project", label: "Kullanıcı proje üyelikleri", policy: "delete" },
   { table: "generalSettings", index: "by_project", label: "Genel ayarlar", policy: "delete" },
   { table: "mailSettings", index: "by_project", label: "E-posta ayarları", policy: "delete" },
@@ -94,6 +100,10 @@ export const projectDeletionMatrix = [
 
 export const projectDeletionBlockingTables = projectDeletionMatrix.filter(entry => entry.policy === "block");
 export const projectDeletionCleanupTables = projectDeletionMatrix.filter(entry => entry.policy === "delete").map(entry => entry.table);
+// Only numeric derived state may outlive the project's atomic deletion transaction.
+export const projectDeletionDeferredTables = projectDeletionMatrix
+  .filter((entry): entry is Extract<typeof entry, { cleanup: "scheduled" }> => "cleanup" in entry && entry.cleanup === "scheduled")
+  .map(entry => entry.table);
 
 export function projectDeletionBlockers(counts: Readonly<Partial<Record<string, number>>>): string[] {
   return projectDeletionBlockingTables
@@ -179,6 +189,11 @@ function projectDeletionTableQuery(
   if (entry.index === "by_project_state") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_project_started") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_project_status_created") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_and_kind") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_and_date") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_and_date_and_hour") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_and_date_and_hour_and_part") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_and_accessTime_and_readingCreationTime_and_readingId") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   throw new Error("Proje silme indeksi bulunamadı");
 }
 

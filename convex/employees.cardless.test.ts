@@ -133,3 +133,9 @@ describe("kartsız kişi → toplu kart atama", () => {
     expect(f.jobs()).toEqual([]);
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./lib/dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./lib/dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

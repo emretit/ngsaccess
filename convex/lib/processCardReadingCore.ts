@@ -1,3 +1,4 @@
+import { withDashboardSummary } from "./dashboardSummary";
 import { notifyLateReading } from "./lateReading";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
@@ -60,6 +61,7 @@ export async function processCardReadingCore(
   args: ProcessCardReadingArgs,
   findDeviceCardEmployee: FindDeviceCardEmployee,
 ): Promise<{ granted: boolean }> {
+  ctx = withDashboardSummary(ctx);
   const accessTime = new Date().toISOString();
   const firstProjectId = (await ctx.db.query("projects").first())?._id;
   const projectForRow = (
@@ -341,6 +343,7 @@ export async function consumeReaderTokenDetailed(
   token: string,
   device: Doc<"devices"> | null,
 ): Promise<ReaderTokenOutcome> {
+  ctx = withDashboardSummary(ctx);
   const deny = (reason: ReaderScanDenial): ReaderTokenOutcome => ({ granted: false, reason });
   const tokenRow = await ctx.db.query("checkInTokens")
     .withIndex("by_token", q => q.eq("token", token)).first();

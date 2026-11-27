@@ -29,7 +29,7 @@ import { diffIds, staleGroupDoorIds } from "./lib/reconcileMath";
 import type { Doc, Id } from "./_generated/dataModel";
 import { paginationOptsValidator, type PaginationOptions } from "convex/server";
 import { matchesRuleStatus, matchesRuleType, personnelRuleTypes, ruleTypeStages, pageRuleStages, panelScope, pageRuleCandidates, personSearchTerms, activeRuleCursor } from "./lib/accessRuleSummary";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 const HIK_RECONCILE_BATCH = 25;

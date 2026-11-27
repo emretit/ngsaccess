@@ -1,3 +1,4 @@
+import { withDashboardSummary } from "./dashboardSummary";
 /**
  * Cihaz cascade + provizyon (bölge/kapı/okuyucu üretimi) yardımcıları.
  *
@@ -43,6 +44,7 @@ export async function purgeDeviceCascade(
   deviceId: Id<"devices">,
   projectId: Id<"projects"> | undefined,
 ) {
+  ctx = withDashboardSummary(ctx);
   await transferDeviceRemoved(ctx, deviceId, projectId);
   const passAttempts = await ctx.db.query("visitorPassAttempts")
     .withIndex("by_deviceId", q => q.eq("deviceId", deviceId)).take(2);

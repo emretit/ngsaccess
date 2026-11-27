@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -69,6 +70,7 @@ export function DeleteImpact({
           confirmLabel="Vardiyayı ve serileri sil"
           onConfirm={async () => {
             const result = await remove({ shiftId: shift._id });
+            invalidatePdksSnapshots();
             notify.success(
               "Vardiya silindi",
               `${result.removedAssignments} seri silindi${result.skippedAssignments > 0 ? `; proje bilgisi eksik ${result.skippedAssignments} seri silinmeden kaldı` : ""}.`,

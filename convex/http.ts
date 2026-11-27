@@ -7,6 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
 import { parseCardReaderBody, readLimitedBody, parseJsonObject, HttpInputError, cardReaderBodyLimit } from "./lib/cardReaderParse";
 import { shouldCreateCardReadingForHikEvent } from "./lib/hikEventCatalog";
+import { hasFreshIsupStatus } from "./lib/deviceConnection";
 import { resolveCardReaderAuth } from "./lib/cardReaderAuth";
 import { serve as serveRequestAttachment, upload as uploadRequestAttachment } from "./requestAttachments";
 
@@ -186,11 +187,20 @@ http.route({
         }
       }
 
-      // Her POST'ta (heartbeat dahil) lastSeen güncelle — cihaz "online" görünsün.
+      // Heartbeat dahil sinyalleri en fazla dakikada bir yaz; mutation da atomik olarak kontrol eder.
       // Token doğrulanmışsa cihaz o token'a sabitlenir (deviceId); aksi halde body
       // serial/IP ile çözen mutation bir token sahibinin başka tenant cihazının
       // lastSeen'ini flip etmesine izin verirdi.
-      if (authedDevice || serial || deviceIp || hikDevIndex || hikEhomeID || ideUuid) {
+      const nowMs = Date.now();
+      const lastSeenMs = authedDevice?.lastSeen ? Date.parse(authedDevice.lastSeen) : NaN;
+      const freshSignal = authedDevice && lastSeenMs > nowMs - 60_000 && lastSeenMs <= nowMs &&
+        authedDevice.hikLastSeenAt !== undefined && authedDevice.hikLastSeenAt > nowMs - 60_000 &&
+        authedDevice.hikLastSeenAt <= nowMs &&
+        (!authedDevice.hikOfflineHint || hasFreshIsupStatus(authedDevice, nowMs)) &&
+        !authedDevice.heartbeatOfflineEventId &&
+        ((authedDevice.brand !== "ide_smart" && !(authedDevice.brand === "hikvision" && authedDevice.hikTransport === "localBridge")) ||
+          authedDevice.isActive === false || authedDevice.heartbeatCheckAt !== undefined);
+      if (!freshSignal && (authedDevice || serial || deviceIp || hikDevIndex || hikEhomeID || ideUuid)) {
         await ctx.runMutation(internal.devices.updateLastSeen, {
           deviceId: authedDevice?._id,
           deviceSerial: serial ?? undefined,

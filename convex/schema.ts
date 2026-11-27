@@ -17,6 +17,33 @@ import { shiftRuleFields, shiftRulesValidator } from "./lib/shiftVersions";
 export default defineSchema({
   ...authTables,
 
+  // Bounded, write-through dashboard evidence. Missing/incomplete days use original queries.
+  dashboardDays: defineTable({
+    projectId: v.optional(v.id("projects")), date: v.string(), complete: v.boolean(), formatVersion: v.optional(v.literal(2)),
+  }).index("by_projectId_and_date", ["projectId", "date"]),
+  dashboardHours: defineTable({
+    projectId: v.optional(v.id("projects")), date: v.string(), hour: v.number(), shard: v.optional(v.number()),
+    total: v.number(), granted: v.number(), denied: v.number(),
+  }).index("by_projectId_and_date_and_hour", ["projectId", "date", "hour"])
+    .index("by_projectId_and_date_and_hour_and_shard", ["projectId", "date", "hour", "shard"]),
+  dashboardEvidence: defineTable({
+    projectId: v.optional(v.id("projects")), date: v.string(), hour: v.number(), shard: v.optional(v.number()), part: v.number(),
+    count: v.number(), payload: v.bytes(),
+  }).index("by_projectId_and_date_and_hour_and_part", ["projectId", "date", "hour", "part"])
+    .index("by_projectId_and_date_and_hour_and_shard_and_part", ["projectId", "date", "hour", "shard", "part"]),
+  dashboardCounts: defineTable({
+    projectId: v.optional(v.id("projects")), kind: v.union(v.literal("employees"), v.literal("devices"), v.literal("accessRules")),
+    count: v.number(),
+  }).index("by_projectId_and_kind", ["projectId", "kind"]),
+  dashboardReadingFeed: defineTable({
+    readingId: v.id("cardReadings"), readingCreationTime: v.number(), projectId: v.optional(v.id("projects")),
+    accessTime: v.string(), cardNo: v.string(), employeeName: v.optional(v.string()),
+    deviceId: v.optional(v.id("devices")),
+    accessStatus: v.optional(v.union(v.literal("izin_verildi"), v.literal("reddedildi"))),
+    direction: v.optional(v.union(v.literal("entry"), v.literal("exit"))),
+  }).index("by_readingId", ["readingId"])
+    .index("by_projectId_and_accessTime_and_readingCreationTime_and_readingId", ["projectId", "accessTime", "readingCreationTime", "readingId"]),
+
   payrollPeriods: defineTable({
     projectId: v.id("projects"),
     period: v.string(),

@@ -1,3 +1,4 @@
+import { withDashboardSummary } from "./dashboardSummary";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { employeeListKeys, EMPLOYEE_LIST_VERSION } from "./employeeListShared";
@@ -37,6 +38,7 @@ export function publicEmployee<T extends Doc<"employees">>(employee: T) {
 
 /** All employee writes use one transaction-local writer; optional undefined fields retain deletion semantics. */
 export async function patchEmployee(ctx: MutationCtx, employeeId: Id<"employees">, patch: EmployeePatch, refreshKeys = false): Promise<void> {
+  ctx = withDashboardSummary(ctx);
   const current = await ctx.db.get(employeeId);
   if (!current) throw new Error("Çalışan bulunamadı");
   const changed = ["projectId", "firstName", "lastName", "email", "cardNumber", "payrollCode", "departmentId", "companyId", "positionId", "isActive", "isVisitor"] as const;
@@ -53,6 +55,7 @@ export async function patchEmployee(ctx: MutationCtx, employeeId: Id<"employees"
 }
 
 export async function insertEmployee(ctx: MutationCtx, value: EmployeeValue): Promise<Id<"employees">> {
+  ctx = withDashboardSummary(ctx);
   const employeeId = await ctx.db.insert("employees", { ...value, deviceSyncUpdatedAt: value.deviceSyncUpdatedAt ?? Date.now() });
   const org = await writerOrganizations(ctx, value);
   await ctx.db.patch(employeeId, employeeIndexFields({ ...value, _id: employeeId, _creationTime: 0 }, org));

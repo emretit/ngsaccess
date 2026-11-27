@@ -2,8 +2,10 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { describe, expect, it, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { encodeEvidence, decodeEvidence } from "./lib/dashboardSummary";
+import { toPdksTransport } from "./lib/pdksTransport";
 import { grantEmployees } from "./lib/grantStatus";
 import { assertIdeRosterMovable } from "./lib/deviceProvision";
 import { projectDeletionMatrix, projectDeletionBlockingTables, projectDeletionCleanupTables } from "./lib/adminGuards";
@@ -178,5 +180,108 @@ it("Y-09: cleanup over its bound fails atomically instead of leaving partial cle
     expect(await ctx.db.get(f.projectId)).not.toBeNull();
     expect(await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", f.projectId)).take(502)).toHaveLength(501);
     expect(await ctx.db.query("userProjects").withIndex("by_project", q => q.eq("projectId", f.projectId)).take(2)).toHaveLength(1);
+  });
+});
+
+it("project deletion removes all five dashboard projections and their PII, preserving foreign and global evidence", async () => {
+  const f = await fixture();
+  const seed = (projectId?: typeof f.projectId) => f.t.run(async ctx => {
+    // An old/raw writer can leave derived rows after source deletion; these
+    // projections must not block project deletion or become orphaned PII.
+    const readingId = await ctx.db.insert("cardReadings", { projectId, cardNo: "SECRET-CARD", employeeName: "Private Person", accessTime: "2026-11-27T08:00:00Z" });
+    const reading = await ctx.db.get(readingId);
+    if (!reading) throw new Error("Missing fixture reading");
+    const day = await ctx.db.insert("dashboardDays", { projectId, date: "2026-11-27", complete: true, formatVersion: 2 });
+    const hour = await ctx.db.insert("dashboardHours", { projectId, date: "2026-11-27", hour: 11, total: 1, granted: 0, denied: 0 });
+    const evidence = await ctx.db.insert("dashboardEvidence", { projectId, date: "2026-11-27", hour: 11, part: 0, count: 1, payload: encodeEvidence([toPdksTransport(reading)]) });
+    const count = await ctx.db.insert("dashboardCounts", { projectId, kind: "employees", count: 0 });
+    const feed = await ctx.db.insert("dashboardReadingFeed", { projectId, readingId, readingCreationTime: reading._creationTime, accessTime: reading.accessTime, cardNo: reading.cardNo, employeeName: reading.employeeName });
+    await ctx.db.delete(readingId);
+    return { ids: [day, hour, evidence, count, feed], evidence, feed };
+  });
+  const owned = await seed(f.projectId), foreign = await seed(f.otherProjectId), global = await seed();
+  const impact = await f.admin.query(api.projects.getDeletionImpact, { projectId: f.projectId });
+  expect(impact).toMatchObject({ canDelete: true, blockers: [] });
+  expect(impact.cleanup.map(row => row.table)).toEqual(expect.arrayContaining([
+    "dashboardDays", "dashboardHours", "dashboardEvidence", "dashboardCounts", "dashboardReadingFeed",
+  ]));
+  await f.admin.mutation(api.projects.remove, { id: f.projectId });
+  await f.t.run(async ctx => {
+    expect(await ctx.db.get(f.projectId)).toBeNull();
+    for (const id of owned.ids) expect(await ctx.db.get(id)).toBeNull();
+    for (const retained of [foreign, global]) {
+      for (const id of retained.ids) expect(await ctx.db.get(id)).not.toBeNull();
+      expect((await ctx.db.get(retained.feed))?.employeeName).toBe("Private Person");
+      const evidence = await ctx.db.get(retained.evidence);
+      if (!evidence) throw new Error("Foreign evidence must survive");
+      expect(decodeEvidence(evidence.payload, evidence.projectId)[0]?.cardNo).toBe("SECRET-CARD");
+    }
+  });
+});
+
+it("a 60-day project deletes without the numeric 500-row lock and drains every dashboard table", async () => {
+  vi.useFakeTimers();
+  try {
+    const f = await fixture();
+    const foreign = await f.t.run(async ctx => {
+      for (let day = 0; day < 60; day++) {
+        const date = new Date(Date.UTC(2026, 8, day + 1)).toISOString().slice(0, 10);
+        await ctx.db.insert("dashboardDays", { projectId: f.projectId, date, complete: true, formatVersion: 2 });
+        for (let hour = 0; hour < 10; hour++) await ctx.db.insert("dashboardHours", {
+          projectId: f.projectId, date, hour, shard: 0, total: 0, granted: 0, denied: 0,
+        });
+      }
+      for (const kind of ["employees", "devices", "accessRules"] as const) await ctx.db.insert("dashboardCounts", { projectId: f.projectId, kind, count: 0 });
+      const readingId = await ctx.db.insert("cardReadings", { projectId: f.projectId, cardNo: "PRIVATE", employeeName: "Private Person", accessTime: "2026-10-30T08:00:00Z" });
+      const reading = await ctx.db.get(readingId);
+      if (!reading) throw new Error("Missing reading fixture");
+      await ctx.db.insert("dashboardReadingFeed", { projectId: f.projectId, readingId, readingCreationTime: reading._creationTime, accessTime: reading.accessTime, cardNo: reading.cardNo, employeeName: reading.employeeName });
+      await ctx.db.insert("dashboardEvidence", { projectId: f.projectId, date: "2026-10-30", hour: 11, part: 0, count: 1, payload: encodeEvidence([toPdksTransport(reading)]) });
+      await ctx.db.delete(readingId);
+      return ctx.db.insert("dashboardHours", { projectId: f.otherProjectId, date: "2026-10-30", hour: 11, total: 1, granted: 1, denied: 0 });
+    });
+    expect((await f.admin.query(api.projects.getDeletionImpact, { projectId: f.projectId })).canDelete).toBe(true);
+    await expect(f.admin.mutation(api.projects.remove, { id: f.projectId })).resolves.toBe(f.projectId);
+    await f.t.run(async ctx => {
+      expect(await ctx.db.get(f.projectId)).toBeNull();
+      // Personal evidence is gone before any scheduled cleanup has run.
+      expect(await ctx.db.query("dashboardReadingFeed").collect()).toEqual([]);
+      expect(await ctx.db.query("dashboardEvidence").collect()).toEqual([]);
+      expect((await ctx.db.query("dashboardHours").collect()).filter(row => row.projectId === f.projectId).length).toBeGreaterThan(0);
+      expect(await ctx.db.system.query("_scheduled_functions").collect()).toHaveLength(1);
+    });
+    await f.t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await f.t.run(async ctx => {
+      for (const table of ["dashboardHours", "dashboardDays", "dashboardCounts", "dashboardReadingFeed", "dashboardEvidence"] as const) {
+        expect((await ctx.db.query(table).collect()).filter(row => row.projectId === f.projectId), table).toEqual([]);
+      }
+      expect(await ctx.db.get(foreign)).not.toBeNull();
+    });
+    // A stale retry is harmless, and an active project is never a cleanup target.
+    await f.t.mutation(internal.projects.cleanupDashboardSummaries, { projectId: f.projectId });
+    await f.t.mutation(internal.projects.cleanupDashboardSummaries, { projectId: f.otherProjectId });
+    expect(await f.t.run(ctx => ctx.db.get(foreign))).not.toBeNull();
+  } finally { vi.useRealTimers(); }
+});
+
+it.each(["dashboardReadingFeed", "dashboardEvidence"] as const)("%s retains its atomic PII limit and rolls back project deletion", async table => {
+  const f = await fixture();
+  await f.t.run(async ctx => {
+    const readingId = await ctx.db.insert("cardReadings", { projectId: f.projectId, cardNo: "PRIVATE", accessTime: "2026-10-30T08:00:00Z" });
+    const reading = await ctx.db.get(readingId);
+    if (!reading) throw new Error("Missing reading fixture");
+    for (let i = 0; i < 501; i++) {
+      if (table === "dashboardReadingFeed") await ctx.db.insert(table, { projectId: f.projectId, readingId, readingCreationTime: reading._creationTime, accessTime: reading.accessTime, cardNo: reading.cardNo });
+      else await ctx.db.insert(table, { projectId: f.projectId, date: "2026-10-30", hour: 11, part: i, count: 1, payload: encodeEvidence([toPdksTransport(reading)]) });
+    }
+    await ctx.db.delete(readingId);
+    await ctx.db.insert("dashboardCounts", { projectId: f.projectId, kind: "employees", count: 0 });
+  });
+  await expect(f.admin.mutation(api.projects.remove, { id: f.projectId })).rejects.toThrow("temizleme sınırı");
+  await f.t.run(async ctx => {
+    expect(await ctx.db.get(f.projectId)).not.toBeNull();
+    expect(await ctx.db.query(table).collect()).toHaveLength(501);
+    expect(await ctx.db.query("dashboardCounts").collect()).toHaveLength(1);
+    expect(await ctx.db.system.query("_scheduled_functions").collect()).toEqual([]);
   });
 });

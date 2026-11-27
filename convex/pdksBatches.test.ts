@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { writeFileSync } from "node:fs";
 /// <reference types="vite/client" />
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { convexTest } from "convex-test";
 import { getConvexSize, type Value } from "convex/values";
 import { getFunctionName, type FunctionReference } from "convex/server";
@@ -9,7 +9,11 @@ import { api } from "./_generated/api";
 import schema from "./schema";
 import type { QueryCtx } from "./_generated/server";
 import * as batchFunctions from "./pdksBatches";
-import { loadPdksTable, loadPdksPayroll } from "../src/lib/pdksBatches";
+import * as annualFunctions from "./pdksAnnual";
+import * as dashboardFunctions from "./dashboard";
+import { convexTestClient } from "../src/test-utils/convexClient";
+import { loadAnnualOvertime } from "../src/lib/pdksAnnual";
+import { loadPdksTable, loadPdksPayroll, pdksBatchRefs, pdksMapConcurrent } from "../src/lib/pdksBatches";
 import { DEFAULT_FLEXIBLE } from "./lib/pdksFlexible";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -17,9 +21,18 @@ const rawDeviceBody = JSON.stringify({ source: "card", padding: "x".repeat(1600)
 const punchTimes = [["05:00", "entry"], ["09:00", "exit"], ["10:00", "entry"], ["14:00", "exit"]] as const;
 type PageState = { rows: Map<string, Record<string, unknown>[]> };
 function proxyQuery<Q extends object>(query: Q, dates: readonly string[], state: PageState, bounds: { start?: string; end?: string } = {}): Q {
-  const expand = (row: Record<string, unknown>) => dates.flatMap(date => punchTimes.map(([time, direction]) => ({ ...row,
-    _id: `${String(row._id)}-${date}-${time}`, accessTime: `${date}T${time}:00.000Z`, direction, rawData: rawDeviceBody,
-  }))).filter(reading => (!bounds.start || reading.accessTime >= bounds.start) && (!bounds.end || reading.accessTime <= bounds.end));
+  const expand = (row: Record<string, unknown>) => {
+    const result: Record<string, unknown>[] = [];
+    for (const date of dates) {
+      if (bounds.start && date < bounds.start.slice(0, 10) || bounds.end && date > bounds.end.slice(0, 10)) continue;
+      for (const [time, direction] of punchTimes) {
+        const accessTime = `${date}T${time}:00.000Z`;
+        if (bounds.start && accessTime < bounds.start || bounds.end && accessTime > bounds.end) continue;
+        result.push({ ...row, _id: `${String(row._id)}-${date}-${time}`, accessTime, direction, rawData: rawDeviceBody });
+      }
+    }
+    return result;
+  };
   return new Proxy(query, { get(target, key) {
     const value: unknown = Reflect.get(target, key);
     if (key === Symbol.asyncIterator) return async function* () {
@@ -59,6 +72,9 @@ function proxyQuery<Q extends object>(query: Q, dates: readonly string[], state:
             if (values[0] === "accessTime" && typeof values[1] === "string") {
               if (method === "gte") nextBounds.start = values[1];
               if (method === "lte") nextBounds.end = values[1];
+              // The stored row is an indexed badge template; apply time bounds only
+              // after expanding it into actual per-month events.
+              return trace(range);
             }
             const result: unknown = Reflect.apply(fn, range, values);
             return result && typeof result === "object" ? trace(result) : result;
@@ -121,17 +137,18 @@ it("batched table and payroll equal existing complete calculations, including gl
     return { projectId, userId, sessionId, companyId };
   });
   const client = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
+  const loaderClient = convexTestClient(client);
   const tableArgs = { projectId: ids.projectId, startDate: "2026-06-01", endDate: "2026-06-30", viewMode: "matrix" as const };
-  expect(await loadPdksTable(client, tableArgs)).toEqual(await client.query(api.cardReadings.getPdksTableData, tableArgs));
+  expect(await loadPdksTable(loaderClient, tableArgs)).toEqual(await client.query(api.cardReadings.getPdksTableData, tableArgs));
   const payrollArgs = { projectId: ids.projectId, year: 2026, month: 6 };
-  expect(await loadPdksPayroll(client, payrollArgs)).toEqual(await client.query(api.cardReadings.getMonthlyPayrollSheet, payrollArgs));
+  expect(await loadPdksPayroll(loaderClient, payrollArgs)).toEqual(await client.query(api.cardReadings.getMonthlyPayrollSheet, payrollArgs));
   const filtered = { ...tableArgs, companyId: ids.companyId };
-  expect(await loadPdksTable(client, filtered)).toEqual(await client.query(api.cardReadings.getPdksTableData, filtered));
+  expect(await loadPdksTable(loaderClient, filtered)).toEqual(await client.query(api.cardReadings.getPdksTableData, filtered));
   const filteredPayroll = { ...payrollArgs, companyId: ids.companyId };
-  expect(await loadPdksPayroll(client, filteredPayroll)).toEqual(await client.query(api.cardReadings.getMonthlyPayrollSheet, filteredPayroll));
+  expect(await loadPdksPayroll(loaderClient, filteredPayroll)).toEqual(await client.query(api.cardReadings.getMonthlyPayrollSheet, filteredPayroll));
 }, 30_000);
 
-async function scaleFixture(count: number) {
+async function scaleFixture(count: number, annualYear = false) {
   const t = convexTest(schema, modules);
   const ids = await t.run(async ctx => {
     const projectId = await ctx.db.insert("projects", { name: `${count} people` });
@@ -148,7 +165,7 @@ async function scaleFixture(count: number) {
     return { projectId, userId, sessionId };
   });
   const user = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
-  const dates = Array.from({ length: 30 }, (_, i) => `2026-06-${String(i + 1).padStart(2, "0")}`).filter(date => ![0, 6].includes(new Date(date).getUTCDay()));
+  const dates = annualYear ? Array.from({ length: 12 }, (_, m) => Array.from({ length: new Date(Date.UTC(2026, m + 1, 0)).getUTCDate() }, (_, i) => `2026-${String(m + 1).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`).filter(date => ![0, 6].includes(new Date(date).getUTCDay()))).flat() : Array.from({ length: 30 }, (_, i) => `2026-06-${String(i + 1).padStart(2, "0")}`).filter(date => ![0, 6].includes(new Date(date).getUTCDay()));
   const io: IoMeter = { bytes: 0, baselineBytes: 0, transactions: 0, current: 0, peak: 0 };
   const pageState: PageState = { rows: new Map() };
   // The real 500-person fixture's indexed badge is expanded before each transaction's
@@ -156,8 +173,9 @@ async function scaleFixture(count: number) {
   const query = async (ref: FunctionReference<"query">, args: Record<string, unknown>) => {
     io.transactions++;
     io.current++; io.peak = Math.max(io.peak, io.current);
-    const name = getFunctionName(ref).split(":")[1] as keyof typeof batchFunctions;
-    const registered = batchFunctions[name] as unknown as { _handler: (ctx: QueryCtx, args: Record<string, unknown>) => Promise<unknown> };
+    const [module, name] = getFunctionName(ref).split(":");
+    const functions = module === "pdksAnnual" ? annualFunctions : module === "dashboard" ? dashboardFunctions : batchFunctions;
+    const registered = Reflect.get(functions, name) as unknown as { _handler: (ctx: QueryCtx, args: Record<string, unknown>) => Promise<unknown> };
     try { return await user.run(ctx => {
       const db = new Proxy(ctx.db, { get(target, key) {
         if (key === "get") return async (...params: unknown[]) => {
@@ -191,12 +209,74 @@ it("500 employees / 44,000 monthly readings: table AND payroll opening reads at 
   expect(io.bytes / io.baselineBytes).toBeLessThanOrEqual(1.2);
   expect(io.peak).toBe(4);
 }, 360_000);
-it.each([500, 1000])("Friday daily view at %i employees returns every row without a monolithic read", async count => {
-  const { client, ids } = await scaleFixture(count);
-  const rows = await loadPdksTable(client, { projectId: ids.projectId, date: "2026-06-05", viewMode: "matrix" });
-  expect(rows).toHaveLength(count);
-  expect(rows.every(row => row.days[0]?.status === "present" || row.days[0]?.status === "late")).toBe(true);
+it.each([500, 1000])("today at %i employees: bounded live group queries equal the full snapshot", async count => {
+  vi.setSystemTime(new Date("2026-06-05T17:00:00Z"));
+  try {
+    const { client, ids } = await scaleFixture(count);
+    const args = { projectId: ids.projectId, date: "2026-06-05", viewMode: "matrix" as const };
+    const expected = await loadPdksTable(client, args);
+    const roster = await client.query(pdksBatchRefs.todayRoster, { projectId: ids.projectId, date: "2026-06-05" });
+    const available = new Set(await client.query(pdksBatchRefs.todayAvailability, { projectId: ids.projectId, date: "2026-06-05", roster }));
+    const deviceAvailability = await client.query(pdksBatchRefs.todayDeviceAvailability, { projectId: ids.projectId });
+    const groups = Array.from({ length: Math.ceil(roster.length / 64) }, (_, i) => roster.slice(i * 64, (i + 1) * 64).map(employee => employee.employeeId));
+    const request = { kind: "table" as const, args };
+    const discovery = await pdksMapConcurrent(groups, employeeIds => client.query(pdksBatchRefs.calculate, { request, roster, employeeIds, availabilityOnly: true }));
+    discovery.forEach(result => result.availableDates.forEach(date => available.add(date)));
+    const calculated = await pdksMapConcurrent(groups, employeeIds => client.query(pdksBatchRefs.calculate, { request, roster, employeeIds, availabilityOnly: false,
+      deviceAvailability, availableDates: [...available].sort(), forceFlexible: discovery.some(result => result.hasFlexible) }));
+    const actual = calculated.flatMap(result => result.kind === "table" ? result.rows : []).sort((a, b) => a.name.localeCompare(b.name, "tr"));
+    expect(actual).toHaveLength(count);
+    expect(actual).toEqual(expected);
+  } finally { vi.useRealTimers(); }
 }, 360_000);
+
+it("post-rollout live groups equal snapshots with completed and overlapping pending gateway scans", async () => {
+  vi.setSystemTime(new Date("2026-11-26T12:00:00Z"));
+  const date = "2026-11-27";
+  try {
+    const t = convexTest(schema, modules);
+    const ids = await t.run(async ctx => {
+      const projectId = await ctx.db.insert("projects", { name: "Completeness equivalence" });
+      const userId = await ctx.db.insert("users", { role: "super_admin", verified: true });
+      const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: Date.now() + 3 * 86400000 });
+      const shiftId = await ctx.db.insert("shifts", { projectId, name: "Day", startTime: "08:00", endTime: "17:00", createdAt: "", updatedAt: "" });
+      const complete = { projectId, brand: "hikvision" as const, hikTransport: "gateway" as const, isActive: true, createdAt: "", updatedAt: "", hikLastBackfillAt: Date.parse(`${date}T20:00:00Z`) };
+      const deviceId = await ctx.db.insert("devices", { ...complete, name: "Complete" });
+      const pendingId = await ctx.db.insert("devices", { ...complete, name: "Pending", hikBackfillPending: {
+        devIndex: "pending", searchID: "scan", position: 0, maxPages: 10, startedAt: Date.parse(`${date}T08:00:00Z`), startTime: `${date}T05:00:00Z`,
+      } });
+      const employeeIds = [];
+      for (let i = 0; i < 2; i++) {
+        const employeeId = await ctx.db.insert("employees", { projectId, shiftId, firstName: `Person ${i}`, lastName: "Test", email: `${i}@complete.test`, cardNumber: String(i), isActive: true });
+        employeeIds.push(employeeId);
+        await ctx.db.insert("shiftAssignments", { projectId, employeeId, shiftId, startDate: "2026-11-01", endDate: "2026-11-30", createdAt: "", updatedAt: "" });
+        for (const day of i === 0 ? ["2026-11-26", date] : ["2026-11-26"]) {
+          for (const [time, direction] of [["05:00", "entry"], ["14:00", "exit"]] as const) await ctx.db.insert("cardReadings", { projectId, employeeId, deviceId, cardNo: String(i), accessTime: `${day}T${time}:00Z`, accessStatus: "izin_verildi", direction });
+        }
+      }
+      return { projectId, userId, sessionId, pendingId, employeeIds };
+    });
+    vi.setSystemTime(new Date(`${date}T20:00:00Z`));
+    const user = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
+    const client = convexTestClient(user);
+    const args = { projectId: ids.projectId, date, viewMode: "matrix" as const };
+    for (const pending of [true, false]) {
+      if (!pending) await t.run(ctx => ctx.db.patch(ids.pendingId, { hikBackfillPending: undefined }));
+      const expected = await loadPdksTable(client, args);
+      const roster = await user.query(pdksBatchRefs.todayRoster, { projectId: ids.projectId, date });
+      const deviceAvailability = await user.query(pdksBatchRefs.todayDeviceAvailability, { projectId: ids.projectId });
+      expect(deviceAvailability.every(device => device.brand === "hikvision" && device.hikTransport === "gateway")).toBe(true);
+      const request = { kind: "table" as const, args };
+      const discovery = await Promise.all(roster.map(employee => user.query(pdksBatchRefs.calculate, { request, roster, employeeIds: [employee.employeeId], availabilityOnly: true })));
+      const availableDates = [...new Set(discovery.flatMap(result => result.availableDates))];
+      const live = await Promise.all(roster.map(employee => user.query(pdksBatchRefs.calculate, { request, roster, employeeIds: [employee.employeeId], availabilityOnly: false, deviceAvailability, availableDates })));
+      const rows = live.flatMap(result => result.kind === "table" ? result.rows : []).sort((a, b) => a.name.localeCompare(b.name, "tr"));
+      expect(rows).toEqual(expected);
+      expect(rows.find(row => row.id === ids.employeeIds[1])?.days[0].status).toBe(pending ? "awaitingData" : "absent");
+      expect(rows.find(row => row.id === ids.employeeIds[0])?.days[0].status).toBe("present");
+    }
+  } finally { vi.useRealTimers(); }
+});
 
 it("every batch endpoint checks project/report access before reading data", async () => {
   const { pdksBatchRefs } = await import("../src/lib/pdksBatches");
@@ -209,8 +289,21 @@ it("every batch endpoint checks project/report access before reading data", asyn
   });
   const user = t.withIdentity({ subject: `${ids.userId}|${ids.sessionId}` });
   const request = { kind: "table" as const, args: { projectId: ids.projectId, date: "2026-06-01" } };
+  await expect(user.query(pdksBatchRefs.todayDeviceAvailability, { projectId: ids.projectId })).rejects.toThrow("erişim");
+  await expect(user.query(pdksBatchRefs.todayRoster, { projectId: ids.projectId, date: "2026-06-01" })).rejects.toThrow("erişim");
+  await expect(user.query(pdksBatchRefs.todayAvailability, { projectId: ids.projectId, date: "2026-06-01", roster: [] })).rejects.toThrow("erişim");
   await expect(user.query(pdksBatchRefs.roster, { request, cursor: null })).rejects.toThrow("erişim");
   await expect(user.query(pdksBatchRefs.dates, { request, roster: [], cursor: null })).rejects.toThrow("erişim");
   await expect(user.query(pdksBatchRefs.calculate, { request, roster: [], employeeIds: [], availabilityOnly: true })).rejects.toThrow("erişim");
   await expect(user.query(pdksBatchRefs.closed, { args: { projectId: ids.projectId, year: 2026, month: 6 }, cursor: null })).rejects.toThrow("erişim");
 });
+
+it("500 annual employees, a full year of realistic device bodies: no more than 120 bounded calls", async () => {
+  const { client, ids, io } = await scaleFixture(500, true);
+  const rows = await loadAnnualOvertime(client, { projectId: ids.projectId, year: 2026 });
+  expect(rows).toHaveLength(500);
+  expect(io.transactions).toBeLessThanOrEqual(120);
+  expect(io.bytes).toBeGreaterThan(500 * 250 * 4 * 1600);
+  expect(io.peak).toBe(4);
+  writeFileSync("/tmp/ngsaccess-pdks-annual-calls.json", JSON.stringify({ employees: 500, transactions: io.transactions, peak: io.peak, bytes: io.bytes }));
+}, 360_000);

@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, internalQuery, type QueryCtx } from "./_generated/server";
+import { internalQuery, type QueryCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { requirePermission } from "./lib/permissions";

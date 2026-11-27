@@ -4,14 +4,16 @@ import { components } from "./_generated/api";
 import { seedDepartmentHistory } from "./lib/employeeDepartmentHistory";
 import { employeeAuditValues } from "./lib/auditPrivacy";
 import { auditSearchText } from "./lib/auditSearch";
-import { internalMutation, internalQuery, type QueryCtx, type MutationCtx } from "./_generated/server";
+import { internalQuery, type QueryCtx, type MutationCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
+import { initializeDashboardCounts } from "./lib/dashboardSummary";
 import { v } from "convex/values";
 import { initializeHeartbeatMonitoring } from "./lib/deviceConnection";
 
 import { LEGACY_PDKS_POLICY } from "./lib/pdksRules";
 import { writePdksRuleVersion } from "./lib/pdksRuleWrite";
 
-const migrations = new Migrations<DataModel>(components.migrations);
+const migrations = new Migrations<DataModel>(components.migrations, { internalMutation });
 
 export const previewEmployeeDepartments = internalQuery({
   args: { cursor: v.optional(v.union(v.string(), v.null())) },
@@ -138,5 +140,19 @@ export const switchProjectsToRequirements = internalMutation({
       created.push({ projectId: project._id, ruleVersionId });
     }
     return { effectiveFrom: PDKS_REQUIREMENTS_EFFECTIVE_FROM, created, skipped, updated, isDone: page.isDone, continueCursor: page.continueCursor };
+  },
+});
+
+/** Negative counters permanently use exact fallback until this manual reset is invoked.
+ * Reinitialize all three bounded counters; projects still over 1000 retain -1. */
+export const resetDashboardCounts = internalMutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    for (const kind of ["employees", "devices", "accessRules"] as const) {
+      const row = await ctx.db.query("dashboardCounts")
+        .withIndex("by_projectId_and_kind", q => q.eq("projectId", projectId).eq("kind", kind)).unique();
+      if (row) await ctx.db.delete(row._id);
+    }
+    await initializeDashboardCounts(ctx, projectId);
   },
 });

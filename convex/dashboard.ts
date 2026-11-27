@@ -17,6 +17,7 @@ import type { PdksTableRow } from "./lib/pdksTable";
 import { filterPdksReadings } from "./lib/pdksSource";
 import { cardKey } from "./lib/employeeUx";
 import { summarizeDailyReadings } from "./lib/dashboardActivity";
+import { readDashboardEvidence, readDashboardTimeline } from "./lib/dashboardSummary";
 import { countDashboardRows } from "./lib/dashboardCounts";
 import { createHourlyCounter } from "./lib/dashboardTimeline";
 import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
@@ -83,6 +84,15 @@ export const getStats = authedQuery({
         ),
       ]);
     } else if (allowedProjectIds.length > 0) {
+      const counters = await Promise.all(allowedProjectIds.map(pid => ctx.db.query("dashboardCounts")
+        .withIndex("by_projectId_and_kind", q => q.eq("projectId", pid)).take(4)));
+      if (counters.every(rows => rows.length === 3 && rows.every(row => row.count >= 0))) {
+        const sum = (kind: "employees" | "devices" | "accessRules") => counters.flat().filter(row => row.kind === kind).reduce((total, row) => total + row.count, 0);
+        const totals = includeTodayReadings ? await Promise.all(allowedProjectIds.map(pid => readDashboardTimeline(ctx, pid, today))) : [];
+        if (!includeTodayReadings || totals.every(total => total !== null)) {
+          return { employees: sum("employees"), devices: sum("devices"), cardReadings: includeTodayReadings ? totals.reduce((count, total) => count + (total?.total ?? 0), 0) : undefined, pendingRequests: sum("accessRules") };
+        }
+      }
       const [empResults, devResults, readingResults, ruleResults] = await Promise.all([
         Promise.all(
           allowedProjectIds.map((pid) =>
@@ -141,6 +151,10 @@ export const getTodayTimeline = authedQuery({
     const allowedProjectIds = await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     const today = trTodayKey();
     const { startISO, endISO } = trDayRangeISO(today, today);
+    if (args.projectId) {
+      const summary = await readDashboardTimeline(ctx, args.projectId, today);
+      if (summary) return summary;
+    }
     const counter = createHourlyCounter();
     const queries =
       ctx.user.role === "super_admin" && !args.projectId
@@ -178,6 +192,7 @@ async function loadPdksDataset(
     projectId?: Id<"projects">;
   },
   batch?: PdksBatchScope & { readingStartISO: string; readingEndISO: string },
+  dashboardDate?: string,
 ): Promise<{
   employees: Doc<"employees">[];
   readings: Doc<"cardReadings">[];
@@ -204,9 +219,10 @@ async function loadPdksDataset(
   for (const pid of allowedProjectIds) {
     employees.push(...(await readBoundedPdks(ctx.db.query("employees")
       .withIndex("by_project", q => q.eq("projectId", pid)), budget)).filter(employee => employee.isActive));
-    readings.push(...await readBoundedPdks(ctx.db.query("cardReadings")
+    const evidence = dashboardDate ? await readDashboardEvidence(ctx, pid, dashboardDate) : null;
+    readings.push(...(evidence ?? await readBoundedPdks(ctx.db.query("cardReadings")
       .withIndex("by_project_access_time", q => q.eq("projectId", pid)
-        .gte("accessTime", rangeStartISO).lte("accessTime", rangeEndISO)), budget));
+        .gte("accessTime", rangeStartISO).lte("accessTime", rangeEndISO)), budget)));
   }
 
   }
@@ -688,11 +704,37 @@ export const getBreakViolations = authedQuery({
 export const getRecentReadings = authedQuery({
   args: {
     limit: v.optional(v.number()),
+    includeDevices: v.optional(v.boolean()),
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
     const limit = args.limit ?? 10;
+    type FeedRow = Pick<Doc<"cardReadings">, "_id" | "employeeName" | "cardNo" | "accessTime" | "accessStatus" | "direction" | "deviceId">;
+    // One release of compatibility for web bundles published before includeDevices existed.
+    const withLegacyDevices = async (rows: FeedRow[]) => {
+      const devices = new Map<Id<"devices">, { name: string; deviceSerial?: string }>();
+      if (args.includeDevices !== false) {
+        for (const id of new Set(rows.flatMap(row => row.deviceId ? [row.deviceId] : []))) {
+          const device = await ctx.db.get(id);
+          if (device && (ctx.user.role === "super_admin" && !args.projectId || device.projectId && allowedProjectIds.includes(device.projectId))) devices.set(id, { name: device.name, deviceSerial: device.deviceSerial });
+        }
+      }
+      return rows.map(row => ({ ...row, devices: row.deviceId ? devices.get(row.deviceId) ?? null : null }));
+    };
+
+    if (args.projectId && limit > 0 && limit <= 100) {
+      const today = trTodayKey();
+      const { startISO, endISO } = trDayRangeISO(today, today);
+      const day = await ctx.db.query("dashboardDays").withIndex("by_projectId_and_date", q => q.eq("projectId", args.projectId).eq("date", today)).unique();
+      if (day?.complete && day.formatVersion === 2) {
+        const feed = await ctx.db.query("dashboardReadingFeed").withIndex("by_projectId_and_accessTime_and_readingCreationTime_and_readingId", q => q.eq("projectId", args.projectId).gte("accessTime", startISO).lte("accessTime", endISO)).order("desc").take(limit);
+        // Legacy/future rows are outside the completed day: retain the old ordering path.
+        const future = await ctx.db.query("cardReadings").withIndex("by_project_access_time", q => q.eq("projectId", args.projectId).gt("accessTime", endISO)).first();
+        if (feed.length === limit && !future) return withLegacyDevices(feed.map(r => ({ _id: r.readingId, employeeName: r.employeeName, cardNo: r.cardNo,
+          accessTime: r.accessTime, accessStatus: r.accessStatus, direction: r.direction, deviceId: r.deviceId })));
+      }
+    }
 
     let readings;
     if (ctx.user.role === "super_admin" && !args.projectId) {
@@ -719,17 +761,8 @@ export const getRecentReadings = authedQuery({
       return [];
     }
 
-    return await Promise.all(
-      readings.map(async (r) => {
-        const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
-        return {
-          ...r,
-          devices: device
-            ? { name: device.name, deviceSerial: device.deviceSerial }
-            : null,
-        };
-      })
-    );
+    return withLegacyDevices(readings.map(r => ({ _id: r._id, employeeName: r.employeeName, cardNo: r.cardNo,
+      accessTime: r.accessTime, accessStatus: r.accessStatus, direction: r.direction, deviceId: r.deviceId })));
   },
 });
 
@@ -738,7 +771,7 @@ export const getActivitySummary = authedQuery({
   handler: async (ctx, args) => {
     const today = trTodayKey();
     const { startISO, endISO } = trDayRangeISO(today, today);
-    const dataset = await loadPdksDataset(ctx, startISO, endISO, args);
+    const dataset = await loadPdksDataset(ctx, startISO, endISO, args, undefined, today);
     const employeeIds = new Set(dataset.employees.map((employee) => employee._id));
     const readings = dataset.activityReadings.filter((reading) =>
       reading.employeeId && employeeIds.has(reading.employeeId) && reading.accessStatus === "izin_verildi"
@@ -792,5 +825,18 @@ export const getAnnualOvertimeAccess = authedQuery({
   handler: async (ctx, args) => {
     await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
     return ctx.user._id;
+  },
+});
+
+/** Device connectivity writes do not invalidate the recent-reading subscription. */
+export const getReadingDevices = authedQuery({
+  args: { projectId: v.id("projects"), deviceIds: v.array(v.id("devices")) },
+  handler: async (ctx, args) => {
+    await resolveReadingScope(ctx, args.projectId, MONITORING_READING_PERMISSIONS);
+    if (args.deviceIds.length > 100) throw new Error("En fazla 100 cihaz");
+    return Promise.all([...new Set(args.deviceIds)].map(async id => {
+      const device = await ctx.db.get(id);
+      return device?.projectId === args.projectId ? { _id: id, name: device.name, deviceSerial: device.deviceSerial } : null;
+    }));
   },
 });

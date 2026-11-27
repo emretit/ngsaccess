@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { defaultDoorName, readerDirectionFromIo, deleteGroupDoorsForDoor, purgeDeviceCascade } from "./deviceHelpers";
@@ -78,3 +78,6 @@ describe("deviceHelpers – groupDoors cascade", () => {
     expect(tables.groupDevices).toEqual([]);
   });
 });
+
+// These unit fixtures stub only the original database methods; integration coverage lives in dashboardSummary.test.ts.
+vi.mock("./dashboardSummary", async importOriginal => ({ ...await importOriginal<typeof import("./dashboardSummary")>(), withDashboardSummary: <T,>(ctx: T) => ctx }));

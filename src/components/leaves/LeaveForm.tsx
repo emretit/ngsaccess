@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { NativeSelect } from "@/components/ui/native-select";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -106,6 +107,7 @@ export function LeaveForm({
             endDate: values.endDate,
             notes: values.notes || undefined,
           });
+        invalidatePdksSnapshots();
       } catch (error: unknown) {
         const detail = leaveError(error);
         setServerError(detail);

@@ -1,3 +1,5 @@
+import { v, type Infer } from "convex/values";
+import { hikBackfillPendingValidator } from "./gateway/backfillState";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { loadPdksRulePolicy, type PdksPolicyResolver, type PdksProjectPolicies } from "./pdksRules";
@@ -7,16 +9,30 @@ import { pdksWorkDayRange } from "./pdksWorkDay";
 import { trDateKey } from "./trDate";
 import { cardKey } from "./employeeUx";
 
+/** Stable completeness inputs only; operational heartbeats/cursors never reach group args. */
+export const pdksDeviceAvailabilityValidator = v.object({
+  _id: v.id("devices"), _creationTime: v.number(), projectId: v.optional(v.id("projects")),
+  brand: v.optional(v.string()), hikTransport: v.optional(v.string()), isActive: v.optional(v.boolean()),
+  hikLastBackfillAt: v.optional(v.number()), hikBackfillPending: v.optional(hikBackfillPendingValidator),
+});
+export type PdksDeviceAvailability = Infer<typeof pdksDeviceAvailabilityValidator>;
+export async function loadPdksDeviceAvailability(ctx: QueryCtx, projectId: Id<"projects"> | undefined): Promise<PdksDeviceAvailability[]> {
+  const devices = await ctx.db.query("devices").withIndex("by_project", q => q.eq("projectId", projectId)).take(1001);
+  if (devices.length > 1000) throw new Error("PDKS cihaz kapsamı sınırı aşıldı");
+  return devices.map(({ _id, _creationTime, projectId, brand, hikTransport, isActive, hikLastBackfillAt, hikBackfillPending }) =>
+    ({ _id, _creationTime, projectId, brand, hikTransport, isActive, hikLastBackfillAt, hikBackfillPending }));
+}
+
 /** Fixed rollout boundary preserves historical payroll for devices without old checkpoints.
  * Cursor values are event serial numbers, never timestamp watermarks. */
 export const PDKS_COMPLETENESS_START = "2026-11-17";
 
 export class PdksAvailableDates extends Set<string> {
-  constructor(dates: ReadonlySet<string>, readonly devices: readonly Doc<"devices">[], readonly projectId: Id<"projects"> | undefined, readonly policies?: PdksProjectPolicies) {
+  constructor(dates: ReadonlySet<string>, readonly devices: readonly PdksDeviceAvailability[], readonly projectId: Id<"projects"> | undefined, readonly policies?: PdksProjectPolicies) {
     super(dates);
   }
 
-  trackedDevices(date: string): readonly Doc<"devices">[] {
+  trackedDevices(date: string): readonly PdksDeviceAvailability[] {
     if (date < PDKS_COMPLETENESS_START) return [];
     const policy = this.policies?.(this.projectId, date);
     return this.devices.filter(device => device.brand === "hikvision" && device.hikTransport !== "localBridge"
@@ -33,10 +49,9 @@ export class PdksAvailableDates extends Set<string> {
 
 /** Keep IDE, mobile/QR, virtual readers and local-bridge devices on legacy availability.
  * Gateway Hikvision devices require a completed scan, including devices never scanned. */
-export async function withPdksDeviceAvailability(ctx: QueryCtx, projectId: Id<"projects"> | undefined, dates: ReadonlySet<string>, policies?: PdksProjectPolicies, endDate?: string): Promise<ReadonlySet<string>> {
+export async function withPdksDeviceAvailability(ctx: QueryCtx, projectId: Id<"projects"> | undefined, dates: ReadonlySet<string>, policies?: PdksProjectPolicies, endDate?: string, deviceAvailability?: readonly PdksDeviceAvailability[]): Promise<ReadonlySet<string>> {
   if (endDate && endDate < PDKS_COMPLETENESS_START) return dates;
-  const devices = await ctx.db.query("devices").withIndex("by_project", q => q.eq("projectId", projectId)).take(1001);
-  if (devices.length > 1000) throw new Error("PDKS cihaz kapsamı sınırı aşıldı");
+  const devices = deviceAvailability ?? await loadPdksDeviceAvailability(ctx, projectId);
   if (!devices.some(device => device.brand === "hikvision" && device.hikTransport !== "localBridge" && device.isActive !== false)) return dates;
   return new PdksAvailableDates(dates, devices, projectId, policies);
 }

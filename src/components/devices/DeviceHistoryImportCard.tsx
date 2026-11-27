@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useEffect, useRef, useState } from "react";
 import { useAction } from "convex/react";
 import { Download } from "lucide-react";
@@ -87,6 +88,7 @@ function ImportCard({
         deviceId: device._id,
         ...historyScopeArgs(scope, date),
       });
+      invalidatePdksSnapshots();
       if (!result.ok && !result.partial) {
         notify.error(
           "Kayıtlar çekilemedi",

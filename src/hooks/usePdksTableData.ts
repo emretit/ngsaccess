@@ -122,7 +122,7 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
   const endDate = "endDate" in args ? args.endDate : args.date;
 
   return {
-    error: snapshot.error, refresh: snapshot.refresh,
+    error: snapshot.error, refresh: snapshot.refresh, progress: snapshot.progress, live: snapshot.live, updatedAt: snapshot.updatedAt,
     tableData: tableData ?? [],
     allRecords: tableData ?? [],
     tableRecords: filterPdksRows(tableData ?? [], filters?.statusFilter),

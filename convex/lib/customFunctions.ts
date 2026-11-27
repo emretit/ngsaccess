@@ -1,6 +1,7 @@
+import { mutation } from "./dashboardMutations";
 import { customQuery, customMutation, customAction, customCtx } from "convex-helpers/server/customFunctions";
 import { v } from "convex/values";
-import { query, mutation, action } from "../_generated/server";
+import { query, action } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
 import { getCurrentUser, getCurrentUserOrNull } from "./auth";

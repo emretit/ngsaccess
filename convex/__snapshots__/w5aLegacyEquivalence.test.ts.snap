@@ -74,6 +74,7 @@ exports[`D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK
 {
   "reads": [
     "["cardReadings",["withIndex","by_project_access_time"],["eq","projectId","projectId"],["gte","accessTime","2026-10-22T21:00:00.000Z"],["lte","accessTime","2026-10-23T20:59:59.999Z"],["export"],["Symbol(Symbol.asyncIterator)"]]",
+    "["dashboardDays",["withIndex","by_projectId_and_date"],["eq","projectId","projectId"],["eq","date","2026-10-23"],["export"],["unique"]]",
     "["employees",["withIndex","by_project"],["eq","projectId","projectId"],["export"],["Symbol(Symbol.asyncIterator)"]]",
     "["leaves",["withIndex","by_project_employee_end"],["eq","projectId",null],["eq","employeeId","employeeId"],["gte","endDate","2026-10-23"],["export"],["Symbol(Symbol.asyncIterator)"]]",
     "["leaves",["withIndex","by_project_end"],["eq","projectId","projectId"],["gte","endDate","2026-10-23"],["export"],["Symbol(Symbol.asyncIterator)"]]",

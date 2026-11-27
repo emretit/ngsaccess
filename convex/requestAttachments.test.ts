@@ -296,3 +296,9 @@ describe("withdrawal and abandoned file deletion", () => {
     expect(f.storageDelete).toHaveBeenCalledTimes(2);
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./lib/dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./lib/dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

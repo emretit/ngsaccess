@@ -3,7 +3,7 @@
  * Convex Dashboard → Functions → seedHikvisionLanDevice:run → Run
  * veya: npx convex run seedHikvisionLanDevice:run
  */
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { v } from "convex/values";
 
 const DEFAULT_IP = "192.168.1.117";

@@ -256,3 +256,9 @@ it("manually inactive records use the same terminated bucket in list and summary
   expect(await invokeVisitor(listPage, ctx, { projectId: "project", status: "checkedOut", now, paginationOpts: { numItems: 25, cursor: null } })).toMatchObject({ page: [{ status: "checkedOut" }] });
   expect(await invokeVisitor(summary, ctx, { projectId: "project", now })).toMatchObject({ counts: { checkedOut: 1, active: 0 } });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { NativeSelect } from "@/components/ui/native-select";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useRef, useState } from "react";
@@ -98,6 +99,7 @@ export function BatchCardAssignDialog({ open, onOpenChange, projectId, employees
       const resultRows = [...rows];
       for (let index = 0; index < candidates.length; index += 100) {
         const response: AssignResult[] = await assignCards({ assignments: candidates.slice(index, index + 100).map((row) => ({ employeeId: row.employeeId as Id<"employees">, cardNumber: row.cardNumber.trim() })) });
+        invalidatePdksSnapshots();
         const merged = mergeAssignmentResults(resultRows, response);
         resultRows.splice(0, resultRows.length, ...merged);
       }

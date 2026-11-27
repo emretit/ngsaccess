@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useId, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -29,6 +30,7 @@ export function EmployeeTerminateDialog({ employee, open, onOpenChange }: {
   const { run, pending } = useAsyncAction(async () => {
     await terminate({ employeeId: employee._id, employmentEndDate: date, terminationType: kind,
       terminationReason: reason.trim() || undefined, sgkExitCode: code || undefined });
+    invalidatePdksSnapshots();
   }, { success: "İşten ayrılma kaydedildi" });
   return <Dialog open={open} onOpenChange={next => { if (!pending) onOpenChange(next); }}>
     <DialogContent aria-busy={pending} onEscapeKeyDown={event => { if (pending) event.preventDefault(); }} onInteractOutside={event => { if (pending) event.preventDefault(); }}>

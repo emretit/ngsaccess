@@ -4,7 +4,8 @@ import { hasPermission, requirePermission } from "./lib/permissions";
 import { doorStatusPlanValidator, normalizeDoorStatusPlan, normalizeVerifyPlan, verifyPlanValidator, holidayPlanValidator, holidayRanges, holidaySupportFromSnapshot } from "./lib/doorStatusPlan";
 
 import { ConvexError, v } from "convex/values";
-import { internalAction, internalMutation, internalQuery } from "./_generated/server";
+import { internalAction, internalQuery } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";

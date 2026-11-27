@@ -2,17 +2,18 @@ import { expect, it } from "vitest";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import type { Id } from "../../convex/_generated/dataModel";
 import { loadAnnualOvertime } from "./pdksAnnual";
-import { annualOvertimeRanges } from "../../convex/lib/annualOvertime";
 
-it("two annual consumers share a five-minute result and no more than four weekly requests", async () => {
-  let active = 0, peak = 0, weeks = 0;
+
+it("two annual consumers share a five-minute result and no more than four monthly requests", async () => {
+  let active = 0, peak = 0, weeks = 0, version = "v1";
   const employeeId = "employee" as Id<"employees">;
   const query = async (ref: FunctionReference<"query">) => {
     const name = getFunctionName(ref);
     if (name.endsWith(":getAnnualOvertimeAccess")) return "account";
     if (name.endsWith(":getAnnualOvertimeRoster")) return { page: [{ employeeId, cardNumber: "1" }], isDone: true, continueCursor: "" };
-    if (name.endsWith(":unassignedDatesPage")) return { readings: [], sourceBytes: 0, isDone: true, continueCursor: "" };
-    expect(name).toBe("dashboard:getAnnualOvertimePart");
+    if (name.endsWith(":sourceVersion")) return version;
+    if (name.endsWith(":unlinkedPage")) return { readings: [], startISO: "2025-12-01T00:00:00Z", endISO: "2027-01-02T00:00:00Z", isDone: true, continueCursor: "" };
+    expect(name).toBe("pdksAnnual:month");
     active++; peak = Math.max(peak, active); weeks++;
     await new Promise(resolve => setTimeout(resolve, 1));
     active--;
@@ -22,13 +23,16 @@ it("two annual consumers share a five-minute result and no more than four weekly
   const args = { projectId: "project" as Id<"projects">, year: 2026 };
   const [alert, preset] = await Promise.all([loadAnnualOvertime(client, args), loadAnnualOvertime(client, args)]);
   expect(preset).toEqual(alert);
-  expect(alert[0]?.totalOvertimeMinutes).toBe(annualOvertimeRanges(2026).length);
-  expect(weeks).toBe(annualOvertimeRanges(2026).length);
-  expect(peak).toBe(4);
+  expect(alert[0]?.totalOvertimeMinutes).toBe(12);
+  expect(weeks).toBe(12);
+  expect(peak).toBe(1);
   expect(await loadAnnualOvertime(client, args)).toEqual(alert);
-  expect(weeks).toBe(53);
+  expect(weeks).toBe(12);
+  version = "v2";
+  await loadAnnualOvertime(client, args);
+  expect(weeks).toBe(24);
 });
-it("unmount/year change stops scheduling weekly work after the four in-flight queries", async () => {
+it("unmount/year change stops scheduling monthly work after the four in-flight queries", async () => {
   const controller = new AbortController();
   const releases: (() => void)[] = [];
   let calls = 0;
@@ -37,8 +41,9 @@ it("unmount/year change stops scheduling weekly work after the four in-flight qu
   const query = async (ref: FunctionReference<"query">) => {
     const name = getFunctionName(ref);
     if (name.endsWith(":getAnnualOvertimeAccess")) return "account";
-    if (name.endsWith(":getAnnualOvertimeRoster")) return { page: [{ employeeId: "employee", cardNumber: "1" }], isDone: true, continueCursor: "" };
-    if (name.endsWith(":unassignedDatesPage")) return { readings: [], sourceBytes: 0, isDone: true, continueCursor: "" };
+    if (name.endsWith(":getAnnualOvertimeRoster")) return { page: Array.from({ length: 256 }, (_, i) => ({ employeeId: `employee-${i}`, cardNumber: String(i) })), isDone: true, continueCursor: "" };
+    if (name.endsWith(":sourceVersion")) return "version1";
+    if (name.endsWith(":unlinkedPage")) return { readings: [], startISO: "2025-12-01T00:00:00Z", endISO: "2027-01-02T00:00:00Z", isDone: true, continueCursor: "" };
     calls++;
     await new Promise<void>(resolve => { releases.push(resolve); if (calls === 4) ready?.(); });
     return [];
@@ -62,6 +67,7 @@ it("rechecks project access before serving a cached annual result", async () => 
       if (!allowed) throw new Error("Yetkiniz yok");
       return "account";
     }
+    if (name.endsWith(":sourceVersion")) return "version1";
     calculations++;
     expect(name).toBe("dashboard:getAnnualOvertimeRoster");
     return { page: [], isDone: true, continueCursor: "" };
@@ -72,4 +78,29 @@ it("rechecks project access before serving a cached annual result", async () => 
   allowed = false;
   await expect(loadAnnualOvertime(client, args)).rejects.toThrow("Yetkiniz yok");
   expect(calculations).toBe(1);
+});
+
+it("500 people use at most 120 calls including roster, authorization, source and calculation, with concurrency four", async () => {
+  let calls = 0, active = 0, peak = 0;
+  const roster = Array.from({ length: 500 }, (_, i) => ({ employeeId: `employee-${i}` as Id<"employees">, cardNumber: String(i) }));
+  const query = async (ref: FunctionReference<"query">, args: Record<string, unknown>) => {
+    calls++;
+    const name = getFunctionName(ref);
+    if (name.endsWith(":getAnnualOvertimeAccess")) return "account";
+    if (name.endsWith(":sourceVersion")) return "v1";
+    if (name.endsWith(":getAnnualOvertimeRoster")) {
+      const offset = args.cursor === null ? 0 : Number(args.cursor);
+      return { page: roster.slice(offset, offset + 100), isDone: offset + 100 >= 500, continueCursor: String(offset + 100) };
+    }
+    if (name.endsWith(":unlinkedPage")) return { readings: [], startISO: "2025-12-01T00:00:00Z", endISO: "2027-01-02T00:00:00Z", isDone: true, continueCursor: "" };
+    expect(name).toBe("pdksAnnual:month");
+    active++; peak = Math.max(peak, active);
+    await new Promise(resolve => setTimeout(resolve, 1)); active--;
+    return (args.employeeIds as string[]).map(employeeId => ({ employeeId, firstName: "A", lastName: employeeId, totalOvertimeMinutes: 1, totalOvertimeHours: 0, limitHours: 270, remainingHours: 270, utilizationPct: 0, exceedsDaily11h: [] }));
+  };
+  const rows = await loadAnnualOvertime({ query } as unknown as Parameters<typeof loadAnnualOvertime>[0], { projectId: "project" as Id<"projects">, year: 2026 });
+  expect(rows).toHaveLength(500);
+  expect(rows.every(row => row.totalOvertimeMinutes === 12)).toBe(true);
+  expect(calls).toBe(115);
+  expect(peak).toBe(4);
 });

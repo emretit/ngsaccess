@@ -1,4 +1,5 @@
-import { internalMutation, type QueryCtx } from "./_generated/server";
+import { type QueryCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { assertUploadOwner } from "./lib/peopleScope";

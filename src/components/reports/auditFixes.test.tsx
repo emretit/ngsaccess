@@ -14,7 +14,7 @@ import { excelReportColumns } from '@/lib/reports/export';
 import { readHiddenColumns, saveHiddenColumns, columnStorageKey } from '@/lib/reports/columns';
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { _id: 'user-a', role: 'project_admin' } }) }));
 vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ projectId: 'project-a', activeProject: { name: 'Proje' }, loading: false }) }));
-vi.mock('convex/react', () => ({ useQuery: () => [], useConvex: () => ({ query: async () => [] }) }));
+vi.mock('convex/react', () => ({ useQuery: () => [], useQueries: () => ({}), useConvex: () => ({ query: async () => [] }) }));
 vi.mock('@/components/ui/select', async original => ({
   ...await original<typeof import('@/components/ui/select')>(),
   SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,

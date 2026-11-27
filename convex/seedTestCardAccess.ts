@@ -1,5 +1,5 @@
 import { insertEmployee, patchEmployee } from "./lib/employeeListFields";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { v } from "convex/values";
 
 export const setupCardAndDevice = internalMutation({

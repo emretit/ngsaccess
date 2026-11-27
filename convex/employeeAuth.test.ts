@@ -201,3 +201,9 @@ describe("employeeAuth signIn errors", () => {
       .resolves.toEqual(expected);
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./lib/dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./lib/dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

@@ -34,5 +34,5 @@ it("skips all project queries while no project is selected", () => {
   state.permissions = ["reports.view", "devices.manage"];
   state.projectId = undefined;
   renderToStaticMarkup(<Probe />);
-  expect(state.query.mock.calls.map(call => call[1])).toEqual(["skip", "skip", "skip", "skip"]);
+  expect(state.query.mock.calls.map(call => call[1])).toEqual(["skip", "skip", "skip", "skip", "skip"]);
 });

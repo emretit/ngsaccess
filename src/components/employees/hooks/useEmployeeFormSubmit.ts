@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { usePermissions } from "@/hooks/usePermissions";
 import { errorMessage } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -131,6 +132,7 @@ export const useEmployeeFormSubmit = (
         else setServerError(message);
         throw error;
       }
+      invalidatePdksSnapshots();
       append("Personel kaydedildi.");
       if (!savedId) return;
       setSavedResult({ employeeId: savedId });

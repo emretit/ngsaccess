@@ -2,7 +2,7 @@ import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { deviceConnection, deviceLastSignal, hasPeriodicHeartbeat, hasFreshIsupStatus, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
 import { toUtcISO } from "./lib/trDate";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";

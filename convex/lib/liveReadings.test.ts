@@ -366,3 +366,9 @@ describe("monitoring audit query regressions", () => {
     expect(await invoke(getReading, f.ctx, { readingId: "invalid" })).toBeNull();
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

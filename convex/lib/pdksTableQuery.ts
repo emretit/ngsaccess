@@ -11,7 +11,7 @@ import { buildBoundedShiftResolver } from "./shiftResolver";
 import { overtimePeriodRange } from "./overtimeCalc";
 import { buildPeriodDateKeys } from "./pdksCalc";
 import { addWorkDate, buildPdksWorkDateResolver, hasFlexiblePdksShift, pdksWorkDayRange } from "./pdksWorkDay";
-import { setPdksHistoryReadings, withPdksDeviceAvailability, pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
+import { type PdksDeviceAvailability, setPdksHistoryReadings, withPdksDeviceAvailability, pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import { trDateKey, trTodayKey } from "./trDate";
 import { countExcludedUnknownPdksReadings, filterPdksReadings } from "./pdksSource";
 import { buildPdksEmployeeReadingMap, computePdksTableRow, filterPdksTableRows, type PdksTableStatusFilter } from "./pdksTable";
@@ -167,7 +167,7 @@ export async function getPdksTableData(
 
 
   await Promise.all([...new Set(availabilityEmployees.map(employee => employee.projectId))].map(async projectId => {
-    tableAvailableDates.set(projectId, await withPdksDeviceAvailability(ctx, projectId, tableAvailableDates.get(projectId) ?? new Set(), policies, overtimeRange.endDate));
+    tableAvailableDates.set(projectId, await withPdksDeviceAvailability(ctx, projectId, tableAvailableDates.get(projectId) ?? new Set(), policies, overtimeRange.endDate, batch?.deviceAvailability));
   }));
   const tableManualDates = pdksManualDatesByEmployee(manualPdksByEmpDate.values());
   const tableData = await Promise.all(
@@ -354,6 +354,7 @@ export function withPdksReadBudget<T extends QueryCtx>(ctx: T): T {
 
 
 export interface PdksBatchScope {
+  deviceAvailability?: readonly PdksDeviceAvailability[];
   preloadedReadings?: readonly Doc<"cardReadings">[];
   readingEndISO?: string;
   employees: Doc<"employees">[];
@@ -372,7 +373,7 @@ export async function readPdksBatchReadings(ctx: QueryCtx, scope: PdksBatchScope
   const rows = new Map<string, Doc<"cardReadings">>();
   if (scope.preloadedReadings) {
     const ids = new Set(scope.employees.map(employee => employee._id));
-    const ownCards = new Set(scope.employees.filter(employee => owners.get(employee.cardNumber) === employee._id).map(employee => employee.cardNumber));
+    const ownCards = new Set(scope.employees.filter(employee => employee.cardNumber && owners.get(employee.cardNumber) === employee._id).map(employee => employee.cardNumber));
     return scope.preloadedReadings.filter(reading => reading.accessTime >= startISO && reading.accessTime <= endISO &&
       (reading.employeeId && ids.has(reading.employeeId) || (!reading.employeeId || !allIds.has(reading.employeeId)) && ownCards.has(reading.cardNo)));
   }

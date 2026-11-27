@@ -396,3 +396,9 @@ it("finishTarget keeps bridge and IDE operations queued until evidence arrives",
   expect(f.targets.map(target => target.status)).toEqual(["queued", "queued"]);
   expect(f.run.status).toBe("running");
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

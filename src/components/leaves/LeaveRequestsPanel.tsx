@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -65,6 +66,7 @@ export function LeaveRequestsPanel({
     if (current.approve)
       await approve({ leaveId: current.id, note: decisionNote.trim() || undefined });
     else await reject({ leaveId: current.id, note: decisionNote.trim() });
+    invalidatePdksSnapshots();
     notify.success(current.approve ? "Talep onaylandı" : "Talep reddedildi");
   }, { error: "Talep sonuçlandırılamadı" });
   const validNote = note.trim().length >= 3 && note.trim().length <= 500;

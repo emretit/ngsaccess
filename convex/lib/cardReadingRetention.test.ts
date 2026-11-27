@@ -142,3 +142,9 @@ describe("saklama handler sınırları", () => {
     expect(schedule).toHaveBeenCalledWith(0, expect.anything(), expect.objectContaining({ projectId: "project-a" }));
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

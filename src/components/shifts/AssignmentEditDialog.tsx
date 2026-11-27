@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { planShiftIds } from "../../../convex/lib/shiftPlan";
 import { assignmentFields, focusAssignmentError, planFormError, planSummary, withShiftSchedule } from "./lib/planForm";
 import type { DepartmentAssignment } from "./lib/planning";
@@ -121,6 +122,7 @@ function EditForm({
         if (confirm === "delete") await remove({ assignmentId: assignment._id });
         else await update({ assignmentId: assignment._id, ...assignmentFields(values, Boolean(assignment.plan)), weekPattern: values.plan && values.plan.kind !== "weekly" ? [] : values.weekPattern, forceConfirm, calendarConfirmed });
       }
+      invalidatePdksSnapshots();
       notify.success(
         confirm === "delete"
           ? "Atama serisi silindi"

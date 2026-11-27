@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { hikPersonIdentity } from "./lib/hikPersonIdentity";
-import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { authedAction, authedMutation, authedQuery } from "./lib/customFunctions";

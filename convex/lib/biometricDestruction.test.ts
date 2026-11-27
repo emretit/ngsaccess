@@ -44,7 +44,7 @@ const mocks = vi.hoisted(() => ({ allowed: ["p"], audit: vi.fn() }));
 vi.mock("./auth", () => ({ getProjectIdsForUser: async () => mocks.allowed }));
 vi.mock("./audit", () => ({ writeAudit: mocks.audit }));
 vi.mock("./customFunctions", () => ({ authedQuery: (value: unknown) => value, authedMutation: (value: unknown) => value }));
-vi.mock("../_generated/server", () => ({ internalQuery: (value: unknown) => value, internalMutation: (value: unknown) => value }));
+vi.mock("../_generated/server", () => ({ mutation: (value: unknown) => value, internalQuery: (value: unknown) => value, internalMutation: (value: unknown) => value }));
 
 function createCtx() {
   const documents = new Map<string, unknown>([["p", { _id: "p", name: "Merkez" }]]);
@@ -325,3 +325,9 @@ describe("projesiz eski şablonlar", () => {
     }
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

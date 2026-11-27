@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useId, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useNavigate } from "react-router-dom";
@@ -44,6 +45,7 @@ export function EmployeeTransferDialog({ employee, projects, permissions, open, 
     try {
       const started = await start({ employeeId: employee._id, targetProjectId: target._id,
         departmentId, accessRuleIds: canManageRules ? ruleIds.filter(ruleId => rules?.some(rule => rule._id === ruleId && rule.isActive !== false)) : [] });
+      invalidatePdksSnapshots();
       setResult(started);
     } catch (error) {
       setFailure(errorMessage(error));

@@ -51,3 +51,9 @@ describe("device assignment snapshot", () => {
     expect(claimAdminDeviceCore).not.toHaveBeenCalled();
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("../../../../convex/lib/dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("../../../../convex/lib/dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

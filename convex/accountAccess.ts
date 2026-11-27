@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { internal } from "./_generated/api";
 import { authedMutation } from "./lib/customFunctions";
 import { requireAccountAccessTarget } from "./lib/adminGuards";

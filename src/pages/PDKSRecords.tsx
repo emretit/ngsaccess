@@ -112,6 +112,8 @@ function PDKSContent({
           <PdksPeriodSwitcher filters={filters} setFilters={setFilters} />
           <PDKSDateNavigator values={filters} onChange={setFilters} />
         </div>
+        {isLoading && view.progress && <p role="status">Hesaplanıyor · {view.progress}</p>}
+        {view.updatedAt && <p className="text-xs text-muted-foreground">{view.live ? "Son güncelleme" : "Son hesaplama"} {new Date(view.updatedAt).toLocaleTimeString("tr-TR")}{view.live ? " · Canlı" : " · Önbellekteki son hesaplama"}</p>}
         <PDKSFilterBar
           values={filters}
           onChange={setFilters}

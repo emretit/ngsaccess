@@ -8,7 +8,8 @@ import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule } from ".
 import { boundedScheduleRows, scheduleRuleDevices } from "./lib/ruleDevices";
 import { mobileOperationId, mobileQueueAllowed, settleMobileIdeOperation, accessError } from "./lib/mobileAccess";
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internalQuery, query } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation } from "./lib/customFunctions";

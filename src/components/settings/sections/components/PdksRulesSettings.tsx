@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -100,6 +101,7 @@ function RulesEditor({
     setSuccess("");
     try {
       await publish(pdksPublishPayload(projectId, parsed));
+    invalidatePdksSnapshots();
       setSuccess("Yeni PDKS kural sürümü yayınlandı.");
       setConfirmation(null);
     } catch (cause) {
@@ -261,6 +263,7 @@ function RulesEditor({
           setSuccess("");
           try {
             await remove({ ruleVersionId: confirmation.rule._id });
+    invalidatePdksSnapshots();
             setSuccess("Gelecek sürüm silindi.");
           } catch (cause) {
             setError(errorMessage(cause));

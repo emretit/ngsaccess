@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
@@ -74,6 +75,7 @@ export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: 
       isCancelled: () => cancelled.current,
       onProgress: (percent, partial) => { setProgress(percent); setResults(partial); },
     });
+    invalidatePdksSnapshots();
     setResults(outcome.results);
     setWasCancelled(outcome.cancelled);
     if (outcome.error !== undefined) setError(outcome.error instanceof Error ? outcome.error.message : "İçe aktarma sırasında hata oluştu.");

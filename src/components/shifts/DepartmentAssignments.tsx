@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { useState } from 'react';
 import { useMutation, useQuery } from 'convex/react';
@@ -35,6 +36,6 @@ export function DepartmentAssignments({ projectId }: { projectId: Id<'projects'>
       </TableRow>)}</TableBody>
     </Table>}
     <AssignmentEditDialog open={Boolean(edit)} onOpenChange={open => { if (!open) setEdit(null); }} assignment={edit} shifts={shifts ?? []} employeeName={edit ? name(edit) : ''} shiftName={shifts?.find(s => s._id === edit?.shiftId)?.name ?? 'Vardiya'} />
-    <ConfirmDestructive open={Boolean(deleting)} onOpenChange={open => { if (!open) setDeleting(null); }} title="Departman ataması silinsin mi?" objectName={deleting ? `${name(deleting)} · ${shortDate(deleting.startDate)}–${shortDate(deleting.endDate)}` : ''} effects={['Bu departman ve alt departmanların tüm seri planı kaldırılır. Kişisel atamalar korunur.']} confirmLabel="Atamayı sil" onConfirm={async () => { if (!deleting) return; await remove({ departmentAssignmentId: deleting._id }); notify.success('Departman ataması silindi'); setDeleting(null); }} />
+    <ConfirmDestructive open={Boolean(deleting)} onOpenChange={open => { if (!open) setDeleting(null); }} title="Departman ataması silinsin mi?" objectName={deleting ? `${name(deleting)} · ${shortDate(deleting.startDate)}–${shortDate(deleting.endDate)}` : ''} effects={['Bu departman ve alt departmanların tüm seri planı kaldırılır. Kişisel atamalar korunur.']} confirmLabel="Atamayı sil" onConfirm={async () => { if (!deleting) return; await remove({ departmentAssignmentId: deleting._id }); invalidatePdksSnapshots(); notify.success('Departman ataması silindi'); setDeleting(null); }} />
   </section>;
 }

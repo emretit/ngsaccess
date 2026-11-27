@@ -9,3 +9,9 @@ it("D5: eski, orphan veya non-Hik yüz hataları otomatik başarıya çevrilmez"
   expect(await handler(ctx, {})).toEqual({ dismissed: 3 });
   expect(ctx.db.patch.mock.calls.map(call => call[0])).toEqual(["addCard-missing", "addCard-non-hik", "addCard-hik"]);
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./lib/dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./lib/dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

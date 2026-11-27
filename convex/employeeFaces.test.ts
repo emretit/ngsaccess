@@ -3,7 +3,7 @@ import type { FunctionReturnType } from "convex/server";
 import type { api } from "./_generated/api";
 import * as faces from "./employeeFaces";
 
-vi.mock("./_generated/server", () => ({ internalQuery: (config: unknown) => config, internalMutation: (config: unknown) => config }));
+vi.mock("./_generated/server", () => ({ mutation: (config: unknown) => config, internalQuery: (config: unknown) => config, internalMutation: (config: unknown) => config }));
 vi.mock("./lib/customFunctions", () => ({ authedQuery: (config: unknown) => config, authedMutation: (config: unknown) => config, authedAction: (config: unknown) => config }));
 const guards = vi.hoisted(() => ({ permission: vi.fn(), allowed: vi.fn(), access: vi.fn(), devices: vi.fn(), audit: vi.fn() }));
 vi.mock("./lib/auth", () => ({ requireEmployeeAccess: guards.access }));
@@ -223,3 +223,9 @@ describe("yüz kayıt yetkisi ve saklama", () => {
     expect(f.tables.hikPendingOperations.filter(row => row.operation === "deleteFace")).toHaveLength(1);
     expect(await invoke(faces.startDelivery, f.ctx, { employeeId: "employee", operationIds: ["hikPendingOperations-0"] })).toMatchObject([{ employeeNo: "123" }]);
   });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./lib/dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./lib/dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

@@ -32,6 +32,9 @@ export function useDashboardReadings(limit = 10) {
   const scope = useDashboardScope();
   const { can } = usePermissions();
   const enabled = scope.enabled && (can("reports.view") || can("devices.manage"));
-  const readings = useQuery(api.dashboard.getRecentReadings, enabled ? { projectId: scope.projectId, limit } : "skip");
-  return { readings: readings ?? [], loading: scope.loading || (enabled && readings === undefined) };
+  const readings = useQuery(api.dashboard.getRecentReadings, enabled ? { projectId: scope.projectId, limit, includeDevices: false } : "skip");
+  const deviceIds = [...new Set((readings ?? []).flatMap(row => row.deviceId ? [row.deviceId] : []))].sort();
+  const devices = useQuery(api.dashboard.getReadingDevices, enabled && scope.projectId ? { projectId: scope.projectId, deviceIds } : "skip");
+  const byId = new Map((devices ?? []).filter((device): device is NonNullable<typeof device> => device !== null).map(device => [device._id, device]));
+  return { readings: (readings ?? []).map(row => ({ ...row, devices: row.deviceId ? byId.get(row.deviceId) ?? null : null })), loading: scope.loading || (enabled && (readings === undefined || (deviceIds.length > 0 && devices === undefined))) };
 }

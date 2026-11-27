@@ -12,7 +12,8 @@ import { employeeCompanyForDepartment, employeeRelationsToValidate, validateEmpl
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { assertSameProject, validatePay, validateEmployeeText, employeeDependentTables, assertEmployeeBulkDeleteLimit, canSyncEmployeeToDevices } from "./lib/employeeUx";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalQuery } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { ConvexError, v, type ObjectType } from "convex/values";
 import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";

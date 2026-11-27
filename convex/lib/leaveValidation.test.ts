@@ -336,3 +336,9 @@ describe("bounded leave queries", () => {
     await expect(invoke(employeeOptions, f.ctx, { projectId: "other" })).rejects.toThrow("Bu projeye erişim yetkiniz yok");
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

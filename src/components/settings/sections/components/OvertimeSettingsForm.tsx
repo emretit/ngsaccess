@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useState } from "react";
 import { z } from "zod";
@@ -65,6 +66,7 @@ export function OvertimeSettingsForm() {
   const { run, pending } = useAsyncAction(async (payload: Values) => {
     if (!projectId || loading || !isAdmin || work === undefined || rates === undefined) throw new Error("Ayarlar yüklenmeden kaydedilemez.");
     await save({ projectId, ...payload });
+    invalidatePdksSnapshots();
     draft.reset();
   }, { success: "Mesai ayarları ve çarpanlar kaydedildi" });
   useSettingsFormState("overtime", draft.dirty, pending);

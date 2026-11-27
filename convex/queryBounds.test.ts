@@ -10,7 +10,7 @@ import { pdksReadBudget, readBoundedPdks } from "./lib/pdksTableQuery";
 it("E1: weeks partition the entire year without splitting an ISO week", () => {
   const ranges = annualOvertimeRanges(2026);
   expect(ranges[0]?.startDate).toBe("2026-01-01");
-  expect(ranges.at(-1)?.endDate).toBe("2026-12-31");
+  expect(ranges[ranges.length - 1]?.endDate).toBe("2026-12-31");
   expect(ranges).toHaveLength(53);
   for (const range of ranges) {
     expect((Date.parse(range.endDate) - Date.parse(range.startDate)) / 86400000).toBeLessThan(7);

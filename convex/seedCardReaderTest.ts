@@ -4,7 +4,7 @@ import { insertEmployee } from "./lib/employeeListFields";
  * Convex Dashboard → Functions → seedCardReaderTest.run → Run (args: {}) ile çalıştır.
  * Veya uygulama üzerinden Cihaz/Çalışan/Erişim kuralı ekleyebilirsiniz (docs/CIHAZ_CALISAN_ERISIM_EKLEME.md).
  */
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 
 const DEVICE_IP = "192.168.1.212";
 const DEVICE_SERIAL = "DS-K1T343MFWX20240702V032100ENFT9649880";

@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { ShiftSelect } from "./ShiftSelect";
 import { shiftScheduleSummary } from "../../../convex/lib/shiftSchedule";
 import { bulkAssignmentRequest, focusAssignmentError, planFormError, withShiftSchedule } from "./lib/planForm";
@@ -103,6 +104,7 @@ export function AssignShiftDialog({
     setServerError("");
     try {
       const response = await apply(bulkAssignmentRequest(parsed.data, projectId, forceConfirm, calendarConfirmed));
+      if (response.insertedCount > 0) invalidatePdksSnapshots();
       const remaining = response.results.filter(item => item.status !== "assigned");
       if (remaining.length === 0) {
         notify.success(`${response.insertedCount} çalışana vardiya atandı.`);

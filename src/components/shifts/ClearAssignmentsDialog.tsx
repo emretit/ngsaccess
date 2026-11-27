@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -27,6 +28,7 @@ export function ClearAssignmentsDialog({ projectId, onClose }: {
       let isDone = false;
       while (!isDone) {
         const result = await clearAll({ projectId });
+        invalidatePdksSnapshots();
         isDone = result.isDone;
       }
       notify.success("Tüm vardiya atamaları temizlendi.");

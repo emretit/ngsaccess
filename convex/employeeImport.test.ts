@@ -324,3 +324,9 @@ describe("logExport", () => {
     await expect(f.actor.mutation(api.employeeImport.logExport, { projectId: f.projectId, rowCount: 5001 })).rejects.toThrow("5000");
   });
 });
+
+// Fake transports test handler behavior; dashboardSummary.test.ts covers real DB hooks.
+vi.mock("./lib/dashboardSummary", async importOriginal => ({
+  ...await importOriginal<typeof import("./lib/dashboardSummary")>(),
+  withDashboardSummary: <T,>(ctx: T) => ctx,
+}));

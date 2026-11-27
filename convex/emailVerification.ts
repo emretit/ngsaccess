@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation } from "./_generated/server";
+import { internalMutation, mutation } from "./lib/dashboardMutations";
 import { internal } from "./_generated/api";
 import { limiter } from "./lib/rateLimit";
 import { verifyUser } from "./lib/auth";

@@ -2,7 +2,7 @@ import { paginationOptsValidator } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { getCurrentUser } from "./lib/auth";
 import { requirePermission } from "./lib/permissions";

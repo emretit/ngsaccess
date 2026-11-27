@@ -1,3 +1,4 @@
+import { withDashboardSummary } from "./dashboardSummary";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { resolveDirection } from "./cardReadingProcess";
@@ -47,6 +48,7 @@ export type VisitorPassOutcome = { status: "denied"; reason: VisitorPassDenial }
 export async function consumeVisitorPass(
   ctx: MutationCtx, device: Doc<"devices">, input: { source: "qr" | "pin"; code: string },
 ): Promise<VisitorPassOutcome> {
+  ctx = withDashboardSummary(ctx);
   const now = Date.now();
   const accessTime = new Date(now).toISOString();
   let pass: Doc<"visitorPasses"> | null = null;

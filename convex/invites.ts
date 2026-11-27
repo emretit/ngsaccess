@@ -1,6 +1,7 @@
 import { getPasswordError } from "./lib/passwordPolicy";
 import { ConvexError, v } from "convex/values";
-import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { action, internalQuery, query } from "./_generated/server";
+import { internalMutation, mutation } from "./lib/dashboardMutations";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";

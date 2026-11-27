@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -61,11 +62,13 @@ function HolidayCalendarContent() {
   const add = useAsyncAction(async (payload: HolidayValues) => {
     if (!projectId) throw new Error("Önce bir proje seçin.");
     await create({ projectId, ...payload });
+    invalidatePdksSnapshots();
     setYear(Number(payload.date.slice(0, 4))); setFocusDate(payload.date); setValues(empty); setOpen(false);
   }, { success: "Tatil eklendi", error: "Tatil eklenemedi" });
   const seedAction = useAsyncAction(async () => {
     if (!projectId) throw new Error("Önce bir proje seçin.");
     const result = await seed({ projectId, years: [year] });
+    invalidatePdksSnapshots();
     const missing = result.missingReligiousYears ?? [];
     notify.success(`${year} resmi tatilleri yüklendi`, `${result.inserted} yeni eklendi, ${result.skipped} mevcut.${missing.length ? ` ${missing.join(", ")} için dini tatilleri ayrıca ekleyin.` : ""}`);
   }, { error: "Tatiller yüklenemedi" });
@@ -130,7 +133,11 @@ function HolidayCalendarContent() {
       effects={[`${deleteHoliday?.date ?? "Seçili gün"} için tatil tanımı kaldırılır.`]} confirmLabel="Tatili sil" onConfirm={async () => {
         if (!deleteHoliday) throw new Error("Tatil seçilmedi");
         setDeleting(true);
-        try { await remove({ id: deleteHoliday._id }); notify.success("Tatil silindi"); } finally { setDeleting(false); }
+        try {
+          await remove({ id: deleteHoliday._id });
+          invalidatePdksSnapshots();
+          notify.success("Tatil silindi");
+        } finally { setDeleting(false); }
       }} />
   </section>;
 }

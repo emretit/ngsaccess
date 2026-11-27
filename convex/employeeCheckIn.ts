@@ -1,6 +1,6 @@
 import { checkInTokenState, CHECK_IN_TOKEN_TTL_MS } from "./lib/checkInUx";
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation } from "./lib/dashboardMutations";
 import { employeeAuthedQuery } from "./lib/customFunctions";
 import { getCurrentEmployee } from "./lib/employeeAuth";
 import { accessError, employeeWithinAccessEpoch } from "./lib/mobileAccess";

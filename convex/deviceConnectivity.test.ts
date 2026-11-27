@@ -251,3 +251,82 @@ describe("connectivity history", () => {
     for (const days of [0, -1, 31, 1.5]) await expect(f.caller.query(api.deviceEvents.getConnectivityHistory, { deviceId: f.deviceId, days })).rejects.toThrow("Gün sayısı");
   });
 });
+
+describe("one-minute HTTP signal persistence", () => {
+  it.each(["ideMqtt", "localBridge", "httpOther"] as const)("%s writes first/missing signals, skips fresh ones and writes at 60 seconds", async path => {
+    const f = await pathFixture(path, undefined);
+    await heartbeat(f, path);
+    const initial = await f.t.run(ctx => ctx.db.get(f.deviceId));
+    expect(initial?.lastSeen).toBe(new Date(now).toISOString());
+    expect(initial?.hikLastSeenAt).toBe(now);
+    for (const elapsed of [1, 30_000, 59_999]) {
+      vi.setSystemTime(now + elapsed);
+      await heartbeat(f, path);
+      expect(await f.t.run(ctx => ctx.db.get(f.deviceId))).toEqual(initial);
+    }
+    vi.setSystemTime(now + 60_000);
+    await heartbeat(f, path);
+    const updated = await f.t.run(ctx => ctx.db.get(f.deviceId));
+    expect(updated?.lastSeen).toBe(new Date(now + 60_000).toISOString());
+    expect(updated?.hikLastSeenAt).toBe(now + 60_000);
+    expect(await alarms(f)).toHaveLength(0);
+  });
+  it("token HTTP heartbeats and direct mutations enforce the same one-minute boundary", async () => {
+    const f = await fixture({ brand: "hikvision", hikTransport: "localBridge", apiToken: "signal-token" });
+    const post = () => f.t.fetch("/card-reader", { method: "POST", headers: {
+      "Content-Type": "application/json", Authorization: "Bearer signal-token",
+    }, body: "{}" });
+    expect((await post()).status).toBe(200);
+    const initial = await f.t.run(ctx => ctx.db.get(f.deviceId));
+    vi.setSystemTime(now + 59_999);
+    expect((await post()).status).toBe(200);
+    expect(await f.t.run(ctx => ctx.db.get(f.deviceId))).toEqual(initial);
+    vi.setSystemTime(now + 60_000);
+    expect((await post()).status).toBe(200);
+    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.hikLastSeenAt).toBe(now + 60_000);
+  });
+  it.each(["ideMqtt", "localBridge"] as const)("%s remains online with frequent throttled heartbeats and detects/resolves a later outage", async path => {
+    const f = await pathFixture(path, undefined);
+    await heartbeat(f, path);
+    for (let elapsed = 10_000; elapsed <= 360_000; elapsed += 10_000) {
+      vi.setSystemTime(now + elapsed);
+      await heartbeat(f, path);
+      if (elapsed === 310_000) {
+        await f.t.mutation(internal.devices.checkHeartbeatOffline, { deviceId: f.deviceId, checkAt: now + 300_001 });
+        expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.heartbeatCheckAt).toBe(now + 600_001);
+      }
+      expect(await alarms(f)).toHaveLength(0);
+    }
+    vi.setSystemTime(now + 600_001);
+    await f.t.mutation(internal.devices.checkHeartbeatOffline, { deviceId: f.deviceId, checkAt: now + 600_001 });
+    expect(await alarms(f)).toHaveLength(0);
+    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.heartbeatCheckAt).toBe(now + 660_001);
+    vi.setSystemTime(now + 660_001);
+    await f.t.mutation(internal.devices.checkHeartbeatOffline, { deviceId: f.deviceId, checkAt: now + 660_001 });
+    const before = await alarms(f);
+    expect(before).toHaveLength(1);
+    expect(before[0].resolvedAt).toBeUndefined();
+    await heartbeat(f, path);
+    expect((await alarms(f))[0]).toMatchObject({ _id: before[0]._id, resolvedAt: new Date(now + 660_001).toISOString() });
+  });
+  it("fresh timestamps still initialize missing heartbeat monitoring", async () => {
+    const f = await fixture({ brand: "ide_smart", lastSeen: new Date(now).toISOString(), hikLastSeenAt: now });
+    await heartbeat(f, "httpOther");
+    expect((await f.t.run(ctx => ctx.db.get(f.deviceId)))?.heartbeatCheckAt).toBe(now + 300_001);
+  });
+});
+
+it("unassigned IDE panels also persist heartbeat timestamps only once per minute", async () => {
+  const t = convexTest(schema, modules);
+  const id = await t.run(ctx => ctx.db.insert("adminDevices", {
+    name: "Pool", brand: "ide_smart", ideUuid: "pool-uuid", createdAt: "", updatedAt: "",
+  }));
+  await t.mutation(internal.devices.updateLastSeen, { ideUuid: "pool-uuid" });
+  const initial = await t.run(ctx => ctx.db.get(id));
+  vi.setSystemTime(now + 59_999);
+  await t.mutation(internal.devices.updateLastSeen, { ideUuid: "pool-uuid" });
+  expect(await t.run(ctx => ctx.db.get(id))).toEqual(initial);
+  vi.setSystemTime(now + 60_000);
+  await t.mutation(internal.devices.updateLastSeen, { ideUuid: "pool-uuid" });
+  expect((await t.run(ctx => ctx.db.get(id)))?.lastSeen).toBe(new Date(now + 60_000).toISOString());
+});

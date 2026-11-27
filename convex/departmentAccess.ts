@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import { type MutationCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { Id } from "./_generated/dataModel";
 import { reconcileEmployeeDepartmentRules } from "./lib/departmentAccess";
 

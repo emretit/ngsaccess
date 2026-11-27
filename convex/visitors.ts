@@ -12,7 +12,7 @@ import { assertAccessProjectUnchanged } from "./lib/accessScope";
 import { validateVisitorAccessRelations } from "./lib/accessScopeRelations";
 import { toPatch } from "./lib/nullablePatch";
 import { visitorPresence, visitorDetailsError } from "./lib/visitorPresence";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";

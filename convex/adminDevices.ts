@@ -8,7 +8,7 @@ import { deviceConnection } from "./lib/deviceConnection";
 import { deviceIdentityError } from "./lib/deviceIdentity";
 import { assertIdeUuidAvailable } from "./lib/deviceProvision";
 import { ConvexError, v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { superAdminQuery, superAdminMutation, authedQuery } from "./lib/customFunctions";
 import { purgeDeviceCascade } from "./lib/deviceHelpers";
 

@@ -11,7 +11,8 @@ import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } 
 import { isBiometricEnabled } from "./lib/privacySettings";
 import { v } from "convex/values";
 import { scheduleBridgeWakeForProject } from "./hikBridge";
-import { internalQuery, internalMutation, query } from "./_generated/server";
+import { internalQuery, query } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation } from "./lib/customFunctions";

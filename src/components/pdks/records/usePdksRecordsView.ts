@@ -28,7 +28,7 @@ export function usePdksRecordsView(filters: FilterValues, setFilters: (values: F
   const {
     tableRecords: rawRecords,
     allRecords: rawAllRecords,
-    isLoading, error, refresh,
+    isLoading, error, refresh, live, updatedAt, progress,
     selectedDate,
     dateRangeLabel,
     startDate,
@@ -41,6 +41,6 @@ export function usePdksRecordsView(filters: FilterValues, setFilters: (values: F
     setDetailTrigger(document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setDrilldown({ scope, employeeId: employeeId as Id<"employees">, date });
   };
-  return { ...derived, filters, setFilters, navigate, projectId, activeProject, canManage, projectLoading, ai, setAi, importOpen, setImport, warningsOpen, setWarningsOpen, setSmartPreset, setSelection, setDrilldown, isLoading, error, refresh, selectedDate, dateRangeLabel, startDate, endDate, detailTrigger, openDetail };
+  return { ...derived, filters, setFilters, navigate, projectId, activeProject, canManage, projectLoading, ai, setAi, importOpen, setImport, warningsOpen, setWarningsOpen, setSmartPreset, setSelection, setDrilldown, isLoading, error, refresh, live, updatedAt, progress, selectedDate, dateRangeLabel, startDate, endDate, detailTrigger, openDetail };
 }
 export type PdksRecordsView = ReturnType<typeof usePdksRecordsView>;

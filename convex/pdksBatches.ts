@@ -1,9 +1,10 @@
+import { loadPdksDeviceAvailability, pdksDeviceAvailabilityValidator } from "./lib/pdksAvailability";
 import { pdksReadingValidator, toPdksTransport } from "./lib/pdksTransport";
-import { getConvexSize } from "convex/values";
+import { ConvexError, getConvexSize } from "convex/values";
 import { v } from "convex/values";
 import { authedQuery } from "./lib/customFunctions";
 import { resolveReadingScope, REPORT_READING_PERMISSIONS } from "./lib/readingAccess";
-import { getPdksTableData, withPdksReadBudget, type PdksBatchScope } from "./lib/pdksTableQuery";
+import { getPdksTableData, readBoundedPdks, pdksReadBudget, withPdksReadBudget, type PdksBatchScope } from "./lib/pdksTableQuery";
 import { loadPayrollPeriod, type MonthlyPayrollSheet } from "./lib/pdksPayrollQuery";
 import { employedDuring } from "./lib/employment";
 import { getEffectiveOvertimeRates } from "./lib/pdksHelpers";
@@ -12,9 +13,10 @@ import { addWorkDate, pdksWorkDayRange } from "./lib/pdksWorkDay";
 import { buildPeriodDateKeys } from "./lib/pdksCalc";
 import { loadPdksPolicies } from "./lib/pdksRules";
 import { isPdksIncludedReading } from "./lib/pdksSource";
-import { trDateKey, trTodayKey } from "./lib/trDate";
+import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { canSeePayInProject } from "./lib/payVisibility";
-import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 
 const tableArgs = v.object({
   projectId: v.id("projects"), date: v.optional(v.string()), startDate: v.optional(v.string()), endDate: v.optional(v.string()),
@@ -38,10 +40,38 @@ export function pdksRequestDates(request: Request) {
   return { startDate: `${prefix}-01`, endDate: `${prefix}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}` };
 }
 
+export async function requirePdksReportAccess(ctx: QueryCtx & { user: Doc<"users"> }, projectId: Id<"projects">) {
+  try { return await resolveReadingScope(ctx, projectId, REPORT_READING_PERMISSIONS); }
+  catch { throw new ConvexError({ code: "PDKS_FORBIDDEN", message: "Bu projeye erişim yetkiniz yok" }); }
+}
+/** Version includes immutable rule identities and editable setting/holiday values. */
+export async function pdksSourceVersion(ctx: QueryCtx, projectId: Id<"projects">) {
+  const budget = pdksReadBudget();
+  const [work, rates, rules, holidays, globalHolidays] = await Promise.all([
+    ctx.db.query("workSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first(),
+    ctx.db.query("overtimeRates").withIndex("by_project", q => q.eq("projectId", projectId)).first(),
+    readBoundedPdks(ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId)), budget),
+    readBoundedPdks(ctx.db.query("holidays").withIndex("by_project", q => q.eq("projectId", projectId)), budget),
+    readBoundedPdks(ctx.db.query("holidays").withIndex("by_project", q => q.eq("projectId", undefined)), budget),
+  ]);
+  return JSON.stringify([work && [work._id, work.updatedAt ?? ""], rates && [rates._id, rates.updatedAt],
+    rules.map(rule => [rule._id, rule.createdAt]), holidays, globalHolidays]);
+}
+export const sourceVersion = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    await requirePdksReportAccess(ctx, projectId);
+    return pdksSourceVersion(withPdksReadBudget(ctx), projectId);
+  },
+});
+export function assertPdksSourceRange(startISO: string | undefined, endISO: string | undefined, required: { startISO: string; endISO: string }) {
+  if (!startISO || !endISO || !Number.isFinite(Date.parse(startISO)) || !Number.isFinite(Date.parse(endISO)) || startISO > required.startISO || endISO < required.endISO) throw new ConvexError({ code: "PDKS_SOURCE_STALE" });
+}
+
 export const rosterPage = authedQuery({
   args: { request: requestValidator, cursor },
   handler: async (ctx, { request, cursor }) => {
-    await resolveReadingScope(ctx, request.args.projectId, REPORT_READING_PERMISSIONS);
+    await requirePdksReportAccess(ctx, request.args.projectId);
     const dates = pdksRequestDates(request);
     const page = await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", request.args.projectId))
       .paginate({ cursor, numItems: 100, maximumBytesRead: 1024 * 1024 });
@@ -55,7 +85,7 @@ export const rosterPage = authedQuery({
 export const unassignedDatesPage = authedQuery({
   args: { request: requestValidator, roster: rosterValidator, cursor },
   handler: async (ctx, { request, cursor }) => {
-    await resolveReadingScope(ctx, request.args.projectId, REPORT_READING_PERMISSIONS);
+    await requirePdksReportAccess(ctx, request.args.projectId);
     const dates = pdksRequestDates(request);
     const rates = await getEffectiveOvertimeRates(ctx, request.args.projectId);
     const range = overtimePeriodRange(dates.startDate, dates.endDate, rates.overtimeBasis, rates.nightShiftDayMode);
@@ -74,23 +104,33 @@ export const unassignedDatesPage = authedQuery({
 });
 
 export const calculate = authedQuery({
-  args: { request: requestValidator, roster: rosterValidator, employeeIds: v.array(v.id("employees")), readings: v.optional(v.array(pdksReadingValidator)), readingEndISO: v.optional(v.string()), availabilityOnly: v.boolean(), availableDates: v.optional(v.array(v.string())), forceFlexible: v.optional(v.boolean()) },
+  args: { request: requestValidator, roster: rosterValidator, employeeIds: v.array(v.id("employees")), readings: v.optional(v.array(pdksReadingValidator)), readingStartISO: v.optional(v.string()), readingEndISO: v.optional(v.string()), sourceVersion: v.optional(v.string()), deviceAvailability: v.optional(v.array(pdksDeviceAvailabilityValidator)), availabilityOnly: v.boolean(), availableDates: v.optional(v.array(v.string())), forceFlexible: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     ctx = withPdksReadBudget(ctx);
     const { request } = args;
-    await resolveReadingScope(ctx, request.args.projectId, REPORT_READING_PERMISSIONS);
+    await requirePdksReportAccess(ctx, request.args.projectId);
+    if (args.readings) {
+      const dates = pdksRequestDates(request);
+      const rates = await getEffectiveOvertimeRates(ctx, request.args.projectId);
+      const range = overtimePeriodRange(dates.startDate, dates.endDate, rates.overtimeBasis, rates.nightShiftDayMode);
+      assertPdksSourceRange(args.readingStartISO, args.readingEndISO, pdksWorkDayRange(addWorkDate(range.startDate, -1), range.endDate));
+      if (args.sourceVersion !== await pdksSourceVersion(ctx, request.args.projectId)) throw new ConvexError({ code: "PDKS_SOURCE_STALE" });
+    }
     const employees: Doc<"employees">[] = [];
     for (const id of args.employeeIds) {
       const employee = await ctx.db.get(id);
       if (employee) employees.push(employee);
     }
-    if (employees.length !== args.employeeIds.length || employees.some(employee => employee.projectId !== request.args.projectId)) throw new Error("Çalışan seçili projeye ait değil");
+    if (employees.some(employee => employee.projectId !== request.args.projectId)) throw new Error("Çalışan seçili projeye ait değil");
+    // Completeness hints only affect presentation; access and actual employee project
+    // ownership above are always checked server-side, independently of these hints.
+    if (args.deviceAvailability?.some(device => device.projectId !== request.args.projectId)) throw new Error("Cihaz seçili projeye ait değil");
     if (args.readings?.some(reading => reading.projectId !== request.args.projectId)) throw new Error("Okuma seçili projeye ait değil");
     let availableDates: string[] = [], hasFlexible = false, eligibleEmployeeIds: typeof args.employeeIds = [];
-    const owners = new Map(args.roster.map(employee => [employee.cardNumber, employee.employeeId]));
+    const owners = new Map(args.roster.filter(employee => employee.cardNumber).map(employee => [employee.cardNumber, employee.employeeId]));
     const batch: PdksBatchScope = { preloadedReadings: args.readings, readingEndISO: args.readingEndISO, employees, allEmployeeIds: args.roster.map(employee => employee.employeeId),
       cardOwners: [...owners].map(([cardNumber, employeeId]) => ({ cardNumber, employeeId })), availabilityOnly: args.availabilityOnly,
-      availableDates: args.availableDates, forceFlexible: args.forceFlexible,
+      deviceAvailability: args.deviceAvailability, availableDates: args.availableDates, forceFlexible: args.forceFlexible,
       onAvailability: (dates, flexible, ids) => { availableDates = dates; hasFlexible = flexible; eligibleEmployeeIds = ids; },
     };
     const helpers = { scopedPdksShift: (shift: Doc<"shifts"> | null, projectId?: string) => projectId && shift?.projectId !== projectId && !(shift?.scheduleType === "flexible" && !shift.projectId) ? null : shift,
@@ -106,7 +146,7 @@ export const calculate = authedQuery({
 export const closedPayrollPage = authedQuery({
   args: { args: payrollArgs, cursor },
   handler: async (ctx, { args, cursor }): Promise<{ sheet: MonthlyPayrollSheet; isDone: boolean; continueCursor: string } | null> => {
-    await resolveReadingScope(ctx, args.projectId, REPORT_READING_PERMISSIONS);
+    await requirePdksReportAccess(ctx, args.projectId);
     const period = `${args.year}-${String(args.month).padStart(2, "0")}`;
     const saved = await ctx.db.query("payrollPeriods").withIndex("by_projectId_and_period", q => q.eq("projectId", args.projectId).eq("period", period)).order("desc").first();
     if (saved?.status !== "closed") return null;
@@ -120,5 +160,56 @@ export const closedPayrollPage = authedQuery({
       return payVisible ? parsed : { ...parsed, hourlyRate: null, cells: parsed.cells.map(cell => ({ ...cell, overtimePayTRY: null })), totals: { ...parsed.totals, overtimePayTRY: null } };
     });
     return { sheet: { ...base, rows }, isDone: page.isDone, continueCursor: page.continueCursor };
+  },
+});
+
+/** Stable roster subscription: badge traffic does not reread employee metadata. */
+export const todayRoster = authedQuery({
+  args: { projectId: v.id("projects"), date: v.string() },
+  handler: async (queryCtx, { projectId, date }) => {
+    const ctx = withPdksReadBudget(queryCtx);
+    await requirePdksReportAccess(ctx, projectId);
+    const today = date;
+    return (await readBoundedPdks(ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)), pdksReadBudget()))
+      .filter(employee => employedDuring(employee, today, today)).map(employee => ({ employeeId: employee._id, cardNumber: employee.cardNumber }));
+  },
+});
+/** Unknown badges contribute global availability; stop at the first eligible event.
+ * The unlinked index probe avoids walking regular staff readings when an unknown badge exists. */
+export const todayAvailability = authedQuery({
+  args: { projectId: v.id("projects"), date: v.string(), roster: rosterValidator },
+  handler: async (queryCtx, { projectId, date, roster }) => {
+    const ctx = withPdksReadBudget(queryCtx);
+    await requirePdksReportAccess(ctx, projectId);
+    const today = date;
+    const { startISO, endISO } = trDayRangeISO(today, today);
+    const policies = await loadPdksPolicies(ctx, [projectId], today, today);
+    const ids = new Set(roster.map(employee => employee.employeeId));
+    const cards = new Set(roster.filter(employee => employee.cardNumber).map(employee => employee.cardNumber));
+    const eligible = (reading: Doc<"cardReadings">) => !((reading.employeeId && ids.has(reading.employeeId)) || cards.has(reading.cardNo))
+      && isPdksIncludedReading(reading, projectId, policies(projectId, today));
+    // Probe unlinked cards first: regular staff events do not touch this index range.
+    for await (const reading of ctx.db.query("cardReadings").withIndex("by_project_employee_time", q => q.eq("projectId", projectId).eq("employeeId", undefined).gte("accessTime", startISO).lte("accessTime", endISO))) {
+      if (eligible(reading)) return [today];
+    }
+    // Only extant project employees outside the roster contribute linked unknowns.
+    // Deleted/moved employee IDs intentionally do not contribute to this live hint;
+    // snapshot/payroll still use their complete source range independently.
+    for await (const employee of ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId))) {
+      if (ids.has(employee._id)) continue;
+      for await (const reading of ctx.db.query("cardReadings").withIndex("by_project_employee_time", q => q.eq("projectId", projectId).eq("employeeId", employee._id).gte("accessTime", startISO).lte("accessTime", endISO))) {
+        if (eligible(reading)) return [today];
+      }
+    }
+    return [];
+  },
+});
+
+/** The sole live device subscription; unchanged projected values keep group args stable. */
+export const todayDeviceAvailability = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    await requirePdksReportAccess(ctx, projectId);
+    return await loadPdksDeviceAvailability(ctx, projectId);
   },
 });

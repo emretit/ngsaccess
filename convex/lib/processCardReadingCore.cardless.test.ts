@@ -101,3 +101,27 @@ describe("empty cards never identify people", () => {
     expect(cardReport.readings).toEqual([cardReading]);
   });
 });
+
+// These unit fixtures stub only the original database methods; integration coverage lives in dashboardSummary.test.ts.
+vi.mock("./dashboardSummary", async importOriginal => ({ ...await importOriginal<typeof import("./dashboardSummary")>(), withDashboardSummary: <T,>(ctx: T) => ctx }));
+
+it("Hik serial persistence writes only changed values while retaining new evidence", async () => {
+  const device = { _id: "device" as Id<"devices">, brand: "hikvision", projectId, name: "Panel", accessDirection: "entry", hikLastSerialNo: 7 };
+  const patch = vi.fn(async () => undefined);
+  const insert = vi.fn(async () => "reading");
+  const ctx = { db: {
+    get: async () => device, insert, patch,
+    query: (table: string) => {
+      const query = { first: async () => table === "projects" ? { _id: projectId } : null,
+        withIndex: () => query, async *[Symbol.asyncIterator]() {} };
+      return query;
+    },
+  } } as unknown as MutationCtx;
+  const findEmployee = vi.fn(async () => null);
+  const args = { cardNo: "", deviceSerial: "", authedDeviceId: device._id, hikSerialNo: 7, hikMajorEventType: 5, hikSubEventType: 1 };
+  await processCardReadingCore(ctx, args, findEmployee);
+  expect(patch).not.toHaveBeenCalled();
+  expect(insert).toHaveBeenCalledWith("cardReadings", expect.objectContaining({ hikSerialNo: 7 }));
+  await processCardReadingCore(ctx, { ...args, hikSerialNo: 8 }, findEmployee);
+  expect(patch).toHaveBeenCalledExactlyOnceWith(device._id, { hikLastSerialNo: 8 });
+});

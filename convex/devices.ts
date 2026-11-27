@@ -8,7 +8,8 @@ import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS
 import { internal } from "./_generated/api";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { listMobileTargets } from "./lib/mobileAccess";
-import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
+import { internalQuery, type MutationCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -409,7 +410,18 @@ export const updateLastSeen = internalMutation({
       // ETMİYORUZ — /card-reader unauth olduğu için saldırgan forged ipAddress
       // veya devIndex yollayarak cihaz lookup index'lerini bozabilir. Bu alanlar
       // sadece trusted yoldan (gateway register / refreshGatewayDeviceStatus) yazılır.
-      await recordConnectivityTransition(ctx, device, Date.parse(now));
+      const nowMs = Date.parse(now);
+      // A successful signal is persisted at most once per minute. Missing/stale
+      // timestamps (and offline recovery) still take the normal transition path.
+      const lastSeenMs = device.lastSeen ? Date.parse(device.lastSeen) : NaN;
+      if (lastSeenMs > nowMs - 60_000 && lastSeenMs <= nowMs &&
+        device.hikLastSeenAt !== undefined && device.hikLastSeenAt > nowMs - 60_000 &&
+        device.hikLastSeenAt <= nowMs &&
+        (!device.hikOfflineHint || hasFreshIsupStatus(device, nowMs)) &&
+        !device.heartbeatOfflineEventId &&
+        ((device.brand !== "ide_smart" && !(device.brand === "hikvision" && device.hikTransport === "localBridge")) ||
+          device.isActive === false || device.heartbeatCheckAt !== undefined)) return;
+      await recordConnectivityTransition(ctx, device, nowMs);
       await ctx.db.patch(device._id, {
         lastSeen: now,
         hikLastSeenAt: Date.parse(now),
@@ -422,7 +434,10 @@ export const updateLastSeen = internalMutation({
         .query("adminDevices")
         .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
         .first();
-      if (adminDevice) {
+      if (adminDevice && (!adminDevice.lastSeen ||
+        !Number.isFinite(Date.parse(adminDevice.lastSeen)) ||
+        Date.parse(adminDevice.lastSeen) <= Date.parse(now) - 60_000 ||
+        Date.parse(adminDevice.lastSeen) > Date.parse(now))) {
         await ctx.db.patch(adminDevice._id, { lastSeen: now });
       }
     }

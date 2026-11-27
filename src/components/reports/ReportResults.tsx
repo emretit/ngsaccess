@@ -26,15 +26,17 @@ function DailyResults(props: ReportResultsProps) {
   const args = dailyReportArgs(props, props.definition);
   const { can } = usePermissions();
   const enabled = can("reports.view") && !!props.projectId;
-  const snapshot = true;
-  const once = useBatchedTable(enabled && snapshot ? args : "skip");
+  const once = useBatchedTable(enabled ? args : "skip");
+  const snapshot = !once.live;
   const data = once.data;
   const rows = useMemo(() => props.definition.rowsMode === 'personMonth' ? buildPersonMonthRows(data ?? []) : dailyRowsForReport(data ?? [], props.definition.slug, props.violationsOnly), [data, props.definition.rowsMode, props.definition.slug, props.violationsOnly]);
   const days = useMemo(() => [...new Set((data ?? []).flatMap(row => row.days.map(cell => cell.date)))].sort(), [data]);
   if (once.error) return <div role="alert"><p>{once.error}</p><button type="button" onClick={once.refresh}>Yeniden dene</button></div>;
   return <ReportPage days={days} projectId={props.projectId} onClear={props.onClear} definition={props.definition} rows={rows} loading={data === undefined} meta={meta(props)}>
+    {data === undefined && once.progress && <p role="status">Hesaplanıyor · {once.progress}</p>}
+    {once.updatedAt && <p className="text-xs text-muted-foreground">{once.live ? "Son güncelleme" : "Son hesaplama"} {new Date(once.updatedAt).toLocaleTimeString("tr-TR")}{once.live ? " · Canlı" : ""}</p>}
     {snapshot && <button type="button" onClick={once.refresh}>Verileri yenile</button>}
-    {snapshot && <p className="text-xs text-muted-foreground">Rapor açıldığı andaki verileri gösterir; yeni okutmalar için “Verileri yenile”.</p>}
+    {snapshot && <p className="text-xs text-muted-foreground">Rapor önbellekteki son hesaplamayı gösterir; güncel veriler için “Verileri yenile”.</p>}
   </ReportPage>;
 }
 function MonthlyResults(props: ReportResultsProps) {

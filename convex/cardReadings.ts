@@ -22,7 +22,8 @@ import { writeAudit } from "./lib/audit";
 import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { hikDoorReaderNumbers } from "./lib/hikDoorReaders";
 import { hikWallClockToUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
-import { internalMutation, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { ConvexError, v } from "convex/values";
 import { api } from "./_generated/api";
 import {

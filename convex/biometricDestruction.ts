@@ -1,7 +1,8 @@
 import { requirePermission } from "./lib/permissions";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";

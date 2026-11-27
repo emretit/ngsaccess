@@ -1,6 +1,7 @@
 import { accessBlockReason } from "./lib/accountAccess";
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalQuery } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
 import {

@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalQuery } from "./_generated/server";
+import { internalMutation } from "./lib/dashboardMutations";
 import { enrollmentTarget, validateFingerNo } from "./fingerprintEnrollment";
 
 /** Encrypted rows are available exclusively to internal actions. */

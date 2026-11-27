@@ -1,3 +1,4 @@
+import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { useRef, useState } from "react";
 import { importedValidity } from "../../../../convex/lib/hikDeviceImport";
 import { useAction } from "convex/react";
@@ -165,6 +166,7 @@ onImported: (result: DeviceImportResult) => void;
         ...(pageCursor ? { cursor: pageCursor } : {}),
         grantFullDeviceAccess: canManageAccess && grantFullDeviceAccess,
       });
+      invalidatePdksSnapshots();
       setConfirmation(null);
       if (preview?.nextCursor) {
         setSelected([]);

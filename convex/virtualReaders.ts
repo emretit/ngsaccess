@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, type MutationCtx } from "./_generated/server";
+import { type MutationCtx } from "./_generated/server";
+import { mutation } from "./lib/dashboardMutations";
 import { authedMutation } from "./lib/customFunctions";
 import { createCore } from "./lib/deviceProvision";
 import { consumeReaderTokenDetailed } from "./lib/processCardReadingCore";
