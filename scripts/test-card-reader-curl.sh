@@ -2,7 +2,7 @@
 # Convex card-reader endpoint'ini curl ile test scripti
 # Kullanım: ./scripts/test-card-reader-curl.sh
 
-URL="${CARD_READER_URL:-https://notable-tern-4.convex.site/card-reader}"
+URL="${CARD_READER_URL:?CARD_READER_URL gerekli}"
 # Cihaz 192.168.1.212 - DS-K1T343MFWX
 SERIAL="${DEVICE_SERIAL:-DS-K1T343MFWX20240702V032100ENFT9649880}"
 CARD_NO="${CARD_NO:-12345678}"

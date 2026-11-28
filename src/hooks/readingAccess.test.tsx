@@ -5,6 +5,10 @@ import { usePdksTableData } from "./usePdksTableData";
 import { useDashboardActivity, useDashboardReadings, useDashboardTimeline } from "./useDashboard";
 const state = vi.hoisted(() => ({ projectId: "project" as string | undefined, permissions: [] as string[], query: vi.fn<(ref: Parameters<typeof getFunctionName>[0], args: unknown) => void>() }));
 vi.mock("convex/react", () => ({ useConvex: () => ({}), useConvexAuth: () => ({ isAuthenticated: true }), useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => { state.query(ref, args); return undefined; } }));
+vi.mock("./useVisibleRefresh", () => ({ useTabVisible: () => true, useVisibleRefresh: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => {
+  state.query(ref, args);
+  return { data: undefined, loading: false, refresh: vi.fn() };
+} }));
 vi.mock("@/hooks/usePdksSnapshot", () => ({ usePdksTableSnapshot: (args: unknown) => {
   state.query(makeFunctionReference<"query">("pdksBatches:tableSnapshot"), args);
   return { data: undefined, error: undefined, refresh: vi.fn() };

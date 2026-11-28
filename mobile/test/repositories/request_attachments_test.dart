@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -41,6 +42,25 @@ void main() {
     when(() => client.sessionToken).thenAnswer((_) => token);
     when(() => client.deploymentUrl).thenReturn('https://test.convex.cloud');
     slot();
+  });
+  test('self-host accepts only configured upload hosts', () async {
+    dotenv.loadFromString(envString: 'CONVEX_UPLOAD_ALLOWED_HOSTS=site.example.com');
+    addTearDown(() => dotenv.clean());
+    when(() => client.deploymentUrl).thenReturn('https://api.example.com');
+    slot(url: 'https://site.example.com/request-attachments?ticket=secret');
+    final repo = RequestRepository(
+      client,
+      uploadClient: MockClient((request) async {
+        expect(request.url.host, 'site.example.com');
+        return http.Response(jsonEncode({'attachmentId': 'attachment-1'}), 200);
+      }),
+    );
+    expect(await repo.uploadAttachment(file), 'attachment-1');
+    slot(url: 'https://evil.example.com/request-attachments?ticket=secret');
+    await expectLater(
+      repo.uploadAttachment(file),
+      throwsA(isA<ProtocolError>()),
+    );
   });
   test(
     'uploads bytes to the authenticated proxy without forwarding the employee session',

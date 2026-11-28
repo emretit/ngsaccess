@@ -12,6 +12,8 @@ import { DashboardPanel } from "./DashboardPanel";
 const state = vi.hoisted(() => ({
   now: Date.parse("2026-10-19T11:30:00Z"),
   loading: false,
+  error: undefined as string | undefined,
+  updatedAt: undefined as number | undefined,
   present: null as number | null,
   inside: null as number | null,
   late: null as number | null,
@@ -19,7 +21,7 @@ const state = vi.hoisted(() => ({
   readings: [] as { _id: string; accessTime: string; employeeName: string; accessStatus: string }[],
 }));
 vi.mock("@/hooks/useDashboard", () => ({
-  useDashboardStats: () => ({ stats: { employees: 7 }, loading: state.loading }),
+  useDashboardStats: () => ({ stats: { employees: 7 }, loading: state.loading, error: state.error, updatedAt: state.updatedAt, refresh: vi.fn() }),
   useDashboardActivity: () => ({
     summary: { presentToday: state.present, insideBuilding: state.inside, lateArrivals: state.late },
     loading: state.loading,
@@ -45,6 +47,7 @@ const render = (node: ReactNode) => renderToStaticMarkup(<MemoryRouter>{node}</M
 beforeEach(() => {
   state.present = null; state.inside = null; state.late = null;
   state.loading = false; state.total = 0; state.readings = [];
+  state.error = undefined; state.updatedAt = undefined;
 });
 describe("dashboard audit fixes", () => {
   it("keeps absent summary values distinct from zero and hides the attendance rate", () => {
@@ -68,6 +71,19 @@ describe("dashboard audit fixes", () => {
   it("shows loading placeholders before summary values arrive", () => {
     state.loading = true;
     expect(render(<TodayStrip />).match(/Yükleniyor/g)).toHaveLength(4);
+  });
+  it("shows refresh controls, the last successful update and a recoverable summary error", () => {
+    state.updatedAt = state.now;
+    state.error = "Bağlantı hatası";
+    const html = render(<TodayStrip />);
+    expect(html).toContain(">Yenile</button>");
+    expect(html).toContain("Son güncelleme:");
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Özet alınamadı: Bağlantı hatası");
+    state.loading = true;
+    const refreshing = render(<TodayStrip />);
+    expect(refreshing).toContain("Özet güncelleniyor…");
+    expect(refreshing).toContain("Son güncelleme:");
   });
   it.each([30 * 60_000, 60 * 60_000])("keeps the live dot for a recent reading (%s ms)", age => {
     state.readings = [{ _id: "r1", accessTime: new Date(state.now - age).toISOString(), employeeName: "Ada", accessStatus: "izin_verildi" }];

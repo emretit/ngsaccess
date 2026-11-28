@@ -27,8 +27,8 @@ const HIK_USER = process.env.HIK_USER || "admin";
 const HIK_PASS = process.env.HIK_PASS || "";
 const DEVICE_API_TOKEN = process.env.DEVICE_API_TOKEN || "";
 const CONVEX_URL =
-  process.env.CONVEX_URL ||
-  "https://notable-tern-4.convex.site/card-reader";
+  process.env.CONVEX_URL;
+if (!process.env.CONVEX_URL) throw new Error("CONVEX_URL gerekli");
 const RECONNECT_DELAY_MS = Number(process.env.RECONNECT_DELAY_MS || "5000");
 
 if (!HIK_PASS) {

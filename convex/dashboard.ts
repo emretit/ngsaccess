@@ -728,7 +728,7 @@ export const getRecentReadings = authedQuery({
       const { startISO, endISO } = trDayRangeISO(today, today);
       const day = await ctx.db.query("dashboardDays").withIndex("by_projectId_and_date", q => q.eq("projectId", args.projectId).eq("date", today)).unique();
       if (day?.complete && day.formatVersion === 2) {
-        const feed = await ctx.db.query("dashboardReadingFeed").withIndex("by_projectId_and_accessTime_and_readingCreationTime_and_readingId", q => q.eq("projectId", args.projectId).gte("accessTime", startISO).lte("accessTime", endISO)).order("desc").take(limit);
+        const feed = await ctx.db.query("dashboardReadingFeed").withIndex("by_projectId_accessTime_readingCreationTime_readingId", q => q.eq("projectId", args.projectId).gte("accessTime", startISO).lte("accessTime", endISO)).order("desc").take(limit);
         // Legacy/future rows are outside the completed day: retain the old ordering path.
         const future = await ctx.db.query("cardReadings").withIndex("by_project_access_time", q => q.eq("projectId", args.projectId).gt("accessTime", endISO)).first();
         if (feed.length === limit && !future) return withLegacyDevices(feed.map(r => ({ _id: r.readingId, employeeName: r.employeeName, cardNo: r.cardNo,

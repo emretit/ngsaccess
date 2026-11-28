@@ -1,10 +1,11 @@
+import { sameHikEvent } from "./lib/hikEventDedup";
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { deviceConnection, deviceLastSignal, hasPeriodicHeartbeat, hasFreshIsupStatus, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
 import { v } from "convex/values";
 import { internalMutation } from "./lib/dashboardMutations";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
-import { toUtcISO } from "./lib/trDate";
+import { hikWallClockToUtcISO, toUtcISO } from "./lib/trDate";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { writeAudit } from "./lib/audit";
 
@@ -131,14 +132,9 @@ export const recordHikDeviceEvent = internalMutation({
     const projectId = args.projectId ?? device?.projectId;
 
     if (deviceId && args.hikSerialNo !== undefined) {
-      const existing = await ctx.db
-        .query("deviceEvents")
-        .withIndex("by_device_and_hik_serial", (q) =>
-          q.eq("deviceId", deviceId).eq("hikSerialNo", args.hikSerialNo),
-        )
-        .first();
-      if (existing) {
-        return { inserted: false, reason: "duplicate" };
+      const candidates = ctx.db.query("deviceEvents").withIndex("by_device_and_hik_serial", q => q.eq("deviceId", deviceId).eq("hikSerialNo", args.hikSerialNo));
+      for await (const existing of candidates) {
+        if (sameHikEvent(existing, { cardNo: args.cardNo, time: toUtcISO(args.eventTime) ?? args.eventTime, alternateTime: hikWallClockToUtcISO(args.eventTime) })) return { inserted: false, reason: "duplicate" };
       }
     }
 

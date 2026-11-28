@@ -1,25 +1,43 @@
+import { useTabVisible } from "./useVisibleRefresh";
 import { trTodayKey } from "../../convex/lib/trDate";
 import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "convex/react";
-import type { FunctionArgs, FunctionReturnType } from "convex/server";
+import { getFunctionName, makeFunctionReference, type FunctionArgs, type FunctionReturnType } from "convex/server";
 import { pdksBatchRefs, type TableArgs, type TableRows } from "@/lib/pdksBatches";
 import { invalidatePdksSnapshots } from "@/lib/pdksInvalidation";
 import { isPdksBudgetError, pdksErrorMessage } from "@/lib/pdksErrors";
+import type { Value } from "convex/values";
+
+// Convex useQueries updates state during render when the request object changes.
+// Stabilize by value, including empty/skipped requests and newly assembled rosters.
+function useStableQueries(requests: Parameters<typeof useQueries>[0]) {
+  const key = JSON.stringify(Object.entries(requests).map(([id, { query, args }]) => [id, getFunctionName(query), args]));
+  const stable = useMemo(() => {
+    const entries = JSON.parse(key) as [string, string, Record<string, Value>][];
+    return Object.fromEntries(entries.map(([id, name, args]) => [id, { query: makeFunctionReference<"query">(name), args }]));
+  }, [key]);
+  return useQueries(stable);
+}
+
 type Result = FunctionReturnType<typeof pdksBatchRefs.calculate>;
 type Roster = FunctionReturnType<typeof pdksBatchRefs.todayRoster>;
 type Requests = Record<string, { query: typeof pdksBatchRefs.calculate; args: FunctionArgs<typeof pdksBatchRefs.calculate> }>;
 
+export const PDKS_HIDDEN_DELAY_MS = 30_000;
+
 /** Bounded group subscriptions: one new badge event recomputes its group, not the full report. */
-export function usePdksLiveTable(args: TableArgs | "skip") {
-  const key = JSON.stringify(args);
+export function usePdksLiveTable(input: TableArgs | "skip") {
+  const isVisible = useTabVisible(PDKS_HIDDEN_DELAY_MS);
+  const args = isVisible ? input : "skip";
+  const key = JSON.stringify(input);
   const [splits, setSplits] = useState<{ key: string; ids: string[] }>({ key, ids: [] });
   const splitIds = useMemo(() => splits.key === key ? splits.ids : [], [splits, key]);
   const date = args === "skip" ? "" : args.startDate ?? args.date ?? trTodayKey();
-  const rosterResult = (useQueries(args === "skip" ? {} : { roster: { query: pdksBatchRefs.todayRoster, args: { projectId: args.projectId, date } } }) as Record<string, Roster | Error | undefined>).roster;
+  const rosterResult = (useStableQueries(args === "skip" ? {} : { roster: { query: pdksBatchRefs.todayRoster, args: { projectId: args.projectId, date } } }) as Record<string, Roster | Error | undefined>).roster;
   const roster = rosterResult instanceof Error ? undefined : rosterResult;
-  const unknownResult = (useQueries(args === "skip" || !roster ? {} : { dates: { query: pdksBatchRefs.todayAvailability, args: { projectId: args.projectId, date, roster } } }) as Record<string, FunctionReturnType<typeof pdksBatchRefs.todayAvailability> | Error | undefined>).dates;
+  const unknownResult = (useStableQueries(args === "skip" || !roster ? {} : { dates: { query: pdksBatchRefs.todayAvailability, args: { projectId: args.projectId, date, roster } } }) as Record<string, FunctionReturnType<typeof pdksBatchRefs.todayAvailability> | Error | undefined>).dates;
   const unknownDates = unknownResult instanceof Error ? undefined : unknownResult;
-  const deviceResult = (useQueries(args === "skip" ? {} : { devices: { query: pdksBatchRefs.todayDeviceAvailability, args: { projectId: args.projectId } } }) as Record<string, FunctionReturnType<typeof pdksBatchRefs.todayDeviceAvailability> | Error | undefined>).devices;
+  const deviceResult = (useStableQueries(args === "skip" ? {} : { devices: { query: pdksBatchRefs.todayDeviceAvailability, args: { projectId: args.projectId } } }) as Record<string, FunctionReturnType<typeof pdksBatchRefs.todayDeviceAvailability> | Error | undefined>).devices;
   const deviceAvailability = deviceResult instanceof Error ? undefined : deviceResult;
   const groups = useMemo(() => {
     const clusters = new Map<string, Roster>();
@@ -49,14 +67,14 @@ export function usePdksLiveTable(args: TableArgs | "skip") {
       ...(availableDates ? { availableDates, forceFlexible } : {}),
     } }]));
   };
-  const discovery = useQueries(request(true)) as Record<string, Result | Error | undefined>;
+  const discovery = useStableQueries(request(true)) as Record<string, Result | Error | undefined>;
   const ready = args !== "skip" && roster !== undefined && unknownDates !== undefined && deviceAvailability !== undefined && groups.every(group => discovery[groupKey(group)] && !(discovery[groupKey(group)] instanceof Error));
   const dates = new Set(unknownDates ?? []);
   let flexible = false;
   for (const result of Object.values(discovery)) if (result && !(result instanceof Error)) {
     result.availableDates.forEach(date => dates.add(date)); flexible ||= result.hasFlexible;
   }
-  const results = useQueries(ready ? request(false, [...dates].sort(), flexible) : {}) as Record<string, Result | Error | undefined>;
+  const results = useStableQueries(ready ? request(false, [...dates].sort(), flexible) : {}) as Record<string, Result | Error | undefined>;
   const failures = [rosterResult, unknownResult, deviceResult, ...Object.values(discovery), ...Object.values(results)].filter((result): result is Error => result instanceof Error);
   const failedGroups = groups.filter(group => group.length > 1 && [discovery[groupKey(group)], results[groupKey(group)]].some(result => result instanceof Error && isPdksBudgetError(result)));
   const failedKeys = failedGroups.map(groupKey).join(";");
@@ -71,11 +89,14 @@ export function usePdksLiveTable(args: TableArgs | "skip") {
       .sort((a, b) => a.name.localeCompare(b.name, "tr") || (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   }
   const signature = data ? JSON.stringify(data) : undefined;
-  const [updatedAt, setUpdatedAt] = useState<number | undefined>(undefined);
-  useEffect(() => { setUpdatedAt(signature ? Date.now() : undefined); }, [signature]);
+  const [last, setLast] = useState<{ key: string; data?: TableRows; updatedAt?: number }>({ key });
+  useEffect(() => {
+    if (signature !== undefined) setLast({ key, data: JSON.parse(signature) as TableRows, updatedAt: Date.now() });
+  }, [signature, key]);
+  const cached = last.key === key && input !== "skip" ? last : undefined;
   const error = [rosterResult, unknownResult, deviceResult].find((value): value is Error => value instanceof Error)
     ?? failures.find(failure => !isPdksBudgetError(failure)) ?? groups.flatMap(group => group.length === 1 ? [discovery[groupKey(group)], results[groupKey(group)]] : []).find((value): value is Error => value instanceof Error);
   const completedGroups = Object.values(results).filter(result => result && !(result instanceof Error)).length;
-  return { data, error: error ? pdksErrorMessage(error) : undefined, updatedAt, refresh: invalidatePdksSnapshots, availabilityUnknown: unknownResult === null,
+  return { data: data ?? cached?.data, error: error ? pdksErrorMessage(error) : undefined, updatedAt: cached?.updatedAt, refreshing: !complete, refresh: invalidatePdksSnapshots, availabilityUnknown: unknownResult === null,
     progress: `${completedGroups}/${groups.length} grup` };
 }

@@ -1,3 +1,4 @@
+import { useTabVisible } from "@/hooks/useVisibleRefresh";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -22,6 +23,7 @@ function isHidden(key: string) {
 }
 
 export default function SetupChecklist() {
+  const visible = useTabVisible();
   const { projectId, loading } = useActiveProject();
   const { can } = usePermissions();
   const canManage = can("admin.manage");
@@ -31,7 +33,7 @@ export default function SetupChecklist() {
   const completed = completedKey === doneKey || isHidden(doneKey);
   const [hiddenKey, setHiddenKey] = useState<string | null>(null);
   const hidden = hiddenKey === storageKey || isHidden(storageKey);
-  const status = useQuery(api.projects.getSetupStatus, !loading && canManage && projectId && !hidden && !completed ? { projectId } : "skip");
+  const status = useQuery(api.projects.getSetupStatus, visible && !loading && canManage && projectId && !hidden && !completed ? { projectId } : "skip");
   useEffect(() => {
     if (!loading && canManage && projectId && !hidden && !completed && status?.complete) {
       try { window.localStorage.setItem(doneKey, "1"); } catch { /* Bu oturumda abonelik kapalı kalır. */ }

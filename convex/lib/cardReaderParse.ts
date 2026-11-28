@@ -93,6 +93,11 @@ function getFirstString(
   return undefined;
 }
 
+/** Shared identity precedence for live payloads and history rows (including legacy reader fallback). */
+export function extractHikCardNo(payload: Record<string, unknown>): string | undefined {
+  return getFirstString(payload, CARD_FIELDS);
+}
+
 function getFirstNumber(
   obj: Record<string, unknown>,
   fields: ReadonlyArray<string>
@@ -360,7 +365,7 @@ export function parseCardReaderBody(
       }
 
       const payload = pickHikvisionPayload(body);
-      let user_id = getFirstString(payload as Record<string, unknown>, CARD_FIELDS);
+      let user_id = extractHikCardNo(payload as Record<string, unknown>);
       let serial = getFirstString(payload as Record<string, unknown>, SERIAL_FIELDS);
       // Serial üst seviye body'de olabilir (örn. macAddress, serialNumber)
       if (!serial && payload !== body) {

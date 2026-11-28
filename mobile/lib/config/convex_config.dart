@@ -15,6 +15,21 @@ class ConvexConfig {
   static const _definedUrl = String.fromEnvironment('CONVEX_URL');
   static const _definedEnvironment = String.fromEnvironment('APP_ENV');
   static const _allowedHost = String.fromEnvironment('CONVEX_ALLOWED_HOST');
+  static const _uploadHosts = String.fromEnvironment(
+    'CONVEX_UPLOAD_ALLOWED_HOSTS',
+  );
+  static Set<String> get uploadAllowedHosts => resolveUploadAllowedHosts(
+    _uploadHosts.isNotEmpty
+        ? _uploadHosts
+        : (!kReleaseMode && dotenv.isInitialized
+              ? dotenv.env['CONVEX_UPLOAD_ALLOWED_HOSTS'] ?? ''
+              : ''),
+  );
+  static Set<String> resolveUploadAllowedHosts(String value) => value
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .where((host) => host.isNotEmpty)
+      .toSet();
   static HttpConvexClient? _client;
 
   static String get deploymentUrl => resolveDeploymentUrl(

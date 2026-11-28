@@ -10,6 +10,8 @@
 
 import type * as accessGrantStatus from "../accessGrantStatus.js";
 import type * as accessRules from "../accessRules.js";
+import type * as selfHostReconcile from "../selfHostReconcile.js";
+import type * as actions_selfHostForwarding from "../actions/selfHostForwarding.js";
 import type * as accountAccess from "../accountAccess.js";
 import type * as actions_biometricDestruction from "../actions/biometricDestruction.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
@@ -299,6 +301,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   accessGrantStatus: typeof accessGrantStatus;
   accessRules: typeof accessRules;
+  selfHostReconcile: typeof selfHostReconcile;
+  "actions/selfHostForwarding": typeof actions_selfHostForwarding;
   accountAccess: typeof accountAccess;
   "actions/biometricDestruction": typeof actions_biometricDestruction;
   "actions/getChatData": typeof actions_getChatData;

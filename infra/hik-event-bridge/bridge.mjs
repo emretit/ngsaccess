@@ -145,6 +145,7 @@ export function createBridge(config, { log = (entry) => console.log(JSON.stringi
     gatewayUrl, username, password, convexSiteUrl, tokens,
     maxAgeMs = 24 * 3600_000, heartbeatTimeoutMs = 30_000, maxQueue = 1000, eventTimeOffset, queueDir,
   } = config;
+  if (!Number.isSafeInteger(maxQueue) || maxQueue < 1) throw new Error('MAX_QUEUE must be a positive integer');
   let queue = Promise.resolve();
   let queued = 0;
   let stopped = false;
@@ -419,6 +420,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     password: process.env.HIK_GATEWAY_PASS,
     convexSiteUrl: process.env.CONVEX_SITE_URL.replace(/\/$/, ''),
     tokens,
+    maxQueue: process.env.MAX_QUEUE === undefined ? 1000 : Number(process.env.MAX_QUEUE),
     maxAgeMs: (Number(process.env.MAX_EVENT_AGE_HOURS) || 24) * 3600_000,
     heartbeatTimeoutMs: Number(process.env.HEARTBEAT_TIMEOUT_MS) || 30_000,
     eventTimeOffset: process.env.EVENT_TIME_OFFSET || undefined,

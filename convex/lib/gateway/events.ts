@@ -2,6 +2,7 @@
 
 import { gatewayApiCall, DEFAULT_SEARCH_PAGE_SIZE } from "./core";
 import { isapiRecord, validateIsapiResult } from "./isapiResult";
+import { extractHikCardNo } from "../cardReaderParse";
 
 // ---------------------------------------------------------------------------
 // AcsEvent — geçmiş erişim olayları (PR2: backfill)
@@ -150,7 +151,7 @@ export async function searchAcsEventsOnDevice(
       }
       infoList.push({
         time: eventText(row.time) ?? "",
-        cardNo: eventText(row.cardNo) ?? "",
+        cardNo: extractHikCardNo(row) ?? "",
         cardType: eventText(row.cardType),
         name: eventText(row.name),
         employeeNoString: eventText(row.employeeNoString),

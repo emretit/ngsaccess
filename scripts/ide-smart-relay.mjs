@@ -22,8 +22,8 @@ import https from "node:https";
 
 const PORT = Number(process.env.PORT || 8090);
 const UPSTREAM =
-  process.env.CONVEX_CARD_READER_URL ||
-  "https://notable-tern-4.convex.site/card-reader";
+  process.env.CONVEX_CARD_READER_URL;
+if (!process.env.CONVEX_CARD_READER_URL) throw new Error("CONVEX_CARD_READER_URL gerekli");
 const DEVICE_API_TOKEN = process.env.DEVICE_API_TOKEN || "";
 
 function shortBody(buf) {

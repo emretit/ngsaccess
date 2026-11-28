@@ -1,3 +1,4 @@
+import { useVisibleRefresh, useTabVisible } from "./useVisibleRefresh";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -11,27 +12,28 @@ function useDashboardScope() {
 }
 export function useDashboardStats() {
   const scope = useDashboardScope();
-  const stats = useQuery(api.dashboard.getStats, scope.enabled ? { projectId: scope.projectId, includeTodayReadings: false } : "skip");
-  return { stats, loading: scope.loading || (scope.enabled && stats === undefined) };
+  const { data: stats, ...status } = useVisibleRefresh(api.dashboard.getStats, scope.enabled ? { projectId: scope.projectId, includeTodayReadings: false } : "skip");
+  return { stats, ...status, loading: scope.loading || status.loading };
 }
 export function useDashboardActivity() {
   const scope = useDashboardScope();
   const { can } = usePermissions();
   const enabled = scope.enabled && can("reports.view");
-  const summary = useQuery(api.dashboard.getActivitySummary, enabled ? { projectId: scope.projectId } : "skip");
-  return { summary, loading: scope.loading || (enabled && summary === undefined) };
+  const { data: summary, ...status } = useVisibleRefresh(api.dashboard.getActivitySummary, enabled ? { projectId: scope.projectId } : "skip");
+  return { summary, ...status, loading: scope.loading || status.loading };
 }
 export function useDashboardTimeline() {
   const scope = useDashboardScope();
   const { can } = usePermissions();
   const enabled = scope.enabled && (can("reports.view") || can("devices.manage"));
-  const timeline = useQuery(api.dashboard.getTodayTimeline, enabled ? { projectId: scope.projectId } : "skip");
-  return { timeline, loading: scope.loading || (enabled && timeline === undefined) };
+  const { data: timeline, ...status } = useVisibleRefresh(api.dashboard.getTodayTimeline, enabled ? { projectId: scope.projectId } : "skip");
+  return { timeline, ...status, loading: scope.loading || status.loading };
 }
 export function useDashboardReadings(limit = 10) {
+  const visible = useTabVisible();
   const scope = useDashboardScope();
   const { can } = usePermissions();
-  const enabled = scope.enabled && (can("reports.view") || can("devices.manage"));
+  const enabled = visible && scope.enabled && (can("reports.view") || can("devices.manage"));
   const readings = useQuery(api.dashboard.getRecentReadings, enabled ? { projectId: scope.projectId, limit, includeDevices: false } : "skip");
   const deviceIds = [...new Set((readings ?? []).flatMap(row => row.deviceId ? [row.deviceId] : []))].sort();
   const devices = useQuery(api.dashboard.getReadingDevices, enabled && scope.projectId ? { projectId: scope.projectId, deviceIds } : "skip");

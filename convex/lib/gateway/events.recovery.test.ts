@@ -1,7 +1,20 @@
 import { expect, it, vi } from "vitest";
 import { searchAcsEventsOnDevice } from "./events";
 import { gatewayApiCall } from "./core";
+import { CARD_FIELDS, parseCardReaderBody } from "../cardReaderParse";
 vi.mock("./core", () => ({ DEFAULT_SEARCH_PAGE_SIZE: 30, gatewayApiCall: vi.fn() }));
+
+it.each(CARD_FIELDS)("history retains the same %s identity as live parsing before the mutation", async field => {
+  const identity = field === "employeeNo"
+    ? { employeeNo: 7, employeeNoString: "0007" }
+    : { [field]: field === "cardReaderNo" ? 1 : "0007" };
+  const row = { time: "2026-11-28T10:00:00+03:00", major: 1, minor: 1030, serialNo: 9, ...identity };
+  vi.mocked(gatewayApiCall).mockResolvedValue({ status: 200, data: { AcsEvent: { numOfMatches: 1, InfoList: [row] } }, raw: "" });
+  const result = await searchAcsEventsOnDevice("index", { searchID: "s", position: 0 });
+  const live = parseCardReaderBody(JSON.stringify({ AccessControllerEvent: { ...identity, dateTime: row.time, majorEventType: 1, subEventType: 1030, serialNo: 9 } }), "application/json");
+  expect(result.events[0]?.cardNo).toBe(live.user_id);
+  expect(result.events[0]?.cardNo).toBe(field === "employeeNo" ? "7" : field === "cardReaderNo" ? "1" : "0007");
+});
 
 it("Y-01 converts textual serials, counts malformed rows and advances by the raw page count", async () => {
   const row = { serialNo: "12", time: "2026-11-03T12:00:00Z", major: "5", minor: "75" };

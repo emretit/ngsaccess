@@ -82,6 +82,7 @@ export const saveUserPhoto = authedMutation({
     if (!url) throw new Error("Dosya URL'si alınamadı");
     await ctx.db.patch(ctx.user._id, {
       photoUrl: url,
+      photoStorageId: args.storageId,
       updatedAt: new Date().toISOString(),
     });
     if (pending) await ctx.db.delete(pending._id);
@@ -115,6 +116,14 @@ export const cleanupPendingUploads = internalMutation({
     // No picture-storage index exists: scan face references once per cleanup batch.
     const candidates = new Set(pending.map(upload => upload.storageId));
     const faceReferences = new Set<Id<"_storage">>();
+    // URL-only legacy records have no stable identity. Conservatively retain
+    // unclaimed blobs until the import photo mapping has been completed.
+    let hasLegacyPhotos = false;
+    if (pending.length) {
+      for await (const user of ctx.db.query("users").withIndex("by_photo_storage", q => q.eq("photoStorageId", undefined))) {
+        if (user.photoUrl) { hasLegacyPhotos = true; break; }
+      }
+    }
     if (pending.length) {
       for await (const face of ctx.db.query("employeeFaces")) {
         if (candidates.has(face.pictureStorageId)) faceReferences.add(face.pictureStorageId);
@@ -132,11 +141,13 @@ export const cleanupPendingUploads = internalMutation({
       }
       const employee = await ctx.db.query("employees")
         .withIndex("by_photo_storage", q => q.eq("photoStorageId", upload.storageId)).first();
-      const url = employee ? null : await ctx.storage.getUrl(upload.storageId);
-      const user = url ? await ctx.db.query("users")
-        .withIndex("by_photo_url", q => q.eq("photoUrl", url)).first() : null;
-      // url null = dosya zaten silinmiş; yalnız satır temizlenir.
-      if (!employee && url && !user) await ctx.storage.delete(upload.storageId);
+      const user = await ctx.db.query("users")
+        .withIndex("by_photo_storage", q => q.eq("photoStorageId", upload.storageId)).first();
+      // Legacy URL-only owners cannot be reliably matched after import. Keep their
+      // pending blobs until photoStorageId has been reconciled from the export.
+      const owner = await ctx.db.get(upload.userId);
+      const legacyPhoto = owner?.photoUrl && !owner.photoStorageId;
+      if (!employee && !user && !legacyPhoto && !hasLegacyPhotos && await ctx.storage.getUrl(upload.storageId)) await ctx.storage.delete(upload.storageId);
       await ctx.db.delete(upload._id);
     }
     if (pending.length === PENDING_CLEANUP_BATCH) {

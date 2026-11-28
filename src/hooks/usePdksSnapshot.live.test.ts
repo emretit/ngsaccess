@@ -4,10 +4,10 @@ import { getFunctionName } from "convex/server";
 import { trTodayKey } from "../../convex/lib/trDate";
 import { usePdksTableSnapshot } from "./usePdksSnapshot";
 import { useAnnualOvertime } from "./useAnnualOvertime";
-import { usePdksLiveTable } from "./usePdksLiveTable";
+import { PDKS_HIDDEN_DELAY_MS, usePdksLiveTable } from "./usePdksLiveTable";
 import { pdksEpoch } from "../lib/pdksInvalidation";
 const state = vi.hoisted(() => ({
-  availabilityUnknown: false,
+  availabilityUnknown: false, pending: false,
   cursor: 0, slots: [] as unknown[], dependencies: [] as (readonly unknown[] | undefined)[], cleanups: [] as (() => void)[], effects: [] as (() => void)[],
   dense: false, revision: "v1" as string | undefined, roster: [{ employeeId: "employee", cardNumber: "1" }], rows: [{ id: "employee", name: "v1", days: [] }], client: {}, query: vi.fn(), table: vi.fn(), annual: vi.fn(), invalidateAnnual: vi.fn(),
 }));
@@ -30,7 +30,7 @@ vi.mock("convex/react", () => ({ useConvex: () => state.client,
   useQueries: (requests: Record<string, { query: Parameters<typeof getFunctionName>[0]; args: { availabilityOnly?: boolean; employeeIds?: string[] } }>) => {
     state.query(requests);
     return Object.fromEntries(Object.entries(requests).map(([key, { query, args }]) => [key,
-      getFunctionName(query).endsWith(":todayRoster") ? state.roster : getFunctionName(query).endsWith(":todayAvailability") ? (state.availabilityUnknown ? null : []) : getFunctionName(query).endsWith(":todayDeviceAvailability") ? [] :
+      state.pending ? undefined : getFunctionName(query).endsWith(":todayRoster") ? state.roster : getFunctionName(query).endsWith(":todayAvailability") ? (state.availabilityUnknown ? null : []) : getFunctionName(query).endsWith(":todayDeviceAvailability") ? [] :
       state.dense && args.employeeIds?.includes("e0") && args.employeeIds.length > 32 ? Object.assign(new Error("budget"), { data: { code: "PDKS_READ_BUDGET" } }) :
       { kind: "table", rows: args.availabilityOnly ? [] : state.rows, availableDates: [trTodayKey()], hasFlexible: false, eligibleEmployeeIds: ["employee"] },
     ]));
@@ -45,8 +45,8 @@ function render<T>(hook: () => T) {
   return result;
 }
 beforeEach(() => { state.dense = false; state.roster = [{ employeeId: "employee", cardNumber: "1" }]; vi.stubGlobal("window", new EventTarget()); state.table.mockResolvedValue([]); state.annual.mockResolvedValue([]); state.revision = "v1"; state.rows = [{ id: "employee", name: "v1", days: [] }]; });
-afterEach(() => { state.cleanups.forEach(cleanup => cleanup()); state.slots = []; state.dependencies = []; state.cleanups = []; state.effects = []; vi.clearAllMocks(); vi.unstubAllGlobals(); });
-beforeEach(() => { state.availabilityUnknown = false; });
+afterEach(() => { state.cleanups.forEach(cleanup => cleanup()); state.slots = []; state.dependencies = []; state.cleanups = []; state.effects = []; vi.clearAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+beforeEach(() => { state.availabilityUnknown = false; state.pending = false; });
 it("unknown shared availability does not block the live rows or surface a budget error", () => {
   state.availabilityUnknown = true;
   const result = render(() => usePdksLiveTable({ projectId: "project" as Id<"projects">, date: trTodayKey() }));
@@ -112,4 +112,81 @@ it("splits only the failed group and keeps healthy subscriptions and date argume
   expect(groups.filter(size => size === 32).length).toBeGreaterThanOrEqual(2);
   expect(groups).toContain(1);
   expect(calls.find(([, request]) => getFunctionName(request.query).endsWith(":todayRoster"))?.[1].args.date).toBe(args.date);
+});
+
+it("closes live subscriptions after the grace period and reopens current company groups on return", async () => {
+  vi.useFakeTimers();
+  const target = new EventTarget();
+  let hidden = false;
+  Object.defineProperty(target, "hidden", { get: () => hidden });
+  vi.stubGlobal("document", target);
+  const args = { projectId: "project" as Id<"projects">, date: trTodayKey() };
+  render(() => usePdksTableSnapshot(args));
+  state.query.mockClear();
+  hidden = true;
+  document.dispatchEvent(new Event("visibilitychange"));
+  await vi.advanceTimersByTimeAsync(PDKS_HIDDEN_DELAY_MS);
+  expect(render(() => usePdksTableSnapshot(args)).data?.[0]?.name).toBe("v1");
+  expect(state.query.mock.calls.every(([requests]) => Object.keys(requests).length === 0)).toBe(true);
+  state.query.mockClear();
+  const nextCompany = { ...args, projectId: "next" as Id<"projects"> };
+  expect(render(() => usePdksTableSnapshot(nextCompany)).data).toBeUndefined();
+  expect(state.query.mock.calls.every(([requests]) => Object.keys(requests).length === 0)).toBe(true);
+  state.query.mockClear();
+  hidden = false;
+  document.dispatchEvent(new Event("visibilitychange"));
+  render(() => usePdksTableSnapshot(nextCompany));
+  const requests = state.query.mock.calls.flatMap(([requests]) => Object.values(requests as Record<string, { args: { projectId?: string; request?: { args: { projectId?: string } } } }>));
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.every(({ args }) => (args.projectId ?? args.request?.args.projectId) === "next")).toBe(true);
+});
+
+it("visibility changes do not abort a running historical request used by exports", async () => {
+  const target = new EventTarget();
+  Object.defineProperty(target, "hidden", { value: false, configurable: true });
+  vi.stubGlobal("document", target);
+  state.table.mockImplementationOnce(() => new Promise(() => {}));
+  const args = { projectId: "project" as Id<"projects">, date: "2025-01-01" };
+  render(() => usePdksTableSnapshot(args));
+  const signal = state.table.mock.calls[0]?.[2] as AbortSignal | undefined;
+  Object.defineProperty(target, "hidden", { value: true });
+  document.dispatchEvent(new Event("visibilitychange"));
+  render(() => usePdksTableSnapshot(args));
+  expect(state.table).toHaveBeenCalledTimes(1);
+  expect(signal?.aborted).toBe(false);
+});
+
+it("keeps subscriptions through short tab switches and preserves rows during resubscription", async () => {
+  vi.useFakeTimers();
+  const target = new EventTarget();
+  let hidden = false;
+  Object.defineProperty(target, "hidden", { get: () => hidden });
+  vi.stubGlobal("document", target);
+  const args = { projectId: "project" as Id<"projects">, date: trTodayKey() };
+  render(() => usePdksTableSnapshot(args));
+  hidden = true;
+  document.dispatchEvent(new Event("visibilitychange"));
+  await vi.advanceTimersByTimeAsync(PDKS_HIDDEN_DELAY_MS - 1);
+  state.query.mockClear();
+  expect(render(() => usePdksTableSnapshot(args)).data?.[0]?.name).toBe("v1");
+  expect(state.query.mock.calls.some(([requests]) => Object.keys(requests).length > 0)).toBe(true);
+  hidden = false;
+  document.dispatchEvent(new Event("visibilitychange"));
+  await vi.advanceTimersByTimeAsync(PDKS_HIDDEN_DELAY_MS);
+  state.query.mockClear();
+  render(() => usePdksTableSnapshot(args));
+  expect(state.query.mock.calls.some(([requests]) => Object.keys(requests).length > 0)).toBe(true);
+  hidden = true;
+  document.dispatchEvent(new Event("visibilitychange"));
+  await vi.advanceTimersByTimeAsync(PDKS_HIDDEN_DELAY_MS);
+  state.query.mockClear();
+  expect(render(() => usePdksTableSnapshot(args)).data?.[0]?.name).toBe("v1");
+  expect(state.query.mock.calls.every(([requests]) => Object.keys(requests).length === 0)).toBe(true);
+  hidden = false;
+  state.pending = true;
+  document.dispatchEvent(new Event("visibilitychange"));
+  const reopening = render(() => usePdksTableSnapshot(args));
+  expect(reopening.data?.[0]?.name).toBe("v1");
+  expect(reopening).toMatchObject({ refreshing: true });
+  expect(render(() => usePdksTableSnapshot({ ...args, projectId: "other" as Id<"projects"> })).data).toBeUndefined();
 });

@@ -1,3 +1,4 @@
+import { cancelImportedJob } from "./lib/cancelImportedJob";
 import { v } from "convex/values";
 import { internalMutation } from "./lib/dashboardMutations";
 import { internal } from "./_generated/api";
@@ -44,7 +45,7 @@ export const setAccessExpiry = authedMutation({
     if (target.accessExpiresAt !== undefined && target.accessExpiresAt <= Date.now()) {
       await revokeUserSessions(ctx, userId);
     }
-    if (target.accessExpiryJobId) await ctx.scheduler.cancel(target.accessExpiryJobId);
+    if (target.accessExpiryJobId) await cancelImportedJob(ctx, target.accessExpiryJobId);
     const jobId = accessExpiresAt === null ? undefined : await ctx.scheduler.runAt(accessExpiresAt, internal.accountAccess.expireAccess, { userId, expectedExpiresAt: accessExpiresAt });
     await ctx.db.patch(userId, { accessExpiresAt: accessExpiresAt ?? undefined, accessExpiryJobId: jobId });
     await writeAudit(ctx, { user: { _id: ctx.user._id, _creationTime: ctx.user._creationTime }, action: "update", targetTable: "users", targetId: userId, note: accessExpiresAt === null ? "user.expiry_cleared" : "user.expiry_set" });

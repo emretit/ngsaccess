@@ -2,7 +2,11 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
-import { useProjectFilteredDevices } from "@/hooks/useProjectFilteredDevices";
+import { useTabVisible } from "@/hooks/useVisibleRefresh";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { deviceConnection } from "@/lib/deviceStatus";
 import { useNow } from "@/hooks/useNow";
 import { deviceDisplayName } from "@/lib/deviceDisplay";
 import { timeAgoTr } from "@/lib/relativeTime";
@@ -15,8 +19,12 @@ const STATUS_ORDER = { offline: 0, never: 1, online: 2 } as const;
 
 /** Cihazların bağlantı durumu; sorunlu olanlar üstte. */
 export default function DeviceHealth() {
-  const { devices, isLoading } = useProjectFilteredDevices();
+  const visible = useTabVisible();
+  const { projectId, loading } = useActiveProjectScope();
+  const rows = useQuery(api.devices.list, visible && !loading && projectId ? { projectId } : "skip");
   const now = useNow(30_000);
+  const devices = (rows ?? []).map(device => ({ ...device, connectionStatus: deviceConnection(device, now) }));
+  const isLoading = loading || (visible && !!projectId && rows === undefined);
   const online = devices.filter((device) => device.connectionStatus === "online").length;
   const sorted = [...devices].sort((a, b) =>
     STATUS_ORDER[a.connectionStatus ?? "never"] - STATUS_ORDER[b.connectionStatus ?? "never"] ||

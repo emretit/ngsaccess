@@ -36,16 +36,27 @@ function Metric({ label, value, suffix, tone, loading, children }: {
 /** Bugünün durumu: gelen / içeride / geç kalan / kart okuması. */
 export default function TodayStrip() {
   const { can } = usePermissions();
-  const { stats, loading: statsLoading } = useDashboardStats();
-  const { summary, loading: activityLoading } = useDashboardActivity();
+  const { stats, loading: statsLoading, ...statsStatus } = useDashboardStats();
+  const { summary, loading: activityLoading, ...activityStatus } = useDashboardActivity();
   // Bugünkü okuma sayısı saatlik grafikle aynı sorgudan gelir; getStats okumaları taramaz.
-  const { timeline, loading: timelineLoading } = useDashboardTimeline();
+  const { timeline, loading: timelineLoading, ...timelineStatus } = useDashboardTimeline();
   const loading = statsLoading || activityLoading;
   const employees = stats?.employees ?? 0;
   const present = summary?.presentToday ?? null;
   const rate = present !== null && employees > 0 ? Math.min(100, Math.round((present / employees) * 100)) : 0;
+  const statuses = [statsStatus, activityStatus, timelineStatus];
+  const error = statuses.find(status => status.error)?.error;
+  const updatedTimes = statuses.flatMap(status => status.updatedAt ? [status.updatedAt] : []);
+  const updatedAt = updatedTimes.length ? Math.min(...updatedTimes) : undefined;
+  const refreshing = statsLoading || activityLoading || timelineLoading;
   return (
     <>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <Button variant="outline" size="sm" disabled={refreshing} onClick={() => statuses.forEach(status => status.refresh())}>Yenile</Button>
+        {refreshing && <span role="status">Özet güncelleniyor…</span>}
+        <span>{updatedAt ? `Son güncelleme: ${new Date(updatedAt).toLocaleTimeString("tr-TR")}` : "Özet henüz güncellenmedi"}</span>
+        {error && <span role="alert" className="text-destructive">Özet alınamadı: {error}</span>}
+      </div>
       <dl aria-label="Bugünün özeti" aria-busy={loading || timelineLoading} className="grid grid-cols-2 overflow-hidden rounded-lg border bg-surface min-[1000px]:grid-cols-4 max-[999px]:[&>div:nth-child(-n+2)]:border-b max-[999px]:[&>div:nth-child(odd)]:border-r min-[1000px]:[&>div:not(:last-child)]:border-r">
         {can("reports.view") && <>
         <Metric label="Bugün gelen" value={present} suffix={`/ ${employees.toLocaleString("tr-TR")}`} loading={loading}>

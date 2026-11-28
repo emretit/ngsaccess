@@ -69,7 +69,7 @@ export const projectDeletionMatrix = [
   { table: "dashboardDays", index: "by_projectId_and_date", label: "Ana sayfa günleri", policy: "delete", cleanup: "scheduled" },
   { table: "dashboardHours", index: "by_projectId_and_date_and_hour", label: "Ana sayfa saatleri", policy: "delete", cleanup: "scheduled" },
   { table: "dashboardEvidence", index: "by_projectId_and_date_and_hour_and_part", label: "Ana sayfa kanıtları", policy: "delete" },
-  { table: "dashboardReadingFeed", index: "by_projectId_and_accessTime_and_readingCreationTime_and_readingId", label: "Ana sayfa canlı akışı", policy: "delete" },
+  { table: "dashboardReadingFeed", index: "by_projectId_accessTime_readingCreationTime_readingId", label: "Ana sayfa canlı akışı", policy: "delete" },
   { table: "userProjects", index: "by_project", label: "Kullanıcı proje üyelikleri", policy: "delete" },
   { table: "generalSettings", index: "by_project", label: "Genel ayarlar", policy: "delete" },
   { table: "mailSettings", index: "by_project", label: "E-posta ayarları", policy: "delete" },
@@ -193,7 +193,7 @@ function projectDeletionTableQuery(
   if (entry.index === "by_projectId_and_date") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_projectId_and_date_and_hour") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   if (entry.index === "by_projectId_and_date_and_hour_and_part") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
-  if (entry.index === "by_projectId_and_accessTime_and_readingCreationTime_and_readingId") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
+  if (entry.index === "by_projectId_accessTime_readingCreationTime_readingId") return ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId));
   throw new Error("Proje silme indeksi bulunamadı");
 }
 

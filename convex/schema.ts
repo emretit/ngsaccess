@@ -42,7 +42,7 @@ export default defineSchema({
     accessStatus: v.optional(v.union(v.literal("izin_verildi"), v.literal("reddedildi"))),
     direction: v.optional(v.union(v.literal("entry"), v.literal("exit"))),
   }).index("by_readingId", ["readingId"])
-    .index("by_projectId_and_accessTime_and_readingCreationTime_and_readingId", ["projectId", "accessTime", "readingCreationTime", "readingId"]),
+    .index("by_projectId_accessTime_readingCreationTime_readingId", ["projectId", "accessTime", "readingCreationTime", "readingId"]),
 
   payrollPeriods: defineTable({
     projectId: v.id("projects"),
@@ -97,6 +97,7 @@ export default defineSchema({
     accessExpiryJobId: v.optional(v.id("_scheduled_functions")),
     fullName: v.optional(v.string()),
     photoUrl: v.optional(v.string()),
+    photoStorageId: v.optional(v.id("_storage")),
     role: v.optional(
       v.union(
         v.literal("super_admin"),
@@ -119,7 +120,8 @@ export default defineSchema({
     .index("by_setup_token", ["setupToken"])
     .index("by_tokenExpiresAt", ["tokenExpiresAt"])
     .index("by_role", ["role"])
-    .index("by_photo_url", ["photoUrl"]),
+    .index("by_photo_url", ["photoUrl"])
+    .index("by_photo_storage", ["photoStorageId"]),
 
   userProjects: defineTable({
     userId: v.id("users"),

@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-CONVEX_URL="${1:-${CONVEX_CARD_READER_URL:-https://notable-tern-4.convex.site}}"
+CONVEX_URL="${1:-${CONVEX_CARD_READER_URL:?CONVEX_CARD_READER_URL gerekli}}"
 ENDPOINT="$CONVEX_URL/card-reader"
 
 GREEN='\033[0;32m'

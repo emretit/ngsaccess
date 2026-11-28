@@ -1,3 +1,4 @@
+import { sameHikEvent } from "./hikEventDedup";
 import { withDashboardSummary } from "./dashboardSummary";
 import { notifyLateReading } from "./lateReading";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -191,10 +192,7 @@ async function persistHikvisionReading(
         q.eq("deviceId", device._id).eq("hikSerialNo", args.hikSerialNo));
     let serialReused = false;
     for await (const existing of candidates) {
-      const sameDeviceTime = deviceTime !== undefined && existing.hikDateTime !== undefined &&
-        toUtcISO(existing.hikDateTime) === deviceTime;
-      const closeAccessTime = Math.abs(Date.parse(existing.accessTime) - Date.parse(hikAccessTime)) <= 10 * 60 * 1000;
-      if (existing.cardNo === args.cardNo && (sameDeviceTime || closeAccessTime)) {
+      if (sameHikEvent(existing, { cardNo: args.cardNo, time: hikAccessTime, deviceTime })) {
         return { granted: existing.accessStatus === "izin_verildi" };
       }
       serialReused = true;

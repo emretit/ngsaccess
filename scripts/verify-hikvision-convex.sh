@@ -12,7 +12,7 @@ if [[ -f .env.local ]]; then
   export $(grep -v '^#' .env.local | grep -E '^VITE_CONVEX_SITE_URL=' | xargs)
 fi
 
-SITE="${VITE_CONVEX_SITE_URL:-https://notable-tern-4.convex.site}"
+SITE="${VITE_CONVEX_SITE_URL:?VITE_CONVEX_SITE_URL gerekli}"
 HIK_IP="${HIK_IP:-192.168.1.34}"
 HIK_USER="${HIK_USER:-admin}"
 HIK_PASS="${HIK_PASS:-}"
@@ -65,7 +65,7 @@ echo "HTTP $code"
 if [[ "$code" == "200" ]]; then
   echo "url satırı:"
   grep -o '<url>[^<]*</url>' /tmp/hik-host.xml || true
-  if grep -q "${SITE#https://}" /tmp/hik-host.xml 2>/dev/null || grep -q "convex.site" /tmp/hik-host.xml; then
+  if grep -q "${SITE#https://}" /tmp/hik-host.xml 2>/dev/null; then
     echo "OK: host Convex .site içeriyor gibi görünüyor."
   else
     echo "UYARI: URL beklenen deployment ile eşleşmeyebilir."
@@ -81,7 +81,7 @@ echo "=============================================="
 code=$(curl -sk --digest -u "${HIK_USER}:${HIK_PASS}" -o /tmp/hik-net.xml -w "%{http_code}" \
   --connect-timeout 8 "https://${HIK_IP}/ISAPI/System/network/interfaces/1" || true)
 if [[ "$code" == "200" ]] && grep -q '<DNSEnable>false</DNSEnable>' /tmp/hik-net.xml 2>/dev/null; then
-  echo "KRİTİK: DNSEnable=false — cihaz genelde notable-tern-4.convex.site adresini ÇÖZEMEZ, HTTPS POST gitmez."
+  echo "KRİTİK: DNSEnable=false — cihaz genelde yapılandırılan hedef adresini ÇÖZEMEZ, HTTPS POST gitmez."
   echo "Çözüm: Web arayüzü https://${HIK_IP}/doc/index.html → Configuration → Network → TCP/IP → DNS kullanımını AÇ."
   echo "        (Primary DNS: 8.8.8.8 veya modem IP’si)"
 elif [[ "$code" == "200" ]]; then

@@ -8,6 +8,12 @@ import {
 } from './bridge.mjs';
 import { parseCardReaderBody } from '../../convex/lib/cardReaderParse.ts';
 
+test('queue capacity rejects invalid limits before opening the spool', () => {
+  for (const maxQueue of [0, -1, NaN, 1.5, Infinity]) {
+    assert.throws(() => createBridge({ maxQueue }), /MAX_QUEUE/);
+  }
+});
+
 // Canlı yakalandı 2026-10-19 (DS-K1T804AEF FW V1.4.0, gateway V1.8.0.4 subscribeDeviceMgmt).
 const cardAlert = {
   AccessControllerEvent: {

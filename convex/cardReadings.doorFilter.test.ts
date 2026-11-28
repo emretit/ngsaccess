@@ -190,6 +190,7 @@ describe("anonymous Hik backfill", () => {
       get: async () => ({ _id: "device", projectId }),
       query: (table: string) => ({ withIndex: () => ({
         first: async () => null,
+        [Symbol.asyncIterator]: async function* () {},
         take: async () => { employeeQuery(table); return [{ _id: "cardless-a", projectId, cardNumber: "", firstName: "A", lastName: "Kişi" }, { _id: "cardless-b", projectId, cardNumber: "", firstName: "B", lastName: "Kişi" }]; },
       }) }),
       insert,

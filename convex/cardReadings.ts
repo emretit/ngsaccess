@@ -1,3 +1,5 @@
+import { sameHikEvent } from "./lib/hikEventDedup";
+import { extractHikCardNo } from "./lib/cardReaderParse";
 import { hasReadingPermission, resolveReadingScope, REPORT_READING_PERMISSIONS, MONITORING_READING_PERMISSIONS, CARD_CAPTURE_PERMISSIONS } from "./lib/readingAccess";
 import { scopedPdksPlan } from "./lib/pdksMultiShift";
 import { usesShiftDayRules } from "./lib/pdksFixedRules";
@@ -21,7 +23,7 @@ import { getEmployeeTargetDevices } from "./lib/peopleHikSnapshot";
 import { writeAudit } from "./lib/audit";
 import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { hikDoorReaderNumbers } from "./lib/hikDoorReaders";
-import { hikWallClockToUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
+import { toUtcISO, hikWallClockToUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internalMutation } from "./lib/dashboardMutations";
 import { ConvexError, v } from "convex/values";
@@ -776,6 +778,12 @@ export const backfillHikEventRow = internalMutation({
       cardType: v.optional(v.string()),
       name: v.optional(v.string()),
       employeeNoString: v.optional(v.string()),
+      employeeNo: v.optional(v.union(v.number(), v.string())),
+      cardNumber: v.optional(v.union(v.number(), v.string())),
+      credentialNo: v.optional(v.union(v.number(), v.string())),
+      credentialsNo: v.optional(v.union(v.number(), v.string())),
+      currentCardNumber: v.optional(v.union(v.number(), v.string())),
+      wiegandCardNo: v.optional(v.union(v.number(), v.string())),
       major: v.number(),
       minor: v.number(),
       doorNo: v.optional(v.number()),
@@ -796,28 +804,25 @@ export const backfillHikEventRow = internalMutation({
       return { inserted: false, reason: "device-not-found" };
     }
 
-    // Cihaz zamanı (+03:00 vb.) UTC Z'ye: aralık sorguları ve index sırası string karşılaştırır.
-    // Geçersizse atla — tarihsel olayı "şimdi" ile yazmak PDKS'te yanlış güne düşürür.
-    const eventTime = hikWallClockToUtcISO(args.event.time);
-    if (!eventTime) {
-      return { inserted: false, reason: "invalid-time" };
-    }
-    const cardNo = args.event.cardNo.trim() || args.event.employeeNoString?.trim() || "";
+    const cardNo = extractHikCardNo(args.event) ?? "";
     const shouldCreateCardReading = shouldCreateCardReadingForHikEvent(
       args.event.major,
       args.event.minor,
       cardNo.length > 0,
     );
+    // History uses the device's Turkey wall clock, including mislabeled offsets.
+    // Dedup also accepts the offset-aware interpretation used by direct forwarding.
+    const eventTime = hikWallClockToUtcISO(args.event.time);
+    if (!eventTime) return { inserted: false, reason: "invalid-time" };
 
     if (!shouldCreateCardReading) {
-      const existingEvent = await ctx.db
+      const eventCandidates = ctx.db
         .query("deviceEvents")
         .withIndex("by_device_and_hik_serial", (q) =>
           q.eq("deviceId", args.deviceId).eq("hikSerialNo", args.event.serialNo),
-        )
-        .first();
-      if (existingEvent) {
-        return { inserted: false, reason: "duplicate" };
+        );
+      for await (const existing of eventCandidates) {
+        if (sameHikEvent(existing, { cardNo, time: eventTime, alternateTime: toUtcISO(args.event.time) })) return { inserted: false, reason: "duplicate" };
       }
 
       const event = classifyHikEvent(args.event.major, args.event.minor);
@@ -845,15 +850,9 @@ export const backfillHikEventRow = internalMutation({
       return { inserted: true, reason: "device-event" };
     }
 
-    // Dedup: (deviceId, serialNo) çifti zaten kayıtlıysa atla.
-    const existing = await ctx.db
-      .query("cardReadings")
-      .withIndex("by_device_hik_serial", (q) =>
-        q.eq("deviceId", args.deviceId).eq("hikSerialNo", args.event.serialNo),
-      )
-      .first();
-    if (existing) {
-      return { inserted: false, reason: "duplicate" };
+    const candidates = ctx.db.query("cardReadings").withIndex("by_device_hik_serial", q => q.eq("deviceId", args.deviceId).eq("hikSerialNo", args.event.serialNo));
+    for await (const existing of candidates) {
+      if (sameHikEvent(existing, { cardNo, time: eventTime, deviceTime: args.event.time })) return { inserted: false, reason: "duplicate" };
     }
 
     const accessStatus: "izin_verildi" | "reddedildi" =

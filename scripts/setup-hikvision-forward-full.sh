@@ -8,7 +8,7 @@ cd "$ROOT"
 if [[ -f .env.local ]]; then
   export $(grep -v '^#' .env.local | grep -E '^VITE_CONVEX_SITE_URL=' | xargs)
 fi
-UPSTREAM="${VITE_CONVEX_SITE_URL:-https://notable-tern-4.convex.site}/card-reader"
+UPSTREAM="${VITE_CONVEX_SITE_URL:?VITE_CONVEX_SITE_URL gerekli}/card-reader"
 FORWARD_PORT="${FORWARD_PORT:-8765}"
 HIK_IP="${HIK_IP:-192.168.1.164}"
 HIK_USER="${HIK_USER:-admin}"

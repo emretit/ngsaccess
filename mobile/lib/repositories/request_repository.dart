@@ -53,7 +53,10 @@ class RequestRepository {
         : deployment.host;
     if (uri == null ||
         uri.scheme != 'https' ||
-        uri.host != expectedHost ||
+        !{
+          expectedHost,
+          ...ConvexConfig.uploadAllowedHosts,
+        }.contains(uri.host.toLowerCase()) ||
         uri.userInfo.isNotEmpty ||
         uri.path != '/request-attachments' ||
         !uri.queryParameters.containsKey('ticket')) {
