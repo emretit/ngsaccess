@@ -1,0 +1,10 @@
+[Unit]
+Description=Re-apply NgAccess Convex egress allowlist (docker/ufw reload + mail API IP refresh)
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=120
+AccuracySec=10
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,99 @@
+# NGS Access — self-hosted Convex PROVA (2026-11-28). Temel: get-convex/convex-backend self-hosted/docker/docker-compose.yml
+# Ag izolasyonu: postgres yalniz "internal" agda; backend ek olarak "egress" aginda, cikisi iptables allowlist ile sinirli (2026-11-28).
+# Disariya yalniz 127.0.0.1 uzerinden "proxy" (TCP stream) ve "dashboard" acilir.
+name: ngs-convex
+
+services:
+  postgres:
+    image: postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2
+    restart: unless-stopped
+    mem_limit: 1536m
+    shm_size: 256m
+    environment:
+      POSTGRES_USER: convex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?missing}
+      POSTGRES_DB: convex_self_hosted
+    command: ["postgres", "-c", "shared_buffers=384MB", "-c", "effective_cache_size=1GB", "-c", "work_mem=8MB", "-c", "maintenance_work_mem=128MB", "-c", "max_connections=100"]
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U convex -d convex_self_hosted"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    image: ghcr.io/convex/convex-backend:7925f9b2a031fbd4b8dca10c3b4d6e9a44865acc@sha256:6ceb93e1ca977452501be41dd8e9e66e6130a2f4078c9d28ad8178a80365cd6c
+    restart: unless-stopped
+    mem_limit: 4g
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    volumes:
+      - ./data/backend:/convex/data
+    environment:
+      - INSTANCE_NAME=convex-self-hosted
+      - INSTANCE_SECRET=${INSTANCE_SECRET:?missing}
+      - POSTGRES_URL=postgresql://convex:${POSTGRES_PASSWORD}@postgres:5432
+      - DO_NOT_REQUIRE_SSL=1
+      - CONVEX_CLOUD_ORIGIN=https://api.ngsplus.app
+      - CONVEX_SITE_ORIGIN=https://site.ngsplus.app
+      - DISABLE_BEACON=true
+      - DISABLE_METRICS_ENDPOINT=true
+      - DOCUMENT_RETENTION_DELAY=172800
+      - REDACT_LOGS_TO_CLIENT=false
+      - RUST_LOG=info
+      - APPLICATION_MAX_CONCURRENT_MUTATIONS=16
+      - APPLICATION_MAX_CONCURRENT_NODE_ACTIONS=8
+      - APPLICATION_MAX_CONCURRENT_QUERIES=16
+      - APPLICATION_MAX_CONCURRENT_V8_ACTIONS=16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # egress: cikis yalniz /usr/local/sbin/ngs-convex-egress.sh allowlist ile (gateway :8088, nginx :443, DNS, SMTP 465/587, api.resend.com)
+    networks: [internal, egress]
+    healthcheck:
+      test: curl -f http://localhost:3210/version
+      interval: 5s
+      start_period: 20s
+
+  proxy:
+    image: nginx:1.28.0-alpine@sha256:30f1c0d78e0ad60901648be663a710bdadf19e4c10ac6782c235200619158284
+    restart: unless-stopped
+    mem_limit: 64m
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "127.0.0.1:3210:3210"
+      - "127.0.0.1:3211:3211"
+    networks: [internal, edge]
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  dashboard:
+    image: ghcr.io/convex/convex-dashboard:7925f9b2a031fbd4b8dca10c3b4d6e9a44865acc@sha256:05e6c870c50286b5e5d9fbc77dd9fa0aad82cb7468b6b80115d8cc74f29fcb54
+    restart: unless-stopped
+    mem_limit: 512m
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - "127.0.0.1:6791:6791"
+    environment:
+      - NEXT_PUBLIC_DEPLOYMENT_URL=http://127.0.0.1:3210
+    networks: [edge]
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+  egress:
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.name: br-ngscvx-egr
+    ipam:
+      config:
+        - subnet: 172.30.210.0/24

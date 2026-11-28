@@ -1,0 +1,13 @@
+[Unit]
+Description=NgAccess self-host Convex backend egress allowlist (iptables)
+# ufw kurallarından sonra, docker konteynerleri kalkmadan önce (fail-closed açılış)
+After=ufw.service network-online.target
+Wants=network-online.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ngs-convex-egress.sh apply
+
+[Install]
+WantedBy=multi-user.target
